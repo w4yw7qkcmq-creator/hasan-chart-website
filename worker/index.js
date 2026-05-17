@@ -50,7 +50,7 @@ const formatNumber = (value) => {
   });
 };
 
-const getBinancePrice = async (symbol) => {
+const getMarketPrice = async (symbol) => {
   const cleanSymbol = normalizeSymbol(symbol);
 
   if (!cleanSymbol) {
@@ -58,7 +58,7 @@ const getBinancePrice = async (symbol) => {
   }
 
   const response = await fetch(
-    `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(cleanSymbol)}`,
+    `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(cleanSymbol)}`,
     {
       headers: {
         Accept: "application/json",
@@ -67,12 +67,13 @@ const getBinancePrice = async (symbol) => {
   );
 
   const data = await response.json().catch(() => null);
+  const price = Number(data?.result?.list?.[0]?.lastPrice);
 
-  if (!response.ok || !data?.price) {
-    throw new Error(data?.msg || `تعذر جلب سعر ${cleanSymbol}`);
+  if (!response.ok || data?.retCode !== 0 || !Number.isFinite(price)) {
+    throw new Error(data?.retMsg || `تعذر جلب سعر ${cleanSymbol}`);
   }
 
-  return Number(data.price);
+  return price;
 };
 
 const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, currentPrice }) => {
@@ -250,7 +251,7 @@ async function checkPriceAlerts() {
       let currentPrice = priceCache.get(coin);
 
       if (!currentPrice) {
-        currentPrice = await getBinancePrice(coin);
+        currentPrice = await getMarketPrice(coin);
         priceCache.set(coin, currentPrice);
       }
 
