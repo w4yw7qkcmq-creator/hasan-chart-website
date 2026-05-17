@@ -57,23 +57,31 @@ const getMarketPrice = async (symbol) => {
     throw new Error("EMPTY_SYMBOL");
   }
 
-  const response = await fetch(
+  const endpoints = [
     `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(cleanSymbol)}`,
-    {
-      headers: {
-        Accept: "application/json",
-      },
+    `https://api.bybit.com/v5/market/tickers?category=spot&symbol=${encodeURIComponent(cleanSymbol)}`,
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+      const price = Number(data?.result?.list?.[0]?.lastPrice);
+
+      if (response.ok && data?.retCode === 0 && Number.isFinite(price)) {
+        return price;
+      }
+    } catch (error) {
+      console.log("⚠️ Bybit endpoint failed:", endpoint);
     }
-  );
-
-  const data = await response.json().catch(() => null);
-  const price = Number(data?.result?.list?.[0]?.lastPrice);
-
-  if (!response.ok || data?.retCode !== 0 || !Number.isFinite(price)) {
-    throw new Error(data?.retMsg || `تعذر جلب سعر ${cleanSymbol}`);
   }
 
-  return price;
+  throw new Error(`تعذر جلب سعر ${cleanSymbol} من Bybit`);
 };
 
 const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, currentPrice }) => {
@@ -295,7 +303,7 @@ async function checkPriceAlerts() {
         console.log("✅ Alert email sent and status updated:", coin);
       }
     } catch (error) {
-      console.log("❌ Price alert processing error:", coin, error.message);
+      console.log("❌ Price alert processing error:", coin, error?.message || error);
     }
   }
 }
