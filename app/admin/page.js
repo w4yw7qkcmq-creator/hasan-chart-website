@@ -1,0 +1,1173 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabase";
+
+function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
+  const glow =
+    tone === "green"
+      ? "from-emerald-400/20 to-cyan-400/10"
+      : tone === "orange"
+      ? "from-amber-400/20 to-orange-400/10"
+      : tone === "red"
+      ? "from-red-400/20 to-orange-400/10"
+      : "from-blue-500/20 to-cyan-400/10";
+
+  return (
+    <div className="relative overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-[0_18px_55px_rgba(0,102,255,0.14)] backdrop-blur-2xl">
+      <div className={`absolute inset-0 bg-gradient-to-br ${glow}`} />
+      <div className="relative z-10 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-slate-400">{title}</p>
+          <h3 className="mt-3 text-4xl font-black text-white">{value}</h3>
+          <p className="mt-2 text-sm text-slate-400">{subtitle}</p>
+        </div>
+        <div className="grid h-14 w-14 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)]">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function StatusBadge({ status }) {
+  const isDone = status === "مكتمل" || status === "تمت المراجعة";
+  const isPending = !status || status === "قيد المراجعة";
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-black ${
+        isDone
+          ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
+          : isPending
+          ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
+          : "border-cyan-300/25 bg-cyan-400/10 text-cyan-200"
+      }`}
+    >
+      {status || "قيد المراجعة"}
+    </span>
+  );
+}
+
+const SUPABASE_URL = "https://lzgsxdsumnteuwtjfqlm.supabase.co";
+const SUPABASE_PUBLIC_KEY = "sb_publishable_XCZkQPsJymbmnNuBR9fMpw_SVEFwZm0";
+const ADMIN_ANALYSIS_LIMIT = 50;
+const ADMIN_USERS_LIMIT = 200;
+const ADMIN_SUBSCRIPTIONS_LIMIT = 50;
+
+const getStoredAccessToken = async () => {
+  try {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error("Session load error:", error);
+      return SUPABASE_PUBLIC_KEY;
+    }
+
+    if (!session?.access_token) {
+      return SUPABASE_PUBLIC_KEY;
+    }
+
+    return session.access_token;
+  } catch (err) {
+    console.error("Access token error:", err);
+    return SUPABASE_PUBLIC_KEY;
+  }
+};
+
+const adminSelect = async (table, query = "select=*") => {
+  const accessToken = await getStoredAccessToken();
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    headers: {
+      apikey: SUPABASE_PUBLIC_KEY,
+      Authorization: `Bearer ${accessToken || SUPABASE_PUBLIC_KEY}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    console.error("Admin select error:", {
+      table,
+      status: response.status,
+      data,
+    });
+
+    if (
+      data?.message?.includes("JWT") ||
+      data?.message?.includes("expired") ||
+      response.status === 401
+    ) {
+      return [];
+    }
+
+    throw new Error(data?.message || data?.hint || `فشل تحميل ${table}`);
+  }
+
+  return data || [];
+};
+
+const formatAnalysisRequest = (item) => ({
+  id: item.id,
+  userEmail: item.user_email,
+  username: item.username,
+  coin: item.coin,
+  frame: item.frame,
+  status: item.status || "قيد المراجعة",
+  reply: item.reply || "",
+  replyImage: item.reply_image || "",
+  createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
+});
+
+const formatSubscriptionRequest = (item) => ({
+  id: item.id,
+  userEmail: item.user_email,
+  username: item.username,
+  planName: item.plan_name,
+  category: item.category,
+  price: item.price,
+  status: item.status || "بانتظار الدفع",
+  createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
+});
+
+const upsertById = (list, item, limit) => {
+  const filtered = list.filter((current) => current.id !== item.id);
+  return [item, ...filtered].slice(0, limit);
+};
+
+export default function AdminPage() {
+  const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [analysisRequests, setAnalysisRequests] = useState([]);
+  const [accountRequests, setAccountRequests] = useState([]);
+  const [subscriptionRequests, setSubscriptionRequests] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [dataMode, setDataMode] = useState("supabase");
+  const [replies, setReplies] = useState({});
+  const [filter, setFilter] = useState("all");
+  const [expandedAnalysis, setExpandedAnalysis] = useState({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [replySending, setReplySending] = useState({});
+  const [lastUpdatedAt, setLastUpdatedAt] = useState("");
+  const [vipSignalForm, setVipSignalForm] = useState({
+    signal_type: "spot",
+    coin: "",
+    entry: "",
+    targets: "",
+    stop_loss: "",
+    notes: "",
+  });
+
+  useEffect(() => {
+    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+
+    if (!currentUser) {
+      alert("يجب تسجيل الدخول أولاً");
+      router.push("/login");
+      return;
+    }
+
+    if (currentUser.role !== "admin") {
+      alert("هذه الصفحة خاصة بالإدارة فقط");
+      router.push("/login");
+      return;
+    }
+
+    setIsAdmin(true);
+    loadAdminData(currentUser);
+
+    const touchUpdatedAt = () => {
+      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+    };
+
+    const handleAnalysisChange = (payload) => {
+      if (payload.eventType === "DELETE") {
+        setAnalysisRequests((prev) => prev.filter((item) => item.id !== payload.old.id));
+        touchUpdatedAt();
+        return;
+      }
+
+      if (!payload.new?.id) return;
+
+      const formatted = formatAnalysisRequest(payload.new);
+      setAnalysisRequests((prev) => upsertById(prev, formatted, ADMIN_ANALYSIS_LIMIT));
+      touchUpdatedAt();
+    };
+
+    const handleSubscriptionChange = (payload) => {
+      if (payload.eventType === "DELETE") {
+        setSubscriptionRequests((prev) => prev.filter((item) => item.id !== payload.old.id));
+        touchUpdatedAt();
+        return;
+      }
+
+      if (!payload.new?.id) return;
+
+      const formatted = formatSubscriptionRequest(payload.new);
+      setSubscriptionRequests((prev) => upsertById(prev, formatted, ADMIN_SUBSCRIPTIONS_LIMIT));
+      touchUpdatedAt();
+    };
+
+    const handleProfileChange = (payload) => {
+      if (payload.eventType === "DELETE") {
+        setUsers((prev) => prev.filter((item) => item.id !== payload.old.id));
+        touchUpdatedAt();
+        return;
+      }
+
+      if (!payload.new?.id) return;
+
+      setUsers((prev) => upsertById(prev, payload.new, ADMIN_USERS_LIMIT));
+      touchUpdatedAt();
+    };
+
+    const channel = supabase
+      .channel("admin-live-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "analysis_requests" },
+        handleAnalysisChange
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "subscription_requests" },
+        handleSubscriptionChange
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        handleProfileChange
+      )
+      .subscribe();
+
+    const backupInterval = setInterval(() => {
+      loadAdminData(currentUser, { silent: true });
+    }, 60000);
+
+    return () => {
+      clearInterval(backupInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [router]);
+
+  const loadAdminData = async (currentUser, options = {}) => {
+    const localUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
+
+    if (!options.silent) {
+      setIsRefreshing(true);
+    }
+
+    setAccountRequests([]);
+
+    const fallbackUsers = [
+      {
+        id: currentUser?.id || "admin-local",
+        email: currentUser?.email || "admin@hasanchart.com",
+        username: currentUser?.username || "admin",
+        telegram: currentUser?.telegram || "@admin",
+        role: currentUser?.role || "admin",
+        subscription_plan: currentUser?.subscription_plan || "إدارة",
+        subscription_status: currentUser?.subscription_status || "نشط",
+      },
+      ...localUsers,
+    ];
+
+    try {
+      const [profiles, analysisData, subscriptionData] = await Promise.all([
+        adminSelect(
+          "profiles",
+          `select=id,email,username,telegram,role,subscription_plan,subscription_status,created_at&order=created_at.desc&limit=${ADMIN_USERS_LIMIT}`
+        ),
+        adminSelect(
+          "analysis_requests",
+          `select=*&order=created_at.desc&limit=${ADMIN_ANALYSIS_LIMIT}`
+        ),
+        adminSelect(
+          "subscription_requests",
+          `select=*&order=created_at.desc&limit=${ADMIN_SUBSCRIPTIONS_LIMIT}`
+        ),
+      ]);
+
+      setUsers(profiles?.length ? profiles : fallbackUsers);
+
+      if (!analysisData) {
+        setAnalysisRequests([]);
+      } else {
+        const formattedAnalysis = analysisData.map(formatAnalysisRequest);
+        setAnalysisRequests(formattedAnalysis);
+        setDataMode("supabase");
+      }
+
+      if (!subscriptionData) {
+        setSubscriptionRequests([]);
+      } else {
+        const formattedSubscriptions = subscriptionData.map(formatSubscriptionRequest);
+        setSubscriptionRequests(formattedSubscriptions);
+      }
+      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+    } catch (err) {
+      console.error("Admin load error:", err);
+      setUsers(fallbackUsers);
+      if (!options.silent) {
+        alert("فشل تحميل بيانات لوحة الإدارة من Supabase: " + (err?.message || err));
+      }
+      setAnalysisRequests([]);
+      setSubscriptionRequests([]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const updateUserRole = async (userId, newRole) => {
+    const updated = users.map((user) =>
+      user.id === userId ? { ...user, role: newRole } : user
+    );
+
+    setUsers(updated);
+
+    if (dataMode === "supabase") {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: newRole })
+        .eq("id", userId);
+
+      if (error) {
+        alert("لم يتم تحديث الدور في Supabase. تأكد من صلاحيات الأدمن أو سياسات RLS.");
+        return;
+      }
+    } else {
+      localStorage.setItem(
+        "adminUsers",
+        JSON.stringify(updated.filter((user) => user.role !== "admin"))
+      );
+    }
+
+    alert("تم تحديث صلاحية المستخدم");
+  };
+
+  const updateUserSubscription = async (userId, plan, status) => {
+    const updated = users.map((user) =>
+      user.id === userId
+        ? { ...user, subscription_plan: plan, subscription_status: status }
+        : user
+    );
+
+    setUsers(updated);
+
+    if (dataMode === "supabase") {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ subscription_plan: plan, subscription_status: status })
+        .eq("id", userId);
+
+      if (error) {
+        alert("لم يتم تحديث الاشتراك في Supabase. تأكد أن أعمدة subscription_plan و subscription_status موجودة.");
+        return;
+      }
+    } else {
+      localStorage.setItem(
+        "adminUsers",
+        JSON.stringify(updated.filter((user) => user.role !== "admin"))
+      );
+    }
+
+    alert("تم تحديث اشتراك المستخدم");
+  };
+
+  const updateSubscriptionRequest = async (request, newStatus) => {
+    const updated = subscriptionRequests.map((item) =>
+      item.id === request.id ? { ...item, status: newStatus } : item
+    );
+
+    if (dataMode === "supabase") {
+      const { error } = await supabase
+        .from("subscription_requests")
+        .update({ status: newStatus })
+        .eq("id", request.id);
+
+      if (error) {
+        alert("لم يتم تحديث طلب الاشتراك في Supabase: " + error.message);
+        return;
+      }
+
+      if (newStatus === "مفعل") {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            subscription_plan: request.planName,
+            subscription_status: "نشط",
+          })
+          .eq("email", request.userEmail);
+
+        if (profileError) {
+          alert("تم تفعيل الطلب، لكن لم يتم تحديث اشتراك المستخدم في profiles: " + profileError.message);
+        }
+      }
+    } else {
+      localStorage.setItem("subscriptionRequests", JSON.stringify(updated));
+    }
+
+    setSubscriptionRequests(updated);
+    alert(newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك");
+  };
+
+  const stats = useMemo(() => {
+    const pendingAnalysis = analysisRequests.filter((req) => req.status !== "مكتمل").length;
+    const completedAnalysis = analysisRequests.filter((req) => req.status === "مكتمل").length;
+    const pendingAccounts = accountRequests.filter((req) => req.status !== "تمت المراجعة").length;
+    const pendingSubscriptions = subscriptionRequests.filter((req) => req.status !== "مفعل").length;
+
+    return { pendingAnalysis, completedAnalysis, pendingAccounts, pendingSubscriptions, usersCount: users.length };
+  }, [analysisRequests, accountRequests, subscriptionRequests, users]);
+
+  const filteredAnalysis = useMemo(() => {
+    if (filter === "pending") return analysisRequests.filter((req) => req.status !== "مكتمل");
+    if (filter === "completed") return analysisRequests.filter((req) => req.status === "مكتمل");
+    return analysisRequests;
+  }, [analysisRequests, filter]);
+
+  const logout = () => {
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("hasan-chart-auth-session");
+
+    supabase.auth.signOut().finally(() => {
+      window.dispatchEvent(new Event("storage"));
+      router.push("/login");
+    });
+  };
+
+  const publishVipSignal = async (signalType) => {
+    if (!vipSignalForm.coin.trim()) {
+      alert("اكتب اسم العملة أولاً");
+      return;
+    }
+
+    const payload = {
+      signal_type: signalType,
+      coin: vipSignalForm.coin.trim().toUpperCase(),
+      entry: vipSignalForm.entry.trim(),
+      targets: vipSignalForm.targets.trim(),
+      stop_loss: vipSignalForm.stop_loss.trim(),
+      notes: vipSignalForm.notes.trim(),
+      status: "نشطة",
+    };
+
+    const { error } = await supabase.from("vip_signals").insert(payload);
+
+    if (error) {
+      alert("فشل نشر توصية VIP: " + error.message);
+      return;
+    }
+
+    alert(signalType === "spot" ? "تم نشر توصية VIP Spot" : "تم نشر توصية VIP Futures");
+    setVipSignalForm({
+      signal_type: signalType,
+      coin: "",
+      entry: "",
+      targets: "",
+      stop_loss: "",
+      notes: "",
+    });
+  };
+
+  const sendAnalysisReply = async (id) => {
+    const data = replies[id];
+
+    if (!data?.text || data.text.trim() === "") {
+      alert("اكتب الرد أولاً");
+      return;
+    }
+
+    if (replySending[id]) return;
+
+    const targetRequest = analysisRequests.find((req) => req.id === id);
+    const replyText = data.text.trim();
+    const replyImage = data.image || targetRequest?.replyImage || "";
+
+    setReplySending((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      const response = await fetch("/api/admin-reply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          request_id: id,
+          reply: replyText,
+          reply_image: replyImage,
+          user_email: targetRequest?.userEmail || "",
+          coin: targetRequest?.coin || "",
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "فشل إرسال الرد");
+      }
+
+      setAnalysisRequests((prev) =>
+        prev.map((req) =>
+          req.id === id
+            ? {
+                ...req,
+                status: "مكتمل",
+                reply: replyText,
+                replyImage,
+                repliedAt: new Date().toLocaleString("ar"),
+              }
+            : req
+        )
+      );
+
+      setReplies((prev) => ({ ...prev, [id]: { text: "", image: "" } }));
+      setExpandedAnalysis((prev) => ({ ...prev, [id]: false }));
+
+      alert("تم إرسال الرد بنجاح ✅");
+    } catch (err) {
+      console.error("Admin reply error:", err);
+      alert(err?.message || "حدث خطأ أثناء إرسال الرد");
+    } finally {
+      setReplySending((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleReplyImage = (id, file) => {
+  if (!file) return;
+
+  const img = new Image();
+  const reader = new FileReader();
+
+  reader.onload = (event) => {
+    img.onload = async () => {
+      try {
+        const canvas = document.createElement("canvas");
+
+        const maxWidth = 900;
+        const scale = Math.min(maxWidth / img.width, 1);
+
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(
+          async (blob) => {
+            if (!blob) {
+              alert("تعذر ضغط الصورة");
+              return;
+            }
+
+            const fileName = `analysis-${id}-${Date.now()}.jpg`;
+
+            const { error: uploadError } = await supabase.storage
+              .from("analysis-images")
+              .upload(fileName, blob, {
+                contentType: "image/jpeg",
+                upsert: true,
+              });
+
+            if (uploadError) {
+              alert("فشل رفع الصورة: " + uploadError.message);
+              return;
+            }
+
+            const { data } = supabase.storage
+              .from("analysis-images")
+              .getPublicUrl(fileName);
+
+            setReplies((prev) => ({
+              ...prev,
+              [id]: {
+                ...prev[id],
+                image: data.publicUrl,
+              },
+            }));
+          },
+          "image/jpeg",
+          0.65
+        );
+      } catch (err) {
+        console.error("Image upload error:", err);
+        alert("حدث خطأ أثناء تجهيز الصورة");
+      }
+    };
+
+    img.src = event.target.result;
+  };
+
+  reader.readAsDataURL(file);
+};
+
+  const deleteAnalysisRequest = async (id) => {
+    if (!confirm("هل تريد حذف طلب التحليل؟")) return;
+
+    const updated = analysisRequests.filter((req) => req.id !== id);
+
+    if (dataMode === "supabase") {
+      const { error } = await supabase
+        .from("analysis_requests")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        alert("لم يتم حذف الطلب من Supabase: " + error.message);
+        return;
+      }
+
+    setAnalysisRequests(updated);
+  }
+  };
+
+  const approveAccountRequest = (id) => {
+    const updated = accountRequests.map((req) =>
+      req.id === id ? { ...req, status: "تمت المراجعة", reviewedAt: new Date().toLocaleString("ar") } : req
+    );
+
+    localStorage.setItem("accountRequests", JSON.stringify(updated));
+    setAccountRequests(updated);
+    alert("تم تحديث حالة طلب إدارة الحساب");
+  };
+
+  const deleteAccountRequest = (id) => {
+    if (!confirm("هل تريد حذف طلب إدارة الحساب؟")) return;
+
+    const updated = accountRequests.filter((req) => req.id !== id);
+    localStorage.setItem("accountRequests", JSON.stringify(updated));
+    setAccountRequests(updated);
+  };
+
+  if (!isAdmin) {
+    return (
+      <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
+        <div className="relative z-10 flex min-h-[calc(100vh-180px)] items-center justify-center text-center">
+          <div className="max-w-md rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-8 backdrop-blur-2xl">
+            <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/25 bg-cyan-400/10 text-4xl">🛡</div>
+            <h1 className="text-3xl font-black">جاري التحقق من الصلاحية</h1>
+            <p className="mt-3 leading-7 text-slate-400">هذه الصفحة مخصصة للإدارة فقط.</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
+
+      <div className="relative z-10 space-y-8 p-4 md:p-6">
+        <section className="relative overflow-hidden rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
+          <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
+          <div className="absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+
+          <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200">
+                ADMIN CONTROL CENTER
+              </span>
+              <h1 className="mt-5 text-4xl font-black leading-tight md:text-5xl">لوحة الإدارة</h1>
+              <p className="mt-4 max-w-3xl leading-8 text-slate-300">
+                إدارة طلبات التحليل، إرسال الردود مع الصور، ومراجعة طلبات إدارة الحسابات من مكان واحد. يتم تحديث الطلبات لحظيًا بدون إعادة تحميل اللوحة كاملة.
+              </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 text-sm text-slate-300 shadow-2xl backdrop-blur-2xl">
+          <span className="font-bold text-cyan-100">
+            {isRefreshing ? "جاري تحديث بيانات اللوحة..." : "التحديث اللحظي مفعل"}
+          </span>
+          <span className="text-slate-400">
+            {lastUpdatedAt ? `آخر تحديث: ${lastUpdatedAt}` : "بانتظار أول تحديث"}
+          </span>
+          <button
+            onClick={() => {
+              const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+              loadAdminData(currentUser);
+            }}
+            className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 font-black text-cyan-100 transition hover:bg-cyan-400/20"
+          >
+            تحديث الآن
+          </button>
+        </div>
+            </div>
+
+            <button
+              onClick={logout}
+              className="rounded-2xl border border-red-400/20 bg-red-500/15 px-6 py-4 font-black text-red-100 transition hover:bg-red-500/25"
+            >
+              تسجيل خروج الأدمن
+            </button>
+          </div>
+        </section>
+
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
+          <AdminStat title="طلبات التحليل" value={analysisRequests.length} icon="🧠" subtitle="إجمالي الطلبات" />
+          <AdminStat title="بانتظار الرد" value={stats.pendingAnalysis} icon="⏳" subtitle="طلبات تحتاج متابعة" tone="orange" />
+          <AdminStat title="تم إنجازها" value={stats.completedAnalysis} icon="✅" subtitle="طلبات مكتملة" tone="green" />
+          <AdminStat title="إدارة الحسابات" value={accountRequests.length} icon="📂" subtitle="طلبات العملاء" tone="red" />
+          <AdminStat title="المستخدمون" value={stats.usersCount} icon="👥" subtitle={dataMode === "supabase" ? "من Supabase" : "محلياً للتجربة"} tone="green" />
+          <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
+        </section>
+
+        <section className="space-y-5">
+          <div>
+            <h2 className="text-3xl font-black">نشر توصيات VIP</h2>
+            <p className="mt-2 text-slate-400">أضف توصية منفصلة لمشتركي Spot أو Futures فقط.</p>
+          </div>
+
+          <div className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <input
+                value={vipSignalForm.coin}
+                onChange={(e) => setVipSignalForm((prev) => ({ ...prev, coin: e.target.value }))}
+                placeholder="العملة مثل BTCUSDT"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50"
+              />
+
+              <input
+                value={vipSignalForm.entry}
+                onChange={(e) => setVipSignalForm((prev) => ({ ...prev, entry: e.target.value }))}
+                placeholder="منطقة الدخول"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50"
+              />
+
+              <input
+                value={vipSignalForm.targets}
+                onChange={(e) => setVipSignalForm((prev) => ({ ...prev, targets: e.target.value }))}
+                placeholder="الأهداف"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50"
+              />
+
+              <input
+                value={vipSignalForm.stop_loss}
+                onChange={(e) => setVipSignalForm((prev) => ({ ...prev, stop_loss: e.target.value }))}
+                placeholder="وقف الخسارة"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50"
+              />
+
+              <textarea
+                value={vipSignalForm.notes}
+                onChange={(e) => setVipSignalForm((prev) => ({ ...prev, notes: e.target.value }))}
+                placeholder="ملاحظات التوصية"
+                className="min-h-28 rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50 md:col-span-2"
+              />
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <button
+                onClick={() => publishVipSignal("spot")}
+                className="rounded-2xl border border-yellow-300/20 bg-yellow-400/10 px-6 py-4 font-black text-yellow-100 transition hover:bg-yellow-400/20"
+              >
+                نشر توصية VIP Spot ⭐
+              </button>
+
+              <button
+                onClick={() => publishVipSignal("futures")}
+                className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-400/10 px-6 py-4 font-black text-fuchsia-100 transition hover:bg-fuchsia-400/20"
+              >
+                نشر توصية VIP Futures 🔥
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-5">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-3xl font-black">إدارة المستخدمين والاشتراكات</h2>
+              <p className="mt-2 text-slate-400">
+                عرض المستخدمين، تغيير الصلاحية، وتفعيل باقات Spot & Futures.
+              </p>
+            </div>
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-200">
+              الوضع الحالي: {dataMode === "supabase" ? "Supabase" : "LocalStorage"}
+            </span>
+          </div>
+
+          {users.length === 0 ? (
+            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">👥</div>
+              <h3 className="text-2xl font-black">لا يوجد مستخدمون حالياً</h3>
+            </div>
+          ) : (
+            <div className="grid gap-5">
+              {users.map((user) => (
+                <article key={user.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
+                  <div className="grid gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
+                    <div className="flex items-center gap-4">
+                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-300 text-lg font-black shadow-[0_0_30px_rgba(0,163,255,0.25)]">
+                        {(user.username || user.email || "U").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-xl font-black text-white">{user.username || "مستخدم"}</h3>
+                        <p className="truncate text-sm text-slate-400">{user.email}</p>
+                        <p className="mt-1 text-xs text-cyan-100/60">{user.telegram || "لا يوجد تليجرام"}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <select
+                        value={user.role || "user"}
+                        onChange={(e) => updateUserRole(user.id, e.target.value)}
+                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-white outline-none"
+                      >
+                        <option value="user">user</option>
+                        <option value="admin">admin</option>
+                      </select>
+
+                      <select
+                        value={user.subscription_plan || "بدون اشتراك"}
+                        onChange={(e) => updateUserSubscription(user.id, e.target.value, user.subscription_status || "نشط")}
+                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-white outline-none"
+                      >
+                        <option value="بدون اشتراك">بدون اشتراك</option>
+                        <option value="Spot - شهر">Spot - شهر</option>
+                        <option value="Spot - 3 أشهر">Spot - 3 أشهر</option>
+                        <option value="Spot - سنة">Spot - سنة</option>
+                        <option value="Futures - شهر">Futures - شهر</option>
+                        <option value="Futures - 3 أشهر">Futures - 3 أشهر</option>
+                        <option value="Futures - سنة">Futures - سنة</option>
+                      </select>
+
+                      <select
+                        value={user.subscription_status || "غير نشط"}
+                        onChange={(e) => updateUserSubscription(user.id, user.subscription_plan || "بدون اشتراك", e.target.value)}
+                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-white outline-none"
+                      >
+                        <option value="غير نشط">غير نشط</option>
+                        <option value="نشط">نشط</option>
+                        <option value="منتهي">منتهي</option>
+                        <option value="موقوف">موقوف</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs font-bold text-slate-500">الصلاحية</p>
+                      <p className="mt-2 font-black text-cyan-200">{user.role || "user"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs font-bold text-slate-500">الباقة</p>
+                      <p className="mt-2 font-black text-cyan-200">{user.subscription_plan || "بدون اشتراك"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs font-bold text-slate-500">حالة الاشتراك</p>
+                      <p className="mt-2 font-black text-cyan-200">{user.subscription_status || "غير نشط"}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-2xl backdrop-blur-2xl md:p-5">
+          <div className="flex flex-wrap gap-3">
+            {[
+              ["all", "كل طلبات التحليل"],
+              ["pending", "بانتظار الرد"],
+              ["completed", "مكتملة"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
+                  filter === key
+                    ? "border-cyan-300/40 bg-cyan-400/20 text-cyan-100 shadow-[0_0_25px_rgba(0,163,255,0.18)]"
+                    : "border-white/10 bg-black/20 text-slate-300 hover:border-cyan-300/30 hover:bg-cyan-400/10"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-black">طلبات تحليل العملات</h2>
+              <p className="mt-2 text-slate-400">اكتب الرد وارفق صورة الشارت ثم أرسلها للمستخدم.</p>
+            </div>
+          </div>
+
+          {filteredAnalysis.length === 0 ? (
+            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">📭</div>
+              <h3 className="text-2xl font-black">لا توجد طلبات تحليل حالياً</h3>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredAnalysis.map((req) => (
+                <article key={req.id} className="relative overflow-hidden rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-2xl backdrop-blur-2xl">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,0.12),transparent_30%)]" />
+                  <div className="relative z-10 space-y-5">
+                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-3xl font-black text-white">{req.coin}</h3>
+                          <StatusBadge status={req.status} />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                            المستخدم: <b className="text-cyan-200">{req.username || req.userEmail}</b>
+                          </span>
+                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                            الفريم: <b className="text-cyan-200">{req.frame}</b>
+                          </span>
+                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                            التاريخ: {req.createdAt}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          setExpandedAnalysis((prev) => ({
+                            ...prev,
+                            [req.id]: !prev[req.id],
+                          }))
+                        }
+                        className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-5 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                      >
+                        {expandedAnalysis[req.id] ? "إخفاء التفاصيل" : "عرض التفاصيل"}
+                      </button>
+                    </div>
+
+                    {!expandedAnalysis[req.id] && req.reply && (
+                      <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-100">
+                        تم الرد على هذا الطلب ✅
+                      </div>
+                    )}
+
+                    {expandedAnalysis[req.id] && (
+                      <div className="space-y-5 border-t border-white/10 pt-5">
+
+                    {req.reply && (
+                      <div className="rounded-[26px] border border-cyan-300/15 bg-cyan-400/5 p-5">
+                        <p className="text-sm font-bold text-cyan-200">الرد الحالي</p>
+                        <p className="mt-2 leading-8 text-slate-200">{req.reply}</p>
+                        {req.replyImage && (
+                          <img
+                            src={req.replyImage}
+                            className="mt-4 max-h-[260px] rounded-2xl border border-white/10 object-contain"
+                            alt="صورة التحليل"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    <textarea
+                      value={replies[req.id]?.text || ""}
+                      onChange={(e) =>
+                        setReplies((prev) => ({
+                          ...prev,
+                          [req.id]: {
+                            ...prev[req.id],
+                            text: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="اكتب تحليل العملة هنا..."
+                      className="min-h-32 w-full rounded-[20px] border border-cyan-300/15 bg-black/30 p-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+                    />
+
+                    <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                      <label className="block text-sm font-bold text-slate-300">أرفق صورة التحليل / الشارت</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleReplyImage(req.id, e.target.files[0])}
+                        className="mt-3 w-full rounded-2xl border border-cyan-300/15 bg-black/30 p-3 text-white"
+                      />
+
+                      {replies[req.id]?.image && (
+                        <img
+                          src={replies[req.id].image}
+                          className="mt-4 max-h-[220px] rounded-2xl border border-white/10 object-contain"
+                          alt="معاينة الصورة"
+                        />
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        onClick={() => sendAnalysisReply(req.id)}
+                        disabled={replySending[req.id]}
+                        className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.32)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {replySending[req.id] ? "جاري الإرسال..." : "إرسال الرد"}
+                      </button>
+
+                      <button
+                        onClick={() => deleteAnalysisRequest(req.id)}
+                        className="rounded-2xl border border-red-400/20 bg-red-500/15 px-5 py-3 font-black text-red-100 transition hover:bg-red-500/25"
+                      >
+                        حذف الطلب
+                      </button>
+                    </div>
+                  </div>
+                )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-5">
+          <div>
+            <h2 className="text-3xl font-black">طلبات إدارة الحسابات</h2>
+            <p className="mt-2 text-slate-400">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
+          </div>
+
+          {accountRequests.length === 0 ? (
+            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">📂</div>
+              <h3 className="text-2xl font-black">لا توجد طلبات إدارة حسابات حالياً</h3>
+            </div>
+          ) : (
+            <div className="grid gap-5">
+              {accountRequests.map((req) => (
+                <article key={req.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
+                  <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="text-2xl font-black">{req.type}</h3>
+                        <StatusBadge status={req.status} />
+                      </div>
+                      <p className="mt-2 text-sm text-slate-500">{req.createdAt}</p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => approveAccountRequest(req.id)}
+                        className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-5 py-3 font-black text-emerald-100 hover:bg-emerald-400/20"
+                      >
+                        تمت المراجعة
+                      </button>
+
+                      <button
+                        onClick={() => deleteAccountRequest(req.id)}
+                        className="rounded-2xl border border-red-400/20 bg-red-500/15 px-5 py-3 font-black text-red-100 hover:bg-red-500/25"
+                      >
+                        حذف
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    {[{
+                      label: "تيليجرام",
+                      value: req.telegram,
+                    }, {
+                      label: "رأس المال",
+                      value: req.capital ? `$${req.capital}` : "",
+                    }, {
+                      label: "API Key",
+                      value: req.apiKey,
+                    }, {
+                      label: "Secret Key",
+                      value: req.secretKey,
+                    }, {
+                      label: "رقم الحساب",
+                      value: req.account,
+                    }, {
+                      label: "كلمة المرور",
+                      value: req.password,
+                    }, {
+                      label: "الخادم",
+                      value: req.server,
+                    }, {
+                      label: "الصورة",
+                      value: req.fileName,
+                    }]
+                      .filter((item) => item.value)
+                      .map((item) => (
+                        <div key={item.label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                          <p className="text-xs font-bold text-slate-500">{item.label}</p>
+                          <p className="mt-2 break-all font-bold text-slate-200">{item.value}</p>
+                        </div>
+                      ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="space-y-5">
+          <div>
+            <h2 className="text-3xl font-black">طلبات الاشتراكات والدفع</h2>
+            <p className="mt-2 text-slate-400">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
+          </div>
+
+          {subscriptionRequests.length === 0 ? (
+            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">💳</div>
+              <h3 className="text-2xl font-black">لا توجد طلبات اشتراك حالياً</h3>
+            </div>
+          ) : (
+            <div className="grid gap-5">
+              {subscriptionRequests.map((req) => (
+                <article key={req.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
+                  <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="text-2xl font-black">{req.planName}</h3>
+                        <StatusBadge status={req.status} />
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                          المستخدم: <b className="text-cyan-200">{req.username || req.userEmail}</b>
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                          النوع: <b className="text-cyan-200">{req.category}</b>
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                          السعر: <b className="text-cyan-200">{req.price}</b>
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                          التاريخ: {req.createdAt}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <button
+                        onClick={() => updateSubscriptionRequest(req, "مفعل")}
+                        className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-5 py-3 font-black text-emerald-100 transition hover:bg-emerald-400/20"
+                      >
+                        تفعيل الاشتراك
+                      </button>
+                      <button
+                        onClick={() => updateSubscriptionRequest(req, "بانتظار الدفع")}
+                        className="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-5 py-3 font-black text-amber-100 transition hover:bg-amber-400/20"
+                      >
+                        بانتظار الدفع
+                      </button>
+                      <button
+                        onClick={() => updateSubscriptionRequest(req, "مرفوض")}
+                        className="rounded-2xl border border-red-400/20 bg-red-500/15 px-5 py-3 font-black text-red-100 transition hover:bg-red-500/25"
+                      >
+                        رفض
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+} 

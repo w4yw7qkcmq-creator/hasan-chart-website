@@ -1,0 +1,502 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #020617;
+  --bg-page: #020617;
+  --bg-card: rgba(255, 255, 255, 0.055);
+  --bg-input: #111827;
+  --text-main: #ffffff;
+  --text-muted: #94a3b8;
+  --border-soft: rgba(255, 255, 255, 0.10);
+  --blue-main: #2563eb;
+  --blue-soft: rgba(37, 99, 235, 0.18);
+  --green-main: #34d399;
+  --shadow-main: rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="light"] {
+  --bg-main: #edf7ff;
+  --bg-page: #edf7ff;
+  --bg-card: rgba(236, 246, 255, 0.92);
+  --bg-input: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --border-soft: rgba(37, 99, 235, 0.16);
+  --blue-main: #2563eb;
+  --blue-soft: rgba(14, 165, 233, 0.12);
+  --green-main: #10b981;
+  --shadow-main: rgba(37, 99, 235, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.24), transparent 34%),
+    radial-gradient(circle at 90% 20%, rgba(52, 211, 153, 0.13), transparent 28%),
+    var(--bg-page);
+  color: var(--text-main);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+html[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(96, 165, 250, 0.22), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(125, 211, 252, 0.20), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #dff1ff 52%, #cfe9ff 100%);
+  color: var(--text-main);
+}
+
+html[data-theme="light"] .bg-\[\#020617\],
+html[data-theme="light"] .bg-\[\#020817\],
+html[data-theme="light"] .bg-\[\#07142f\] {
+  background-color: transparent !important;
+}
+
+html[data-theme="light"] .text-white,
+html[data-theme="light"] .text-slate-100,
+html[data-theme="light"] .text-slate-200,
+html[data-theme="light"] .text-cyan-100,
+html[data-theme="light"] .text-cyan-200 {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .text-slate-300,
+html[data-theme="light"] .text-slate-400,
+html[data-theme="light"] .text-slate-500 {
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .bg-white\/\[0\.045\],
+html[data-theme="light"] .bg-white\/\[0\.05\],
+html[data-theme="light"] .bg-white\/\[0\.055\],
+html[data-theme="light"] .bg-white\/\[0\.035\],
+html[data-theme="light"] .bg-white\/5,
+html[data-theme="light"] .bg-black\/20,
+html[data-theme="light"] .bg-black\/25 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+html[data-theme="light"] .border-white\/10,
+html[data-theme="light"] .border-cyan-300\/10,
+html[data-theme="light"] .border-cyan-300\/15,
+html[data-theme="light"] .border-cyan-300\/20,
+html[data-theme="light"] .border-cyan-300\/25 {
+  border-color: rgba(37, 99, 235, 0.16) !important;
+}
+
+html[data-theme="light"] .from-\[\#07142f\]\/85,
+html[data-theme="light"] .from-\[\#07142f\],
+html[data-theme="light"] .via-\[\#040b1c\]\/90,
+html[data-theme="light"] .to-\[\#020617\]\/95,
+html[data-theme="light"] .to-\[\#030712\] {
+  --tw-gradient-from: #ffffff var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: #ffffff, #eff8ff, #f8fbff !important;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.65);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.55);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.85);
+}
+
+.navBtn {
+  @apply px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 transition font-bold;
+}
+
+.card,
+.box {
+  @apply rounded-3xl border backdrop-blur-xl p-6 shadow-2xl transition;
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+  color: var(--text-main);
+  box-shadow: 0 24px 80px var(--shadow-main);
+}
+
+.card:hover,
+.box:hover {
+  border-color: rgba(59, 130, 246, 0.42);
+  transform: translateY(-2px);
+}
+
+.sectionTitle {
+  @apply text-4xl font-black mb-6 tracking-tight;
+}
+
+.input {
+  @apply w-full p-4 rounded-2xl border mb-3 outline-none transition;
+  background: var(--bg-input);
+  border-color: var(--border-soft);
+  color: var(--text-main);
+}
+
+.input:focus {
+  border-color: rgba(59, 130, 246, 0.85);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
+}
+
+.input::placeholder {
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.blueBtn {
+  @apply w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-bold transition;
+  box-shadow: 0 12px 35px rgba(37, 99, 235, 0.28);
+}
+
+.greenBtn {
+  @apply w-full bg-emerald-400 hover:bg-emerald-300 text-black py-4 rounded-2xl font-bold transition;
+  box-shadow: 0 12px 35px rgba(52, 211, 153, 0.22);
+}
+
+.blueBtn:hover,
+.greenBtn:hover {
+  transform: translateY(-1px);
+}
+
+.menuItem {
+  @apply block w-full rounded-2xl px-4 py-3 border hover:bg-blue-600/30 hover:border-blue-500/50 transition font-bold;
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+  color: var(--text-main);
+}
+
+.menuItem:hover {
+  transform: translateX(-3px);
+}
+
+.glassPanel {
+  @apply rounded-[36px] border backdrop-blur-2xl shadow-2xl;
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+}
+
+.badgeBlue {
+  @apply inline-flex items-center rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-blue-300 text-sm font-bold;
+}
+
+.badgeGreen {
+  @apply inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-emerald-300 text-sm font-bold;
+}
+
+@media (max-width: 1023px) {
+  .sectionTitle {
+    @apply text-3xl;
+  }
+}
+
+/* ===== FINAL LIGHT MODE: soft background + blue panels ===== */
+
+html[data-theme="light"] body,
+html[data-theme="light"] main,
+html[data-theme="light"] .min-h-screen,
+html[data-theme="light"] .lg\:flex {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(88, 184, 255, 0.14), transparent 32%),
+    radial-gradient(circle at 88% 18%, rgba(47, 150, 255, 0.10), transparent 30%),
+    linear-gradient(135deg, #f8fbff 0%, #eef7ff 42%, #e4f3ff 100%) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] header {
+  background: rgba(248, 251, 255, 0.92) !important;
+  border-color: rgba(47, 150, 255, 0.18) !important;
+  color: #0f172a !important;
+  box-shadow: 0 14px 45px rgba(47, 150, 255, 0.10) !important;
+}
+
+html[data-theme="light"] aside {
+  background: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 18px 60px rgba(41, 151, 242, 0.24) !important;
+}
+
+html[data-theme="light"] aside .menuItem,
+html[data-theme="light"] aside .sidebarUserCard,
+html[data-theme="light"] aside .topLoginBtn,
+html[data-theme="light"] aside .topUserChip,
+html[data-theme="light"] aside .bg-white\/\[0\.035\],
+html[data-theme="light"] aside .bg-white\/\[0\.045\],
+html[data-theme="light"] aside .bg-white\/5 {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 10px 28px rgba(0, 68, 145, 0.12) !important;
+}
+
+html[data-theme="light"] aside,
+html[data-theme="light"] aside *,
+html[data-theme="light"] aside .text-white,
+html[data-theme="light"] aside .text-slate-100,
+html[data-theme="light"] aside .text-slate-200,
+html[data-theme="light"] aside .text-slate-300,
+html[data-theme="light"] aside .text-slate-400,
+html[data-theme="light"] aside .text-cyan-100,
+html[data-theme="light"] aside .text-cyan-200 {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .card,
+html[data-theme="light"] .box,
+html[data-theme="light"] .glassPanel,
+html[data-theme="light"] .bg-white\/\[0\.045\],
+html[data-theme="light"] .bg-white\/\[0\.05\],
+html[data-theme="light"] .bg-white\/\[0\.055\],
+html[data-theme="light"] .bg-white\/\[0\.035\],
+html[data-theme="light"] .bg-white\/5,
+html[data-theme="light"] .bg-black\/20,
+html[data-theme="light"] .bg-black\/25,
+html[data-theme="light"] .bg-\[\#020617\],
+html[data-theme="light"] .bg-\[\#020817\],
+html[data-theme="light"] .bg-\[\#07142f\],
+html[data-theme="light"] .bg-\[\#07142f\]\/70 {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(47, 150, 255, 0.18) !important;
+  color: #0f172a !important;
+  box-shadow: 0 16px 45px rgba(47, 150, 255, 0.10) !important;
+}
+
+html[data-theme="light"] .card *,
+html[data-theme="light"] .box *,
+html[data-theme="light"] .glassPanel *,
+html[data-theme="light"] .text-white,
+html[data-theme="light"] .text-slate-100,
+html[data-theme="light"] .text-slate-200,
+html[data-theme="light"] .text-cyan-100,
+html[data-theme="light"] .text-cyan-200 {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .text-slate-300,
+html[data-theme="light"] .text-slate-400,
+html[data-theme="light"] .text-slate-500,
+html[data-theme="light"] .text-cyan-100\/50,
+html[data-theme="light"] .text-cyan-100\/55,
+html[data-theme="light"] .text-cyan-100\/60 {
+  color: #475569 !important;
+}
+
+/* Price/market windows stay full blue */
+html[data-theme="light"] [class*="market"],
+html[data-theme="light"] [class*="Market"],
+html[data-theme="light"] [class*="price"],
+html[data-theme="light"] [class*="Price"],
+html[data-theme="light"] .card:has(.tradingview-widget-container),
+html[data-theme="light"] .box:has(.tradingview-widget-container),
+html[data-theme="light"] div:has(> .tradingview-widget-container) {
+  background: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 12px 36px rgba(41, 151, 242, 0.25), inset 0 1px 0 rgba(255,255,255,0.18) !important;
+}
+
+html[data-theme="light"] .tradingview-widget-container,
+html[data-theme="light"] .tradingview-widget-container__widget,
+html[data-theme="light"] iframe {
+  background: transparent !important;
+  border-radius: 22px !important;
+}
+
+/* Keep original price-number colors as much as possible */
+html[data-theme="light"] [class*="market"] *,
+html[data-theme="light"] [class*="Market"] *,
+html[data-theme="light"] [class*="price"] *,
+html[data-theme="light"] [class*="Price"] *,
+html[data-theme="light"] .card:has(.tradingview-widget-container) *,
+html[data-theme="light"] .box:has(.tradingview-widget-container) * {
+  color: inherit;
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html[data-theme="light"] .input {
+  background: #ffffff !important;
+  border-color: rgba(47, 150, 255, 0.22) !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 10px 28px rgba(47,150,255,0.08) !important;
+}
+
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder {
+  color: #64748b !important;
+}
+
+html[data-theme="light"] .topLogoutBtn,
+html[data-theme="light"] .bg-red-500\/15 {
+  background: #fee2e2 !important;
+  border-color: rgba(239, 68, 68, 0.24) !important;
+  color: #991b1b !important;
+}
+
+html[data-theme="light"] .border-cyan-300\/10,
+html[data-theme="light"] .border-cyan-300\/15,
+html[data-theme="light"] .border-cyan-300\/20,
+html[data-theme="light"] .border-cyan-300\/25,
+html[data-theme="light"] .border-white\/10 {
+  border-color: rgba(47, 150, 255, 0.20) !important;
+}
+
+html[data-theme="light"] .pointer-events-none.absolute.inset-0 {
+  opacity: 0.12 !important;
+}
+
+html[data-theme="light"] .badgeBlue,
+html[data-theme="light"] .badgeGreen {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  color: #0f172a !important;
+}
+
+/* ===== LIGHT MODE FINAL OVERRIDES: blue sidebar, blue hero, blue price cards ===== */
+
+html[data-theme="light"] {
+  --light-blue-panel: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%);
+}
+
+html[data-theme="light"] body,
+html[data-theme="light"] main,
+html[data-theme="light"] .min-h-screen,
+html[data-theme="light"] .lg\:flex {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(88, 184, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 88% 12%, rgba(47, 150, 255, 0.12), transparent 30%),
+    linear-gradient(135deg, #f8fbff 0%, #eef7ff 45%, #e1f1ff 100%) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] aside,
+html[data-theme="light"] .lg\:fixed.lg\:right-0,
+html[data-theme="light"] .fixed.right-0,
+html[data-theme="light"] [class*="sidebar"] {
+  background: var(--light-blue-panel) !important;
+  border-color: rgba(255, 255, 255, 0.30) !important;
+  box-shadow: 0 18px 65px rgba(41, 151, 242, 0.24) !important;
+}
+
+html[data-theme="light"] aside .menuItem,
+html[data-theme="light"] aside a,
+html[data-theme="light"] aside button:not(.topLogoutBtn),
+html[data-theme="light"] aside .sidebarUserCard,
+html[data-theme="light"] aside .topUserChip,
+html[data-theme="light"] aside .topLoginBtn {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px rgba(0, 68, 145, 0.12) !important;
+}
+
+html[data-theme="light"] aside *,
+html[data-theme="light"] [class*="sidebar"] * {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .topLogoutBtn,
+html[data-theme="light"] aside .topLogoutBtn,
+html[data-theme="light"] .bg-red-500\/15 {
+  background: #fee2e2 !important;
+  border-color: rgba(239, 68, 68, 0.28) !important;
+  color: #991b1b !important;
+}
+
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeBlue),
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeGreen),
+html[data-theme="light"] section:has(.badgeBlue),
+html[data-theme="light"] section:has(.badgeGreen) {
+  background: var(--light-blue-panel) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 18px 60px rgba(41, 151, 242, 0.24) !important;
+}
+
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeBlue) *,
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeGreen) *,
+html[data-theme="light"] section:has(.badgeBlue) *,
+html[data-theme="light"] section:has(.badgeGreen) * {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .badgeBlue,
+html[data-theme="light"] .badgeGreen {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.42) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] [class*="market"],
+html[data-theme="light"] [class*="Market"],
+html[data-theme="light"] [class*="price"],
+html[data-theme="light"] [class*="Price"],
+html[data-theme="light"] .card:has(.tradingview-widget-container),
+html[data-theme="light"] .box:has(.tradingview-widget-container),
+html[data-theme="light"] div:has(> .tradingview-widget-container) {
+  background: var(--light-blue-panel) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 12px 36px rgba(41, 151, 242, 0.25), inset 0 1px 0 rgba(255,255,255,0.18) !important;
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html[data-theme="light"] .input {
+  background: rgba(255,255,255,0.92) !important;
+  color: #0f172a !important;
+  border-color: rgba(47, 150, 255, 0.22) !important;
+}
+
+/* ===== FORCE LIGHT SIDEBAR BLUE ===== */
+html[data-theme="light"] body > div > aside,
+html[data-theme="light"] aside:has(.menuItem),
+html[data-theme="light"] aside:has(.sidebarUserCard),
+html[data-theme="light"] div:has(> .sidebarUserCard),
+html[data-theme="light"] div:has(> nav .menuItem),
+html[data-theme="light"] .fixed:has(.sidebarUserCard),
+html[data-theme="light"] .fixed:has(.menuItem) {
+  background: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  box-shadow: 0 18px 65px rgba(41, 151, 242, 0.28) !important;
+}
+
+html[data-theme="light"] aside:has(.menuItem) .menuItem,
+html[data-theme="light"] aside:has(.sidebarUserCard) .menuItem,
+html[data-theme="light"] div:has(> .sidebarUserCard) .menuItem,
+html[data-theme="light"] div:has(> nav .menuItem) .menuItem,
+html[data-theme="light"] .fixed:has(.menuItem) .menuItem,
+html[data-theme="light"] .fixed:has(.sidebarUserCard) .menuItem {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] aside:has(.menuItem) .sidebarUserCard,
+html[data-theme="light"] aside:has(.sidebarUserCard) .sidebarUserCard,
+html[data-theme="light"] div:has(> .sidebarUserCard) .sidebarUserCard,
+html[data-theme="light"] .fixed:has(.sidebarUserCard) .sidebarUserCard {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+}
