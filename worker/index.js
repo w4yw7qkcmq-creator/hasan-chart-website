@@ -57,31 +57,27 @@ const getMarketPrice = async (symbol) => {
     throw new Error("EMPTY_SYMBOL");
   }
 
-  const endpoints = [
-    `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(cleanSymbol)}`,
-    `https://api.bybit.com/v5/market/tickers?category=spot&symbol=${encodeURIComponent(cleanSymbol)}`,
+  const urls = [
+    `https://api.bybit.com/v5/market/tickers?category=spot&symbol=${cleanSymbol}`,
+    `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${cleanSymbol}`,
   ];
 
-  for (const endpoint of endpoints) {
+  for (const url of urls) {
     try {
-      const response = await fetch(endpoint, {
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      const response = await fetch(url);
+      const data = await response.json();
 
-      const data = await response.json().catch(() => null);
       const price = Number(data?.result?.list?.[0]?.lastPrice);
 
-      if (response.ok && data?.retCode === 0 && Number.isFinite(price)) {
+      if (Number.isFinite(price)) {
         return price;
       }
-    } catch (error) {
-      console.log("⚠️ Bybit endpoint failed:", endpoint);
+    } catch (err) {
+      console.log("❌ API failed:", url);
     }
   }
 
-  throw new Error(`تعذر جلب سعر ${cleanSymbol} من Bybit`);
+  throw new Error(`تعذر جلب سعر ${cleanSymbol}`);
 };
 
 const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, currentPrice }) => {
