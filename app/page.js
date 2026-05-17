@@ -232,17 +232,26 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`
+        `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(symbol)}`,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        }
       );
 
-      if (!response.ok) {
-        setChartSearchError("لم يتم العثور على هذه العملة في سوق Binance USDT");
+      const data = await response.json().catch(() => null);
+      const foundPrice = Number(data?.result?.list?.[0]?.lastPrice);
+
+      if (!response.ok || data?.retCode !== 0 || !Number.isFinite(foundPrice)) {
+        setChartSearchError("لم يتم العثور على هذه العملة في سوق USDT");
         return;
       }
 
       setChartSymbol(symbol);
       setChartSearch(symbol);
     } catch (err) {
+      console.error("Chart symbol search error:", err);
       setChartSearchError("حدث خطأ أثناء البحث عن العملة");
     }
   };
@@ -460,7 +469,7 @@ export default function Home() {
               width="100%"
               height="520"
               frameBorder="0"
-              allowtransparency="true"
+              allowTransparency="true"
               scrolling="no"
             />
           </div>
