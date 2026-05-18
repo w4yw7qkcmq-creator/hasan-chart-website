@@ -77,6 +77,7 @@ export default function MyDashboard() {
   const [aiError, setAiError] = useState("");
   const [aiResult, setAiResult] = useState(null);
   const [showAiAnalysis, setShowAiAnalysis] = useState(true);
+  const railwayAiWorkerUrl = String(process.env.NEXT_PUBLIC_RAILWAY_AI_WORKER_URL || "").replace(/\/$/, "");
 
   useEffect(() => {
     const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
@@ -117,53 +118,147 @@ export default function MyDashboard() {
       return;
     }
 
+    if (!railwayAiWorkerUrl) {
+      setAiError("رابط سيرفر Railway غير مضاف داخل Vercel: NEXT_PUBLIC_RAILWAY_AI_WORKER_URL");
+      return;
+    }
+
     setAiLoading(true);
-    setAiLoadingText("جاري تجهيز طلب التحليل...");
+    setAiLoadingText("جاري إرسال طلب التحليل إلى Railway...");
     setAiError("");
     setAiResult(null);
     setShowAiAnalysis(true);
 
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("ANALYSIS_TIMEOUT")), 45000);
-    });
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    try {
-      setAiLoadingText("جاري الاتصال بسيرفر التحليل...");
+    const fetchWithTimeout = async (url, options = {}, timeoutMs = 20000) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-      const analysisPromise = supabase.functions.invoke("analyze-coin", {
-        body: {
-          symbol,
-          source: "my-dashboard",
-          mode: "professional-smc-ict-classic",
-          requestChart: true,
-          schools: ["SMC", "ICT", "CLASSIC"],
-        },
-      });
-
-      setAiLoadingText("جاري قراءة بيانات السوق وتوليد التحليل...");
-
-      const { data, error } = await Promise.race([analysisPromise, timeoutPromise]);
-
-      if (error) {
-        setAiError(error.message || "فشل تحليل العملة من السيرفر");
-        return;
+      try {
+        return await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
       }
+    };
 
-      if (!data?.success) {
-        setAiError(data?.error || "تعذر إنشاء التحليل حالياً");
-        return;
-      }
+    const normalizeResult = (raw) => {
+      const data = raw?.result || raw || {};
+      const trend = data.marketBias || data.trend || data.direction || "neutral";
+      const confidence = data.confidence ? `\n\nنسبة الثقة: ${data.confidence}%` : "";
+      const levels = [
+        data.entry ? `الدخول المحتمل: ${Number(data.entry).toLocaleString()}` : "",
+        data.stopLoss ? `وقف الخسارة: ${Number(data.stopLoss).toLocaleString()}` : "",
+        data.target1 ? `الهدف الأول: ${Number(data.target1).toLocaleString()}` : "",
+        data.target2 ? `الهدف الثاني: ${Number(data.target2).toLocaleString()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
 
-      setAiLoadingText("تم تجهيز التحليل بنجاح");
-      setAiResult({
+      return {
         ...data,
         symbol: data.symbol || symbol,
-      });
+        marketBias: trend,
+        bos: data.bos || (String(trend).toLowerCase().includes("bull") ? "Bullish BOS" : String(trend).toLowerCase().includes("bear") ? "Bearish BOS" : "بانتظار تأكيد"),
+        choch: data.choch || "راقب تغير السلوك السعري",
+        premiumZone: Boolean(data.premiumZone),
+        currentPrice: data.currentPrice,
+        chartImage: data.chartImage || null,
+        analysis:
+          data.analysis ||
+          [
+            data.summary ? `الملخص: ${data.summary}` : "",
+            data.smartMoney ? `SMC / ICT: ${data.smartMoney}` : "",
+            data.classic ? `الكلاسيكي: ${data.classic}` : "",
+            data.scenario ? `السيناريو المتوقع: ${data.scenario}` : "",
+            levels,
+            data.risk ? `إدارة المخاطر: ${data.risk}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n") + confidence,
+      };
+    };
+
+    try {
+      const response = await fetchWithTimeout(
+        `${railwayAiWorkerUrl}/api/instant-analysis`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            symbol,
+            source: "my-dashboard",
+            mode: "professional-smc-ict-classic",
+            requestChart: true,
+            schools: ["SMC", "ICT", "CLASSIC"],
+          }),
+        },
+        20000
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || `فشل إرسال طلب التحليل إلى Railway. كود الخطأ: ${response.status}`);
+      }
+
+      if (!data.jobId && data.result) {
+        setAiResult(normalizeResult(data.result));
+        setAiLoadingText("تم تجهيز التحليل بنجاح");
+        return;
+      }
+
+      if (!data.jobId) {
+        setAiResult(normalizeResult(data));
+        setAiLoadingText("تم تجهيز التحليل بنجاح");
+        return;
+      }
+
+      setAiLoadingText("تم استلام الطلب. جاري توليد التحليل والشارت على Railway...");
+
+      for (let attempt = 1; attempt <= 45; attempt += 1) {
+        await sleep(2000);
+        setAiLoadingText(`جاري تجهيز التحليل على Railway... ${attempt * 2} ثانية`);
+
+        const statusResponse = await fetchWithTimeout(
+          `${railwayAiWorkerUrl}/api/instant-analysis/${encodeURIComponent(data.jobId)}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+          12000
+        );
+
+        const statusData = await statusResponse.json().catch(() => null);
+
+        if (!statusResponse.ok || !statusData?.success) {
+          throw new Error(statusData?.error || "تعذر قراءة نتيجة التحليل من Railway");
+        }
+
+        if (statusData.status === "completed" || statusData.result) {
+          setAiResult(normalizeResult(statusData.result || statusData));
+          setAiLoadingText("تم تجهيز التحليل بنجاح");
+          return;
+        }
+
+        if (statusData.status === "failed") {
+          throw new Error(statusData.error || "فشل توليد التحليل على السيرفر");
+        }
+      }
+
+      setAiError("التحليل ما زال قيد المعالجة على السيرفر. جرّب مرة ثانية بعد قليل.");
     } catch (err) {
-      if (err?.message === "ANALYSIS_TIMEOUT") {
-        setAiError("استغرق التحليل وقتاً طويلاً. سنربطه بالـ Worker ليعمل بالخلفية بدون تعليق الصفحة.");
+      if (err?.name === "AbortError") {
+        setAiError("السيرفر تأخر بالرد، لكن الصفحة لم تعلق. جرّب مرة ثانية بعد لحظات.");
       } else {
-        setAiError(err?.message || "حدث خطأ أثناء الاتصال بخدمة التحليل");
+        setAiError(err?.message || "حدث خطأ أثناء الاتصال بسيرفر Railway");
       }
     } finally {
       setAiLoading(false);
