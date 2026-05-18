@@ -98,65 +98,56 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
       subject: `🔔 تحقق تنبيه ${safeCoin}`,
       html: `
 <div style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;color:#ffffff;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#020617;margin:0;padding:0;width:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#020617;width:100%;padding:24px 12px;">
     <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px;background:#07142f;border:1px solid rgba(34,211,238,0.22);border-radius:24px;overflow:hidden;box-shadow:0 0 42px rgba(37,99,235,0.24);">
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px;background:#07142f;border-radius:24px;overflow:hidden;border:1px solid rgba(34,211,238,0.18);box-shadow:0 0 40px rgba(37,99,235,0.22);">
+
           <tr>
-            <td style="padding:0;">
-              <div style="background:linear-gradient(135deg,#07142f 0%,#0b63ff 55%,#06b6d4 100%);padding:30px 22px;text-align:center;">
-                <div style="display:inline-block;background:rgba(2,6,23,0.28);border:1px solid rgba(255,255,255,0.28);border-radius:999px;padding:9px 16px;color:#ffffff;font-size:13px;font-weight:800;letter-spacing:0.3px;white-space:nowrap;">
-                  HasaN CharT World
-                </div>
-                <h1 style="margin:18px 0 0;color:#ffffff;font-size:27px;line-height:1.45;font-weight:900;text-align:center;">
-                  تحقق التنبيه السعري
-                </h1>
-                <p style="margin:8px 0 0;color:#dbeafe;font-size:14px;line-height:1.9;text-align:center;">
-                  وصل السعر إلى الشرط الذي قمت بتحديده داخل المنصة
-                </p>
+            <td style="background:linear-gradient(135deg,#07142f 0%,#0b63ff 55%,#06b6d4 100%);padding:34px 22px;text-align:center;">
+              <div style="display:inline-block;background:rgba(2,6,23,0.28);border:1px solid rgba(255,255,255,0.25);border-radius:999px;padding:10px 18px;color:#ffffff;font-size:14px;font-weight:900;">
+                🔔 Price Alert Triggered
+              </div>
+
+              <h1 style="margin:24px 0 0;color:#ffffff;font-size:34px;line-height:1.5;font-weight:900;text-align:center;">
+                تم تفعيل تنبيه السعر
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:28px 20px 10px;">
+              <div style="background:#020817;border:1px solid rgba(34,211,238,0.16);border-radius:20px;padding:22px;color:#e2e8f0;font-size:20px;line-height:2.1;font-weight:600;text-align:center;">
+                تم تفعيل التنبيه لعملة
+                <strong style="color:#67e8f9;">${safeCoin}</strong>
+                لأن السعر ${conditionText} المستوى المحدد.
               </div>
             </td>
           </tr>
 
           <tr>
-            <td style="padding:24px 18px 8px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#0b1b3a;border:1px solid rgba(34,211,238,0.20);border-radius:20px;">
-                <tr>
-                  <td style="padding:20px;text-align:center;">
-                    <div style="color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:9px;">العملة</div>
-                    <div style="color:#ffffff;font-size:32px;line-height:1.25;font-weight:900;word-break:break-word;">
-                      ${safeCoin}
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:14px 18px 6px;">
-              <div style="background:#020817;border:1px solid rgba(34,211,238,0.18);border-radius:18px;padding:18px;color:#e2e8f0;font-size:16px;line-height:2.05;font-weight:600;word-break:break-word;">
-                تم تفعيل التنبيه بنجاح لأن سعر <strong style="color:#67e8f9;">${safeCoin}</strong> ${conditionText} السعر الذي قمت بتحديده.
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:14px 18px 6px;">
+            <td style="padding:12px 20px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                 <tr>
-                  <td width="50%" style="padding:0 0 0 6px;">
-                    <div style="background:#0b1b3a;border:1px solid rgba(34,211,238,0.18);border-radius:18px;padding:18px;text-align:center;">
-                      <div style="color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:8px;">السعر المستهدف</div>
-                      <div style="color:#67e8f9;font-size:26px;line-height:1.25;font-weight:900;word-break:break-word;">
+                  <td width="50%" style="padding-left:6px;">
+                    <div style="background:#0b1b3a;border:1px solid rgba(34,211,238,0.16);border-radius:18px;padding:22px;text-align:center;">
+                      <div style="color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:10px;">
+                        السعر المستهدف
+                      </div>
+
+                      <div style="color:#67e8f9;font-size:28px;font-weight:900;word-break:break-word;">
                         ${safeTargetPrice}
                       </div>
                     </div>
                   </td>
-                  <td width="50%" style="padding:0 6px 0 0;">
-                    <div style="background:#0b1b3a;border:1px solid rgba(34,211,238,0.18);border-radius:18px;padding:18px;text-align:center;">
-                      <div style="color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:8px;">السعر الحالي</div>
-                      <div style="color:#ffffff;font-size:26px;line-height:1.25;font-weight:900;word-break:break-word;">
+
+                  <td width="50%" style="padding-right:6px;">
+                    <div style="background:#0b1b3a;border:1px solid rgba(34,211,238,0.16);border-radius:18px;padding:22px;text-align:center;">
+                      <div style="color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:10px;">
+                        السعر الحالي
+                      </div>
+
+                      <div style="color:#ffffff;font-size:28px;font-weight:900;word-break:break-word;">
                         ${safeCurrentPrice}
                       </div>
                     </div>
@@ -167,20 +158,13 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
           </tr>
 
           <tr>
-            <td align="center" style="padding:24px 18px 30px;">
-              <a href="https://www.hasanchartworld.com" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#2563eb);color:#ffffff;text-decoration:none;padding:16px 30px;border-radius:16px;font-size:16px;font-weight:900;line-height:1;white-space:nowrap;box-shadow:0 0 24px rgba(37,99,235,0.38);">
+            <td align="center" style="padding:32px 20px 34px;">
+              <a href="https://www.hasanchartworld.com" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#2563eb);color:#ffffff;text-decoration:none;padding:18px 34px;border-radius:18px;font-size:17px;font-weight:900;box-shadow:0 0 22px rgba(37,99,235,0.35);">
                 فتح منصة HasaN CharT
               </a>
             </td>
           </tr>
 
-          <tr>
-            <td style="padding:17px 18px;background:#020617;border-top:1px solid rgba(255,255,255,0.07);text-align:center;color:#64748b;font-size:12px;line-height:1.9;">
-              <div style="font-weight:900;color:#e2e8f0;white-space:nowrap;">HasaN CharT World</div>
-              <div style="color:#94a3b8;">Trading Intelligence Platform</div>
-              <div style="color:#64748b;">© 2026 جميع الحقوق محفوظة</div>
-            </td>
-          </tr>
         </table>
       </td>
     </tr>
