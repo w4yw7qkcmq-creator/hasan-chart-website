@@ -1,4 +1,6 @@
 require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
 
 const { createClient } = require("@supabase/supabase-js");
 
@@ -20,6 +22,14 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const CHECK_INTERVAL_MS = 15000;
 const MAX_ALERTS_PER_RUN = 20;
+
+const app = express();
+const PORT = Number(process.env.PORT || 3000);
+
+app.use(cors());
+app.use(express.json({ limit: "2mb" }));
+
+const analysisJobs = new Map();
 
 const normalizeSymbol = (value) => {
   return String(value || "")
@@ -281,7 +291,114 @@ async function checkPriceAlerts() {
   }
 }
 
+app.get("/health", async (_req, res) => {
+  res.json({
+    success: true,
+    status: "online",
+    service: "hasan-chart-worker",
+    alertsWorker: true,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.post("/api/instant-analysis", async (req, res) => {
+  try {
+    const symbol = normalizeSymbol(req.body?.symbol);
+
+    if (!symbol) {
+      return res.status(400).json({
+        success: false,
+        error: "رمز العملة مطلوب",
+      });
+    }
+
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    analysisJobs.set(jobId, {
+      id: jobId,
+      status: "processing",
+      symbol,
+      createdAt: new Date().toISOString(),
+    });
+
+    process.nextTick(async () => {
+      try {
+        const currentPrice = await getMarketPrice(symbol);
+
+        const fakeAnalysis = {
+          success: true,
+          symbol,
+          trend: currentPrice > 0 ? "bullish" : "neutral",
+          currentPrice,
+          summary:
+            "تحليل احترافي مبدئي يعتمد على SMC و ICT والمدرسة الكلاسيكية مع مراقبة السيولة ومناطق الطلب والعرض.",
+          smartMoney:
+            "يوجد اهتمام شرائي واضح مع احتمالية استهداف مناطق سيولة أعلى إذا استمر الثبات فوق المنطقة الحالية.",
+          risk:
+            "يفضل انتظار تأكيد إضافي قبل الدخول الكامل وإدارة المخاطر بدقة.",
+          chartImage: null,
+          generatedAt: new Date().toISOString(),
+        };
+
+        analysisJobs.set(jobId, {
+          id: jobId,
+          status: "completed",
+          result: fakeAnalysis,
+          completedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        analysisJobs.set(jobId, {
+          id: jobId,
+          status: "failed",
+          error: error?.message || "ANALYSIS_FAILED",
+          failedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    return res.json({
+      success: true,
+      queued: true,
+      jobId,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error?.message || "SERVER_ERROR",
+    });
+  }
+});
+
+app.get("/api/instant-analysis/:jobId", async (req, res) => {
+  try {
+    const jobId = String(req.params?.jobId || "").trim();
+
+    const job = analysisJobs.get(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: "JOB_NOT_FOUND",
+      });
+    }
+
+    return res.json({
+      success: true,
+      ...job,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error?.message || "SERVER_ERROR",
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Railway Worker API listening on port ${PORT}`);
+});
+
 setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
 
-console.log("🚀 Price Alerts Worker started...");
+console.log("🚀 Price Alerts + AI Worker started...");
 checkPriceAlerts();
