@@ -344,9 +344,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen text-white w-full">
-      <div className="fixed left-3 top-3 z-[99999] rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white shadow-2xl">
-        TEST POPUP VERSION
-      </div>
       {activeNotice && (
         <div className="fixed top-5 left-5 z-[999] max-w-md rounded-3xl bg-emerald-500 text-black p-5 shadow-2xl font-bold">
           <div className="flex justify-between gap-4">
