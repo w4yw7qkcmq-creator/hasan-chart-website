@@ -68,35 +68,31 @@ export default function Home() {
 
   const refreshAnalysisCooldown = async (user) => {
     if (!user?.email) {
-      setCanRequestAnalysis(true);
+      setCanRequestAnalysis(false);
       setAnalysisCooldownText("");
       return;
     }
 
+    setCanRequestAnalysis(false);
+
     try {
-      const cooldownPromise = supabase
-        .from("analysis_requests")
-        .select("created_at")
-        .eq("user_email", user.email)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      const response = await fetch(`/api/analysis-request?email=${encodeURIComponent(user.email)}`, {
+        method: "GET",
+        cache: "no-store",
+      });
 
-      const { data, error } = await withTimeout(cooldownPromise, 8000, "COOLDOWN_TIMEOUT");
+      const result = await response.json().catch(() => null);
 
-      if (error) {
-        console.error("Cooldown check error:", error.message);
-        setCanRequestAnalysis(true);
-        setAnalysisCooldownText("");
-        return;
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || `فشل التحقق من مدة الانتظار. كود الخطأ: ${response.status}`);
       }
 
-      const cooldown = getCooldownMessage(data?.[0]?.created_at);
-      setCanRequestAnalysis(!cooldown.blocked);
-      setAnalysisCooldownText(cooldown.text);
+      setCanRequestAnalysis(!result.blocked);
+      setAnalysisCooldownText(result.text || "");
     } catch (err) {
       console.error("Cooldown check failed:", err);
-      setCanRequestAnalysis(true);
-      setAnalysisCooldownText("");
+      setCanRequestAnalysis(false);
+      setAnalysisCooldownText("جاري التحقق من إمكانية إرسال طلب تحليل جديد...");
     }
   };
 
@@ -222,11 +218,17 @@ export default function Home() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.success) {
+        if (response.status === 429 && result?.error) {
+          setCanRequestAnalysis(false);
+          setAnalysisCooldownText(result.error);
+        }
+
         throw new Error(result?.error || `فشل إرسال طلب التحليل. كود الخطأ: ${response.status}`);
       }
 
       setCanRequestAnalysis(false);
       setAnalysisCooldownText("يمكنك إرسال طلب تحليل جديد بعد 24 ساعة و 0 دقيقة");
+      await refreshAnalysisCooldown(user);
       setAnalysisCoin("");
       setAnalysisFrame("");
       setSuccessModal({
