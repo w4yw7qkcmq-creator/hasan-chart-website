@@ -18,6 +18,16 @@ const getSupabaseAdmin = () => {
   });
 };
 
+const ANALYSIS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+const getCooldownText = (remainingMs) => {
+  const safeRemaining = Math.max(0, Number(remainingMs) || 0);
+  const hours = Math.floor(safeRemaining / (60 * 60 * 1000));
+  const minutes = Math.ceil((safeRemaining % (60 * 60 * 1000)) / (60 * 1000));
+
+  return `يمكنك إرسال طلب تحليل جديد بعد ${hours} ساعة و ${minutes} دقيقة`;
+};
+
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -40,11 +50,51 @@ export async function POST(req) {
     }
     const supabase = getSupabaseAdmin();
 
-    const { error } = await supabase
+    const normalizedEmail = String(user_email || "").trim().toLowerCase();
+
+    const { data: latestRequest, error: latestRequestError } = await supabase
+      .from("analysis_requests")
+      .select("created_at")
+      .eq("user_email", normalizedEmail)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestRequestError) {
+      console.error("ANALYSIS COOLDOWN CHECK ERROR:", latestRequestError);
+
+      return Response.json(
+        {
+          success: false,
+          error: "تعذر التحقق من مدة الانتظار. جرّب مرة ثانية.",
+          details: latestRequestError,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (latestRequest?.created_at) {
+      const lastRequestTime = new Date(latestRequest.created_at).getTime();
+      const remainingMs = ANALYSIS_COOLDOWN_MS - (Date.now() - lastRequestTime);
+
+      if (Number.isFinite(remainingMs) && remainingMs > 0) {
+        return Response.json(
+          {
+            success: false,
+            error: getCooldownText(remainingMs),
+            remainingMs,
+            lastRequestAt: latestRequest.created_at,
+          },
+          { status: 429 }
+        );
+      }
+    }
+
+    const { data: insertedRequest, error } = await supabase
       .from("analysis_requests")
       .insert([
         {
-          user_email,
+          user_email: normalizedEmail,
           username,
           coin,
           frame,
@@ -54,7 +104,9 @@ export async function POST(req) {
           reply: "",
           reply_image: "",
         },
-      ]);
+      ])
+      .select("id, created_at")
+      .single();
 
     if (error) {
       console.error("ANALYSIS INSERT ERROR:", error);
@@ -72,6 +124,7 @@ export async function POST(req) {
     return Response.json({
       success: true,
       message: "تم استلام طلب التحليل بنجاح ✅",
+      data: insertedRequest,
     });
   } catch (err) {
     console.error("API ERROR:", err);
