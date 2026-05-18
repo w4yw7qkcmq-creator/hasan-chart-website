@@ -7,6 +7,7 @@ const { createClient } = require("@supabase/supabase-js");
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
+const openaiApiKey = process.env.OPENAI_API_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error("❌ Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in worker/.env");
@@ -81,6 +82,218 @@ const getMarketPrice = async (symbol) => {
   }
 
   throw new Error(`تعذر جلب سعر ${cleanSymbol} من OKX`);
+};
+
+const extractJsonObject = (value) => {
+  const text = String(value || "").trim();
+
+  try {
+    return JSON.parse(text);
+  } catch (_error) {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+
+    if (start >= 0 && end > start) {
+      return JSON.parse(text.slice(start, end + 1));
+    }
+
+    throw new Error("INVALID_AI_JSON");
+  }
+};
+
+const buildAnalysisChartImage = ({ symbol, currentPrice, direction, entry, stopLoss, target1, target2 }) => {
+  const safeSymbol = escapeHtml(symbol);
+  const safeCurrent = escapeHtml(formatNumber(currentPrice));
+  const safeEntry = escapeHtml(formatNumber(entry));
+  const safeStop = escapeHtml(formatNumber(stopLoss));
+  const safeTarget1 = escapeHtml(formatNumber(target1));
+  const safeTarget2 = escapeHtml(formatNumber(target2));
+  const isBullish = String(direction || "").toLowerCase().includes("bull");
+  const path = isBullish
+    ? "M70 355 C160 330 210 290 285 305 C365 322 405 240 485 250 C560 260 600 170 705 135"
+    : "M70 135 C160 160 210 210 285 195 C365 178 405 260 485 250 C560 240 600 330 705 355";
+  const arrowPoints = isBullish ? "705,135 682,128 692,154" : "705,355 682,362 692,336";
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020617"/>
+      <stop offset="55%" stop-color="#07142f"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="720" fill="url(#bg)"/>
+  <g opacity="0.16" stroke="#94a3b8" stroke-width="1">
+    ${Array.from({ length: 12 }, (_, i) => `<line x1="${80 + i * 90}" y1="90" x2="${80 + i * 90}" y2="620"/>`).join("")}
+    ${Array.from({ length: 7 }, (_, i) => `<line x1="60" y1="${110 + i * 75}" x2="1140" y2="${110 + i * 75}"/>`).join("")}
+  </g>
+  <text x="80" y="70" fill="#ffffff" font-size="34" font-weight="900" font-family="Arial">HasaN CharT World</text>
+  <text x="80" y="108" fill="#67e8f9" font-size="24" font-weight="800" font-family="Arial">${safeSymbol} · SMC / ICT / CLASSIC</text>
+  <rect x="770" y="58" width="330" height="74" rx="24" fill="#0b1b3a" stroke="#22d3ee" stroke-opacity="0.28"/>
+  <text x="800" y="92" fill="#94a3b8" font-size="18" font-family="Arial">Current Price</text>
+  <text x="800" y="120" fill="#ffffff" font-size="28" font-weight="900" font-family="Arial">${safeCurrent}</text>
+
+  <rect x="110" y="190" width="360" height="92" rx="22" fill="#022c22" fill-opacity="0.72" stroke="#34d399" stroke-opacity="0.7"/>
+  <text x="135" y="225" fill="#6ee7b7" font-size="18" font-weight="800" font-family="Arial">Demand / Order Block</text>
+  <text x="135" y="258" fill="#ffffff" font-size="24" font-weight="900" font-family="Arial">Entry: ${safeEntry}</text>
+
+  <rect x="700" y="166" width="340" height="80" rx="22" fill="#172554" fill-opacity="0.82" stroke="#60a5fa" stroke-opacity="0.75"/>
+  <text x="725" y="198" fill="#93c5fd" font-size="18" font-weight="800" font-family="Arial">Liquidity / Target Zone</text>
+  <text x="725" y="228" fill="#ffffff" font-size="23" font-weight="900" font-family="Arial">T1 ${safeTarget1} · T2 ${safeTarget2}</text>
+
+  <rect x="130" y="462" width="330" height="70" rx="20" fill="#450a0a" fill-opacity="0.72" stroke="#f87171" stroke-opacity="0.7"/>
+  <text x="155" y="505" fill="#fecaca" font-size="22" font-weight="900" font-family="Arial">Invalidation / SL: ${safeStop}</text>
+
+  <path d="${path}" fill="none" stroke="url(#line)" stroke-width="9" stroke-linecap="round" filter="url(#glow)"/>
+  <polygon points="${arrowPoints}" fill="#22d3ee" filter="url(#glow)"/>
+
+  <circle cx="285" cy="305" r="8" fill="#22d3ee"/>
+  <circle cx="485" cy="250" r="8" fill="#22d3ee"/>
+  <circle cx="705" cy="${isBullish ? 135 : 355}" r="10" fill="#34d399"/>
+
+  <text x="80" y="650" fill="#cbd5e1" font-size="20" font-family="Arial">Educational analysis only · Manage risk strictly · Not financial advice</text>
+</svg>`;
+
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+};
+
+const getFallbackAnalysis = ({ symbol, currentPrice }) => {
+  const base = Number(currentPrice) || 1;
+  const entry = base;
+  const stopLoss = base * 0.985;
+  const target1 = base * 1.015;
+  const target2 = base * 1.03;
+
+  return {
+    success: true,
+    symbol,
+    trend: "neutral",
+    direction: "neutral",
+    currentPrice: base,
+    summary: `تحليل ${symbol}: السعر حالياً عند ${formatNumber(base)}. الأفضل انتظار كسر واضح أو إعادة اختبار قبل الدخول.`,
+    smartMoney: "SMC/ICT: راقب مناطق السيولة القريبة وأي CHOCH أو BOS واضح قبل اتخاذ القرار.",
+    classic: "كلاسيكي: الاتجاه يحتاج تأكيد عبر كسر مقاومة أو فقدان دعم قريب.",
+    risk: "إدارة المخاطر: لا تدخل بدون وقف خسارة واضح ولا تخاطر بأكثر من نسبة صغيرة من رأس المال.",
+    entry,
+    stopLoss,
+    target1,
+    target2,
+    confidence: 55,
+    scenario: "انتظار تأكيد الحركة هو الخيار الأفضل حالياً.",
+    chartImage: buildAnalysisChartImage({
+      symbol,
+      currentPrice: base,
+      direction: "neutral",
+      entry,
+      stopLoss,
+      target1,
+      target2,
+    }),
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+const generateOpenAiAnalysis = async ({ symbol, currentPrice }) => {
+  if (!openaiApiKey) {
+    return getFallbackAnalysis({ symbol, currentPrice });
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0.35,
+      max_tokens: 750,
+      messages: [
+        {
+          role: "system",
+          content:
+            "أنت محلل كريبتو احترافي لمنصة HasaN CharT World. اكتب تحليل عربي مختصر ومفيد فقط. اجمع بين SMC و ICT والمدرسة الكلاسيكية. لا تقدم وعود ربح. أعد JSON صالح فقط بدون markdown.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            symbol,
+            currentPrice,
+            requiredOutput: {
+              trend: "bullish | bearish | neutral",
+              direction: "bullish | bearish | neutral",
+              summary: "سطرين كحد أقصى",
+              smartMoney: "قراءة SMC/ICT مختصرة",
+              classic: "قراءة كلاسيكية مختصرة",
+              risk: "إدارة مخاطر مختصرة",
+              entry: "number",
+              stopLoss: "number",
+              target1: "number",
+              target2: "number",
+              confidence: "number 0-100",
+              scenario: "سيناريو الحركة المتوقعة باختصار",
+            },
+          }),
+        },
+      ],
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    console.log("❌ OpenAI analysis error:", JSON.stringify(data, null, 2));
+    return getFallbackAnalysis({ symbol, currentPrice });
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  const parsed = extractJsonObject(content);
+
+  const entry = Number(parsed.entry) || Number(currentPrice);
+  const stopLoss = Number(parsed.stopLoss) || Number(currentPrice) * 0.985;
+  const target1 = Number(parsed.target1) || Number(currentPrice) * 1.015;
+  const target2 = Number(parsed.target2) || Number(currentPrice) * 1.03;
+  const direction = String(parsed.direction || parsed.trend || "neutral").toLowerCase();
+
+  return {
+    success: true,
+    symbol,
+    trend: parsed.trend || direction,
+    direction,
+    currentPrice,
+    summary: parsed.summary || `تحليل ${symbol} عند ${formatNumber(currentPrice)}.` ,
+    smartMoney: parsed.smartMoney || "راقب السيولة ومناطق الطلب والعرض قبل الدخول.",
+    classic: parsed.classic || "انتظر تأكيد الكسر أو إعادة الاختبار.",
+    risk: parsed.risk || "التزم بإدارة المخاطر ووقف خسارة واضح.",
+    entry,
+    stopLoss,
+    target1,
+    target2,
+    confidence: Number(parsed.confidence) || 60,
+    scenario: parsed.scenario || "الحركة المتوقعة تحتاج تأكيد من الإغلاق القادم.",
+    chartImage: buildAnalysisChartImage({
+      symbol,
+      currentPrice,
+      direction,
+      entry,
+      stopLoss,
+      target1,
+      target2,
+    }),
+    generatedAt: new Date().toISOString(),
+  };
 };
 
 const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, currentPrice }) => {
@@ -324,26 +537,12 @@ app.post("/api/instant-analysis", async (req, res) => {
     process.nextTick(async () => {
       try {
         const currentPrice = await getMarketPrice(symbol);
-
-        const fakeAnalysis = {
-          success: true,
-          symbol,
-          trend: currentPrice > 0 ? "bullish" : "neutral",
-          currentPrice,
-          summary:
-            "تحليل احترافي مبدئي يعتمد على SMC و ICT والمدرسة الكلاسيكية مع مراقبة السيولة ومناطق الطلب والعرض.",
-          smartMoney:
-            "يوجد اهتمام شرائي واضح مع احتمالية استهداف مناطق سيولة أعلى إذا استمر الثبات فوق المنطقة الحالية.",
-          risk:
-            "يفضل انتظار تأكيد إضافي قبل الدخول الكامل وإدارة المخاطر بدقة.",
-          chartImage: null,
-          generatedAt: new Date().toISOString(),
-        };
+        const analysis = await generateOpenAiAnalysis({ symbol, currentPrice });
 
         analysisJobs.set(jobId, {
           id: jobId,
           status: "completed",
-          result: fakeAnalysis,
+          result: analysis,
           completedAt: new Date().toISOString(),
         });
       } catch (error) {
