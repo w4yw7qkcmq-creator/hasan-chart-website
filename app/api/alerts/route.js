@@ -27,6 +27,53 @@ const normalizeText = (value, maxLength) => {
     .slice(0, maxLength);
 };
 
+const normalizeSymbol = (value) => {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+};
+
+const getOkxMarketPrice = async (symbol) => {
+  const cleanSymbol = normalizeSymbol(symbol);
+
+  if (!cleanSymbol) {
+    throw new Error("EMPTY_SYMBOL");
+  }
+
+  const okxSymbol = cleanSymbol.replace("USDT", "-USDT");
+
+  const response = await fetch(
+    `https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(okxSymbol)}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  const data = await response.json().catch(() => null);
+  const currentPrice = Number(data?.data?.[0]?.last);
+
+  if (Number.isFinite(currentPrice)) {
+    return currentPrice;
+  }
+
+  throw new Error(`تعذر جلب سعر ${cleanSymbol} من OKX`);
+};
+
+const resolveAlertCondition = async ({ coin, targetPrice, condition }) => {
+  const cleanCondition = String(condition || "auto")
+    .trim()
+    .toLowerCase();
+
+  if (cleanCondition === "above" || cleanCondition === "below") {
+    return cleanCondition;
+  }
+
+  const currentPrice = await getOkxMarketPrice(coin);
+
+  return Number(targetPrice) >= currentPrice ? "above" : "below";
+};
+
 export async function POST(req) {
   try {
     const body = await req.json().catch(() => null);
@@ -35,7 +82,7 @@ export async function POST(req) {
     const price = normalizeText(body?.price, 30);
     const user_email = normalizeText(body?.user_email, 120).toLowerCase();
     const username = normalizeText(body?.username, 120);
-    const condition = normalizeText(body?.condition, 20) || "above";
+    const condition = normalizeText(body?.condition, 20) || "auto";
 
     if (!coin || !price || !user_email) {
       return Response.json(
@@ -49,6 +96,12 @@ export async function POST(req) {
 
     const supabase = getSupabaseAdmin();
 
+    const resolvedCondition = await resolveAlertCondition({
+      coin,
+      targetPrice: Number(price),
+      condition,
+    });
+
     const { data, error } = await supabase
       .from("price_alerts")
       .insert([
@@ -57,7 +110,7 @@ export async function POST(req) {
           username,
           coin,
           target_price: price,
-          condition,
+          condition: resolvedCondition,
           status: "active",
         },
       ])

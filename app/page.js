@@ -31,7 +31,6 @@ export default function Home() {
   const [canRequestAnalysis, setCanRequestAnalysis] = useState(true);
   const [alertCoin, setAlertCoin] = useState("");
   const [alertPrice, setAlertPrice] = useState("");
-  const [alertCondition, setAlertCondition] = useState("above");
   const [alertSubmitting, setAlertSubmitting] = useState(false);
   const [chartSymbol, setChartSymbol] = useState("BTCUSDT");
   const [chartSearch, setChartSearch] = useState("BTCUSDT");
@@ -332,7 +331,7 @@ export default function Home() {
           username: user.username || user.email,
           coin: cleanCoin,
           price: cleanPrice,
-          condition: alertCondition,
+          condition: "auto",
         }),
       });
 
@@ -349,7 +348,6 @@ export default function Home() {
 
       setAlertCoin("");
       setAlertPrice("");
-      setAlertCondition("above");
     } catch (err) {
       console.error("Submit alert error:", err);
 
@@ -635,14 +633,9 @@ export default function Home() {
               className="input"
             />
 
-            <select
-              value={alertCondition}
-              onChange={(e) => setAlertCondition(e.target.value)}
-              className="input"
-            >
-              <option value="above">عند الصعود فوق السعر</option>
-              <option value="below">عند الهبوط تحت السعر</option>
-            </select>
+            <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-center text-sm font-bold leading-7 text-blue-100">
+              اكتب السعر فقط، وسيتم تفعيل التنبيه تلقائيًا عند ملامسة السعر المحدد.
+            </div>
 
             <button
               onClick={submitAlert}
