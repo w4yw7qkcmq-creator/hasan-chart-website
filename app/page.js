@@ -135,6 +135,14 @@ export default function Home() {
         return;
       }
 
+      if (text.includes("تم استلام طلب التحليل")) {
+        setSuccessModal({
+          title: "تم استلام طلب التحليل بنجاح",
+          message: "سيتم مراجعة طلبك وإرسال الرد من الإدارة قريبًا.",
+        });
+        return;
+      }
+
       originalAlert(message);
     };
 
@@ -221,7 +229,10 @@ export default function Home() {
       setAnalysisCooldownText("يمكنك إرسال طلب تحليل جديد بعد 24 ساعة و 0 دقيقة");
       setAnalysisCoin("");
       setAnalysisFrame("");
-      alert(result?.message || "تم استلام طلب التحليل وسيتم معالجته قريبًا ✅");
+      setSuccessModal({
+        title: "تم استلام طلب التحليل بنجاح",
+        message: "سيتم مراجعة طلبك وإرسال الرد من الإدارة قريبًا.",
+      });
     } catch (err) {
       console.error("Submit analysis error:", err);
 
