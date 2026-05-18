@@ -95,7 +95,7 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
     body: JSON.stringify({
       from: "HasaN CharT World <alerts@hasanchartworld.com>",
       to: email,
-      subject: `🔔 تحقق تنبيه ${safeCoin}`,
+      subject: `🔔 تحقق تنبيه ${safeCoin} - V2`,
       html: `
 <div style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;color:#ffffff;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#020617;margin:0;padding:0;width:100%;">
@@ -299,5 +299,5 @@ async function checkPriceAlerts() {
 
 setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
 
-console.log("🚀 Price Alerts Worker started...");
+console.log("🚀 Price Alerts Worker started - EMAIL TEMPLATE V2 OKX...");
 checkPriceAlerts();
