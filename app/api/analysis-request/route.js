@@ -28,6 +28,79 @@ const getCooldownText = (remainingMs) => {
   return `يمكنك إرسال طلب تحليل جديد بعد ${hours} ساعة و ${minutes} دقيقة`;
 };
 
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const userEmail = String(searchParams.get("email") || "").trim().toLowerCase();
+
+    if (!userEmail) {
+      return Response.json(
+        {
+          success: false,
+          error: "البريد الإلكتروني مطلوب",
+        },
+        { status: 400 }
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    const { data: latestRequest, error } = await supabase
+      .from("analysis_requests")
+      .select("created_at")
+      .eq("user_email", userEmail)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("ANALYSIS COOLDOWN GET ERROR:", error);
+
+      return Response.json(
+        {
+          success: false,
+          error: "تعذر التحقق من مدة الانتظار. جرّب مرة ثانية.",
+          details: error,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!latestRequest?.created_at) {
+      return Response.json({
+        success: true,
+        blocked: false,
+        text: "",
+        remainingMs: 0,
+        lastRequestAt: null,
+      });
+    }
+
+    const lastRequestTime = new Date(latestRequest.created_at).getTime();
+    const remainingMs = ANALYSIS_COOLDOWN_MS - (Date.now() - lastRequestTime);
+    const blocked = Number.isFinite(remainingMs) && remainingMs > 0;
+
+    return Response.json({
+      success: true,
+      blocked,
+      text: blocked ? getCooldownText(remainingMs) : "",
+      remainingMs: blocked ? remainingMs : 0,
+      lastRequestAt: latestRequest.created_at,
+    });
+  } catch (err) {
+    console.error("API GET ERROR:", err);
+
+    return Response.json(
+      {
+        success: false,
+        error: err.message || "Server Error",
+        details: err,
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req) {
   try {
     const body = await req.json();
