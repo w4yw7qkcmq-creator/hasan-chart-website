@@ -93,7 +93,7 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
       Authorization: `Bearer ${resendApiKey}`,
     },
     body: JSON.stringify({
-      from: "HasaN CharT World <alerts@hasanchartworld.com>",
+      from: "onboarding@resend.dev",
       to: email,
       subject: `🔔 تحقق تنبيه ${safeCoin} - V2`,
       html: `
