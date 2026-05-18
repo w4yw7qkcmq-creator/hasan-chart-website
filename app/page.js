@@ -139,6 +139,12 @@ export default function Home() {
         return;
       }
 
+      if (text.includes("يمكنك إرسال طلب تحليل جديد بعد") || text.includes("يمكنك طلب تحليل عملة مرة واحدة كل 24 ساعة")) {
+        setCanRequestAnalysis(false);
+        setAnalysisCooldownText(text.replace("يمكنك طلب تحليل عملة مرة واحدة كل 24 ساعة. ", ""));
+        return;
+      }
+
       originalAlert(message);
     };
 
@@ -191,7 +197,9 @@ export default function Home() {
     }
 
     if (!canRequestAnalysis) {
-      alert("يمكنك طلب تحليل عملة مرة واحدة كل 24 ساعة. " + analysisCooldownText);
+      setAnalysisCooldownText(
+        analysisCooldownText || "يمكنك إرسال طلب تحليل جديد بعد انتهاء مدة الانتظار"
+      );
       return;
     }
 
@@ -221,6 +229,7 @@ export default function Home() {
         if (response.status === 429 && result?.error) {
           setCanRequestAnalysis(false);
           setAnalysisCooldownText(result.error);
+          return;
         }
 
         throw new Error(result?.error || `فشل إرسال طلب التحليل. كود الخطأ: ${response.status}`);
@@ -599,7 +608,7 @@ export default function Home() {
             </button>
 
             {analysisCooldownText && (
-              <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-center text-sm font-bold text-amber-100">
+              <div className="mt-4 rounded-2xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-center text-sm font-bold leading-7 text-blue-100 shadow-[0_0_18px_rgba(59,130,246,0.18)]">
                 ⏳ {analysisCooldownText}
               </div>
             )}
