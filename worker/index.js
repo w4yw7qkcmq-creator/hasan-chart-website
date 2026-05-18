@@ -50,6 +50,42 @@ const formatNumber = (value) => {
   });
 };
 
+const getCoinGeckoId = (symbol) => {
+  const baseSymbol = normalizeSymbol(symbol).replace(/USDT$/, "");
+
+  const coinMap = {
+    BTC: "bitcoin",
+    ETH: "ethereum",
+    SOL: "solana",
+    BNB: "binancecoin",
+    XRP: "ripple",
+    ADA: "cardano",
+    DOGE: "dogecoin",
+    TRX: "tron",
+    LINK: "chainlink",
+    AVAX: "avalanche-2",
+    DOT: "polkadot",
+    MATIC: "matic-network",
+    POL: "polygon-ecosystem-token",
+    LTC: "litecoin",
+    BCH: "bitcoin-cash",
+    TON: "the-open-network",
+    SHIB: "shiba-inu",
+    PEPE: "pepe",
+    SUI: "sui",
+    NEAR: "near",
+    UNI: "uniswap",
+    APT: "aptos",
+    ARB: "arbitrum",
+    OP: "optimism",
+    ETC: "ethereum-classic",
+    FIL: "filecoin",
+    ATOM: "cosmos",
+  };
+
+  return coinMap[baseSymbol] || null;
+};
+
 const getMarketPrice = async (symbol) => {
   const cleanSymbol = normalizeSymbol(symbol);
 
@@ -57,27 +93,61 @@ const getMarketPrice = async (symbol) => {
     throw new Error("EMPTY_SYMBOL");
   }
 
-  const urls = [
-    `https://api.bybit.com/v5/market/tickers?category=spot&symbol=${cleanSymbol}`,
-    `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${cleanSymbol}`,
+  const bybitUrls = [
+    `https://api.bybit.com/v5/market/tickers?category=spot&symbol=${encodeURIComponent(cleanSymbol)}`,
+    `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(cleanSymbol)}`,
   ];
 
-  for (const url of urls) {
+  for (const url of bybitUrls) {
     try {
-      const response = await fetch(url);
-      const data = await response.json();
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "HasaN-CharT-World-Price-Alerts/1.0",
+        },
+      });
 
+      const data = await response.json().catch(() => null);
       const price = Number(data?.result?.list?.[0]?.lastPrice);
 
-      if (Number.isFinite(price)) {
+      if (response.ok && data?.retCode === 0 && Number.isFinite(price)) {
         return price;
       }
-    } catch (err) {
-      console.log("❌ API failed:", url);
+
+      console.log("⚠️ Bybit did not return a valid price:", cleanSymbol, data?.retMsg || response.status);
+    } catch (error) {
+      console.log("⚠️ Bybit endpoint failed:", cleanSymbol, error?.message || error);
     }
   }
 
-  throw new Error(`تعذر جلب سعر ${cleanSymbol}`);
+  const coinGeckoId = getCoinGeckoId(cleanSymbol);
+
+  if (coinGeckoId) {
+    try {
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coinGeckoId)}&vs_currencies=usd`,
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "HasaN-CharT-World-Price-Alerts/1.0",
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+      const price = Number(data?.[coinGeckoId]?.usd);
+
+      if (response.ok && Number.isFinite(price)) {
+        return price;
+      }
+
+      console.log("⚠️ CoinGecko did not return a valid price:", cleanSymbol, response.status);
+    } catch (error) {
+      console.log("⚠️ CoinGecko endpoint failed:", cleanSymbol, error?.message || error);
+    }
+  }
+
+  throw new Error(`تعذر جلب سعر ${cleanSymbol} من Bybit أو CoinGecko`);
 };
 
 const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, currentPrice }) => {
@@ -102,7 +172,7 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
     body: JSON.stringify({
       from: "HasaN CharT World <alerts@hasanchartworld.com>",
       to: email,
-      subject: `🔔 تحقق تنبيه ${safeCoin}`,
+      subject: `🔔 تم تفعيل تنبيه ${safeCoin}`,
       html: `
 <div style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;color:#ffffff;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#020617;margin:0;padding:0;width:100%;">
