@@ -17,6 +17,7 @@ const withTimeout = (promise, ms, message = "REQUEST_TIMEOUT") => {
 
 export default function Home() {
   const [activeNotice, setActiveNotice] = useState("");
+  const [successModal, setSuccessModal] = useState(null);
   const [prices, setPrices] = useState({
     BTCUSDT: "0",
     ETHUSDT: "0",
@@ -297,12 +298,10 @@ export default function Home() {
         throw new Error(result?.error || `فشل إنشاء التنبيه. كود الخطأ: ${response.status}`);
       }
 
-      alert(
-        result?.message ||
-          (alertCondition === "above"
-            ? `تم إنشاء تنبيه ${cleanCoin} عند الصعود إلى ${cleanPrice}$`
-            : `تم إنشاء تنبيه ${cleanCoin} عند الهبوط إلى ${cleanPrice}$`)
-      );
+      setSuccessModal({
+        title: "تم إضافة التنبيه بنجاح",
+        message: "وسيتم إرسال الإيميل فقط عند تحقق السعر.",
+      });
 
       setAlertCoin("");
       setAlertPrice("");
@@ -329,6 +328,52 @@ export default function Home() {
             <span>{activeNotice}</span>
             <button onClick={() => setActiveNotice("")}>✕</button>
           </div>
+        </div>
+      )}
+
+      {successModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm">
+          <div className="successAlertCard w-full max-w-[620px] rounded-[32px] p-8 text-center shadow-2xl md:p-10" dir="rtl">
+            <div className="mx-auto mb-7 flex h-24 w-24 items-center justify-center rounded-full border-[5px] border-emerald-400 text-6xl font-black text-emerald-400 shadow-[0_0_34px_rgba(52,211,153,0.35)]">
+              ✓
+            </div>
+
+            <h3 className="text-3xl font-black leading-relaxed md:text-4xl">
+              {successModal.title}
+            </h3>
+
+            <p className="mt-4 text-lg font-semibold leading-9 text-slate-600 dark:text-slate-300 md:text-xl">
+              {successModal.message}
+            </p>
+
+            <div className="mt-10 flex justify-start">
+              <button
+                type="button"
+                onClick={() => setSuccessModal(null)}
+                className="rounded-2xl px-5 py-3 text-lg font-black text-blue-500 transition hover:text-blue-400"
+              >
+                حسنًا
+              </button>
+            </div>
+          </div>
+
+          <style jsx>{`
+            .successAlertCard {
+              background: rgba(255, 255, 255, 0.96);
+              color: #020617;
+              border: 1px solid rgba(148, 163, 184, 0.28);
+              box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+            }
+
+            @media (prefers-color-scheme: dark) {
+              .successAlertCard {
+                background: radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 34%), #07142f;
+                color: #ffffff;
+                border: 1px solid rgba(59, 130, 246, 0.9);
+                box-shadow: 0 0 42px rgba(37, 99, 235, 0.32), 0 24px 70px rgba(0, 0, 0, 0.42);
+              }
+            }
+          `}</style>
         </div>
       )}
 
