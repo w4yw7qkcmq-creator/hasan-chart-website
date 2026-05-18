@@ -120,6 +120,28 @@ export default function Home() {
 
     return () => ws.close();
   }, []);
+
+  useEffect(() => {
+    const originalAlert = window.alert;
+
+    window.alert = (message) => {
+      const text = String(message || "");
+
+      if (text.includes("تم إضافة التنبيه بنجاح") || text.includes("سيتم إرسال الإيميل فقط عند تحقق السعر")) {
+        setSuccessModal({
+          title: "تم إضافة التنبيه بنجاح",
+          message: "وسيتم إرسال الإيميل فقط عند تحقق السعر.",
+        });
+        return;
+      }
+
+      originalAlert(message);
+    };
+
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, []);
   
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("currentUser") || "null");
