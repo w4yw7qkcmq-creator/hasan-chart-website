@@ -275,7 +275,7 @@ async function checkPriceAlerts() {
       });
 
       if (!emailResult.sent) {
-        console.log("❌ Alert email failed:", emailResult);
+        console.log("❌ Alert email failed:", JSON.stringify(emailResult, null, 2));
         continue;
       }
 
