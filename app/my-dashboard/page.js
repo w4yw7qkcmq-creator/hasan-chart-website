@@ -73,6 +73,7 @@ export default function MyDashboard() {
   const [myAnalysis, setMyAnalysis] = useState([]);
   const [aiSymbol, setAiSymbol] = useState("BTCUSDT");
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiLoadingText, setAiLoadingText] = useState("");
   const [aiError, setAiError] = useState("");
   const [aiResult, setAiResult] = useState(null);
   const [showAiAnalysis, setShowAiAnalysis] = useState(true);
@@ -109,7 +110,7 @@ export default function MyDashboard() {
   };
 
   const analyzeCoinWithAI = async () => {
-    const symbol = aiSymbol.trim().toUpperCase();
+    const symbol = aiSymbol.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 
     if (!symbol) {
       setAiError("اكتب رمز العملة أولاً مثل BTCUSDT");
@@ -117,16 +118,34 @@ export default function MyDashboard() {
     }
 
     setAiLoading(true);
+    setAiLoadingText("جاري تجهيز طلب التحليل...");
     setAiError("");
     setAiResult(null);
+    setShowAiAnalysis(true);
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("ANALYSIS_TIMEOUT")), 45000);
+    });
 
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-coin", {
-        body: { symbol },
+      setAiLoadingText("جاري الاتصال بسيرفر التحليل...");
+
+      const analysisPromise = supabase.functions.invoke("analyze-coin", {
+        body: {
+          symbol,
+          source: "my-dashboard",
+          mode: "professional-smc-ict-classic",
+          requestChart: true,
+          schools: ["SMC", "ICT", "CLASSIC"],
+        },
       });
 
+      setAiLoadingText("جاري قراءة بيانات السوق وتوليد التحليل...");
+
+      const { data, error } = await Promise.race([analysisPromise, timeoutPromise]);
+
       if (error) {
-        setAiError(error.message || "فشل تحليل العملة");
+        setAiError(error.message || "فشل تحليل العملة من السيرفر");
         return;
       }
 
@@ -135,11 +154,20 @@ export default function MyDashboard() {
         return;
       }
 
-      setAiResult(data);
+      setAiLoadingText("تم تجهيز التحليل بنجاح");
+      setAiResult({
+        ...data,
+        symbol: data.symbol || symbol,
+      });
     } catch (err) {
-      setAiError("حدث خطأ أثناء الاتصال بخدمة التحليل");
+      if (err?.message === "ANALYSIS_TIMEOUT") {
+        setAiError("استغرق التحليل وقتاً طويلاً. سنربطه بالـ Worker ليعمل بالخلفية بدون تعليق الصفحة.");
+      } else {
+        setAiError(err?.message || "حدث خطأ أثناء الاتصال بخدمة التحليل");
+      }
     } finally {
       setAiLoading(false);
+      setAiLoadingText("");
     }
   };
 
@@ -234,7 +262,7 @@ export default function MyDashboard() {
               </span>
               <h2 className="mt-4 text-3xl font-black">تحليل العملات لحظياً</h2>
               <p className="mt-2 max-w-3xl leading-7 text-slate-400">
-                تحليل لحظي احترافي يعتمد على Smart Money Concepts و ICT مع كشف السيولة و BOS و CHOCH.
+                تحليل لحظي احترافي يجمع بين SMC و ICT والمدرسة الكلاسيكية مع قراءة السيولة و BOS و CHOCH ومناطق العرض والطلب.
               </p>
             </div>
 
@@ -252,11 +280,16 @@ export default function MyDashboard() {
               <button
                 onClick={analyzeCoinWithAI}
                 disabled={aiLoading}
-                className="min-h-14 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-7 font-black text-white"
+                className="min-h-14 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-7 font-black text-white shadow-[0_0_28px_rgba(37,99,235,0.28)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {aiLoading ? "جاري التحليل..." : "📈 أطلب تحليل لحظي الآن"}
               </button>
             </div>
+            {aiLoadingText && (
+              <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-center text-sm font-black leading-7 text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.16)] lg:max-w-xl">
+                {aiLoadingText}
+              </div>
+            )}
           </div>
 
           {aiError && (
@@ -319,6 +352,15 @@ export default function MyDashboard() {
                     </div>
                   </div>
 
+                  {aiResult.chartImage && (
+                    <div className="mt-6 overflow-hidden rounded-[28px] border border-cyan-300/15 bg-black/30 p-3 shadow-[0_0_40px_rgba(34,211,238,0.12)]">
+                      <img
+                        src={aiResult.chartImage}
+                        alt={`تحليل ${aiResult.symbol}`}
+                        className="w-full rounded-2xl object-contain"
+                      />
+                    </div>
+                  )}
                   <div className="mt-6 grid gap-6 xl:grid-cols-[0.42fr_0.58fr]">
                     <div className="overflow-hidden rounded-[28px] border border-emerald-400/15 bg-gradient-to-br from-[#03111f] via-[#041a2d] to-[#020617] p-5 shadow-[0_0_45px_rgba(16,185,129,0.12)]">
                       <div className="flex items-center justify-between">
