@@ -456,8 +456,8 @@ export default function MyDashboard() {
                       />
                     </div>
                   )}
-                  <div className="mt-6 grid gap-6 xl:grid-cols-[0.42fr_0.58fr]">
-                    <div className="overflow-hidden rounded-[28px] border border-emerald-400/15 bg-gradient-to-br from-[#03111f] via-[#041a2d] to-[#020617] p-5 shadow-[0_0_45px_rgba(16,185,129,0.12)]">
+                  <div className="mt-6 grid gap-6 xl:grid-cols-[0.32fr_0.68fr]">
+                    <div className="hidden overflow-hidden rounded-[28px] border border-emerald-400/15 bg-gradient-to-br from-[#03111f] via-[#041a2d] to-[#020617] p-5 shadow-[0_0_45px_rgba(16,185,129,0.12)] xl:block">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-bold text-emerald-300">الاتجاه العام</p>
@@ -481,7 +481,7 @@ export default function MyDashboard() {
                       </div>
                     </div>
 
-                    <div className="whitespace-pre-line rounded-2xl border border-cyan-300/15 bg-cyan-400/5 p-5 leading-8 text-slate-200">
+                    <div dir="rtl" className="whitespace-pre-line rounded-2xl border border-cyan-300/15 bg-white/95 p-6 text-right text-[15px] font-bold leading-9 text-slate-950 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.12)] dark:bg-cyan-400/5 dark:text-slate-100">
                       {aiResult.analysis}
                     </div>
                   </div>
