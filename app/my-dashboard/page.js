@@ -124,7 +124,7 @@ export default function MyDashboard() {
     }
 
     setAiLoading(true);
-    setAiLoadingText("جاري إرسال طلب التحليل إلى Railway...");
+    setAiLoadingText("جاري التحليل اللحظي...");
     setAiError("");
     setAiResult(null);
     setShowAiAnalysis(true);
@@ -218,12 +218,11 @@ export default function MyDashboard() {
         setAiLoadingText("تم تجهيز التحليل بنجاح");
         return;
       }
-
-      setAiLoadingText("تم استلام الطلب. جاري توليد التحليل والشارت على Railway...");
+      setAiLoadingText("جاري التحليل اللحظي...");
 
       for (let attempt = 1; attempt <= 45; attempt += 1) {
         await sleep(2000);
-        setAiLoadingText(`جاري تجهيز التحليل على Railway... ${attempt * 2} ثانية`);
+        setAiLoadingText("جاري التحليل اللحظي...");
 
         const statusResponse = await fetchWithTimeout(
           `${railwayAiWorkerUrl}/api/instant-analysis/${encodeURIComponent(data.jobId)}`,
@@ -377,12 +376,13 @@ export default function MyDashboard() {
                 disabled={aiLoading}
                 className="min-h-14 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-7 font-black text-white shadow-[0_0_28px_rgba(37,99,235,0.28)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {aiLoading ? "جاري التحليل..." : "📈 أطلب تحليل لحظي الآن"}
+                {aiLoading ? "جاري التحليل اللحظي" : "📈 أطلب تحليل لحظي الآن"}
               </button>
             </div>
             {aiLoadingText && (
-              <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-center text-sm font-black leading-7 text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.16)] lg:max-w-xl">
-                {aiLoadingText}
+              <div className="mt-4 flex items-center justify-center gap-4 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 text-center text-sm font-black leading-7 text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.16)] lg:max-w-xl">
+                <div className="h-9 w-9 shrink-0 animate-spin rounded-full border-4 border-cyan-200/40 border-t-cyan-300" />
+                <span>جاري التحليل اللحظي</span>
               </div>
             )}
           </div>
