@@ -82,8 +82,11 @@ function RealCandlestickChart({ result }) {
   const chartHeight = height - padding.top - padding.bottom;
   const highs = candles.map((candle) => Number(candle.high)).filter(Number.isFinite);
   const lows = candles.map((candle) => Number(candle.low)).filter(Number.isFinite);
-  const maxPrice = Math.max(...highs, Number(result?.target2 || 0), Number(result?.stopLoss || 0));
-  const minPrice = Math.min(...lows, Number(result?.target2 || Infinity), Number(result?.stopLoss || Infinity));
+  const maxRaw = Math.max(...highs, Number(result?.resistance || 0));
+  const minRaw = Math.min(...lows, Number(result?.support || Infinity));
+  const extra = Math.max((maxRaw - minRaw) * 0.14, Math.abs(maxRaw) * 0.002 || 1);
+  const maxPrice = maxRaw + extra;
+  const minPrice = minRaw - extra;
   const priceRange = Math.max(maxPrice - minPrice, Math.abs(maxPrice) * 0.01 || 1);
   const toY = (price) => padding.top + ((maxPrice - Number(price)) / priceRange) * chartHeight;
   const candleStep = chartWidth / Math.max(candles.length - 1, 1);
@@ -93,12 +96,9 @@ function RealCandlestickChart({ result }) {
   const isBullish = direction.includes("bull");
   const biasText = isBullish ? "Bullish" : isBearish ? "Bearish" : "Neutral";
 
-  const levels = [
-    { key: "entry", label: "ENTRY", value: Number(result?.entry), color: "#22c55e" },
-    { key: "stop", label: "SL", value: Number(result?.stopLoss), color: "#ef4444" },
-    { key: "target1", label: "TP1", value: Number(result?.target1), color: "#60a5fa" },
-    { key: "target2", label: "TP2", value: Number(result?.target2), color: "#38bdf8" },
-  ].filter((level) => Number.isFinite(level.value));
+  const signals = Array.isArray(result?.signals) ? result.signals.slice(0, 4) : [];
+  const currentPrice = Number(result?.currentPrice || candles[candles.length - 1]?.close || 0);
+  const currentPriceY = Number.isFinite(currentPrice) ? toY(currentPrice) : null;
 
   const resistanceY = Number.isFinite(Number(result?.resistance)) ? toY(result.resistance) : null;
   const supportY = Number.isFinite(Number(result?.support)) ? toY(result.support) : null;
@@ -125,10 +125,10 @@ function RealCandlestickChart({ result }) {
         <rect x="22" y="20" width={width - 44} height={height - 40} rx="26" fill="#020817" opacity="0.72" stroke="#155e75" strokeOpacity="0.42" />
 
         <text x="48" y="52" fill="#ffffff" fontSize="26" fontWeight="900">
-          {result?.symbol || "MARKET"} · Real OHLC Chart
+          {result?.symbol || "MARKET"} · Professional Market Structure
         </text>
         <text x="48" y="82" fill="#67e8f9" fontSize="16" fontWeight="800">
-          SMC / ICT / Classic · 15m candles from OKX
+          Real OKX 15m candles · Liquidity · Support / Resistance · Structure
         </text>
 
         <rect x={width - 255} y="38" width="205" height="54" rx="18" fill="#07142f" stroke="#22d3ee" strokeOpacity="0.38" />
@@ -169,18 +169,25 @@ function RealCandlestickChart({ result }) {
           </g>
         )}
 
-        {levels.map((level) => {
-          const y = toY(level.value);
-          return (
-            <g key={level.key}>
-              <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke={level.color} strokeWidth="2" strokeDasharray="8 8" strokeOpacity="0.84" />
-              <rect x={width - padding.right - 155} y={y - 16} width="150" height="32" rx="10" fill="#020817" stroke={level.color} strokeOpacity="0.55" />
-              <text x={width - padding.right - 142} y={y + 5} fill={level.color} fontSize="14" fontWeight="900">
-                {level.label} {level.value.toLocaleString(undefined, { maximumFractionDigits: 4 })}
-              </text>
-            </g>
-          );
-        })}
+        {currentPriceY && (
+          <g>
+            <line x1={padding.left} y1={currentPriceY} x2={width - padding.right} y2={currentPriceY} stroke="#67e8f9" strokeWidth="2" strokeDasharray="6 8" strokeOpacity="0.75" />
+            <rect x={width - padding.right - 170} y={currentPriceY - 16} width="165" height="32" rx="10" fill="#020817" stroke="#67e8f9" strokeOpacity="0.55" />
+            <text x={width - padding.right - 156} y={currentPriceY + 5} fill="#67e8f9" fontSize="14" fontWeight="900">
+              LIVE {currentPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+            </text>
+          </g>
+        )}
+
+        <g>
+          <rect x={padding.left + 14} y={padding.top + 14} width="380" height="128" rx="18" fill="#020817" fillOpacity="0.78" stroke="#22d3ee" strokeOpacity="0.22" />
+          <text x={padding.left + 34} y={padding.top + 44} fill="#e2e8f0" fontSize="15" fontWeight="900">Market Structure Notes</text>
+          {(signals.length ? signals : [result?.bos, result?.choch].filter(Boolean)).slice(0, 4).map((signal, index) => (
+            <text key={`signal-${index}`} x={padding.left + 34} y={padding.top + 72 + index * 22} fill="#cbd5e1" fontSize="13" fontWeight="700">
+              • {signal}
+            </text>
+          ))}
+        </g>
 
         {candles.map((candle, index) => {
           const x = padding.left + index * candleStep;
@@ -202,7 +209,7 @@ function RealCandlestickChart({ result }) {
         })}
 
         <text x="48" y={height - 38} fill="#cbd5e1" fontSize="14" fontWeight="700">
-          Real market candles · Entry/SL/TP drawn from AI + technical analysis · Educational only
+          Real market candles · Structure zones from recent OHLC data · Educational only
         </text>
       </svg>
     </div>
