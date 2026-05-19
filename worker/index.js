@@ -218,10 +218,15 @@ const analyzeCandles = (candles) => {
   const premiumLevel = support + range * 0.7;
   const discountLevel = support + range * 0.3;
   const setupReady = direction !== "neutral" && (brokeHigh || brokeLow || sweptHigh || sweptLow || volumeSpike);
+  const rawEntry = setupReady
+    ? direction === "bullish"
+      ? Math.min(orderBlockHigh, Math.max(orderBlockLow, discountLevel))
+      : Math.max(orderBlockLow, Math.min(orderBlockHigh, premiumLevel))
+    : null;
   const entry = setupReady
     ? direction === "bullish"
-      ? Math.max(orderBlockLow, Math.min(last.close, orderBlockHigh))
-      : Math.min(orderBlockHigh, Math.max(last.close, orderBlockLow))
+      ? Math.min(rawEntry, last.close * 0.999)
+      : Math.max(rawEntry, last.close * 1.001)
     : null;
   const stopLoss = setupReady
     ? direction === "bullish"
@@ -517,7 +522,7 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
         {
           role: "system",
           content:
-            "أنت محلل كريبتو مؤسساتي احترافي لمنصة HasaN CharT World. مهمتك إنشاء تحليل لحظي احترافي جداً مثل TradingView والمؤسسات المالية. استخدم مفاهيم SMC و ICT والمدرسة الكلاسيكية مع BOS و CHOCH و Liquidity Sweep و Order Blocks و Fair Value Gap و Premium/Discount و Supply & Demand. يجب أن يكون التحليل قصير جداً لكنه قوي واحترافي. اكتب بلغة عربية احترافية. أعطِ Bias واضح للحركة القادمة. حدّد هل السوق Bullish أو Bearish أو Neutral. أعطِ أفضل Entry و Stop Loss و Target 1 و Target 2 بدقة. اشرح أين توجد السيولة ولماذا قد يتحرك السعر إليها. اجعل التحليل يبدو وكأنه صادر من محلل مؤسساتي محترف. لا تكتب أي مقدمات أو تحذيرات طويلة. لا تقدم وعود ربح. أعد JSON صالح فقط بدون markdown أو أي نص خارجي.",
+            "أنت محلل كريبتو مؤسساتي احترافي لمنصة HasaN CharT World. مهمتك إنشاء تحليل لحظي احترافي جداً مثل TradingView والمؤسسات المالية بناءً على الشموع والبيانات الفنية المرسلة فقط، ولا تخترع مستويات من نفسك. استخدم SMC و ICT والمدرسة الكلاسيكية مع BOS و CHOCH و Liquidity Sweep و Order Blocks و Fair Value Gap و Premium/Discount و Supply & Demand. إذا كان الاتجاه Bearish فلا تجعل سعر الدخول تحت السعر الحالي؛ الدخول المنطقي يكون من إعادة اختبار أو منطقة عرض أعلى السعر الحالي. إذا كان الاتجاه Bullish فلا تجعل سعر الدخول فوق السعر الحالي؛ الدخول المنطقي يكون من إعادة اختبار أو منطقة طلب أسفل السعر الحالي. إذا لا يوجد إعداد مؤكد قل بوضوح لا يوجد دخول الآن. يجب أن يكون التحليل قصير جداً لكنه قوي واحترافي. لا تقدم وعود ربح. أعد JSON صالح فقط بدون markdown أو أي نص خارجي.",
         },
         {
           role: "user",
@@ -533,7 +538,7 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
               smartMoney: "قراءة SMC/ICT مختصرة",
               classic: "قراءة كلاسيكية مختصرة",
               risk: "إدارة مخاطر مختصرة",
-              entry: "number ويجب ألا يساوي السعر الحالي إلا إذا كان السعر فعلاً داخل منطقة الدخول",
+              entry: "number أو null. إذا كان Bearish يجب أن يكون الدخول أعلى السعر الحالي كإعادة اختبار. إذا كان Bullish يجب أن يكون الدخول أسفل السعر الحالي كإعادة اختبار. إذا لا يوجد Setup مؤكد اجعله null",
               stopLoss: "number",
               target1: "number",
               target2: "number",
@@ -573,11 +578,18 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
     return getFallbackAnalysis({ symbol, currentPrice, candles, technicalAnalysis });
   }
 
-  const entry = Number(parsed.entry) || Number(currentPrice);
-  const stopLoss = Number(parsed.stopLoss) || Number(currentPrice) * 0.985;
-  const target1 = Number(parsed.target1) || Number(currentPrice) * 1.015;
-  const target2 = Number(parsed.target2) || Number(currentPrice) * 1.03;
-  const direction = String(parsed.direction || parsed.trend || "neutral").toLowerCase();
+  const direction = String(parsed.direction || parsed.trend || technicalAnalysis?.direction || "neutral").toLowerCase();
+  const parsedEntry = Number(parsed.entry);
+  const correctedEntry =
+    Number.isFinite(Number(technicalAnalysis?.entry))
+      ? Number(technicalAnalysis.entry)
+      : Number.isFinite(parsedEntry)
+        ? parsedEntry
+        : null;
+  const entry = correctedEntry;
+  const stopLoss = Number.isFinite(Number(technicalAnalysis?.stopLoss)) ? Number(technicalAnalysis.stopLoss) : Number(parsed.stopLoss) || null;
+  const target1 = Number.isFinite(Number(technicalAnalysis?.target1)) ? Number(technicalAnalysis.target1) : Number(parsed.target1) || null;
+  const target2 = Number.isFinite(Number(technicalAnalysis?.target2)) ? Number(technicalAnalysis.target2) : Number(parsed.target2) || null;
 
   return {
     success: true,
@@ -585,14 +597,16 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
     trend: parsed.trend || direction,
     direction,
     currentPrice,
-    summary: parsed.summary || `تحليل ${symbol} عند ${formatNumber(currentPrice)}.` ,
+    summary: technicalAnalysis?.setupReady
+      ? parsed.summary || `تحليل ${symbol} عند ${formatNumber(currentPrice)} مع إعداد مراقبة مبني على هيكل السوق.`
+      : `تحليل ${symbol} عند ${formatNumber(currentPrice)}. لا يوجد دخول مباشر الآن حتى يظهر تأكيد واضح.` ,
     smartMoney: parsed.smartMoney || "راقب السيولة ومناطق الطلب والعرض قبل الدخول.",
     classic: parsed.classic || "انتظر تأكيد الكسر أو إعادة الاختبار.",
     risk: parsed.risk || "التزم بإدارة المخاطر ووقف خسارة واضح.",
-    entry: Number(parsed.entry) || technicalAnalysis?.entry || entry,
-    stopLoss: Number(parsed.stopLoss) || technicalAnalysis?.stopLoss || stopLoss,
-    target1: Number(parsed.target1) || technicalAnalysis?.target1 || target1,
-    target2: Number(parsed.target2) || technicalAnalysis?.target2 || target2,
+    entry,
+    stopLoss,
+    target1,
+    target2,
     confidence: Number(parsed.confidence) || technicalAnalysis?.confidence || 60,
     support: technicalAnalysis?.support || null,
     resistance: technicalAnalysis?.resistance || null,
