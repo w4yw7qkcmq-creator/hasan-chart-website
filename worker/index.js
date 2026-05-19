@@ -108,62 +108,119 @@ const buildAnalysisChartImage = ({ symbol, currentPrice, direction, entry, stopL
   const safeStop = escapeHtml(formatNumber(stopLoss));
   const safeTarget1 = escapeHtml(formatNumber(target1));
   const safeTarget2 = escapeHtml(formatNumber(target2));
-  const isBullish = String(direction || "").toLowerCase().includes("bull");
-  const path = isBullish
-    ? "M70 355 C160 330 210 290 285 305 C365 322 405 240 485 250 C560 260 600 170 705 135"
-    : "M70 135 C160 160 210 210 285 195 C365 178 405 260 485 250 C560 240 600 330 705 355";
-  const arrowPoints = isBullish ? "705,135 682,128 692,154" : "705,355 682,362 692,336";
+  const cleanDirection = String(direction || "neutral").toLowerCase();
+  const isBearish = cleanDirection.includes("bear");
+  const isBullish = cleanDirection.includes("bull");
+  const biasText = isBullish ? "Bullish Setup" : isBearish ? "Bearish Setup" : "Neutral Setup";
+  const biasColor = isBullish ? "#34d399" : isBearish ? "#fb7185" : "#22d3ee";
+
+  const candles = (isBearish
+    ? [
+        { x: 150, o: 205, c: 250, h: 178, l: 285 },
+        { x: 225, o: 245, c: 300, h: 220, l: 330 },
+        { x: 300, o: 292, c: 270, h: 238, l: 318 },
+        { x: 375, o: 274, c: 330, h: 250, l: 356 },
+        { x: 450, o: 326, c: 382, h: 300, l: 412 },
+        { x: 525, o: 376, c: 348, h: 318, l: 404 },
+        { x: 600, o: 350, c: 420, h: 332, l: 452 },
+        { x: 675, o: 415, c: 470, h: 390, l: 508 },
+        { x: 750, o: 462, c: 438, h: 408, l: 492 },
+        { x: 825, o: 440, c: 510, h: 418, l: 550 },
+      ]
+    : [
+        { x: 150, o: 480, c: 440, h: 415, l: 510 },
+        { x: 225, o: 445, c: 390, h: 360, l: 470 },
+        { x: 300, o: 398, c: 420, h: 372, l: 452 },
+        { x: 375, o: 414, c: 350, h: 322, l: 438 },
+        { x: 450, o: 352, c: 292, h: 268, l: 382 },
+        { x: 525, o: 300, c: 330, h: 282, l: 360 },
+        { x: 600, o: 326, c: 260, h: 235, l: 350 },
+        { x: 675, o: 268, c: 220, h: 190, l: 300 },
+        { x: 750, o: 228, c: 250, h: 205, l: 278 },
+        { x: 825, o: 246, c: 182, h: 158, l: 270 },
+      ])
+    .map((candle) => {
+      const up = candle.c < candle.o;
+      const color = up ? "#34d399" : "#fb7185";
+      const bodyY = Math.min(candle.o, candle.c);
+      const bodyH = Math.max(12, Math.abs(candle.o - candle.c));
+
+      return `
+        <line x1="${candle.x}" y1="${candle.h}" x2="${candle.x}" y2="${candle.l}" stroke="${color}" stroke-width="5" stroke-linecap="round"/>
+        <rect x="${candle.x - 18}" y="${bodyY}" width="36" height="${bodyH}" rx="7" fill="${color}" fill-opacity="0.95"/>
+      `;
+    })
+    .join("");
+
+  const projectionPath = isBearish
+    ? "M520 250 C620 318 690 405 840 500"
+    : "M520 400 C620 332 690 245 840 165";
+  const arrowPoints = isBearish ? "840,500 805,494 824,466" : "840,165 805,171 824,199";
+  const demandY = isBearish ? 450 : 398;
+  const supplyY = isBearish ? 150 : 112;
 
   const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#020617"/>
-      <stop offset="55%" stop-color="#07142f"/>
-      <stop offset="100%" stop-color="#0f172a"/>
+      <stop offset="52%" stop-color="#081733"/>
+      <stop offset="100%" stop-color="#020617"/>
     </linearGradient>
-    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="cyanLine" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#22d3ee"/>
       <stop offset="100%" stop-color="#2563eb"/>
     </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
-  <rect width="1200" height="720" fill="url(#bg)"/>
-  <g opacity="0.16" stroke="#94a3b8" stroke-width="1">
-    ${Array.from({ length: 12 }, (_, i) => `<line x1="${80 + i * 90}" y1="90" x2="${80 + i * 90}" y2="620"/>`).join("")}
-    ${Array.from({ length: 7 }, (_, i) => `<line x1="60" y1="${110 + i * 75}" x2="1140" y2="${110 + i * 75}"/>`).join("")}
+
+  <rect width="1280" height="760" fill="url(#bg)"/>
+  <rect x="36" y="32" width="1208" height="696" rx="34" fill="#020817" fill-opacity="0.82" stroke="#22d3ee" stroke-opacity="0.18"/>
+
+  <g opacity="0.14" stroke="#94a3b8" stroke-width="1">
+    ${Array.from({ length: 13 }, (_, i) => `<line x1="${92 + i * 86}" y1="138" x2="${92 + i * 86}" y2="620"/>`).join("")}
+    ${Array.from({ length: 7 }, (_, i) => `<line x1="70" y1="${150 + i * 72}" x2="1210" y2="${150 + i * 72}"/>`).join("")}
   </g>
-  <text x="80" y="70" fill="#ffffff" font-size="34" font-weight="900" font-family="Arial">HasaN CharT World</text>
-  <text x="80" y="108" fill="#67e8f9" font-size="24" font-weight="800" font-family="Arial">${safeSymbol} · SMC / ICT / CLASSIC</text>
-  <rect x="770" y="58" width="330" height="74" rx="24" fill="#0b1b3a" stroke="#22d3ee" stroke-opacity="0.28"/>
-  <text x="800" y="92" fill="#94a3b8" font-size="18" font-family="Arial">Current Price</text>
-  <text x="800" y="120" fill="#ffffff" font-size="28" font-weight="900" font-family="Arial">${safeCurrent}</text>
 
-  <rect x="110" y="190" width="360" height="92" rx="22" fill="#022c22" fill-opacity="0.72" stroke="#34d399" stroke-opacity="0.7"/>
-  <text x="135" y="225" fill="#6ee7b7" font-size="18" font-weight="800" font-family="Arial">Demand / Order Block</text>
-  <text x="135" y="258" fill="#ffffff" font-size="24" font-weight="900" font-family="Arial">Entry: ${safeEntry}</text>
+  <text x="78" y="82" fill="#ffffff" font-size="34" font-weight="900" font-family="Arial">HasaN CharT World</text>
+  <text x="78" y="120" fill="#67e8f9" font-size="23" font-weight="800" font-family="Arial">${safeSymbol} · SMC / ICT / CLASSIC</text>
 
-  <rect x="700" y="166" width="340" height="80" rx="22" fill="#172554" fill-opacity="0.82" stroke="#60a5fa" stroke-opacity="0.75"/>
-  <text x="725" y="198" fill="#93c5fd" font-size="18" font-weight="800" font-family="Arial">Liquidity / Target Zone</text>
-  <text x="725" y="228" fill="#ffffff" font-size="23" font-weight="900" font-family="Arial">T1 ${safeTarget1} · T2 ${safeTarget2}</text>
+  <rect x="830" y="58" width="350" height="86" rx="26" fill="#0b1b3a" stroke="#22d3ee" stroke-opacity="0.26"/>
+  <text x="858" y="94" fill="#94a3b8" font-size="17" font-family="Arial">Current Price</text>
+  <text x="858" y="126" fill="#ffffff" font-size="30" font-weight="900" font-family="Arial">${safeCurrent}</text>
 
-  <rect x="130" y="462" width="330" height="70" rx="20" fill="#450a0a" fill-opacity="0.72" stroke="#f87171" stroke-opacity="0.7"/>
-  <text x="155" y="505" fill="#fecaca" font-size="22" font-weight="900" font-family="Arial">Invalidation / SL: ${safeStop}</text>
+  <rect x="92" y="${supplyY}" width="1060" height="76" rx="18" fill="#7f1d1d" fill-opacity="0.18" stroke="#fb7185" stroke-dasharray="12 10" stroke-opacity="0.52"/>
+  <text x="112" y="${supplyY + 48}" fill="#fecaca" font-size="20" font-weight="900" font-family="Arial">Supply / Premium Liquidity</text>
 
-  <path d="${path}" fill="none" stroke="url(#line)" stroke-width="9" stroke-linecap="round" filter="url(#glow)"/>
+  <rect x="92" y="${demandY}" width="1060" height="86" rx="18" fill="#064e3b" fill-opacity="0.18" stroke="#34d399" stroke-dasharray="12 10" stroke-opacity="0.52"/>
+  <text x="112" y="${demandY + 52}" fill="#a7f3d0" font-size="20" font-weight="900" font-family="Arial">Demand / Discount Order Block</text>
+
+  <g filter="url(#glow)">
+    ${candles}
+  </g>
+
+  <path d="${projectionPath}" fill="none" stroke="url(#cyanLine)" stroke-width="8" stroke-linecap="round" stroke-dasharray="18 12" filter="url(#glow)"/>
   <polygon points="${arrowPoints}" fill="#22d3ee" filter="url(#glow)"/>
 
-  <circle cx="285" cy="305" r="8" fill="#22d3ee"/>
-  <circle cx="485" cy="250" r="8" fill="#22d3ee"/>
-  <circle cx="705" cy="${isBullish ? 135 : 355}" r="10" fill="#34d399"/>
+  <text x="315" y="260" fill="#cbd5e1" font-size="18" font-weight="900" font-family="Arial">CHOCH</text>
+  <text x="535" y="330" fill="#cbd5e1" font-size="18" font-weight="900" font-family="Arial">BOS</text>
 
-  <text x="80" y="650" fill="#cbd5e1" font-size="20" font-family="Arial">Educational analysis only · Manage risk strictly · Not financial advice</text>
+  <rect x="78" y="620" width="320" height="62" rx="22" fill="#07142f" stroke="${biasColor}" stroke-opacity="0.65"/>
+  <circle cx="112" cy="651" r="10" fill="${biasColor}"/>
+  <text x="138" y="660" fill="#ffffff" font-size="22" font-weight="900" font-family="Arial">${biasText}</text>
+
+  <rect x="430" y="608" width="300" height="82" rx="22" fill="#022c22" fill-opacity="0.78" stroke="#34d399" stroke-opacity="0.75"/>
+  <text x="456" y="638" fill="#6ee7b7" font-size="17" font-weight="900" font-family="Arial">Entry</text>
+  <text x="456" y="670" fill="#ffffff" font-size="25" font-weight="900" font-family="Arial">${safeEntry}</text>
+
+  <rect x="760" y="608" width="370" height="82" rx="22" fill="#172554" fill-opacity="0.86" stroke="#60a5fa" stroke-opacity="0.78"/>
+  <text x="786" y="638" fill="#93c5fd" font-size="17" font-weight="900" font-family="Arial">Targets</text>
+  <text x="786" y="670" fill="#ffffff" font-size="23" font-weight="900" font-family="Arial">T1 ${safeTarget1} · T2 ${safeTarget2}</text>
+
+  <rect x="882" y="482" width="300" height="64" rx="20" fill="#450a0a" fill-opacity="0.76" stroke="#f87171" stroke-opacity="0.75"/>
+  <text x="906" y="523" fill="#fecaca" font-size="21" font-weight="900" font-family="Arial">SL ${safeStop}</text>
+
+  <text x="80" y="710" fill="#cbd5e1" font-size="18" font-family="Arial">Educational analysis only · Manage risk strictly · Not financial advice</text>
 </svg>`;
 
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
