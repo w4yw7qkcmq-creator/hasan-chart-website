@@ -344,12 +344,12 @@ const buildAnalysisChartImage = ({ symbol, currentPrice, direction, entry, stopL
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 };
 
-const getFallbackAnalysis = ({ symbol, currentPrice }) => {
+const getFallbackAnalysis = ({ symbol, currentPrice, candles = [], technicalAnalysis = null }) => {
   const base = Number(currentPrice) || 1;
-  const entry = base;
-  const stopLoss = base * 0.985;
-  const target1 = base * 1.015;
-  const target2 = base * 1.03;
+  const entry = technicalAnalysis?.entry || base;
+  const stopLoss = technicalAnalysis?.stopLoss || base * 0.985;
+  const target1 = technicalAnalysis?.target1 || base * 1.015;
+  const target2 = technicalAnalysis?.target2 || base * 1.03;
 
   return {
     success: true,
@@ -365,24 +365,20 @@ const getFallbackAnalysis = ({ symbol, currentPrice }) => {
     stopLoss,
     target1,
     target2,
-    confidence: 55,
+    confidence: technicalAnalysis?.confidence || 55,
+    support: technicalAnalysis?.support || null,
+    resistance: technicalAnalysis?.resistance || null,
+    signals: technicalAnalysis?.signals || [],
     scenario: "انتظار تأكيد الحركة هو الخيار الأفضل حالياً.",
-    chartImage: buildAnalysisChartImage({
-      symbol,
-      currentPrice: base,
-      direction: "neutral",
-      entry,
-      stopLoss,
-      target1,
-      target2,
-    }),
+    chartData: Array.isArray(candles) ? candles : [],
+    chartImage: null,
     generatedAt: new Date().toISOString(),
   };
 };
 
 const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technicalAnalysis }) => {
   if (!openaiApiKey) {
-    return getFallbackAnalysis({ symbol, currentPrice });
+    return getFallbackAnalysis({ symbol, currentPrice, candles, technicalAnalysis });
   }
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -442,11 +438,18 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
 
   if (!response.ok) {
     console.log("❌ OpenAI analysis error:", JSON.stringify(data, null, 2));
-    return getFallbackAnalysis({ symbol, currentPrice });
+    return getFallbackAnalysis({ symbol, currentPrice, candles, technicalAnalysis });
   }
 
   const content = data?.choices?.[0]?.message?.content;
-  const parsed = extractJsonObject(content);
+  let parsed;
+
+  try {
+    parsed = extractJsonObject(content);
+  } catch (error) {
+    console.log("⚠️ Invalid OpenAI JSON, using technical fallback:", error?.message || error);
+    return getFallbackAnalysis({ symbol, currentPrice, candles, technicalAnalysis });
+  }
 
   const entry = Number(parsed.entry) || Number(currentPrice);
   const stopLoss = Number(parsed.stopLoss) || Number(currentPrice) * 0.985;
@@ -474,15 +477,7 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
     signals: technicalAnalysis?.signals || [],
     chartData: candles,
     scenario: parsed.scenario || "الحركة المتوقعة تحتاج تأكيد من الإغلاق القادم.",
-    chartImage: buildAnalysisChartImage({
-      symbol,
-      currentPrice,
-      direction,
-      entry: Number(parsed.entry) || technicalAnalysis?.entry || entry,
-      stopLoss: Number(parsed.stopLoss) || technicalAnalysis?.stopLoss || stopLoss,
-      target1: Number(parsed.target1) || technicalAnalysis?.target1 || target1,
-      target2: Number(parsed.target2) || technicalAnalysis?.target2 || target2,
-    }),
+    chartImage: null,
     generatedAt: new Date().toISOString(),
   };
 };
