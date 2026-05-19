@@ -129,7 +129,7 @@ const average = (values) => {
 };
 
 const analyzeCandles = (candles) => {
-  if (!Array.isArray(candles) || candles.length < 20) {
+  if (!Array.isArray(candles) || candles.length < 40) {
     return {
       trend: "neutral",
       direction: "neutral",
@@ -140,65 +140,155 @@ const analyzeCandles = (candles) => {
       target1: null,
       target2: null,
       confidence: 45,
+      setupReady: false,
       signals: ["بيانات الشموع غير كافية للتحليل الكامل"],
+      structureNotes: ["بانتظار بيانات كافية لتحديد BOS / CHOCH"],
     };
   }
 
-  const recent = candles.slice(-30);
   const last = candles[candles.length - 1];
-  const previous = candles[candles.length - 2];
-  const swingHigh = Math.max(...recent.slice(0, -1).map((candle) => candle.high));
-  const swingLow = Math.min(...recent.slice(0, -1).map((candle) => candle.low));
+  const recent = candles.slice(-60);
   const emaFast = average(candles.slice(-9).map((candle) => candle.close));
   const emaSlow = average(candles.slice(-21).map((candle) => candle.close));
   const avgVolume = average(recent.slice(0, -1).map((candle) => candle.volume));
   const volumeSpike = Number.isFinite(last.volume) && avgVolume > 0 && last.volume > avgVolume * 1.35;
-  const brokeHigh = last.close > swingHigh;
-  const brokeLow = last.close < swingLow;
-  const sweptHigh = last.high > swingHigh && last.close < swingHigh;
-  const sweptLow = last.low < swingLow && last.close > swingLow;
-  const bullishImpulse = last.close > last.open && last.close > emaFast && emaFast >= emaSlow;
-  const bearishImpulse = last.close < last.open && last.close < emaFast && emaFast <= emaSlow;
+
+  const swings = [];
+
+  for (let i = 3; i < candles.length - 3; i += 1) {
+    const window = candles.slice(i - 3, i + 4);
+    const current = candles[i];
+    const isSwingHigh = current.high === Math.max(...window.map((candle) => candle.high));
+    const isSwingLow = current.low === Math.min(...window.map((candle) => candle.low));
+
+    if (isSwingHigh) {
+      swings.push({ type: "high", index: i, price: current.high, time: current.time });
+    }
+
+    if (isSwingLow) {
+      swings.push({ type: "low", index: i, price: current.low, time: current.time });
+    }
+  }
+
+  const recentSwingHighs = swings.filter((swing) => swing.type === "high").slice(-4);
+  const recentSwingLows = swings.filter((swing) => swing.type === "low").slice(-4);
+  const lastSwingHigh = recentSwingHighs[recentSwingHighs.length - 1];
+  const previousSwingHigh = recentSwingHighs[recentSwingHighs.length - 2];
+  const lastSwingLow = recentSwingLows[recentSwingLows.length - 1];
+  const previousSwingLow = recentSwingLows[recentSwingLows.length - 2];
+  const resistance = lastSwingHigh?.price || Math.max(...recent.slice(0, -1).map((candle) => candle.high));
+  const support = lastSwingLow?.price || Math.min(...recent.slice(0, -1).map((candle) => candle.low));
+  const brokeHigh = Number.isFinite(resistance) && last.close > resistance;
+  const brokeLow = Number.isFinite(support) && last.close < support;
+  const sweptHigh = Number.isFinite(resistance) && last.high > resistance && last.close < resistance;
+  const sweptLow = Number.isFinite(support) && last.low < support && last.close > support;
+  const higherHigh = Boolean(lastSwingHigh && previousSwingHigh && lastSwingHigh.price > previousSwingHigh.price);
+  const higherLow = Boolean(lastSwingLow && previousSwingLow && lastSwingLow.price > previousSwingLow.price);
+  const lowerHigh = Boolean(lastSwingHigh && previousSwingHigh && lastSwingHigh.price < previousSwingHigh.price);
+  const lowerLow = Boolean(lastSwingLow && previousSwingLow && lastSwingLow.price < previousSwingLow.price);
+  const bullishStructure = Boolean((higherHigh && higherLow) || (last.close > emaFast && emaFast > emaSlow));
+  const bearishStructure = Boolean((lowerHigh && lowerLow) || (last.close < emaFast && emaFast < emaSlow));
+  const bullishChoch = Boolean(sweptLow || (bearishStructure && brokeHigh));
+  const bearishChoch = Boolean(sweptHigh || (bullishStructure && brokeLow));
 
   let direction = "neutral";
-  if (brokeHigh || sweptLow || bullishImpulse) direction = "bullish";
-  if (brokeLow || sweptHigh || bearishImpulse) direction = "bearish";
+  if (brokeHigh || bullishChoch || bullishStructure) direction = "bullish";
+  if (brokeLow || bearishChoch || bearishStructure) direction = "bearish";
 
-  const range = Math.max(last.high - last.low, last.close * 0.006);
-  const entry = direction === "bullish" ? Math.max(last.close, swingHigh) : direction === "bearish" ? Math.min(last.close, swingLow) : last.close;
-  const stopLoss = direction === "bullish" ? Math.min(swingLow, entry - range * 1.4) : direction === "bearish" ? Math.max(swingHigh, entry + range * 1.4) : last.close - range;
-  const target1 = direction === "bullish" ? entry + Math.abs(entry - stopLoss) * 1.4 : direction === "bearish" ? entry - Math.abs(stopLoss - entry) * 1.4 : last.close + range;
-  const target2 = direction === "bullish" ? entry + Math.abs(entry - stopLoss) * 2.2 : direction === "bearish" ? entry - Math.abs(stopLoss - entry) * 2.2 : last.close + range * 2;
+  const range = Math.max(resistance - support, last.close * 0.008);
+  const impulseCandles = recent
+    .map((candle, offset) => ({
+      ...candle,
+      index: candles.length - recent.length + offset,
+      body: Math.abs(candle.close - candle.open),
+      range: candle.high - candle.low,
+    }))
+    .filter((candle) => candle.range > 0)
+    .sort((a, b) => b.body / b.range - a.body / a.range);
+
+  const orderBlockCandle =
+    direction === "bullish"
+      ? [...recent].reverse().find((candle) => candle.close < candle.open) || impulseCandles[0]
+      : direction === "bearish"
+        ? [...recent].reverse().find((candle) => candle.close > candle.open) || impulseCandles[0]
+        : impulseCandles[0];
+
+  const orderBlockLow = orderBlockCandle ? Math.min(orderBlockCandle.open, orderBlockCandle.close, orderBlockCandle.low) : support;
+  const orderBlockHigh = orderBlockCandle ? Math.max(orderBlockCandle.open, orderBlockCandle.close, orderBlockCandle.high) : resistance;
+  const premiumLevel = support + range * 0.7;
+  const discountLevel = support + range * 0.3;
+  const setupReady = direction !== "neutral" && (brokeHigh || brokeLow || sweptHigh || sweptLow || volumeSpike);
+  const entry = setupReady
+    ? direction === "bullish"
+      ? Math.max(orderBlockLow, Math.min(last.close, orderBlockHigh))
+      : Math.min(orderBlockHigh, Math.max(last.close, orderBlockLow))
+    : null;
+  const stopLoss = setupReady
+    ? direction === "bullish"
+      ? Math.min(support, orderBlockLow) - range * 0.08
+      : Math.max(resistance, orderBlockHigh) + range * 0.08
+    : null;
+  const target1 = setupReady && entry && stopLoss
+    ? direction === "bullish"
+      ? entry + Math.abs(entry - stopLoss) * 1.4
+      : entry - Math.abs(stopLoss - entry) * 1.4
+    : null;
+  const target2 = setupReady && entry && stopLoss
+    ? direction === "bullish"
+      ? entry + Math.abs(entry - stopLoss) * 2.2
+      : entry - Math.abs(stopLoss - entry) * 2.2
+    : null;
 
   const signals = [
-    brokeHigh ? "BOS صاعد فوق آخر قمة" : "",
-    brokeLow ? "BOS هابط أسفل آخر قاع" : "",
-    sweptHigh ? "سحب سيولة أعلى القمم" : "",
-    sweptLow ? "سحب سيولة أسفل القيعان" : "",
-    volumeSpike ? "ارتفاع واضح في الفوليوم" : "",
-    bullishImpulse ? "اندفاع شرائي فوق المتوسطات" : "",
-    bearishImpulse ? "اندفاع بيعي أسفل المتوسطات" : "",
+    brokeHigh ? "BOS صاعد: إغلاق فوق آخر قمة معتبرة" : "",
+    brokeLow ? "BOS هابط: إغلاق أسفل آخر قاع معتبر" : "",
+    bullishChoch ? "CHOCH صاعد: تغير سلوك بعد ضغط بيعي" : "",
+    bearishChoch ? "CHOCH هابط: تغير سلوك بعد ضغط شرائي" : "",
+    sweptHigh ? "Liquidity Sweep: سحب سيولة أعلى القمم ثم رفض" : "",
+    sweptLow ? "Liquidity Sweep: سحب سيولة أسفل القيعان ثم ارتداد" : "",
+    volumeSpike ? "Volume Expansion: دخول حجم أعلى من المتوسط" : "",
+    bullishStructure ? "Market Structure: قمم/قيعان صاعدة أو متوسطات داعمة" : "",
+    bearishStructure ? "Market Structure: قمم/قيعان هابطة أو متوسطات ضاغطة" : "",
   ].filter(Boolean);
 
-  const confidence = Math.min(88, Math.max(52, 52 + signals.length * 7 + (volumeSpike ? 8 : 0)));
+  const structureNotes = [
+    `الدعم الأقرب: ${formatNumber(support)}`,
+    `المقاومة الأقرب: ${formatNumber(resistance)}`,
+    `السيولة الشرائية فوق: ${formatNumber(resistance)}`,
+    `السيولة البيعية تحت: ${formatNumber(support)}`,
+    direction === "bullish" ? `Order Block طلب: ${formatNumber(orderBlockLow)} - ${formatNumber(orderBlockHigh)}` : "",
+    direction === "bearish" ? `Order Block عرض: ${formatNumber(orderBlockLow)} - ${formatNumber(orderBlockHigh)}` : "",
+    `Premium: فوق ${formatNumber(premiumLevel)}`,
+    `Discount: تحت ${formatNumber(discountLevel)}`,
+  ].filter(Boolean);
+
+  const confidence = Math.min(90, Math.max(50, 50 + signals.length * 6 + (setupReady ? 10 : 0)));
 
   return {
     trend: direction,
     direction,
-    support: swingLow,
-    resistance: swingHigh,
+    support,
+    resistance,
+    orderBlockLow,
+    orderBlockHigh,
+    premiumLevel,
+    discountLevel,
     entry,
     stopLoss,
     target1,
     target2,
     confidence,
-    bos: brokeHigh ? "BOS صاعد" : brokeLow ? "BOS هابط" : "لم يظهر BOS مؤكد",
-    choch: sweptLow ? "CHOCH محتمل بعد سحب سيولة بيعية" : sweptHigh ? "CHOCH محتمل بعد سحب سيولة شرائية" : "بانتظار CHOCH أوضح",
-    liquiditySweep: sweptLow ? "سحب سيولة أسفل القيعان" : sweptHigh ? "سحب سيولة أعلى القمم" : "لا يوجد سحب سيولة واضح حالياً",
-    orderBlock: direction === "bullish" ? `منطقة طلب قريبة حول ${formatNumber(swingLow)}` : direction === "bearish" ? `منطقة عرض قريبة حول ${formatNumber(swingHigh)}` : "بانتظار منطقة مؤكدة",
-    liquidityAbove: `فوق ${formatNumber(swingHigh)}`,
-    liquidityBelow: `تحت ${formatNumber(swingLow)}`,
+    setupReady,
+    bos: brokeHigh ? "BOS صاعد مؤكد" : brokeLow ? "BOS هابط مؤكد" : "بانتظار BOS مؤكد",
+    choch: bullishChoch ? "CHOCH صاعد محتمل" : bearishChoch ? "CHOCH هابط محتمل" : "راقب تغير السلوك السعري",
+    liquiditySweep: sweptLow ? "سحب سيولة أسفل القيعان" : sweptHigh ? "سحب سيولة أعلى القمم" : "لا يوجد Sweep مؤكد حالياً",
+    orderBlock: direction === "bullish" ? `منطقة طلب ${formatNumber(orderBlockLow)} - ${formatNumber(orderBlockHigh)}` : direction === "bearish" ? `منطقة عرض ${formatNumber(orderBlockLow)} - ${formatNumber(orderBlockHigh)}` : "بانتظار Order Block مؤكد",
+    premiumZone: `Premium أعلى ${formatNumber(premiumLevel)}`,
+    discountZone: `Discount أسفل ${formatNumber(discountLevel)}`,
+    liquidityAbove: `فوق ${formatNumber(resistance)}`,
+    liquidityBelow: `تحت ${formatNumber(support)}`,
     signals,
+    structureNotes,
   };
 };
 
@@ -357,10 +447,18 @@ const getFallbackAnalysis = ({ symbol, currentPrice, candles = [], technicalAnal
     trend: "neutral",
     direction: "neutral",
     currentPrice: base,
-    summary: `تحليل ${symbol}: السعر حالياً عند ${formatNumber(base)}. الأفضل انتظار كسر واضح أو إعادة اختبار قبل الدخول.`,
-    smartMoney: "SMC/ICT: راقب مناطق السيولة القريبة وأي CHOCH أو BOS واضح قبل اتخاذ القرار.",
-    classic: "كلاسيكي: الاتجاه يحتاج تأكيد عبر كسر مقاومة أو فقدان دعم قريب.",
-    risk: "إدارة المخاطر: لا تدخل بدون وقف خسارة واضح ولا تخاطر بأكثر من نسبة صغيرة من رأس المال.",
+    summary: technicalAnalysis?.setupReady
+      ? `السعر عند ${formatNumber(base)} والهيكل الحالي يميل إلى ${technicalAnalysis.direction === "bullish" ? "الصعود" : "الهبوط"} بعد قراءة السيولة والهيكل.`
+      : `السعر عند ${formatNumber(base)} داخل نطاق مراقبة. لا يوجد إعداد دخول مؤكد حتى تظهر إشارة BOS أو CHOCH واضحة.`,
+    smartMoney: technicalAnalysis?.signals?.length
+      ? `SMC/ICT: ${technicalAnalysis.signals.slice(0, 3).join("، ")}.`
+      : "SMC/ICT: راقب مناطق السيولة القريبة وأي CHOCH أو BOS واضح قبل اتخاذ القرار.",
+    classic: technicalAnalysis?.support && technicalAnalysis?.resistance
+      ? `كلاسيكي: السعر بين دعم ${formatNumber(technicalAnalysis.support)} ومقاومة ${formatNumber(technicalAnalysis.resistance)}.`
+      : "كلاسيكي: الاتجاه يحتاج تأكيد عبر كسر مقاومة أو فقدان دعم قريب.",
+    risk: technicalAnalysis?.setupReady
+      ? "إدارة المخاطر: لا يتم الدخول إلا بعد تأكيد الإغلاق أو إعادة الاختبار، مع وقف واضح خلف منطقة الهيكل."
+      : "إدارة المخاطر: لا يوجد إعداد دخول مؤكد حالياً، الأفضل الانتظار وعدم ملاحقة السعر.",
     entry,
     stopLoss,
     target1,
@@ -370,6 +468,30 @@ const getFallbackAnalysis = ({ symbol, currentPrice, candles = [], technicalAnal
     resistance: technicalAnalysis?.resistance || null,
     signals: technicalAnalysis?.signals || [],
     scenario: "انتظار تأكيد الحركة هو الخيار الأفضل حالياً.",
+    marketBias: technicalAnalysis?.direction || "neutral",
+    bos: technicalAnalysis?.bos || "بانتظار BOS مؤكد",
+    choch: technicalAnalysis?.choch || "راقب تغير السلوك السعري",
+    liquiditySweep: technicalAnalysis?.liquiditySweep || "لا يوجد Sweep مؤكد حالياً",
+    orderBlock: technicalAnalysis?.orderBlock || "بانتظار Order Block مؤكد",
+    premiumZone: technicalAnalysis?.premiumZone || "غير مؤكد",
+    discountZone: technicalAnalysis?.discountZone || "غير مؤكد",
+    liquidityAbove: technicalAnalysis?.liquidityAbove || null,
+    liquidityBelow: technicalAnalysis?.liquidityBelow || null,
+    structureNotes: technicalAnalysis?.structureNotes || [],
+    analysis:
+      [
+        technicalAnalysis?.setupReady
+          ? `الملخص: يوجد إعداد مراقبة مبني على هيكل السوق الحالي، والاتجاه المرجح ${technicalAnalysis.direction === "bullish" ? "صاعد" : technicalAnalysis.direction === "bearish" ? "هابط" : "محايد"}.`
+          : "الملخص: لا يوجد إعداد دخول مؤكد حالياً، والسوق يحتاج تأكيد BOS أو CHOCH.",
+        `SMC / ICT: ${technicalAnalysis?.signals?.length ? technicalAnalysis.signals.join("، ") : "السيولة ما زالت تحت المراقبة ولا يوجد Sweep مؤكد."}`,
+        `الكلاسيكي: الدعم ${formatNumber(technicalAnalysis?.support || base)} والمقاومة ${formatNumber(technicalAnalysis?.resistance || base)} هما أهم مناطق القرار الحالية.`,
+        `Order Block: ${technicalAnalysis?.orderBlock || "بانتظار منطقة مؤكدة"}.`,
+        `السيولة: أعلى ${formatNumber(technicalAnalysis?.resistance || base)} وأسفل ${formatNumber(technicalAnalysis?.support || base)}.`,
+        technicalAnalysis?.setupReady
+          ? "الخطة: انتظار إعادة اختبار منطقة الهيكل قبل أي دخول، وعدم الدخول من منتصف النطاق."
+          : "الخطة: انتظار كسر واضح أو إعادة اختبار، ولا يوجد دخول مباشر الآن.",
+        `الثقة: ${technicalAnalysis?.confidence || 55}%`,
+      ].join("\n\n"),
     chartData: Array.isArray(candles) ? candles : [],
     chartImage: null,
     generatedAt: new Date().toISOString(),
@@ -475,6 +597,11 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
     support: technicalAnalysis?.support || null,
     resistance: technicalAnalysis?.resistance || null,
     signals: technicalAnalysis?.signals || [],
+    structureNotes: technicalAnalysis?.structureNotes || [],
+    orderBlock: parsed.orderBlock || technicalAnalysis?.orderBlock || "بانتظار Order Block مؤكد",
+    liquiditySweep: parsed.liquiditySweep || technicalAnalysis?.liquiditySweep || "لا يوجد Sweep مؤكد حالياً",
+    liquidityAbove: parsed.liquidityAbove || technicalAnalysis?.liquidityAbove || null,
+    liquidityBelow: parsed.liquidityBelow || technicalAnalysis?.liquidityBelow || null,
     chartData: candles,
     scenario: parsed.scenario || "الحركة المتوقعة تحتاج تأكيد من الإغلاق القادم.",
     chartImage: null,
