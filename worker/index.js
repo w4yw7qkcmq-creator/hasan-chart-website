@@ -553,7 +553,7 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
               premiumDiscount: "Premium أو Discount",
               liquidityAbove: "السيولة أعلى السعر",
               liquidityBelow: "السيولة أسفل السعر",
-              analysis: "تحليل عربي مختصر ومنسق لا يتجاوز 8 أسطر",
+             analysis: "تحليل عربي منسق لا يتجاوز 8 أسطر ويحتوي حرفياً على: الاتجاه العام في SMC، قراءة ICT، التحليل الكلاسيكي، السيناريو المتوقع، فشل السيناريو، قرار الدخول",
             },
           }),
         },
