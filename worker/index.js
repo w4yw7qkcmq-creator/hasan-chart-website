@@ -61,6 +61,7 @@ const formatNumber = (value) => {
   });
 };
 
+
 const getMarketPrice = async (symbol) => {
   const cleanSymbol = normalizeSymbol(symbol);
 
@@ -82,6 +83,123 @@ const getMarketPrice = async (symbol) => {
   }
 
   throw new Error(`تعذر جلب سعر ${cleanSymbol} من OKX`);
+};
+
+const getMarketCandles = async (symbol, bar = "15m", limit = 120) => {
+  const cleanSymbol = normalizeSymbol(symbol);
+
+  if (!cleanSymbol) {
+    throw new Error("EMPTY_SYMBOL");
+  }
+
+  const okxSymbol = cleanSymbol.replace("USDT", "-USDT");
+  const response = await fetch(
+    `https://www.okx.com/api/v5/market/candles?instId=${encodeURIComponent(okxSymbol)}&bar=${encodeURIComponent(bar)}&limit=${encodeURIComponent(String(limit))}`
+  );
+
+  const data = await response.json();
+
+  if (!response.ok || data?.code !== "0" || !Array.isArray(data?.data)) {
+    throw new Error(`تعذر جلب شموع ${cleanSymbol} من OKX`);
+  }
+
+  return data.data
+    .map((item) => ({
+      time: Number(item[0]),
+      open: Number(item[1]),
+      high: Number(item[2]),
+      low: Number(item[3]),
+      close: Number(item[4]),
+      volume: Number(item[5]),
+    }))
+    .filter((candle) =>
+      Number.isFinite(candle.time) &&
+      Number.isFinite(candle.open) &&
+      Number.isFinite(candle.high) &&
+      Number.isFinite(candle.low) &&
+      Number.isFinite(candle.close)
+    )
+    .reverse();
+};
+
+const average = (values) => {
+  const cleanValues = values.filter((value) => Number.isFinite(value));
+  if (!cleanValues.length) return 0;
+  return cleanValues.reduce((sum, value) => sum + value, 0) / cleanValues.length;
+};
+
+const analyzeCandles = (candles) => {
+  if (!Array.isArray(candles) || candles.length < 20) {
+    return {
+      trend: "neutral",
+      direction: "neutral",
+      support: null,
+      resistance: null,
+      entry: null,
+      stopLoss: null,
+      target1: null,
+      target2: null,
+      confidence: 45,
+      signals: ["بيانات الشموع غير كافية للتحليل الكامل"],
+    };
+  }
+
+  const recent = candles.slice(-30);
+  const last = candles[candles.length - 1];
+  const previous = candles[candles.length - 2];
+  const swingHigh = Math.max(...recent.slice(0, -1).map((candle) => candle.high));
+  const swingLow = Math.min(...recent.slice(0, -1).map((candle) => candle.low));
+  const emaFast = average(candles.slice(-9).map((candle) => candle.close));
+  const emaSlow = average(candles.slice(-21).map((candle) => candle.close));
+  const avgVolume = average(recent.slice(0, -1).map((candle) => candle.volume));
+  const volumeSpike = Number.isFinite(last.volume) && avgVolume > 0 && last.volume > avgVolume * 1.35;
+  const brokeHigh = last.close > swingHigh;
+  const brokeLow = last.close < swingLow;
+  const sweptHigh = last.high > swingHigh && last.close < swingHigh;
+  const sweptLow = last.low < swingLow && last.close > swingLow;
+  const bullishImpulse = last.close > last.open && last.close > emaFast && emaFast >= emaSlow;
+  const bearishImpulse = last.close < last.open && last.close < emaFast && emaFast <= emaSlow;
+
+  let direction = "neutral";
+  if (brokeHigh || sweptLow || bullishImpulse) direction = "bullish";
+  if (brokeLow || sweptHigh || bearishImpulse) direction = "bearish";
+
+  const range = Math.max(last.high - last.low, last.close * 0.006);
+  const entry = direction === "bullish" ? Math.max(last.close, swingHigh) : direction === "bearish" ? Math.min(last.close, swingLow) : last.close;
+  const stopLoss = direction === "bullish" ? Math.min(swingLow, entry - range * 1.4) : direction === "bearish" ? Math.max(swingHigh, entry + range * 1.4) : last.close - range;
+  const target1 = direction === "bullish" ? entry + Math.abs(entry - stopLoss) * 1.4 : direction === "bearish" ? entry - Math.abs(stopLoss - entry) * 1.4 : last.close + range;
+  const target2 = direction === "bullish" ? entry + Math.abs(entry - stopLoss) * 2.2 : direction === "bearish" ? entry - Math.abs(stopLoss - entry) * 2.2 : last.close + range * 2;
+
+  const signals = [
+    brokeHigh ? "BOS صاعد فوق آخر قمة" : "",
+    brokeLow ? "BOS هابط أسفل آخر قاع" : "",
+    sweptHigh ? "سحب سيولة أعلى القمم" : "",
+    sweptLow ? "سحب سيولة أسفل القيعان" : "",
+    volumeSpike ? "ارتفاع واضح في الفوليوم" : "",
+    bullishImpulse ? "اندفاع شرائي فوق المتوسطات" : "",
+    bearishImpulse ? "اندفاع بيعي أسفل المتوسطات" : "",
+  ].filter(Boolean);
+
+  const confidence = Math.min(88, Math.max(52, 52 + signals.length * 7 + (volumeSpike ? 8 : 0)));
+
+  return {
+    trend: direction,
+    direction,
+    support: swingLow,
+    resistance: swingHigh,
+    entry,
+    stopLoss,
+    target1,
+    target2,
+    confidence,
+    bos: brokeHigh ? "BOS صاعد" : brokeLow ? "BOS هابط" : "لم يظهر BOS مؤكد",
+    choch: sweptLow ? "CHOCH محتمل بعد سحب سيولة بيعية" : sweptHigh ? "CHOCH محتمل بعد سحب سيولة شرائية" : "بانتظار CHOCH أوضح",
+    liquiditySweep: sweptLow ? "سحب سيولة أسفل القيعان" : sweptHigh ? "سحب سيولة أعلى القمم" : "لا يوجد سحب سيولة واضح حالياً",
+    orderBlock: direction === "bullish" ? `منطقة طلب قريبة حول ${formatNumber(swingLow)}` : direction === "bearish" ? `منطقة عرض قريبة حول ${formatNumber(swingHigh)}` : "بانتظار منطقة مؤكدة",
+    liquidityAbove: `فوق ${formatNumber(swingHigh)}`,
+    liquidityBelow: `تحت ${formatNumber(swingLow)}`,
+    signals,
+  };
 };
 
 const extractJsonObject = (value) => {
@@ -262,7 +380,7 @@ const getFallbackAnalysis = ({ symbol, currentPrice }) => {
   };
 };
 
-const generateOpenAiAnalysis = async ({ symbol, currentPrice }) => {
+const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technicalAnalysis }) => {
   if (!openaiApiKey) {
     return getFallbackAnalysis({ symbol, currentPrice });
   }
@@ -288,6 +406,8 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice }) => {
           content: JSON.stringify({
             symbol,
             currentPrice,
+            candles: candles.slice(-80),
+            technicalAnalysis,
             requiredOutput: {
               trend: "bullish | bearish | neutral",
               direction: "bullish | bearish | neutral",
@@ -295,7 +415,7 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice }) => {
               smartMoney: "قراءة SMC/ICT مختصرة",
               classic: "قراءة كلاسيكية مختصرة",
               risk: "إدارة مخاطر مختصرة",
-              entry: "number",
+              entry: "number ويجب ألا يساوي السعر الحالي إلا إذا كان السعر فعلاً داخل منطقة الدخول",
               stopLoss: "number",
               target1: "number",
               target2: "number",
@@ -344,20 +464,24 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice }) => {
     smartMoney: parsed.smartMoney || "راقب السيولة ومناطق الطلب والعرض قبل الدخول.",
     classic: parsed.classic || "انتظر تأكيد الكسر أو إعادة الاختبار.",
     risk: parsed.risk || "التزم بإدارة المخاطر ووقف خسارة واضح.",
-    entry,
-    stopLoss,
-    target1,
-    target2,
-    confidence: Number(parsed.confidence) || 60,
+    entry: Number(parsed.entry) || technicalAnalysis?.entry || entry,
+    stopLoss: Number(parsed.stopLoss) || technicalAnalysis?.stopLoss || stopLoss,
+    target1: Number(parsed.target1) || technicalAnalysis?.target1 || target1,
+    target2: Number(parsed.target2) || technicalAnalysis?.target2 || target2,
+    confidence: Number(parsed.confidence) || technicalAnalysis?.confidence || 60,
+    support: technicalAnalysis?.support || null,
+    resistance: technicalAnalysis?.resistance || null,
+    signals: technicalAnalysis?.signals || [],
+    chartData: candles,
     scenario: parsed.scenario || "الحركة المتوقعة تحتاج تأكيد من الإغلاق القادم.",
     chartImage: buildAnalysisChartImage({
       symbol,
       currentPrice,
       direction,
-      entry,
-      stopLoss,
-      target1,
-      target2,
+      entry: Number(parsed.entry) || technicalAnalysis?.entry || entry,
+      stopLoss: Number(parsed.stopLoss) || technicalAnalysis?.stopLoss || stopLoss,
+      target1: Number(parsed.target1) || technicalAnalysis?.target1 || target1,
+      target2: Number(parsed.target2) || technicalAnalysis?.target2 || target2,
     }),
     generatedAt: new Date().toISOString(),
   };
@@ -603,8 +727,10 @@ app.post("/api/instant-analysis", async (req, res) => {
 
     process.nextTick(async () => {
       try {
-        const currentPrice = await getMarketPrice(symbol);
-        const analysis = await generateOpenAiAnalysis({ symbol, currentPrice });
+        const candles = await getMarketCandles(symbol, "15m", 120);
+        const currentPrice = candles[candles.length - 1]?.close || (await getMarketPrice(symbol));
+        const technicalAnalysis = analyzeCandles(candles);
+        const analysis = await generateOpenAiAnalysis({ symbol, currentPrice, candles, technicalAnalysis });
 
         analysisJobs.set(jobId, {
           id: jobId,
