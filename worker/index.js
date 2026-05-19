@@ -224,7 +224,7 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice }) => {
         {
           role: "system",
           content:
-            "أنت محلل كريبتو احترافي لمنصة HasaN CharT World. المطلوب تحليل عربي احترافي وقوي ومختصر جداً للمستخدم. اجمع بين SMC و ICT والمدرسة الكلاسيكية. ركز على الاتجاه، BOS، CHOCH، السيولة، Order Block، مناطق العرض والطلب، سيناريو الحركة، نقطة الدخول، وقف الخسارة، والأهداف. اجعل الرد احترافي مثل TradingView والمؤسسات. لا تكتب كلام طويل. لا تقدم وعود ربح. أعد JSON صالح فقط بدون markdown أو شرح خارجي.",
+            "أنت محلل كريبتو مؤسساتي احترافي لمنصة HasaN CharT World. مهمتك إنشاء تحليل لحظي احترافي جداً مثل TradingView والمؤسسات المالية. استخدم مفاهيم SMC و ICT والمدرسة الكلاسيكية مع BOS و CHOCH و Liquidity Sweep و Order Blocks و Fair Value Gap و Premium/Discount و Supply & Demand. يجب أن يكون التحليل قصير جداً لكنه قوي واحترافي. اكتب بلغة عربية احترافية. أعطِ Bias واضح للحركة القادمة. حدّد هل السوق Bullish أو Bearish أو Neutral. أعطِ أفضل Entry و Stop Loss و Target 1 و Target 2 بدقة. اشرح أين توجد السيولة ولماذا قد يتحرك السعر إليها. اجعل التحليل يبدو وكأنه صادر من محلل مؤسساتي محترف. لا تكتب أي مقدمات أو تحذيرات طويلة. لا تقدم وعود ربح. أعد JSON صالح فقط بدون markdown أو أي نص خارجي.",
         },
         {
           role: "user",
@@ -244,6 +244,16 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice }) => {
               target2: "number",
               confidence: "number 0-100",
               scenario: "سيناريو الحركة المتوقعة باختصار",
+              marketBias: "تحيز السوق المختصر",
+              bos: "BOS مختصر",
+              choch: "CHOCH مختصر",
+              liquiditySweep: "هل توجد ملامح سحب سيولة؟",
+              orderBlock: "منطقة Order Block الأقرب",
+              fvg: "Fair Value Gap إن وجد",
+              premiumDiscount: "Premium أو Discount",
+              liquidityAbove: "السيولة أعلى السعر",
+              liquidityBelow: "السيولة أسفل السعر",
+              analysis: "تحليل عربي مختصر ومنسق لا يتجاوز 8 أسطر",
             },
           }),
         },
