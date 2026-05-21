@@ -1,5 +1,17 @@
 export async function POST(req: Request) {
   try {
+    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+    const chatId = process.env.TELEGRAM_CHANNEL_ID?.trim();
+
+    if (!token || !chatId) {
+      return Response.json({
+        success: false,
+        error: "Missing Telegram env",
+        hasToken: !!token,
+        hasChatId: !!chatId,
+      });
+    }
+
     const body = await req.json();
 
     const message = `
@@ -12,17 +24,17 @@ export async function POST(req: Request) {
 📉 السابق: ${body.previous}
 
 🧠 ${body.analysis}
-    `;
+`;
 
     const response = await fetch(
-      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          chat_id: process.env.TELEGRAM_CHANNEL_ID,
+          chat_id: chatId,
           text: message,
           parse_mode: "HTML",
         }),
@@ -32,13 +44,13 @@ export async function POST(req: Request) {
     const data = await response.json();
 
     return Response.json({
-      success: true,
+      success: data.ok === true,
       telegram: data,
     });
   } catch (error) {
     return Response.json({
       success: false,
-      error,
+      error: String(error),
     });
   }
 }
