@@ -2,3 +2,7 @@ node_modules
 .next
 .env
 .vercel
+
+worker/last-news.json
+worker/news-card.png
+worker/.env
