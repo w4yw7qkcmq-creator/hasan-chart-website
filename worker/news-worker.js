@@ -18,7 +18,7 @@ const NEWS_CARD_FILE = path.join(__dirname, "news-card.png");
 // Temporary test mode: true = publish any latest news to test the image design.
 // After testing, change this to false to activate the important-news filter again.
 const TEMP_ALLOW_ALL_NEWS = false;
-const MAX_NEWS_AGE_HOURS = 12;
+const MAX_NEWS_AGE_HOURS = 24;
 
 const IMPORTANT_KEYWORDS = [
   "fed",
@@ -226,6 +226,18 @@ async function createNewsCard(title, imageUrl) {
     ctx.fillRect(0, 280, width, 500);
   } catch (error) {
     console.error("⚠️ Image load failed:", error.message);
+
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, width, 720);
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "bold 64px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("ECONOMIC NEWS", width / 2, 330);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 42px Arial";
+    ctx.fillText("Market Moving Update", width / 2, 395);
   }
 
   ctx.fillStyle = "#dc2626";
@@ -370,7 +382,7 @@ async function isMarketMovingNews(title) {
           {
             role: "system",
             content:
-              "أنت فلتر أخبار مالية عاجلة. قرر هل هذا الخبر مهم للمتداولين في الفوركس أو الذهب أو النفط أو الكريبتو أو المؤشرات أو بسبب حرب أو توتر جيوسياسي أو مفاوضات إيران وأمريكا أو عقوبات. أجب بكلمة واحدة فقط: YES أو NO.",
+              "أنت فلتر أخبار مالية عاجلة. إذا كان الخبر له أي تأثير محتمل على الفوركس أو الدولار أو الذهب أو النفط أو الكريبتو أو الأسهم أو السندات أو الحرب أو السياسة العالمية أو توترات إيران وأمريكا أو العقوبات أو البنوك المركزية أجب YES. تجاهل فقط الأخبار الضعيفة جدًا أو غير المرتبطة بالأسواق. أجب بكلمة واحدة فقط: YES أو NO.",
           },
           {
             role: "user",
