@@ -322,6 +322,50 @@ async function sendTelegramPhoto(message, photoPath) {
   }
 }
 
+async function isMarketMovingNews(title) {
+  if (TEMP_ALLOW_ALL_NEWS) {
+    return true;
+  }
+
+  if (!OPENAI_API_KEY) {
+    return isImportantNews(title);
+  }
+
+  try {
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "أنت فلتر أخبار مالية عاجلة. قرر هل هذا الخبر مهم للمتداولين في الفوركس أو الذهب أو النفط أو الكريبتو أو المؤشرات أو بسبب حرب أو توتر جيوسياسي أو مفاوضات إيران وأمريكا أو عقوبات. أجب بكلمة واحدة فقط: YES أو NO.",
+          },
+          {
+            role: "user",
+            content: `عنوان الخبر: ${title}`,
+          },
+        ],
+        temperature: 0,
+        max_tokens: 5,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const decision = response.data.choices?.[0]?.message?.content?.trim().toUpperCase();
+    return decision === "YES";
+  } catch (error) {
+    console.error("⚠️ AI Importance Filter Error:", error.response?.data || error.message);
+    return isImportantNews(title);
+  }
+}
+
 async function analyzeNewsWithAI(title, link) {
   if (!OPENAI_API_KEY) {
     return `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\nالتأثير: متباين على الدولار / الذهب / الكريبتو حسب ردّة فعل السوق\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`;
@@ -402,19 +446,29 @@ async function fetchForexNews() {
 
     const publishedLinks = readPublishedNewsLinks();
 
-    const latestNews = allItems.slice(0, 50).find((item) => {
+    let latestNews = null;
+
+    for (const item of allItems.slice(0, 50)) {
       const newsDate = new Date(item.isoDate || item.pubDate || Date.now()).getTime();
       const maxAge = MAX_NEWS_AGE_HOURS * 60 * 60 * 1000;
 
       const isFresh = Date.now() - newsDate <= maxAge;
       const isNew = item.link && !publishedLinks.includes(item.link);
-      const isImportant = TEMP_ALLOW_ALL_NEWS || isImportantNews(item.title || "");
 
-      return isFresh && isNew && isImportant;
-    });
+      if (!isFresh || !isNew) {
+        continue;
+      }
+
+      const isImportant = await isMarketMovingNews(item.title || "");
+
+      if (isImportant) {
+        latestNews = item;
+        break;
+      }
+    }
 
     if (!latestNews) {
-      console.log("⏭️ No new important news found.");
+      console.log("⏭️ No new AI-approved important news found.");
       return;
     }
 
