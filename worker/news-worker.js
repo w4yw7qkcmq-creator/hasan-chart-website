@@ -231,12 +231,12 @@ async function createNewsCard(title, imageUrl) {
     ctx.fillRect(0, 0, width, 720);
 
     ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 64px Arial";
+    ctx.font = "bold 64px Noto Naskh Arabic";
     ctx.textAlign = "center";
     ctx.fillText("ECONOMIC NEWS", width / 2, 330);
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 42px Arial";
+    ctx.font = "bold 42px Noto Naskh Arabic";
     ctx.fillText("Market Moving Update", width / 2, 395);
   }
 
@@ -245,7 +245,7 @@ async function createNewsCard(title, imageUrl) {
   ctx.fill();
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 44px Arial";
+  ctx.font = "bold 44px Noto Naskh Arabic";
   ctx.textAlign = "center";
   ctx.fillText("عاجل", 170, 116);
 
@@ -256,7 +256,7 @@ async function createNewsCard(title, imageUrl) {
   ctx.direction = "rtl";
   ctx.textAlign = "right";
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 56px Arial";
+  ctx.font = "bold 56px Noto Naskh Arabic";
 
   const lines = wrapText(ctx, title, 900);
   let y = 805;
@@ -268,12 +268,12 @@ async function createNewsCard(title, imageUrl) {
 
   ctx.direction = "rtl";
   ctx.textAlign = "right";
-  ctx.font = "bold 30px Arial";
+  ctx.font = "bold 30px Noto Naskh Arabic";
   ctx.fillStyle = "#38bdf8";
   ctx.fillText("الأخبار الاقتصادية | Economic News", 990, 1015);
 
   ctx.textAlign = "left";
-  ctx.font = "bold 28px Arial";
+  ctx.font = "bold 28px Noto Naskh Arabic";
   ctx.fillStyle = "#ffffff";
   ctx.fillText("t.me/EconomicNewsi", 60, 1015);
 
