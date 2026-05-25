@@ -32,7 +32,10 @@ const CHANNEL_LOGO_FILE = path.join(__dirname, "assets", "logo.png");
 // Temporary test mode: true = publish any latest news to test the image design.
 // After testing, change this to false to activate the important-news filter again.
 const TEMP_ALLOW_ALL_NEWS = false;
+
 const MAX_NEWS_AGE_HOURS = 24;
+// Prefer real images from the news source. Keep local images only as an optional emergency fallback.
+const USE_LOCAL_IMAGE_FALLBACK = false;
 
 const IMPORTANT_KEYWORDS = [
   "fed",
@@ -284,6 +287,49 @@ function getImageFromNewsItem(item) {
 
   if (match?.[1] && /^https?:\/\//i.test(match[1])) {
     return match[1];
+  }
+
+  return null;
+}
+
+// Try to extract an image from the article's HTML if not found in the RSS item.
+async function getImageFromArticleUrl(articleUrl) {
+  if (!articleUrl || !/^https?:\/\//i.test(articleUrl)) {
+    return null;
+  }
+
+  try {
+    const response = await axios.get(articleUrl, {
+      timeout: 8000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
+    });
+
+    const html = response.data || "";
+
+    const patterns = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+      /<img[^>]+src=["']([^"']+)["']/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+
+      if (match?.[1]) {
+        const imageUrl = new URL(match[1], articleUrl).href;
+
+        if (/^https?:\/\//i.test(imageUrl)) {
+          return imageUrl;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("⚠️ Article image fetch failed:", error.message);
   }
 
   return null;
@@ -752,12 +798,19 @@ async function fetchForexNews() {
     );
 
     if (veryImportantNews) {
-      const sourceImage = getImageFromNewsItem(latestNews);
-      const fallbackImage = selectNewsImage(latestNews.title);
-      const photoPath = await createNewsCard(imageTitle, sourceImage || fallbackImage);
+      const rssImage = getImageFromNewsItem(latestNews);
+      const articleImage = rssImage ? null : await getImageFromArticleUrl(latestNews.link);
+      const localFallbackImage = USE_LOCAL_IMAGE_FALLBACK ? selectNewsImage(latestNews.title) : null;
+      const finalImage = rssImage || articleImage || localFallbackImage;
 
-      if (photoPath) {
-        await sendTelegramPhoto(message, photoPath);
+      if (finalImage) {
+        const photoPath = await createNewsCard(imageTitle, finalImage);
+
+        if (photoPath) {
+          await sendTelegramPhoto(message, photoPath);
+        } else {
+          await sendTelegramMessage(message);
+        }
       } else {
         await sendTelegramMessage(message);
       }
