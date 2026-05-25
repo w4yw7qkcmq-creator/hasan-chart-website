@@ -239,8 +239,8 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 async function createNewsCard(title, imageUrl) {
-  const width = 1080;
-  const height = 1080;
+  const width = 1600;
+  const height = 1600;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
@@ -268,53 +268,8 @@ async function createNewsCard(title, imageUrl) {
 
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(0, 0, width, 720);
-
-    ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 64px Arabic";
-    ctx.textAlign = "center";
-    ctx.fillText("ECONOMIC NEWS", width / 2, 330);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 42px Arabic";
-    ctx.fillText("Market Moving Update", width / 2, 395);
   }
 
-  ctx.fillStyle = "#dc2626";
-  ctx.roundRect(60, 60, 220, 82, 18);
-  ctx.fill();
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 44px Arabic";
-  ctx.textAlign = "center";
-  ctx.fillText("عاجل", 170, 116);
-
-  ctx.fillStyle = "rgba(2, 6, 23, 0.86)";
-  ctx.roundRect(55, 720, 970, 250, 34);
-  ctx.fill();
-
-  ctx.direction = "rtl";
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 56px Arabic";
-
-  const lines = wrapText(ctx, title, 900);
-  let y = 805;
-
-  for (const line of lines) {
-    ctx.fillText(line, 990, y);
-    y += 72;
-  }
-
-  ctx.direction = "rtl";
-  ctx.textAlign = "right";
-  ctx.font = "bold 30px Arabic";
-  ctx.fillStyle = "#38bdf8";
-  ctx.fillText("الأخبار الاقتصادية | Economic News", 990, 1015);
-
-  ctx.textAlign = "left";
-  ctx.font = "bold 28px Arabic";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("t.me/EconomicNewsi", 60, 1015);
 
   const buffer = canvas.toBuffer("image/png");
   fs.writeFileSync(NEWS_CARD_FILE, buffer);
@@ -575,10 +530,37 @@ async function fetchForexNews() {
     const message = aiResult.message;
     const imageTitle = aiResult.imageTitle || latestNews.title;
 
-    const photoUrl = selectNewsImage(latestNews.title);
-    const photoPath = await createNewsCard(imageTitle, photoUrl);
+    const veryImportantNews = [
+      "fed",
+      "fomc",
+      "powell",
+      "interest rate",
+      "cpi",
+      "inflation",
+      "nfp",
+      "bitcoin",
+      "crypto",
+      "war",
+      "iran",
+      "oil",
+      "gold",
+      "trump",
+      "attack",
+      "missile",
+      "breaking",
+    ].some((keyword) =>
+      latestNews.title.toLowerCase().includes(keyword)
+    );
 
-    await sendTelegramPhoto(message, photoPath);
+    if (veryImportantNews) {
+      const photoUrl = selectNewsImage(latestNews.title);
+      const photoPath = await createNewsCard(imageTitle, photoUrl);
+
+      await sendTelegramPhoto(message, photoPath);
+    } else {
+      await sendTelegramMessage(message);
+    }
+
     savePublishedNewsLink(latestLink);
   } catch (error) {
     console.error("❌ RSS Error:", error.message);
