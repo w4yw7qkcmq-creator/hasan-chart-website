@@ -340,7 +340,7 @@ function normalizeNewsTitle(title) {
     .toLowerCase()
     .replace(/https?:\/\/\S+/g, "")
     .replace(/[^a-z0-9\u0600-\u06ff\s]/g, " ")
-    .replace(/\b(breaking|update|latest|market|news|says|said)\b/g, " ")
+    .replace(/\b(breaking|update|latest|market|news|says|said|live|forexlive|investing|reuters|bloomberg|fxstreet|coindesk)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -353,7 +353,10 @@ function areSimilarNewsTitles(titleA, titleB) {
     return false;
   }
 
-  if (normalizedA.includes(normalizedB.slice(0, 45)) || normalizedB.includes(normalizedA.slice(0, 45))) {
+  if (
+    normalizedA.includes(normalizedB.slice(0, 30)) ||
+    normalizedB.includes(normalizedA.slice(0, 30))
+  ) {
     return true;
   }
 
@@ -367,7 +370,7 @@ function areSimilarNewsTitles(titleA, titleB) {
   const commonWords = [...wordsA].filter((word) => wordsB.has(word)).length;
   const smallerSetSize = Math.min(wordsA.size, wordsB.size);
 
-  return commonWords / smallerSetSize >= 0.68;
+  return commonWords / smallerSetSize >= 0.52;
 }
 
 function wrapText(ctx, text, maxWidth) {
@@ -718,7 +721,7 @@ async function fetchForexNews() {
 
     let latestNews = null;
 
-    for (const item of allItems.slice(0, 50)) {
+    for (const item of allItems.slice(0, 80)) {
       const newsDate = new Date(item.isoDate || item.pubDate || Date.now()).getTime();
       const maxAge = MAX_NEWS_AGE_HOURS * 60 * 60 * 1000;
 
@@ -728,8 +731,67 @@ async function fetchForexNews() {
       const isDuplicateTopic = recentTitles.some((recentTitle) =>
         areSimilarNewsTitles(item.title || "", recentTitle)
       );
+      const normalizedCurrentTitle = normalizeNewsTitle(item.title || "");
 
-      if (isDuplicateTopic) {
+      const sameKeywordCluster = recentTitles.some((recentTitle) => {
+        const normalizedRecent = normalizeNewsTitle(recentTitle);
+
+        return (
+          normalizedCurrentTitle.includes("powell") && normalizedRecent.includes("powell") ||
+          normalizedCurrentTitle.includes("fed") && normalizedRecent.includes("fed") ||
+          normalizedCurrentTitle.includes("bitcoin") && normalizedRecent.includes("bitcoin") ||
+          normalizedCurrentTitle.includes("crypto") && normalizedRecent.includes("crypto") ||
+          normalizedCurrentTitle.includes("gold") && normalizedRecent.includes("gold") ||
+          normalizedCurrentTitle.includes("oil") && normalizedRecent.includes("oil") ||
+          normalizedCurrentTitle.includes("iran") && normalizedRecent.includes("iran") ||
+          normalizedCurrentTitle.includes("tehran") && normalizedRecent.includes("tehran") ||
+          normalizedCurrentTitle.includes("israel") && normalizedRecent.includes("israel") ||
+          normalizedCurrentTitle.includes("gaza") && normalizedRecent.includes("gaza") ||
+          normalizedCurrentTitle.includes("middle east") && normalizedRecent.includes("middle east") ||
+          normalizedCurrentTitle.includes("russia") && normalizedRecent.includes("russia") ||
+          normalizedCurrentTitle.includes("ukraine") && normalizedRecent.includes("ukraine") ||
+          normalizedCurrentTitle.includes("war") && normalizedRecent.includes("war") ||
+          normalizedCurrentTitle.includes("attack") && normalizedRecent.includes("attack") ||
+          normalizedCurrentTitle.includes("missile") && normalizedRecent.includes("missile") ||
+          normalizedCurrentTitle.includes("airstrike") && normalizedRecent.includes("airstrike") ||
+          normalizedCurrentTitle.includes("military") && normalizedRecent.includes("military") ||
+          normalizedCurrentTitle.includes("ceasefire") && normalizedRecent.includes("ceasefire") ||
+          normalizedCurrentTitle.includes("sanctions") && normalizedRecent.includes("sanctions") ||
+          normalizedCurrentTitle.includes("nfp") && normalizedRecent.includes("nfp") ||
+          normalizedCurrentTitle.includes("inflation") && normalizedRecent.includes("inflation") ||
+          normalizedCurrentTitle.includes("cpi") && normalizedRecent.includes("cpi")
+        );
+      });
+
+      const warTerms = [
+        "war",
+        "attack",
+        "missile",
+        "airstrike",
+        "military",
+        "ceasefire",
+        "sanctions",
+        "iran",
+        "israel",
+        "gaza",
+        "russia",
+        "ukraine",
+        "middle east",
+      ];
+
+      const isWarNews = warTerms.some((term) => normalizedCurrentTitle.includes(term));
+      const hasRecentWarNews = recentTitles.some((recentTitle) => {
+        const normalizedRecent = normalizeNewsTitle(recentTitle);
+        return warTerms.some((term) => normalizedRecent.includes(term));
+      });
+
+      if (isWarNews && hasRecentWarNews) {
+        console.log("⏭️ Skipped repeated war/geopolitical news:", item.title);
+        continue;
+      }
+
+      if (isDuplicateTopic || sameKeywordCluster) {
+        console.log("⏭️ Skipped duplicate/similar news:", item.title);
         continue;
       }
 
