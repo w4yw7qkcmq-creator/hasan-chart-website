@@ -224,8 +224,8 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 async function createNewsCard(title, imageUrl) {
-  const width = 1600;
-  const height = 1600;
+  const width = 1280;
+  const height = 720;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
@@ -238,21 +238,27 @@ async function createNewsCard(title, imageUrl) {
 
   try {
     const image = await loadImage(imageUrl);
+
+    const scale = Math.max(width / image.width, height / image.height);
+    const scaledWidth = image.width * scale;
+    const scaledHeight = image.height * scale;
+    const x = (width - scaledWidth) / 2;
+    const y = (height - scaledHeight) / 2;
+
     ctx.save();
-    ctx.globalAlpha = 0.92;
-    ctx.drawImage(image, 0, 0, width, 720);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(image, x, y, scaledWidth, scaledHeight);
     ctx.restore();
 
-    const imageOverlay = ctx.createLinearGradient(0, 280, 0, 760);
-    imageOverlay.addColorStop(0, "rgba(2, 6, 23, 0.05)");
-    imageOverlay.addColorStop(1, "rgba(2, 6, 23, 0.95)");
+    const imageOverlay = ctx.createLinearGradient(0, 0, 0, height);
+    imageOverlay.addColorStop(0, "rgba(2, 6, 23, 0.08)");
+    imageOverlay.addColorStop(1, "rgba(2, 6, 23, 0.18)");
     ctx.fillStyle = imageOverlay;
-    ctx.fillRect(0, 280, width, 500);
+    ctx.fillRect(0, 0, width, height);
   } catch (error) {
     console.error("⚠️ Image load failed:", error.message);
-
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(0, 0, width, 720);
+    return null;
   }
 
 
@@ -570,7 +576,11 @@ async function fetchForexNews() {
       const photoUrl = selectNewsImage(latestNews.title);
       const photoPath = await createNewsCard(imageTitle, photoUrl);
 
-      await sendTelegramPhoto(message, photoPath);
+      if (photoPath) {
+        await sendTelegramPhoto(message, photoPath);
+      } else {
+        await sendTelegramMessage(message);
+      }
     } else {
       await sendTelegramMessage(message);
     }
