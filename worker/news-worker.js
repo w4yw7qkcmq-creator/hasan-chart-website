@@ -423,7 +423,10 @@ async function isMarketMovingNews(title) {
 
 async function analyzeNewsWithAI(title, link) {
   if (!OPENAI_API_KEY) {
-    return `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\nالتأثير: متباين على الدولار / الذهب / الكريبتو حسب ردّة فعل السوق\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`;
+    return {
+      message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\nالتأثير: متباين على الدولار / الذهب / الكريبتو حسب ردّة فعل السوق\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
+      imageTitle: title,
+    };
   }
 
   try {
@@ -465,11 +468,23 @@ async function analyzeNewsWithAI(title, link) {
       .replace(/المصدر:?/gi, "")
       .trim();
 
-    return `${cleanedAiText}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`;
+    const firstLine = cleanedAiText
+      .split("\n")
+      .find((line) => line.trim().length > 10) || title;
+
+    return {
+      message: `${cleanedAiText}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`,
+      imageTitle: firstLine
+        .replace(/🚨|📌|📈|📉|🔥|⚡|🛢️|💰|🇺🇸|🇮🇷|🔴|🟢|🟡|🎯|📊|📰/g, "")
+        .trim(),
+    };
   } catch (error) {
     console.error("⚠️ AI Error:", error.response?.data || error.message);
 
-    return `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\nالتأثير: متباين على الدولار / الذهب / الكريبتو حسب ردّة فعل السوق\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`;
+    return {
+      message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\nالتأثير: متباين على الدولار / الذهب / الكريبتو حسب ردّة فعل السوق\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
+      imageTitle: title,
+    };
   }
 }
 
@@ -529,9 +544,13 @@ async function fetchForexNews() {
 
     const latestLink = latestNews.link;
 
-    const message = await analyzeNewsWithAI(latestNews.title, latestNews.link);
+    const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link);
+
+    const message = aiResult.message;
+    const imageTitle = aiResult.imageTitle || latestNews.title;
+
     const photoUrl = selectNewsImage(latestNews.title);
-    const photoPath = await createNewsCard(latestNews.title, photoUrl);
+    const photoPath = await createNewsCard(imageTitle, photoUrl);
 
     await sendTelegramPhoto(message, photoPath);
     savePublishedNewsLink(latestLink);
