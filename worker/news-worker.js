@@ -115,6 +115,19 @@ function isImportantNews(title) {
   );
 }
 
+function pickRandomAsset(fileNames) {
+  const availableFiles = fileNames
+    .map((fileName) => path.join(__dirname, "assets", fileName))
+    .filter((filePath) => fs.existsSync(filePath));
+
+  if (!availableFiles.length) {
+    return path.join(__dirname, "assets", "default.png");
+  }
+
+  const randomIndex = Math.floor(Math.random() * availableFiles.length);
+  return availableFiles[randomIndex];
+}
+
 function selectNewsImage(title) {
   const lowerTitle = title.toLowerCase();
 
@@ -125,14 +138,24 @@ function selectNewsImage(title) {
     lowerTitle.includes("ethereum") ||
     lowerTitle.includes("solana")
   ) {
-    return path.join(__dirname, "assets", "bitcoin.png");
+    return pickRandomAsset([
+      "bitcoin-1.png",
+      "bitcoin-2.png",
+      "bitcoin-3.png",
+      "crypto-1.png",
+      "crypto-2.png",
+      "bitcoin.png",
+      "crypto.png",
+    ]);
   }
 
-  if (
-    lowerTitle.includes("gold") ||
-    lowerTitle.includes("xau")
-  ) {
-    return path.join(__dirname, "assets", "gold.png");
+  if (lowerTitle.includes("gold") || lowerTitle.includes("xau")) {
+    return pickRandomAsset([
+      "gold-1.png",
+      "gold-2.png",
+      "gold-3.png",
+      "gold.png",
+    ]);
   }
 
   if (
@@ -141,7 +164,12 @@ function selectNewsImage(title) {
     lowerTitle.includes("brent") ||
     lowerTitle.includes("wti")
   ) {
-    return path.join(__dirname, "assets", "oil.png");
+    return pickRandomAsset([
+      "oil-1.png",
+      "oil-2.png",
+      "oil-3.png",
+      "oil.png",
+    ]);
   }
 
   if (
@@ -151,18 +179,33 @@ function selectNewsImage(title) {
     lowerTitle.includes("interest rate") ||
     lowerTitle.includes("federal reserve")
   ) {
-    return path.join(__dirname, "assets", "fed.png");
+    return pickRandomAsset([
+      "fed-1.png",
+      "fed-2.png",
+      "fed-3.png",
+      "powell-1.png",
+      "powell-2.png",
+      "fed.png",
+      "powell.png",
+    ]);
   }
 
   if (lowerTitle.includes("trump")) {
-    return path.join(__dirname, "assets", "trump.png");
+    return pickRandomAsset([
+      "trump-1.png",
+      "trump-2.png",
+      "trump-3.png",
+      "trump.png",
+    ]);
   }
 
-  if (
-    lowerTitle.includes("iran") ||
-    lowerTitle.includes("tehran")
-  ) {
-    return path.join(__dirname, "assets", "iran.png");
+  if (lowerTitle.includes("iran") || lowerTitle.includes("tehran")) {
+    return pickRandomAsset([
+      "iran-1.png",
+      "iran-2.png",
+      "iran-3.png",
+      "iran.png",
+    ]);
   }
 
   if (
@@ -175,7 +218,12 @@ function selectNewsImage(title) {
     lowerTitle.includes("russia") ||
     lowerTitle.includes("israel")
   ) {
-    return path.join(__dirname, "assets", "war.png");
+    return pickRandomAsset([
+      "war-1.png",
+      "war-2.png",
+      "war-3.png",
+      "war.png",
+    ]);
   }
 
   if (
@@ -184,7 +232,12 @@ function selectNewsImage(title) {
     lowerTitle.includes("forex") ||
     lowerTitle.includes("dollar")
   ) {
-    return path.join(__dirname, "assets", "forex.png");
+    return pickRandomAsset([
+      "forex-1.png",
+      "forex-2.png",
+      "forex-3.png",
+      "forex.png",
+    ]);
   }
 
   if (
@@ -193,10 +246,46 @@ function selectNewsImage(title) {
     lowerTitle.includes("dow") ||
     lowerTitle.includes("s&p")
   ) {
-    return path.join(__dirname, "assets", "stocks.png");
+    return pickRandomAsset([
+      "stocks-1.png",
+      "stocks-2.png",
+      "stocks-3.png",
+      "stocks.png",
+    ]);
   }
 
-  return path.join(__dirname, "assets", "default.png");
+  return pickRandomAsset([
+    "default-1.png",
+    "default-2.png",
+    "default-3.png",
+    "default.png",
+  ]);
+}
+
+function getImageFromNewsItem(item) {
+  const enclosureUrl = item.enclosure?.url;
+  if (enclosureUrl && /^https?:\/\//i.test(enclosureUrl)) {
+    return enclosureUrl;
+  }
+
+  const mediaContent = item["media:content"]?.$.url || item["media:content"]?.url;
+  if (mediaContent && /^https?:\/\//i.test(mediaContent)) {
+    return mediaContent;
+  }
+
+  const mediaThumbnail = item["media:thumbnail"]?.$.url || item["media:thumbnail"]?.url;
+  if (mediaThumbnail && /^https?:\/\//i.test(mediaThumbnail)) {
+    return mediaThumbnail;
+  }
+
+  const html = item.content || item["content:encoded"] || item.summary || item.description || "";
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+
+  if (match?.[1] && /^https?:\/\//i.test(match[1])) {
+    return match[1];
+  }
+
+  return null;
 }
 
 function wrapText(ctx, text, maxWidth) {
@@ -573,8 +662,9 @@ async function fetchForexNews() {
     );
 
     if (veryImportantNews) {
-      const photoUrl = selectNewsImage(latestNews.title);
-      const photoPath = await createNewsCard(imageTitle, photoUrl);
+      const sourceImage = getImageFromNewsItem(latestNews);
+      const fallbackImage = selectNewsImage(latestNews.title);
+      const photoPath = await createNewsCard(imageTitle, sourceImage || fallbackImage);
 
       if (photoPath) {
         await sendTelegramPhoto(message, photoPath);
