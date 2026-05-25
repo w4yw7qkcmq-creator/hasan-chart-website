@@ -27,6 +27,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const LAST_NEWS_FILE = path.join(__dirname, "last-news.json");
 const NEWS_CARD_FILE = path.join(__dirname, "news-card.png");
+const CHANNEL_LOGO_FILE = path.join(__dirname, "assets", "logo.png");
 
 // Temporary test mode: true = publish any latest news to test the image design.
 // After testing, change this to false to activate the important-news filter again.
@@ -350,6 +351,42 @@ async function createNewsCard(title, imageUrl) {
     return null;
   }
 
+
+  try {
+    ctx.save();
+
+    const watermarkWidth = 380;
+    const watermarkHeight = 74;
+    const watermarkX = width - watermarkWidth - 24;
+    const watermarkY = height - watermarkHeight - 22;
+
+    ctx.globalAlpha = 0.78;
+    ctx.fillStyle = "rgba(2, 6, 23, 0.68)";
+    ctx.roundRect(watermarkX, watermarkY, watermarkWidth, watermarkHeight, 18);
+    ctx.fill();
+
+    if (fs.existsSync(CHANNEL_LOGO_FILE)) {
+      const logo = await loadImage(CHANNEL_LOGO_FILE);
+      const logoSize = 50;
+      ctx.globalAlpha = 1;
+      ctx.drawImage(logo, watermarkX + watermarkWidth - logoSize - 14, watermarkY + 12, logoSize, logoSize);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px Arabic";
+    ctx.textAlign = "right";
+    ctx.direction = "rtl";
+    ctx.fillText("الأخبار الاقتصادية", watermarkX + watermarkWidth - 78, watermarkY + 32);
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "bold 20px Arabic";
+    ctx.fillText("t.me/EconomicNewsi", watermarkX + watermarkWidth - 78, watermarkY + 58);
+
+    ctx.restore();
+  } catch (error) {
+    console.error("⚠️ Watermark failed:", error.message);
+  }
 
   const buffer = canvas.toBuffer("image/png");
   fs.writeFileSync(NEWS_CARD_FILE, buffer);
