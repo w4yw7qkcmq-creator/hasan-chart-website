@@ -37,6 +37,8 @@ const MAX_NEWS_AGE_HOURS = 24;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = false;
 
+let isFetchingNews = false;
+
 const IMPORTANT_KEYWORDS = [
   "fed",
   "fomc",
@@ -379,36 +381,85 @@ function getNewsTopicCluster(title) {
   const topicClusters = [
     {
       key: "hormuz_iran_us",
-      terms: ["hormuz", "strait", "iran", "tehran", "united states", "usa", "us", "talks", "negotiations", "deal", "gulf"],
+      terms: [
+        "hormuz",
+        "strait",
+        "strait of hormuz",
+        "iran",
+        "tehran",
+        "united states",
+        "usa",
+        "us",
+        "talks",
+        "negotiations",
+        "deal",
+        "gulf",
+        "مضيق",
+        "هرمز",
+        "مضيق هرمز",
+        "إيران",
+        "ايران",
+        "طهران",
+        "الولايات المتحدة",
+        "امريكا",
+        "أمريكا",
+        "مفاوضات",
+        "اتفاق",
+        "الخليج",
+      ],
     },
     {
       key: "iran_israel_middle_east",
-      terms: ["iran", "israel", "tehran", "gaza", "middle east", "missile", "attack", "airstrike", "war"],
+      terms: [
+        "iran",
+        "israel",
+        "tehran",
+        "gaza",
+        "middle east",
+        "missile",
+        "attack",
+        "airstrike",
+        "war",
+        "إيران",
+        "ايران",
+        "إسرائيل",
+        "اسرائيل",
+        "غزة",
+        "الشرق الأوسط",
+        "صاروخ",
+        "هجوم",
+        "ضربة",
+        "حرب",
+      ],
     },
     {
       key: "russia_ukraine",
-      terms: ["russia", "ukraine", "moscow", "kyiv", "missile", "attack", "war", "ceasefire"],
+      terms: ["russia", "ukraine", "moscow", "kyiv", "missile", "attack", "war", "ceasefire", "روسيا", "أوكرانيا", "اوكرانيا", "موسكو", "كييف", "حرب", "هجوم", "وقف إطلاق النار"],
     },
     {
       key: "oil_geopolitics",
-      terms: ["oil", "crude", "brent", "wti", "opec", "hormuz", "gulf", "iran", "sanctions"],
+      terms: ["oil", "crude", "brent", "wti", "opec", "hormuz", "gulf", "iran", "sanctions", "نفط", "النفط", "خام", "برنت", "أوبك", "اوبك", "هرمز", "الخليج", "إيران", "ايران", "عقوبات"],
     },
     {
       key: "fed_rates",
-      terms: ["fed", "fomc", "powell", "federal reserve", "interest rate", "rate cut", "rate hike"],
+      terms: ["fed", "fomc", "powell", "federal reserve", "interest rate", "rate cut", "rate hike", "الفيدرالي", "باول", "الفائدة", "خفض الفائدة", "رفع الفائدة"],
     },
     {
       key: "us_inflation_jobs",
-      terms: ["cpi", "inflation", "pce", "nfp", "payrolls", "jobs", "unemployment"],
+      terms: ["cpi", "inflation", "pce", "nfp", "payrolls", "jobs", "unemployment", "التضخم", "الوظائف", "البطالة", "الرواتب"],
     },
     {
       key: "bitcoin_crypto",
-      terms: ["bitcoin", "btc", "crypto", "ethereum", "etf"],
+      terms: ["bitcoin", "btc", "crypto", "ethereum", "etf", "بيتكوين", "البيتكوين", "كريبتو", "العملات الرقمية", "إيثريوم", "ايثريوم"],
     },
   ];
 
   for (const cluster of topicClusters) {
     const matches = cluster.terms.filter((term) => normalizedTitle.includes(term));
+
+    if (matches.length >= 1 && ["hormuz_iran_us", "iran_israel_middle_east", "russia_ukraine"].includes(cluster.key)) {
+      return cluster.key;
+    }
 
     if (matches.length >= 2) {
       return cluster.key;
@@ -749,6 +800,12 @@ async function analyzeNewsWithAI(title, link) {
 }
 
 async function fetchForexNews() {
+  if (isFetchingNews) {
+    console.log("⏭️ Previous news fetch still running. Skipping overlap.");
+    return;
+  }
+
+  isFetchingNews = true;
   try {
     console.log("🚀 Fetching forex news...");
 
@@ -856,6 +913,26 @@ async function fetchForexNews() {
         "negotiations",
         "deal",
         "nuclear",
+        "مضيق",
+        "هرمز",
+        "مضيق هرمز",
+        "إيران",
+        "ايران",
+        "طهران",
+        "امريكا",
+        "أمريكا",
+        "الولايات المتحدة",
+        "مفاوضات",
+        "اتفاق",
+        "الخليج",
+        "إسرائيل",
+        "اسرائيل",
+        "غزة",
+        "حرب",
+        "هجوم",
+        "صاروخ",
+        "ضربة",
+        "عقوبات",
       ];
 
       const isWarNews = warTerms.some((term) => normalizedCurrentTitle.includes(term));
@@ -962,6 +1039,8 @@ async function fetchForexNews() {
     savePublishedNewsLink(latestLink, latestNews.title || "");
   } catch (error) {
     console.error("❌ RSS Error:", error.message);
+  } finally {
+    isFetchingNews = false;
   }
 }
 
