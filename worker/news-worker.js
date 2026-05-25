@@ -406,6 +406,18 @@ function getNewsTopicCluster(title) {
         "مفاوضات",
         "اتفاق",
         "الخليج",
+        "فتح",
+        "إعادة فتح",
+        "اعادة فتح",
+        "إغلاق",
+        "اغلاق",
+        "العلاقات الأمريكية الإيرانية",
+        "العلاقات الامريكية الايرانية",
+        "واشنطن",
+        "إيراني",
+        "ايراني",
+        "الأمريكية الإيرانية",
+        "الامريكية الايرانية",
       ],
     },
     {
@@ -438,7 +450,7 @@ function getNewsTopicCluster(title) {
     },
     {
       key: "oil_geopolitics",
-      terms: ["oil", "crude", "brent", "wti", "opec", "hormuz", "gulf", "iran", "sanctions", "نفط", "النفط", "خام", "برنت", "أوبك", "اوبك", "هرمز", "الخليج", "إيران", "ايران", "عقوبات"],
+      terms: ["oil", "crude", "brent", "wti", "opec", "hormuz", "gulf", "iran", "sanctions", "strait", "talks", "deal", "نفط", "النفط", "خام", "برنت", "أوبك", "اوبك", "هرمز", "مضيق", "الخليج", "إيران", "ايران", "عقوبات", "اتفاق", "مفاوضات"],
     },
     {
       key: "fed_rates",
@@ -851,9 +863,12 @@ async function fetchForexNews() {
         areSimilarNewsTitles(item.title || "", recentTitle)
       );
       const normalizedCurrentTitle = normalizeNewsTitle(item.title || "");
-      const currentTopicCluster = getNewsTopicCluster(item.title || "");
+      const currentTopicCluster = getNewsTopicCluster(`${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`);
       const hasRecentSameTopicCluster = currentTopicCluster
-        ? recentPublishedItems.some((publishedItem) => publishedItem.topicCluster === currentTopicCluster)
+        ? recentPublishedItems.some((publishedItem) => {
+            const publishedCluster = publishedItem.topicCluster || getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
+            return publishedCluster === currentTopicCluster;
+          })
         : false;
 
       if (hasRecentSameTopicCluster) {
@@ -973,6 +988,7 @@ async function fetchForexNews() {
     const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link);
 
     const message = aiResult.message;
+    const combinedNewsIdentity = `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
     const imageTitle = aiResult.imageTitle || latestNews.title;
 
     const veryImportantNews = [
@@ -1036,7 +1052,7 @@ async function fetchForexNews() {
       await sendTelegramMessage(message);
     }
 
-    savePublishedNewsLink(latestLink, latestNews.title || "");
+    savePublishedNewsLink(latestLink, combinedNewsIdentity);
   } catch (error) {
     console.error("❌ RSS Error:", error.message);
   } finally {
