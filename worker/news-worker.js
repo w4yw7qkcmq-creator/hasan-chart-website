@@ -356,12 +356,12 @@ async function isMarketMovingNews(title) {
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-mini",
         messages: [
           {
             role: "system",
             content:
-              "أنت فلتر احترافي لأخبار الأسواق المالية العالمية. انشر فقط الأخبار التي تؤثر فعليًا على سوق الفوركس والعملات الرئيسية مثل الدولار واليورو والين والجنيه، أو سوق الأسهم الأمريكية، أو الذهب، أو النفط، أو السلع، أو العملات الرقمية، أو قرارات الفيدرالي، أو الاقتصاد الأمريكي، أو الحروب والتوترات الجيوسياسية الكبرى. تجاهل الأخبار الضعيفة أو المحلية أو التي لا تحرك الأسواق العالمية بشكل واضح. إذا كان الخبر مؤثرًا فعلاً على الأسواق أجب YES فقط، وإذا لم يكن مهمًا أجب NO فقط.",
+              "أنت رئيس تحرير لقناة أخبار مالية احترافية مشابهة لـ Bloomberg و ForexBreakingNews. انشر فقط الأخبار التي قد تحرك السوق فعليًا أو تسبب تقلبات واضحة في الفوركس أو الدولار أو الذهب أو النفط أو الأسهم الأمريكية أو العملات الرقمية أو الحروب الجيوسياسية الكبرى. تجاهل الأخبار العادية والتحليلات الضعيفة والتصريحات غير المهمة والأخبار المحلية. إذا كان الخبر قوي ومؤثر فعلًا أجب YES فقط. إذا كان الخبر ضعيف أو تأثيره محدود أجب NO فقط.",
           },
           {
             role: "user",
@@ -481,6 +481,9 @@ async function fetchForexNews() {
     });
 
     const publishedLinks = readPublishedNewsLinks();
+    const recentTitles = publishedLinks.map((item) =>
+      item.toLowerCase().slice(0, 80)
+    );
 
     let latestNews = null;
 
@@ -490,6 +493,14 @@ async function fetchForexNews() {
 
       const isFresh = Date.now() - newsDate <= maxAge;
       const isNew = item.link && !publishedLinks.includes(item.link);
+
+      const isDuplicateTopic = recentTitles.some((t) =>
+        (item.title || "").toLowerCase().includes(t.slice(0, 35))
+      );
+
+      if (isDuplicateTopic) {
+        continue;
+      }
 
       if (!isFresh || !isNew) {
         continue;
