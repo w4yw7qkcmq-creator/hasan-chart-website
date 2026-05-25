@@ -3,8 +3,21 @@ const path = require("path");
 const Parser = require("rss-parser");
 const axios = require("axios");
 const FormData = require("form-data");
-const { createCanvas, loadImage } = require("canvas");
+const { createCanvas, loadImage, registerFont } = require("canvas");
 require("dotenv").config();
+
+try {
+  const arabicFontPath = "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf";
+
+  if (fs.existsSync(arabicFontPath)) {
+    registerFont(arabicFontPath, { family: "Arabic" });
+    console.log("✅ Arabic font registered");
+  } else {
+    console.log("⚠️ Arabic font file not found, using system fallback");
+  }
+} catch (error) {
+  console.error("⚠️ Arabic font registration failed:", error.message);
+}
 
 const parser = new Parser();
 
@@ -231,12 +244,12 @@ async function createNewsCard(title, imageUrl) {
     ctx.fillRect(0, 0, width, 720);
 
     ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 64px Noto Naskh Arabic";
+    ctx.font = "bold 64px Arabic";
     ctx.textAlign = "center";
     ctx.fillText("ECONOMIC NEWS", width / 2, 330);
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 42px Noto Naskh Arabic";
+    ctx.font = "bold 42px Arabic";
     ctx.fillText("Market Moving Update", width / 2, 395);
   }
 
@@ -245,7 +258,7 @@ async function createNewsCard(title, imageUrl) {
   ctx.fill();
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 44px Noto Naskh Arabic";
+  ctx.font = "bold 44px Arabic";
   ctx.textAlign = "center";
   ctx.fillText("عاجل", 170, 116);
 
@@ -256,7 +269,7 @@ async function createNewsCard(title, imageUrl) {
   ctx.direction = "rtl";
   ctx.textAlign = "right";
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 56px Noto Naskh Arabic";
+  ctx.font = "bold 56px Arabic";
 
   const lines = wrapText(ctx, title, 900);
   let y = 805;
@@ -268,12 +281,12 @@ async function createNewsCard(title, imageUrl) {
 
   ctx.direction = "rtl";
   ctx.textAlign = "right";
-  ctx.font = "bold 30px Noto Naskh Arabic";
+  ctx.font = "bold 30px Arabic";
   ctx.fillStyle = "#38bdf8";
   ctx.fillText("الأخبار الاقتصادية | Economic News", 990, 1015);
 
   ctx.textAlign = "left";
-  ctx.font = "bold 28px Noto Naskh Arabic";
+  ctx.font = "bold 28px Arabic";
   ctx.fillStyle = "#ffffff";
   ctx.fillText("t.me/EconomicNewsi", 60, 1015);
 
