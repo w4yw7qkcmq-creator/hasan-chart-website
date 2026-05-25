@@ -373,6 +373,66 @@ function areSimilarNewsTitles(titleA, titleB) {
   return commonWords / smallerSetSize >= 0.52;
 }
 
+function getNewsTopicCluster(title) {
+  const normalizedTitle = normalizeNewsTitle(title);
+
+  const topicClusters = [
+    {
+      key: "hormuz_iran_us",
+      terms: ["hormuz", "strait", "iran", "tehran", "united states", "usa", "us", "talks", "negotiations", "deal", "gulf"],
+    },
+    {
+      key: "iran_israel_middle_east",
+      terms: ["iran", "israel", "tehran", "gaza", "middle east", "missile", "attack", "airstrike", "war"],
+    },
+    {
+      key: "russia_ukraine",
+      terms: ["russia", "ukraine", "moscow", "kyiv", "missile", "attack", "war", "ceasefire"],
+    },
+    {
+      key: "oil_geopolitics",
+      terms: ["oil", "crude", "brent", "wti", "opec", "hormuz", "gulf", "iran", "sanctions"],
+    },
+    {
+      key: "fed_rates",
+      terms: ["fed", "fomc", "powell", "federal reserve", "interest rate", "rate cut", "rate hike"],
+    },
+    {
+      key: "us_inflation_jobs",
+      terms: ["cpi", "inflation", "pce", "nfp", "payrolls", "jobs", "unemployment"],
+    },
+    {
+      key: "bitcoin_crypto",
+      terms: ["bitcoin", "btc", "crypto", "ethereum", "etf"],
+    },
+  ];
+
+  for (const cluster of topicClusters) {
+    const matches = cluster.terms.filter((term) => normalizedTitle.includes(term));
+
+    if (matches.length >= 2) {
+      return cluster.key;
+    }
+  }
+
+  return null;
+}
+
+function isRecentPublishedItem(item) {
+  if (!item.publishedAt) {
+    return true;
+  }
+
+  const publishedAt = new Date(item.publishedAt).getTime();
+
+  if (Number.isNaN(publishedAt)) {
+    return true;
+  }
+
+  const maxDuplicateWindowHours = 6;
+  return Date.now() - publishedAt <= maxDuplicateWindowHours * 60 * 60 * 1000;
+}
+
 function wrapText(ctx, text, maxWidth) {
   const words = text.split(" ");
   const lines = [];
@@ -517,6 +577,7 @@ function savePublishedNewsLink(link, title = "") {
         link,
         title,
         normalizedTitle: normalizeNewsTitle(title),
+        topicCluster: getNewsTopicCluster(title),
         publishedAt: new Date().toISOString(),
       },
       ...publishedItems.filter((item) => item.link !== link),
@@ -715,7 +776,8 @@ async function fetchForexNews() {
 
     const publishedItems = readPublishedNewsRecords();
     const publishedLinks = publishedItems.map((item) => item.link).filter(Boolean);
-    const recentTitles = publishedItems
+    const recentPublishedItems = publishedItems.filter(isRecentPublishedItem);
+    const recentTitles = recentPublishedItems
       .map((item) => item.title || item.normalizedTitle || "")
       .filter(Boolean);
 
@@ -732,6 +794,15 @@ async function fetchForexNews() {
         areSimilarNewsTitles(item.title || "", recentTitle)
       );
       const normalizedCurrentTitle = normalizeNewsTitle(item.title || "");
+      const currentTopicCluster = getNewsTopicCluster(item.title || "");
+      const hasRecentSameTopicCluster = currentTopicCluster
+        ? recentPublishedItems.some((publishedItem) => publishedItem.topicCluster === currentTopicCluster)
+        : false;
+
+      if (hasRecentSameTopicCluster) {
+        console.log("⏭️ Skipped repeated topic cluster:", currentTopicCluster, item.title);
+        continue;
+      }
 
       const sameKeywordCluster = recentTitles.some((recentTitle) => {
         const normalizedRecent = normalizeNewsTitle(recentTitle);
@@ -777,6 +848,14 @@ async function fetchForexNews() {
         "russia",
         "ukraine",
         "middle east",
+        "hormuz",
+        "strait",
+        "gulf",
+        "tehran",
+        "talks",
+        "negotiations",
+        "deal",
+        "nuclear",
       ];
 
       const isWarNews = warTerms.some((term) => normalizedCurrentTitle.includes(term));
