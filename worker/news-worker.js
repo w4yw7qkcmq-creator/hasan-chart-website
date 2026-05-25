@@ -133,59 +133,85 @@ function isImportantNews(title) {
 function selectNewsImage(title) {
   const lowerTitle = title.toLowerCase();
 
-  if (lowerTitle.includes("powell") || lowerTitle.includes("fed") || lowerTitle.includes("fomc") || lowerTitle.includes("federal reserve")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Jerome_H._Powell,_Federal_Reserve_Chair.jpg";
+  if (
+    lowerTitle.includes("bitcoin") ||
+    lowerTitle.includes("btc") ||
+    lowerTitle.includes("crypto") ||
+    lowerTitle.includes("ethereum") ||
+    lowerTitle.includes("solana")
+  ) {
+    return path.join(__dirname, "assets", "bitcoin.png");
   }
 
-  if (lowerTitle.includes("trump") || lowerTitle.includes("tariff")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Donald_Trump_official_portrait.jpg";
+  if (
+    lowerTitle.includes("gold") ||
+    lowerTitle.includes("xau")
+  ) {
+    return path.join(__dirname, "assets", "gold.png");
   }
 
-  if (lowerTitle.includes("biden")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Joe_Biden_presidential_portrait.jpg";
+  if (
+    lowerTitle.includes("oil") ||
+    lowerTitle.includes("crude") ||
+    lowerTitle.includes("brent") ||
+    lowerTitle.includes("wti")
+  ) {
+    return path.join(__dirname, "assets", "oil.png");
   }
 
-  if (lowerTitle.includes("iran") || lowerTitle.includes("tehran") || lowerTitle.includes("sanctions") || lowerTitle.includes("nuclear talks")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Flag_of_Iran.svg";
+  if (
+    lowerTitle.includes("fed") ||
+    lowerTitle.includes("powell") ||
+    lowerTitle.includes("fomc") ||
+    lowerTitle.includes("interest rate") ||
+    lowerTitle.includes("federal reserve")
+  ) {
+    return path.join(__dirname, "assets", "fed.png");
   }
 
-  if (lowerTitle.includes("war") || lowerTitle.includes("attack") || lowerTitle.includes("missile") || lowerTitle.includes("conflict") || lowerTitle.includes("ceasefire") || lowerTitle.includes("gaza") || lowerTitle.includes("ukraine") || lowerTitle.includes("russia") || lowerTitle.includes("israel")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/War_icon.svg";
+  if (lowerTitle.includes("trump")) {
+    return path.join(__dirname, "assets", "trump.png");
   }
 
-  if (lowerTitle.includes("oil") || lowerTitle.includes("crude") || lowerTitle.includes("brent") || lowerTitle.includes("wti")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Oil_platform_P-51_(Brazil).jpg";
+  if (
+    lowerTitle.includes("iran") ||
+    lowerTitle.includes("tehran")
+  ) {
+    return path.join(__dirname, "assets", "iran.png");
   }
 
-  if (lowerTitle.includes("ecb") || lowerTitle.includes("lagarde") || lowerTitle.includes("european central bank")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Christine_Lagarde_2018.jpg";
+  if (
+    lowerTitle.includes("war") ||
+    lowerTitle.includes("missile") ||
+    lowerTitle.includes("attack") ||
+    lowerTitle.includes("military") ||
+    lowerTitle.includes("gaza") ||
+    lowerTitle.includes("ukraine") ||
+    lowerTitle.includes("russia") ||
+    lowerTitle.includes("israel")
+  ) {
+    return path.join(__dirname, "assets", "war.png");
   }
 
-  if (lowerTitle.includes("boj") || lowerTitle.includes("japan") || lowerTitle.includes("yen")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bank_of_Japan_2010.jpg";
+  if (
+    lowerTitle.includes("usd") ||
+    lowerTitle.includes("eur") ||
+    lowerTitle.includes("forex") ||
+    lowerTitle.includes("dollar")
+  ) {
+    return path.join(__dirname, "assets", "forex.png");
   }
 
-  if (lowerTitle.includes("cpi") || lowerTitle.includes("inflation")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/US_CPI_inflation_1914_to_2022.png";
+  if (
+    lowerTitle.includes("stock") ||
+    lowerTitle.includes("nasdaq") ||
+    lowerTitle.includes("dow") ||
+    lowerTitle.includes("s&p")
+  ) {
+    return path.join(__dirname, "assets", "stocks.png");
   }
 
-  if (lowerTitle.includes("gold") || lowerTitle.includes("xau")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Gold_bars.jpg";
-  }
-
-  if (lowerTitle.includes("bitcoin") || lowerTitle.includes("crypto") || lowerTitle.includes("ethereum")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bitcoin_logo.svg";
-  }
-
-  if (lowerTitle.includes("gdp")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/GDP_nominal_per_capita_world_map_IMF_2022.svg";
-  }
-
-  if (lowerTitle.includes("nfp") || lowerTitle.includes("payrolls") || lowerTitle.includes("jobs") || lowerTitle.includes("unemployment")) {
-    return "https://commons.wikimedia.org/wiki/Special:Redirect/file/Unemployment_Rates_in_the_United_States_1950-2022.png";
-  }
-
-  return "https://commons.wikimedia.org/wiki/Special:Redirect/file/New_York_Stock_Exchange_-_Wall_Street.jpg";
+  return path.join(__dirname, "assets", "default.png");
 }
 
 function wrapText(ctx, text, maxWidth) {
