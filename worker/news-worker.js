@@ -289,6 +289,41 @@ function getImageFromNewsItem(item) {
   return null;
 }
 
+function normalizeNewsTitle(title) {
+  return (title || "")
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[^a-z0-9\u0600-\u06ff\s]/g, " ")
+    .replace(/\b(breaking|update|latest|market|news|says|said)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function areSimilarNewsTitles(titleA, titleB) {
+  const normalizedA = normalizeNewsTitle(titleA);
+  const normalizedB = normalizeNewsTitle(titleB);
+
+  if (!normalizedA || !normalizedB) {
+    return false;
+  }
+
+  if (normalizedA.includes(normalizedB.slice(0, 45)) || normalizedB.includes(normalizedA.slice(0, 45))) {
+    return true;
+  }
+
+  const wordsA = new Set(normalizedA.split(" ").filter((word) => word.length > 3));
+  const wordsB = new Set(normalizedB.split(" ").filter((word) => word.length > 3));
+
+  if (!wordsA.size || !wordsB.size) {
+    return false;
+  }
+
+  const commonWords = [...wordsA].filter((word) => wordsB.has(word)).length;
+  const smallerSetSize = Math.min(wordsA.size, wordsB.size);
+
+  return commonWords / smallerSetSize >= 0.68;
+}
+
 function wrapText(ctx, text, maxWidth) {
   const words = text.split(" ");
   const lines = [];
@@ -394,7 +429,7 @@ async function createNewsCard(title, imageUrl) {
   return NEWS_CARD_FILE;
 }
 
-function readPublishedNewsLinks() {
+function readPublishedNewsRecords() {
   try {
     if (!fs.existsSync(LAST_NEWS_FILE)) {
       return [];
@@ -402,12 +437,16 @@ function readPublishedNewsLinks() {
 
     const data = JSON.parse(fs.readFileSync(LAST_NEWS_FILE, "utf8"));
 
+    if (Array.isArray(data.publishedItems)) {
+      return data.publishedItems;
+    }
+
     if (Array.isArray(data.publishedLinks)) {
-      return data.publishedLinks;
+      return data.publishedLinks.map((link) => ({ link, title: "" }));
     }
 
     if (data.lastLink) {
-      return [data.lastLink];
+      return [{ link: data.lastLink, title: "" }];
     }
 
     return [];
@@ -417,17 +456,30 @@ function readPublishedNewsLinks() {
   }
 }
 
-function savePublishedNewsLink(link) {
+function readPublishedNewsLinks() {
+  return readPublishedNewsRecords().map((item) => item.link).filter(Boolean);
+}
+
+function savePublishedNewsLink(link, title = "") {
   try {
-    const publishedLinks = readPublishedNewsLinks();
-    const updatedLinks = [link, ...publishedLinks.filter((item) => item !== link)].slice(0, 50);
+    const publishedItems = readPublishedNewsRecords();
+    const updatedItems = [
+      {
+        link,
+        title,
+        normalizedTitle: normalizeNewsTitle(title),
+        publishedAt: new Date().toISOString(),
+      },
+      ...publishedItems.filter((item) => item.link !== link),
+    ].slice(0, 80);
 
     fs.writeFileSync(
       LAST_NEWS_FILE,
       JSON.stringify(
         {
           lastLink: link,
-          publishedLinks: updatedLinks,
+          publishedItems: updatedItems,
+          publishedLinks: updatedItems.map((item) => item.link),
           updatedAt: new Date().toISOString(),
         },
         null,
@@ -612,10 +664,11 @@ async function fetchForexNews() {
       return dateB - dateA;
     });
 
-    const publishedLinks = readPublishedNewsLinks();
-    const recentTitles = publishedLinks.map((item) =>
-      item.toLowerCase().slice(0, 80)
-    );
+    const publishedItems = readPublishedNewsRecords();
+    const publishedLinks = publishedItems.map((item) => item.link).filter(Boolean);
+    const recentTitles = publishedItems
+      .map((item) => item.title || item.normalizedTitle || "")
+      .filter(Boolean);
 
     let latestNews = null;
 
@@ -626,8 +679,8 @@ async function fetchForexNews() {
       const isFresh = Date.now() - newsDate <= maxAge;
       const isNew = item.link && !publishedLinks.includes(item.link);
 
-      const isDuplicateTopic = recentTitles.some((t) =>
-        (item.title || "").toLowerCase().includes(t.slice(0, 35))
+      const isDuplicateTopic = recentTitles.some((recentTitle) =>
+        areSimilarNewsTitles(item.title || "", recentTitle)
       );
 
       if (isDuplicateTopic) {
@@ -712,7 +765,7 @@ async function fetchForexNews() {
       await sendTelegramMessage(message);
     }
 
-    savePublishedNewsLink(latestLink);
+    savePublishedNewsLink(latestLink, latestNews.title || "");
   } catch (error) {
     console.error("❌ RSS Error:", error.message);
   }
