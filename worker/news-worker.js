@@ -7,7 +7,7 @@ const { createCanvas, loadImage, registerFont } = require("canvas");
 require("dotenv").config();
 
 try {
-  const arabicFontPath = "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf";
+  const arabicFontPath = path.join(__dirname, "fonts", "NotoNaskhArabic-Regular.ttf");
 
   if (fs.existsSync(arabicFontPath)) {
     registerFont(arabicFontPath, { family: "Arabic" });
