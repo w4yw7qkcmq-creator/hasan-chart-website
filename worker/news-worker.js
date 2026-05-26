@@ -705,7 +705,7 @@ async function createNewsCard(title, imageUrl) {
   const titleBoxWidth = width - 112;
   const titleBoxHeight = 132;
 
-  ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
+  ctx.fillStyle = "rgba(2, 6, 23, 0.78)";
   ctx.roundRect(titleBoxX, titleBoxY, titleBoxWidth, titleBoxHeight, 24);
   ctx.fill();
 
@@ -714,7 +714,7 @@ async function createNewsCard(title, imageUrl) {
   ctx.fill();
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 38px Arabic";
+  ctx.font = "bold 40px Arabic";
   ctx.textAlign = /[\u0600-\u06FF]/.test(cleanTitle) ? "right" : "left";
   ctx.direction = /[\u0600-\u06FF]/.test(cleanTitle) ? "rtl" : "ltr";
 
@@ -737,6 +737,37 @@ async function createNewsCard(title, imageUrl) {
   ctx.restore();
   // --- End title drawing block ---
 
+  // --- Top brand block ---
+  ctx.save();
+  if (fs.existsSync(CHANNEL_LOGO_FILE)) {
+    const logo = await loadImage(CHANNEL_LOGO_FILE);
+    const brandLogoSize = 64;
+    const brandX = width - 250;
+    const brandY = 38;
+
+    ctx.fillStyle = "rgba(2, 6, 23, 0.62)";
+    ctx.roundRect(brandX - 18, brandY - 10, 214, 84, 24);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+    ctx.beginPath();
+    ctx.arc(brandX + brandLogoSize / 2, brandY + brandLogoSize / 2, brandLogoSize / 2 + 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.drawImage(logo, brandX, brandY, brandLogoSize, brandLogoSize);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px Arabic";
+    ctx.textAlign = "right";
+    ctx.direction = "rtl";
+    ctx.fillText("الأخبار الاقتصادية", brandX - 26 + 196, brandY + 29);
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "bold 18px Arabic";
+    ctx.fillText("Economic News", brandX - 26 + 196, brandY + 56);
+  }
+  ctx.restore();
+
 
   try {
     ctx.save();
@@ -753,9 +784,23 @@ async function createNewsCard(title, imageUrl) {
 
     if (fs.existsSync(CHANNEL_LOGO_FILE)) {
       const logo = await loadImage(CHANNEL_LOGO_FILE);
-      const logoSize = 50;
+      const logoSize = 58;
+      const logoX = watermarkX + watermarkWidth - logoSize - 14;
+      const logoY = watermarkY + 10;
+
       ctx.globalAlpha = 1;
-      ctx.drawImage(logo, watermarkX + watermarkWidth - logoSize - 14, watermarkY + 12, logoSize, logoSize);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.beginPath();
+      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
+      ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
     }
 
     ctx.globalAlpha = 1;
