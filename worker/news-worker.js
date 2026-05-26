@@ -676,22 +676,78 @@ async function createNewsCard(title, imageUrl) {
     imageOverlay.addColorStop(1, "rgba(2, 6, 23, 0.18)");
     ctx.fillStyle = imageOverlay;
     ctx.fillRect(0, 0, width, height);
+
+    // --- New design overlay block ---
+    const bottomFade = ctx.createLinearGradient(0, height * 0.42, 0, height);
+    bottomFade.addColorStop(0, "rgba(2, 6, 23, 0.05)");
+    bottomFade.addColorStop(0.55, "rgba(2, 6, 23, 0.60)");
+    bottomFade.addColorStop(1, "rgba(2, 6, 23, 0.94)");
+    ctx.fillStyle = bottomFade;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "rgba(56, 189, 248, 0.92)";
+    ctx.fillRect(0, height - 8, width, 8);
+    // --- End new design overlay block ---
   } catch (error) {
     console.error("⚠️ Image load failed:", error.message);
     return null;
   }
 
 
+  // --- Title drawing block ---
+  ctx.save();
+  const cleanTitle = String(title || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const titleBoxX = 56;
+  const titleBoxY = height - 210;
+  const titleBoxWidth = width - 112;
+  const titleBoxHeight = 132;
+
+  ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
+  ctx.roundRect(titleBoxX, titleBoxY, titleBoxWidth, titleBoxHeight, 24);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(56, 189, 248, 0.95)";
+  ctx.roundRect(titleBoxX, titleBoxY, 8, titleBoxHeight, 8);
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 38px Arabic";
+  ctx.textAlign = /[\u0600-\u06FF]/.test(cleanTitle) ? "right" : "left";
+  ctx.direction = /[\u0600-\u06FF]/.test(cleanTitle) ? "rtl" : "ltr";
+
+  const titleLines = wrapText(ctx, cleanTitle, titleBoxWidth - 80).slice(0, 2);
+  const textX = ctx.direction === "rtl" ? titleBoxX + titleBoxWidth - 40 : titleBoxX + 40;
+  titleLines.forEach((line, index) => {
+    ctx.fillText(line, textX, titleBoxY + 54 + index * 46);
+  });
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = "rgba(220, 38, 38, 0.92)";
+  ctx.roundRect(56, 42, 160, 52, 18);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 26px Arabic";
+  ctx.textAlign = "center";
+  ctx.direction = "rtl";
+  ctx.fillText("عاجل", 136, 77);
+  ctx.restore();
+  // --- End title drawing block ---
+
+
   try {
     ctx.save();
 
-    const watermarkWidth = 380;
-    const watermarkHeight = 74;
+    const watermarkWidth = 430;
+    const watermarkHeight = 78;
     const watermarkX = width - watermarkWidth - 24;
     const watermarkY = height - watermarkHeight - 22;
 
     ctx.globalAlpha = 0.78;
-    ctx.fillStyle = "rgba(2, 6, 23, 0.68)";
+    ctx.fillStyle = "rgba(2, 6, 23, 0.76)";
     ctx.roundRect(watermarkX, watermarkY, watermarkWidth, watermarkHeight, 18);
     ctx.fill();
 
@@ -707,11 +763,11 @@ async function createNewsCard(title, imageUrl) {
     ctx.font = "bold 22px Arabic";
     ctx.textAlign = "right";
     ctx.direction = "rtl";
-    ctx.fillText("الأخبار الاقتصادية", watermarkX + watermarkWidth - 78, watermarkY + 32);
+    ctx.fillText("Economic News | الأخبار الاقتصادية", watermarkX + watermarkWidth - 78, watermarkY + 33);
 
     ctx.fillStyle = "#38bdf8";
     ctx.font = "bold 20px Arabic";
-    ctx.fillText("t.me/EconomicNewsi", watermarkX + watermarkWidth - 78, watermarkY + 58);
+    ctx.fillText("t.me/EconomicNewsi", watermarkX + watermarkWidth - 78, watermarkY + 61);
 
     ctx.restore();
   } catch (error) {
