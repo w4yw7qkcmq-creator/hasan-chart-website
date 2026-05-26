@@ -492,7 +492,7 @@ function isRecentPublishedItem(item) {
     return true;
   }
 
-  const maxDuplicateWindowHours = 6;
+  const maxDuplicateWindowHours = 2;
   return Date.now() - publishedAt <= maxDuplicateWindowHours * 60 * 60 * 1000;
 }
 
@@ -718,11 +718,11 @@ async function isMarketMovingNews(title) {
           {
             role: "system",
             content:
-              "أنت رئيس تحرير صارم لقناة أخبار مالية احترافية مشابهة لـ Bloomberg و ForexBreakingNews. لا توافق إلا على الأخبار عالية التأثير التي قد تسبب حركة واضحة وقوية في الأسواق العالمية خلال دقائق أو ساعات، خصوصًا الفوركس والدولار والذهب والنفط والأسهم الأمريكية والكريبتو. وافق فقط على أخبار مثل: قرارات الفيدرالي والبنوك المركزية، التضخم CPI/PCE، الوظائف NFP والبطالة، تصريحات قوية من Powell أو أعضاء الفيدرالي، تحركات مفاجئة في النفط أو الذهب أو البيتكوين، عقوبات أو حروب أو هجمات أو إغلاق مضائق أو توترات جيوسياسية تؤثر على النفط أو الدولار أو الأسهم، أخبار كبرى عن البنوك أو الأزمات المالية. ارفض الأخبار الضعيفة أو العامة أو المحلية أو التحليلات والآراء والتوقعات العادية أو أخبار الشركات الصغيرة أو الأخبار التي تأثيرها محدود. أجب بكلمة واحدة فقط: YES إذا كان الخبر قوي ومؤثر فعلاً، أو NO إذا كان ضعيفًا أو غير مؤثر كفاية.",
+              "أنت رئيس تحرير لقناة أخبار مالية احترافية مشابهة لـ Bloomberg و ForexBreakingNews. وافق على الأخبار ذات التأثير المتوسط إلى القوي التي يمكن أن تؤثر على الأسواق العالمية خلال اليوم، خصوصًا الفوركس والدولار والذهب والنفط والأسهم الأمريكية والكريبتو. وافق على أخبار الفيدرالي والبنوك المركزية، التضخم CPI/PCE، الوظائف NFP والبطالة، تصريحات Powell أو أعضاء الفيدرالي، تحركات النفط أو الذهب أو البيتكوين، العقوبات والحروب والهجمات وإغلاق المضائق والتوترات الجيوسياسية التي تؤثر على النفط أو الدولار أو الأسهم، وأخبار البنوك أو الأزمات المالية. ارفض فقط الأخبار الضعيفة جدًا أو المحلية أو التحليلات والآراء العامة أو الأخبار التي لا علاقة واضحة لها بالأسواق. أجب بكلمة واحدة فقط: YES إذا كان الخبر مهمًا للأسواق، أو NO إذا كان ضعيفًا أو غير مرتبط.",
           },
           {
             role: "user",
-            content: `عنوان الخبر: ${title}\nقيّم التأثير الحقيقي فقط. إذا كان التأثير متوسط أو ضعيف أو غير واضح، أجب NO.`,
+            content: `عنوان الخبر: ${title}\nقيّم التأثير على الأسواق. إذا كان له تأثير متوسط أو قوي على الفوركس أو الأسهم أو الذهب أو النفط أو الكريبتو، أجب YES. إذا كان ضعيف جدًا أو غير مرتبط، أجب NO.`,
           },
         ],
         temperature: 0,
@@ -852,7 +852,7 @@ async function fetchForexNews() {
 
     let latestNews = null;
 
-    for (const item of allItems.slice(0, 80)) {
+    for (const item of allItems.slice(0, 120)) {
       const newsDate = new Date(item.isoDate || item.pubDate || Date.now()).getTime();
       const maxAge = MAX_NEWS_AGE_HOURS * 60 * 60 * 1000;
 
@@ -906,60 +906,6 @@ async function fetchForexNews() {
         );
       });
 
-      const warTerms = [
-        "war",
-        "attack",
-        "missile",
-        "airstrike",
-        "military",
-        "ceasefire",
-        "sanctions",
-        "iran",
-        "israel",
-        "gaza",
-        "russia",
-        "ukraine",
-        "middle east",
-        "hormuz",
-        "strait",
-        "gulf",
-        "tehran",
-        "talks",
-        "negotiations",
-        "deal",
-        "nuclear",
-        "مضيق",
-        "هرمز",
-        "مضيق هرمز",
-        "إيران",
-        "ايران",
-        "طهران",
-        "امريكا",
-        "أمريكا",
-        "الولايات المتحدة",
-        "مفاوضات",
-        "اتفاق",
-        "الخليج",
-        "إسرائيل",
-        "اسرائيل",
-        "غزة",
-        "حرب",
-        "هجوم",
-        "صاروخ",
-        "ضربة",
-        "عقوبات",
-      ];
-
-      const isWarNews = warTerms.some((term) => normalizedCurrentTitle.includes(term));
-      const hasRecentWarNews = recentTitles.some((recentTitle) => {
-        const normalizedRecent = normalizeNewsTitle(recentTitle);
-        return warTerms.some((term) => normalizedRecent.includes(term));
-      });
-
-      if (isWarNews && hasRecentWarNews) {
-        console.log("⏭️ Skipped repeated war/geopolitical news:", item.title);
-        continue;
-      }
 
       if (isDuplicateTopic || sameKeywordCluster) {
         console.log("⏭️ Skipped duplicate/similar news:", item.title);
