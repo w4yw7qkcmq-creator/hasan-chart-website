@@ -42,6 +42,8 @@ const CHANNEL_LOGO_FILE = path.join(__dirname, "assets", "logo.png");
 const TEMP_ALLOW_ALL_NEWS = false;
 
 const MAX_NEWS_AGE_HOURS = 24;
+const MAX_POSTS_PER_HOUR = 5;
+const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = false;
 const MIN_IMAGE_WIDTH = 900;
@@ -615,6 +617,27 @@ function isRecentForTopicCluster(item, topicCluster) {
   return Date.now() - publishedAt <= cooldownHours * 60 * 60 * 1000;
 }
 
+function getRecentPublishStats(publishedItems) {
+  const now = Date.now();
+  const oneHourMs = 60 * 60 * 1000;
+  const minGapMs = Math.max(0, MIN_MINUTES_BETWEEN_POSTS) * 60 * 1000;
+
+  const timestamps = publishedItems
+    .map((item) => new Date(item.publishedAt || item.published_at || item.created_at || 0).getTime())
+    .filter((time) => !Number.isNaN(time) && time > 0)
+    .sort((a, b) => b - a);
+
+  const postsLastHour = timestamps.filter((time) => now - time <= oneHourMs).length;
+  const lastPostAt = timestamps[0] || 0;
+  const hasEnoughGap = !lastPostAt || now - lastPostAt >= minGapMs;
+
+  return {
+    postsLastHour,
+    hasEnoughGap,
+    lastPostAt,
+  };
+}
+
 function wrapText(ctx, text, maxWidth) {
   const words = text.split(" ");
   const lines = [];
@@ -1090,6 +1113,18 @@ async function fetchForexNews() {
       ...supabasePublishedItems,
       ...localPublishedItems,
     ];
+
+    const publishStats = getRecentPublishStats(publishedItems);
+
+    if (publishStats.postsLastHour >= MAX_POSTS_PER_HOUR) {
+      console.log(`⏭️ Hourly post limit reached: ${publishStats.postsLastHour}/${MAX_POSTS_PER_HOUR}`);
+      return;
+    }
+
+    if (MIN_MINUTES_BETWEEN_POSTS > 0 && !publishStats.hasEnoughGap) {
+      console.log(`⏭️ Waiting for minimum ${MIN_MINUTES_BETWEEN_POSTS} minute gap between posts.`);
+      return;
+    }
     const publishedLinks = publishedItems.map((item) => item.link).filter(Boolean);
     const recentPublishedItems = publishedItems.filter(isRecentPublishedItem);
     const recentTitles = recentPublishedItems
@@ -1190,15 +1225,17 @@ async function fetchForexNews() {
 
       const isImportant = await isMarketMovingNews(item.title || "");
 
-      if (!isImportant) {
-        const mediumImpact =
-          /fed|federal reserve|fomc|powell|interest rate|rate decision|rate cut|rate hike|inflation|cpi|ppi|pce|unemployment|nfp|payrolls|jobless claims|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|oil|crude|brent|wti|gold|bitcoin|btc|crypto|ethereum|nasdaq|dow jones|s&p|stocks|earnings|revenue|guidance|nvidia|apple|tesla|microsoft|amazon|meta|google|war|attack|missile|iran|israel|russia|ukraine|hormuz|الفيدرالي|الفائدة|التضخم|البطالة|الوظائف|ثقة المستهلك|مبيعات التجزئة|أرباح|إيران|ايران|إسرائيل|اسرائيل|هرمز/i.test(
-            item.title || ""
-          );
+      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""}`;
+      const weakNewsPattern = /analyst estimates|price target|stock on pace|shares rise modestly|personal care|autozone|retailer|upgrade|downgrade|opinion|preview|recap|what to watch|could|may|might/i;
+      const highImpactPattern = /fed|federal reserve|fomc|powell|interest rate|rate decision|rate cut|rate hike|inflation|cpi|ppi|pce|unemployment|nfp|payrolls|jobless claims|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|oil prices|crude oil|brent|wti|gold|bitcoin|btc|crypto|nasdaq|dow jones|s&p 500|treasury yields|dollar index|earnings|revenue|guidance|nvidia|apple|tesla|microsoft|amazon|meta|google|war|attack|missile|iran|israel|russia|ukraine|hormuz|sanctions|tariff|الفيدرالي|الفائدة|التضخم|البطالة|الوظائف|ثقة المستهلك|مبيعات التجزئة|أرباح|إيران|ايران|إسرائيل|اسرائيل|هرمز|النفط|الذهب|الدولار/i;
 
-        if (!mediumImpact) {
-          continue;
-        }
+      if (!isImportant && !highImpactPattern.test(titleForImpact)) {
+        continue;
+      }
+
+      if (weakNewsPattern.test(titleForImpact) && !/fed|fomc|powell|cpi|ppi|pce|nfp|unemployment|consumer confidence|interest rate|war|attack|missile|hormuz|oil prices|bitcoin|gold|nvidia|tesla|apple|microsoft/i.test(titleForImpact)) {
+        console.log("⏭️ Skipped weak/low-impact market story:", item.title);
+        continue;
       }
 
       latestNews = item;
