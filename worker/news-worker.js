@@ -407,7 +407,7 @@ function normalizeNewsTitle(title) {
     .toLowerCase()
     .replace(/https?:\/\/\S+/g, "")
     .replace(/[^a-z0-9\u0600-\u06ff\s]/g, " ")
-    .replace(/\b(breaking|update|latest|market|news|says|said|live|forexlive|investing|reuters|bloomberg|fxstreet|coindesk)\b/g, " ")
+    .replace(/\b(breaking|update|latest|market|news|says|said|live|forexlive|investing|reuters|bloomberg|fxstreet|coindesk|cnbc|marketwatch|forexnewspaper)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -437,7 +437,7 @@ function areSimilarNewsTitles(titleA, titleB) {
   const commonWords = [...wordsA].filter((word) => wordsB.has(word)).length;
   const smallerSetSize = Math.min(wordsA.size, wordsB.size);
 
-  return commonWords / smallerSetSize >= 0.52;
+  return commonWords / smallerSetSize >= 0.42;
 }
 
 function getNewsTopicCluster(title) {
@@ -732,7 +732,7 @@ function savePublishedNewsLink(link, title = "") {
       {
         link,
         title,
-        normalizedTitle: normalizeNewsTitle(title),
+        normalizedTitle: normalizeNewsTitle(title).slice(0, 500),
         topicCluster: getNewsTopicCluster(title),
         publishedAt: new Date().toISOString(),
       },
@@ -945,6 +945,9 @@ async function fetchForexNews() {
     const recentTitles = recentPublishedItems
       .map((item) => item.title || item.normalizedTitle || "")
       .filter(Boolean);
+    const recentAiMessages = recentPublishedItems
+      .map((item) => item.normalizedTitle || item.title || "")
+      .filter(Boolean);
 
     let latestNews = null;
 
@@ -1019,7 +1022,14 @@ async function fetchForexNews() {
       });
 
 
-      if (isDuplicateTopic || sameKeywordCluster) {
+      const aiSimilarityDuplicate = recentAiMessages.some((recentMessage) =>
+        areSimilarNewsTitles(
+          `${item.title || ""} ${item.contentSnippet || ""}`,
+          recentMessage
+        )
+      );
+
+      if (isDuplicateTopic || sameKeywordCluster || aiSimilarityDuplicate) {
         console.log("⏭️ Skipped duplicate/similar news:", item.title);
         continue;
       }
