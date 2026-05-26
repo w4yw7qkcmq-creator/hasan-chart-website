@@ -189,12 +189,32 @@ const NEWS_FEEDS = [
   "https://www.investing.com/rss/news_301.rss",
 ];
 
+
 function isImportantNews(title) {
   const lowerTitle = title.toLowerCase();
-
   return IMPORTANT_KEYWORDS.some((keyword) =>
     lowerTitle.includes(keyword)
   );
+}
+
+function getMarketImpactLevel(text) {
+  const value = String(text || "").toLowerCase();
+
+  const criticalPattern = /fed rate decision|fomc decision|interest rate decision|rate cut|rate hike|powell speaks|powell says|cpi|core cpi|pce inflation|core pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|ism manufacturing|ism services|gdp|oil prices surge|oil prices jump|oil spikes|gold jumps|bitcoin plunges|bitcoin surges|war breaks out|missile attack|hormuz|sanctions announced|tariff announced|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|التضخم|مؤشر ثقة المستهلك|البطالة|الوظائف|النفط|الذهب|هرمز|عقوبات|هجوم/i;
+
+  const mediumPattern = /federal reserve|fomc|powell|interest rate|inflation|ppi|pce|payrolls|jobless claims|retail sales|pmi|ism|treasury yields|dollar index|brent|wti|gold|bitcoin|btc|ethereum|nasdaq|dow jones|s&p 500|nvidia|apple|tesla|microsoft|earnings|revenue|guidance|iran|israel|russia|ukraine|opec|tariff|sanctions|الفائدة|باول|مبيعات التجزئة|طلبات إعانة البطالة|الدولار|البيتكوين|إيران|ايران|إسرائيل|اسرائيل|روسيا|أوكرانيا|اوكرانيا|أرباح/i;
+
+  const weakPattern = /analyst estimates|price target|stock on pace|shares rise modestly|personal care|retailer|upgrade|downgrade|opinion|preview|recap|what to watch|could|may|might|minor|small move|mixed close|little changed/i;
+
+  if (criticalPattern.test(value)) {
+    return "HIGH";
+  }
+
+  if (mediumPattern.test(value) && !weakPattern.test(value)) {
+    return "MEDIUM";
+  }
+
+  return "LOW";
 }
 
 function pickRandomAsset(fileNames) {
@@ -993,7 +1013,7 @@ async function isMarketMovingNews(title) {
 async function analyzeNewsWithAI(title, link) {
   if (!OPENAI_API_KEY) {
     return {
-      message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\nالتأثير: متباين على الدولار / الذهب / الكريبتو حسب ردّة فعل السوق\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
+      message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
       imageTitle: title,
     };
   }
@@ -1011,7 +1031,7 @@ async function analyzeNewsWithAI(title, link) {
           },
           {
             role: "user",
-            content: `عنوان الخبر: ${title}\nمهم جدًا: لا تكتب رابط المصدر ولا تذكر اسم المصدر داخل المنشور. لا تبالغ في التأثير. اكتب فقط سطر التأثير إذا كان التأثير واضحًا ومتوقعًا على أصول محددة. إذا كان التأثير ضعيفًا أو غير واضح أو غير مؤكد، لا تكتب كلمة التأثير ولا تضف سطر التأثير نهائيًا.`,
+            content: `عنوان الخبر: ${title}\nمهم جدًا: لا تكتب رابط المصدر ولا تذكر اسم المصدر داخل المنشور. لا تبالغ في التأثير. اكتب فقط سطر التأثير إذا كان التأثير واضحًا ومتوقعًا على أصول محددة. إذا كان التأثير ضعيفًا أو غير واضح أو غير مؤكد، لا تكتب كلمة التأثير ولا تضف سطر التأثير نهائيًا. اكتب الخبر بأسلوب عاجل ومختصر جدًا بدون حشو.`,
           },
         ],
         temperature: 0.4,
@@ -1054,7 +1074,7 @@ async function analyzeNewsWithAI(title, link) {
     console.error("⚠️ AI Error:", error.response?.data || error.message);
 
     return {
-      message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\nالتأثير: متباين على الدولار / الذهب / الكريبتو حسب ردّة فعل السوق\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
+      message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
       imageTitle: title,
     };
   }
@@ -1210,19 +1230,19 @@ async function fetchForexNews() {
 
       const isImportant = await isMarketMovingNews(item.title || "");
 
-      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""}`;
-      const weakNewsPattern = /analyst estimates|price target|stock on pace|shares rise modestly|personal care|autozone|retailer|upgrade|downgrade|opinion|preview|recap|what to watch|could|may|might/i;
-      const highImpactPattern = /fed|federal reserve|fomc|powell|interest rate|rate decision|rate cut|rate hike|inflation|cpi|ppi|pce|unemployment|nfp|payrolls|jobless claims|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|oil prices|crude oil|brent|wti|gold|bitcoin|btc|crypto|nasdaq|dow jones|s&p 500|treasury yields|dollar index|earnings|revenue|guidance|nvidia|apple|tesla|microsoft|amazon|meta|google|war|attack|missile|iran|israel|russia|ukraine|hormuz|sanctions|tariff|الفيدرالي|الفائدة|التضخم|البطالة|الوظائف|ثقة المستهلك|مبيعات التجزئة|أرباح|إيران|ايران|إسرائيل|اسرائيل|هرمز|النفط|الذهب|الدولار/i;
+      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
+      const impactLevel = getMarketImpactLevel(titleForImpact);
 
-      if (!isImportant && !highImpactPattern.test(titleForImpact)) {
+      if (!isImportant && impactLevel === "LOW") {
         continue;
       }
 
-      if (weakNewsPattern.test(titleForImpact) && !/fed|fomc|powell|cpi|ppi|pce|nfp|unemployment|consumer confidence|interest rate|war|attack|missile|hormuz|oil prices|bitcoin|gold|nvidia|tesla|apple|microsoft/i.test(titleForImpact)) {
+      if (impactLevel === "LOW") {
         console.log("⏭️ Skipped weak/low-impact market story:", item.title);
         continue;
       }
 
+      item.impactLevel = impactLevel;
       latestNews = item;
       break;
     }
