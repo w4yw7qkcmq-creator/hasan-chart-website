@@ -529,6 +529,7 @@ function getNewsTopicCluster(title) {
   return null;
 }
 
+
 function isRecentPublishedItem(item) {
   if (!item.publishedAt) {
     return true;
@@ -542,6 +543,29 @@ function isRecentPublishedItem(item) {
 
   const maxDuplicateWindowHours = 2;
   return Date.now() - publishedAt <= maxDuplicateWindowHours * 60 * 60 * 1000;
+}
+
+function isRecentForTopicCluster(item, topicCluster) {
+  if (!item.publishedAt) {
+    return true;
+  }
+
+  const publishedAt = new Date(item.publishedAt).getTime();
+
+  if (Number.isNaN(publishedAt)) {
+    return true;
+  }
+
+  const longCooldownClusters = [
+    "hormuz_iran_us",
+    "iran_israel_middle_east",
+    "russia_ukraine",
+    "oil_geopolitics",
+  ];
+
+  const cooldownHours = longCooldownClusters.includes(topicCluster) ? 12 : 2;
+
+  return Date.now() - publishedAt <= cooldownHours * 60 * 60 * 1000;
 }
 
 function wrapText(ctx, text, maxWidth) {
@@ -916,9 +940,12 @@ async function fetchForexNews() {
       const normalizedCurrentTitle = normalizeNewsTitle(item.title || "");
       const currentTopicCluster = getNewsTopicCluster(`${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`);
       const hasRecentSameTopicCluster = currentTopicCluster
-        ? recentPublishedItems.some((publishedItem) => {
+        ? publishedItems.some((publishedItem) => {
             const publishedCluster = publishedItem.topicCluster || getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
-            return publishedCluster === currentTopicCluster;
+            return (
+              publishedCluster === currentTopicCluster &&
+              isRecentForTopicCluster(publishedItem, currentTopicCluster)
+            );
           })
         : false;
 
@@ -986,6 +1013,24 @@ async function fetchForexNews() {
 
     const message = aiResult.message;
     const combinedNewsIdentity = `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
+    const combinedTopicCluster = getNewsTopicCluster(combinedNewsIdentity);
+
+    if (combinedTopicCluster) {
+      const alreadyPublishedSameCluster = readPublishedNewsRecords().some((publishedItem) => {
+        const publishedCluster = publishedItem.topicCluster || getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
+        return (
+          publishedCluster === combinedTopicCluster &&
+          isRecentForTopicCluster(publishedItem, combinedTopicCluster)
+        );
+      });
+
+      if (alreadyPublishedSameCluster) {
+        console.log("⏭️ Skipped duplicate after AI analysis:", combinedTopicCluster, latestNews.title);
+        savePublishedNewsLink(latestLink, combinedNewsIdentity);
+        return;
+      }
+    }
+
     const imageTitle = aiResult.imageTitle || latestNews.title;
 
     const veryImportantNews = [
