@@ -462,7 +462,7 @@ function getNewsTopicCluster(title) {
         "tehran",
         "united states",
         "usa",
-        "us",
+        // "us", // removed as requested
         "talks",
         "negotiations",
         "deal",
@@ -539,13 +539,35 @@ function getNewsTopicCluster(title) {
     },
   ];
 
+  const hasTerm = (term) => normalizedTitle.includes(term);
+
+  if (hasTerm("hormuz") || hasTerm("هرمز") || hasTerm("مضيق هرمز")) {
+    return "hormuz_iran_us";
+  }
+
+  if (
+    (hasTerm("iran") || hasTerm("tehran") || hasTerm("إيران") || hasTerm("ايران") || hasTerm("طهران")) &&
+    (hasTerm("united states") || hasTerm("usa") || hasTerm("washington") || hasTerm("واشنطن") || hasTerm("الولايات المتحدة") || hasTerm("امريكا") || hasTerm("أمريكا") || hasTerm("talks") || hasTerm("negotiations") || hasTerm("deal") || hasTerm("مفاوضات") || hasTerm("اتفاق"))
+  ) {
+    return "hormuz_iran_us";
+  }
+
+  if (
+    (hasTerm("iran") || hasTerm("tehran") || hasTerm("إيران") || hasTerm("ايران") || hasTerm("طهران")) &&
+    (hasTerm("israel") || hasTerm("gaza") || hasTerm("missile") || hasTerm("attack") || hasTerm("airstrike") || hasTerm("war") || hasTerm("إسرائيل") || hasTerm("اسرائيل") || hasTerm("غزة") || hasTerm("صاروخ") || hasTerm("هجوم") || hasTerm("ضربة") || hasTerm("حرب"))
+  ) {
+    return "iran_israel_middle_east";
+  }
+
+  if (
+    (hasTerm("russia") || hasTerm("moscow") || hasTerm("روسيا") || hasTerm("موسكو")) &&
+    (hasTerm("ukraine") || hasTerm("kyiv") || hasTerm("كييف") || hasTerm("أوكرانيا") || hasTerm("اوكرانيا"))
+  ) {
+    return "russia_ukraine";
+  }
+
   for (const cluster of topicClusters) {
     const matches = cluster.terms.filter((term) => normalizedTitle.includes(term));
-
-    if (matches.length >= 1 && ["hormuz_iran_us", "iran_israel_middle_east", "russia_ukraine"].includes(cluster.key)) {
-      return cluster.key;
-    }
-
     if (matches.length >= 2) {
       return cluster.key;
     }
@@ -1103,10 +1125,19 @@ async function fetchForexNews() {
 
       const isImportant = await isMarketMovingNews(item.title || "");
 
-      if (isImportant) {
-        latestNews = item;
-        break;
+      if (!isImportant) {
+        const mediumImpact =
+          /fed|federal reserve|fomc|powell|interest rate|rate decision|rate cut|rate hike|inflation|cpi|ppi|pce|unemployment|nfp|payrolls|jobless claims|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|oil|crude|brent|wti|gold|bitcoin|btc|crypto|ethereum|nasdaq|dow jones|s&p|stocks|earnings|revenue|guidance|nvidia|apple|tesla|microsoft|amazon|meta|google|war|attack|missile|iran|israel|russia|ukraine|hormuz|الفيدرالي|الفائدة|التضخم|البطالة|الوظائف|ثقة المستهلك|مبيعات التجزئة|أرباح|إيران|ايران|إسرائيل|اسرائيل|هرمز/i.test(
+            item.title || ""
+          );
+
+        if (!mediumImpact) {
+          continue;
+        }
       }
+
+      latestNews = item;
+      break;
     }
 
     if (!latestNews) {
