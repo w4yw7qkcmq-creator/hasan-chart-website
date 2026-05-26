@@ -43,6 +43,7 @@ const TEMP_ALLOW_ALL_NEWS = false;
 
 const MAX_NEWS_AGE_HOURS = 24;
 const MAX_POSTS_PER_HOUR = 5;
+const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 10;
 const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = false;
@@ -660,7 +661,7 @@ function wrapText(ctx, text, maxWidth) {
   return lines.slice(0, 3);
 }
 
-async function createNewsCard(title, imageUrl) {
+async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
   const width = 1280;
   const height = 720;
   const canvas = createCanvas(width, height);
@@ -754,14 +755,15 @@ async function createNewsCard(title, imageUrl) {
   ctx.restore();
 
   ctx.save();
-  ctx.fillStyle = "rgba(220, 38, 38, 0.92)";
+  const impactBadgeText = impactLevel === "HIGH" ? "عاجل" : "مهم";
+  ctx.fillStyle = impactLevel === "HIGH" ? "rgba(220, 38, 38, 0.92)" : "rgba(234, 179, 8, 0.94)";
   ctx.roundRect(56, 42, 160, 52, 18);
   ctx.fill();
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = impactLevel === "HIGH" ? "#ffffff" : "#111827";
   ctx.font = "bold 26px Arabic";
   ctx.textAlign = "center";
   ctx.direction = "rtl";
-  ctx.fillText("عاجل", 136, 77);
+  ctx.fillText(impactBadgeText, 136, 77);
   ctx.restore();
   // --- End title drawing block ---
 
@@ -1121,9 +1123,16 @@ async function fetchForexNews() {
 
     const publishStats = getRecentPublishStats(publishedItems);
 
-    if (publishStats.postsLastHour >= MAX_POSTS_PER_HOUR) {
-      console.log(`⏭️ Hourly post limit reached: ${publishStats.postsLastHour}/${MAX_POSTS_PER_HOUR}`);
+    const normalHourlyLimitReached = publishStats.postsLastHour >= MAX_POSTS_PER_HOUR;
+    const hardHourlyLimitReached = publishStats.postsLastHour >= MAX_HIGH_IMPACT_POSTS_PER_HOUR;
+
+    if (hardHourlyLimitReached) {
+      console.log(`⏭️ Hard hourly post limit reached: ${publishStats.postsLastHour}/${MAX_HIGH_IMPACT_POSTS_PER_HOUR}`);
       return;
+    }
+
+    if (normalHourlyLimitReached) {
+      console.log(`⚠️ Normal hourly limit reached: ${publishStats.postsLastHour}/${MAX_POSTS_PER_HOUR}. Only HIGH impact news can pass now.`);
     }
 
     if (MIN_MINUTES_BETWEEN_POSTS > 0 && !publishStats.hasEnoughGap) {
@@ -1241,6 +1250,10 @@ async function fetchForexNews() {
         console.log("⏭️ Skipped weak/low-impact market story:", item.title);
         continue;
       }
+      if (normalHourlyLimitReached && impactLevel !== "HIGH") {
+        console.log("⏭️ Hourly limit reached. Skipped non-HIGH impact story:", item.title);
+        continue;
+      }
 
       item.impactLevel = impactLevel;
       latestNews = item;
@@ -1332,7 +1345,7 @@ async function fetchForexNews() {
       const finalImage = rssImage || articleImage || localFallbackImage;
 
       if (finalImage) {
-        const photoPath = await createNewsCard(imageTitle, finalImage);
+        const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
 
         if (photoPath) {
           await sendTelegramPhoto(message, photoPath);
