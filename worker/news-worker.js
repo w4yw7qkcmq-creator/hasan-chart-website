@@ -878,43 +878,7 @@ async function isMarketMovingNews(title) {
     return true;
   }
 
-  if (!OPENAI_API_KEY) {
-    return isImportantNews(title);
-  }
-
-  try {
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4.1-mini",
-        messages: [
-          {
-            role: "system",
-            content:
-            "أنت رئيس تحرير لقناة أخبار مالية احترافية بأسلوب Bloomberg و ForexBreakingNews و ForexNewspaper. وافق فقط على الأخبار ذات التأثير المتوسط أو القوي على الأسواق العالمية. يجب أن يكون للخبر تأثير واضح أو محتمل على الفوركس أو الدولار أو الذهب أو النفط أو الأسهم الأمريكية أو الكريبتو. وافق على أخبار الفيدرالي والبنوك المركزية، التضخم، البطالة، الوظائف، PMI وISM، ثقة المستهلك، مبيعات التجزئة، تحركات النفط والذهب والبيتكوين، الحروب والتوترات الجيوسياسية، وأرباح الشركات الأمريكية الكبرى. ارفض الأخبار الضعيفة أو المتكررة أو المحلية أو العامة أو التي لا تحمل تأثيرًا اقتصاديًا أو ماليًا واضحًا. إذا كان الخبر متوسط أو قوي التأثير أجب YES فقط. إذا كان ضعيف أو مكرر أو غير مهم للأسواق أجب NO فقط."
-          },
-          {
-            role: "user",
-            content: `عنوان الخبر: ${title}\nقيّم التأثير على الأسواق. إذا كان له تأثير متوسط أو قوي على الفوركس أو الأسهم أو الذهب أو النفط أو الكريبتو، أجب YES. إذا كان ضعيف جدًا أو غير مرتبط، أجب NO.`,
-          },
-        ],
-        temperature: 0,
-        max_tokens: 5,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const decision = response.data.choices?.[0]?.message?.content?.trim().toUpperCase();
-    return decision === "YES";
-  } catch (error) {
-    console.error("⚠️ AI Importance Filter Error:", error.response?.data || error.message);
-    return isImportantNews(title);
-  }
+  return isImportantNews(title);
 }
 
 async function analyzeNewsWithAI(title, link) {
@@ -929,7 +893,7 @@ async function analyzeNewsWithAI(title, link) {
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-nano",
         messages: [
           {
             role: "system",
