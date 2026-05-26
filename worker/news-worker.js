@@ -564,7 +564,7 @@ function isRecentForTopicCluster(item, topicCluster) {
     "oil_geopolitics",
   ];
 
-  const cooldownHours = longCooldownClusters.includes(topicCluster) ? 12 : 2;
+  const cooldownHours = longCooldownClusters.includes(topicCluster) ? 18 : 3;
 
   return Date.now() - publishedAt <= cooldownHours * 60 * 60 * 1000;
 }
@@ -795,7 +795,7 @@ async function isMarketMovingNews(title) {
           {
             role: "system",
             content:
-              "أنت رئيس تحرير لقناة أخبار مالية احترافية مشابهة لـ Bloomberg و ForexBreakingNews. وافق على الأخبار ذات التأثير المتوسط إلى القوي التي يمكن أن تؤثر على الأسواق العالمية خلال اليوم، خصوصًا الفوركس والدولار والذهب والنفط والأسهم الأمريكية والكريبتو. وافق على أخبار الفيدرالي والبنوك المركزية، التضخم CPI/PCE، الوظائف NFP والبطالة، تصريحات Powell أو أعضاء الفيدرالي، تحركات النفط أو الذهب أو البيتكوين، العقوبات والحروب والهجمات وإغلاق المضائق والتوترات الجيوسياسية التي تؤثر على النفط أو الدولار أو الأسهم، وأخبار البنوك أو الأزمات المالية. ارفض فقط الأخبار الضعيفة جدًا أو المحلية أو التحليلات والآراء العامة أو الأخبار التي لا علاقة واضحة لها بالأسواق. أجب بكلمة واحدة فقط: YES إذا كان الخبر مهمًا للأسواق، أو NO إذا كان ضعيفًا أو غير مرتبط.",
+            "أنت رئيس تحرير لقناة أخبار مالية احترافية مشابهة لـ Bloomberg و ForexBreakingNews. وافق فقط على الأخبار ذات التأثير المتوسط أو القوي على الأسواق العالمية. يجب أن يكون للخبر تأثير واضح أو محتمل على الفوركس أو الدولار أو الذهب أو النفط أو الأسهم الأمريكية أو الكريبتو. وافق على أخبار الفيدرالي والبنوك المركزية، التضخم، البطالة، الوظائف، PMI وISM، ثقة المستهلك، مبيعات التجزئة، تحركات النفط والذهب والبيتكوين، الحروب والتوترات الجيوسياسية، وأرباح الشركات الأمريكية الكبرى. ارفض الأخبار الضعيفة أو المتكررة أو المحلية أو العامة أو التي لا تحمل تأثيرًا اقتصاديًا أو ماليًا واضحًا. إذا كان الخبر متوسط أو قوي التأثير أجب YES فقط. إذا كان ضعيف أو مكرر أو غير مهم للأسواق أجب NO فقط."
           },
           {
             role: "user",
@@ -932,7 +932,7 @@ async function fetchForexNews() {
 
     let latestNews = null;
 
-    for (const item of allItems.slice(0, 120)) {
+   for (const item of allItems.slice(0, 90)) {
       const newsDate = new Date(item.isoDate || item.pubDate || Date.now()).getTime();
       const maxAge = MAX_NEWS_AGE_HOURS * 60 * 60 * 1000;
 
@@ -986,6 +986,19 @@ async function fetchForexNews() {
           normalizedCurrentTitle.includes("nfp") && normalizedRecent.includes("nfp") ||
           normalizedCurrentTitle.includes("inflation") && normalizedRecent.includes("inflation") ||
           normalizedCurrentTitle.includes("cpi") && normalizedRecent.includes("cpi")
+          || normalizedCurrentTitle.includes("ppi") && normalizedRecent.includes("ppi")
+|| normalizedCurrentTitle.includes("pce") && normalizedRecent.includes("pce")
+|| normalizedCurrentTitle.includes("consumer confidence") && normalizedRecent.includes("consumer confidence")
+|| normalizedCurrentTitle.includes("consumer sentiment") && normalizedRecent.includes("consumer sentiment")
+|| normalizedCurrentTitle.includes("retail sales") && normalizedRecent.includes("retail sales")
+|| normalizedCurrentTitle.includes("jobless claims") && normalizedRecent.includes("jobless claims")
+|| normalizedCurrentTitle.includes("pmi") && normalizedRecent.includes("pmi")
+|| normalizedCurrentTitle.includes("ism") && normalizedRecent.includes("ism")
+|| normalizedCurrentTitle.includes("earnings") && normalizedRecent.includes("earnings")
+|| normalizedCurrentTitle.includes("tesla") && normalizedRecent.includes("tesla")
+|| normalizedCurrentTitle.includes("nvidia") && normalizedRecent.includes("nvidia")
+|| normalizedCurrentTitle.includes("apple") && normalizedRecent.includes("apple")
+|| normalizedCurrentTitle.includes("microsoft") && normalizedRecent.includes("microsoft")
         );
       });
 
