@@ -5,6 +5,7 @@ const axios = require("axios");
 const FormData = require("form-data");
 const { createCanvas, loadImage, registerFont } = require("canvas");
 require("dotenv").config();
+const { createClient } = require("@supabase/supabase-js");
 
 try {
   const arabicFontPath = path.join(__dirname, "fonts", "NotoNaskhArabic-Regular.ttf");
@@ -24,6 +25,13 @@ const parser = new Parser();
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY
+);
 
 const LAST_NEWS_FILE = path.join(__dirname, "last-news.json");
 const NEWS_CARD_FILE = path.join(__dirname, "news-card.png");
@@ -694,6 +702,56 @@ async function createNewsCard(title, imageUrl) {
   return NEWS_CARD_FILE;
 }
 
+async function loadPublishedNewsFromSupabase() {
+  try {
+    const { data, error } = await supabase
+      .from("published_news")
+      .select("*")
+      .order("published_at", { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.error("❌ Supabase Load Error:", error.message);
+      return [];
+    }
+
+    return (data || []).map((item) => ({
+      link: item.link,
+      title: item.title || "",
+      normalizedTitle: item.normalized_title || "",
+      topicCluster: item.topic_cluster || null,
+      publishedAt: item.published_at || item.created_at || null,
+    }));
+  } catch (error) {
+    console.error("❌ Supabase Load Exception:", error.message);
+    return [];
+  }
+}
+
+async function savePublishedNewsToSupabase(item) {
+  try {
+    const { error } = await supabase
+      .from("published_news")
+      .upsert(
+        [
+          {
+            link: item.link,
+            title: item.title || "",
+            normalized_title: item.normalized_title || "",
+            topic_cluster: item.topic_cluster || null,
+            published_at: item.published_at || new Date().toISOString(),
+          },
+        ],
+        { onConflict: "link" }
+      );
+
+    if (error) {
+      console.error("❌ Supabase Save Error:", error.message);
+    }
+  } catch (error) {
+    console.error("❌ Supabase Save Exception:", error.message);
+  }
+}
 function readPublishedNewsRecords() {
   try {
     if (!fs.existsSync(LAST_NEWS_FILE)) {
@@ -727,7 +785,12 @@ function readPublishedNewsLinks() {
 
 function savePublishedNewsLink(link, title = "") {
   try {
-    const publishedItems = readPublishedNewsRecords();
+    const localPublishedItems = readPublishedNewsRecords();
+    const supabasePublishedItems = await loadPublishedNewsFromSupabase();
+    const publishedItems = [
+      ...supabasePublishedItems,
+      ...localPublishedItems,
+    ];
     const updatedItems = [
       {
         link,
@@ -1060,7 +1123,7 @@ async function fetchForexNews() {
     const combinedTopicCluster = getNewsTopicCluster(combinedNewsIdentity);
 
     if (combinedTopicCluster) {
-      const alreadyPublishedSameCluster = readPublishedNewsRecords().some((publishedItem) => {
+      const alreadyPublishedSameCluster = publishedItems.some((publishedItem) => {
         const publishedCluster = publishedItem.topicCluster || getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
         return (
           publishedCluster === combinedTopicCluster &&
@@ -1071,6 +1134,13 @@ async function fetchForexNews() {
       if (alreadyPublishedSameCluster) {
         console.log("⏭️ Skipped duplicate after AI analysis:", combinedTopicCluster, latestNews.title);
         savePublishedNewsLink(latestLink, combinedNewsIdentity);
+        await savePublishedNewsToSupabase({
+          link: latestLink,
+          title: combinedNewsIdentity,
+          normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
+          topic_cluster: combinedTopicCluster,
+          published_at: new Date().toISOString(),
+        });
         return;
       }
     }
@@ -1140,6 +1210,13 @@ async function fetchForexNews() {
     }
 
     savePublishedNewsLink(latestLink, combinedNewsIdentity);
+    await savePublishedNewsToSupabase({
+      link: latestLink,
+      title: combinedNewsIdentity,
+      normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
+      topic_cluster: combinedTopicCluster,
+      published_at: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("❌ RSS Error:", error.message);
   } finally {
