@@ -136,6 +136,17 @@ const IMPORTANT_KEYWORDS = [
   "opec",
   "breaking",
   "breaking news",
+  "breaking forex news",
+  "central bank",
+  "boj",
+  "ecb",
+  "bank of england",
+  "boe",
+  "ecb president",
+  "yield",
+  "treasury",
+  "risk sentiment",
+  "safe haven",
   "الفيدرالي",
 "الفائدة",
 "رفع الفائدة",
@@ -161,6 +172,11 @@ const NEWS_FEEDS = [
   "https://www.investing.com/rss/news_25.rss",
   "https://www.investing.com/rss/news_1.rss",
   "https://www.coindesk.com/arc/outboundfeeds/rss/",
+  "https://www.fxstreet.com/rss/news",
+  "https://feeds.marketwatch.com/marketwatch/topstories/",
+  "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+  "https://www.investing.com/rss/news_285.rss",
+  "https://www.investing.com/rss/news_301.rss",
 ];
 
 function isImportantNews(title) {
@@ -795,7 +811,7 @@ async function isMarketMovingNews(title) {
           {
             role: "system",
             content:
-            "أنت رئيس تحرير لقناة أخبار مالية احترافية مشابهة لـ Bloomberg و ForexBreakingNews. وافق فقط على الأخبار ذات التأثير المتوسط أو القوي على الأسواق العالمية. يجب أن يكون للخبر تأثير واضح أو محتمل على الفوركس أو الدولار أو الذهب أو النفط أو الأسهم الأمريكية أو الكريبتو. وافق على أخبار الفيدرالي والبنوك المركزية، التضخم، البطالة، الوظائف، PMI وISM، ثقة المستهلك، مبيعات التجزئة، تحركات النفط والذهب والبيتكوين، الحروب والتوترات الجيوسياسية، وأرباح الشركات الأمريكية الكبرى. ارفض الأخبار الضعيفة أو المتكررة أو المحلية أو العامة أو التي لا تحمل تأثيرًا اقتصاديًا أو ماليًا واضحًا. إذا كان الخبر متوسط أو قوي التأثير أجب YES فقط. إذا كان ضعيف أو مكرر أو غير مهم للأسواق أجب NO فقط."
+            "أنت رئيس تحرير لقناة أخبار مالية احترافية بأسلوب Bloomberg و ForexBreakingNews و ForexNewspaper. وافق فقط على الأخبار ذات التأثير المتوسط أو القوي على الأسواق العالمية. يجب أن يكون للخبر تأثير واضح أو محتمل على الفوركس أو الدولار أو الذهب أو النفط أو الأسهم الأمريكية أو الكريبتو. وافق على أخبار الفيدرالي والبنوك المركزية، التضخم، البطالة، الوظائف، PMI وISM، ثقة المستهلك، مبيعات التجزئة، تحركات النفط والذهب والبيتكوين، الحروب والتوترات الجيوسياسية، وأرباح الشركات الأمريكية الكبرى. ارفض الأخبار الضعيفة أو المتكررة أو المحلية أو العامة أو التي لا تحمل تأثيرًا اقتصاديًا أو ماليًا واضحًا. إذا كان الخبر متوسط أو قوي التأثير أجب YES فقط. إذا كان ضعيف أو مكرر أو غير مهم للأسواق أجب NO فقط."
           },
           {
             role: "user",
