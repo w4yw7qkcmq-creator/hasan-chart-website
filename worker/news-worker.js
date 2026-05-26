@@ -36,6 +36,8 @@ const TEMP_ALLOW_ALL_NEWS = false;
 const MAX_NEWS_AGE_HOURS = 24;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = false;
+const MIN_IMAGE_WIDTH = 900;
+const MIN_IMAGE_HEIGHT = 500;
 
 let isFetchingNews = false;
 
@@ -364,7 +366,6 @@ async function getImageFromArticleUrl(articleUrl) {
       /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
       /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
       /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
-      /<img[^>]+src=["']([^"']+)["']/i,
     ];
 
     for (const pattern of patterns) {
@@ -607,6 +608,10 @@ async function createNewsCard(title, imageUrl) {
 
   try {
     const image = await loadImage(imageUrl);
+    if (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT) {
+      console.log(`⏭️ Skipped low-quality image: ${image.width}x${image.height}`);
+      return null;
+    }
 
     const scale = Math.max(width / image.width, height / image.height);
     const scaledWidth = image.width * scale;
@@ -1085,6 +1090,7 @@ async function fetchForexNews() {
         if (photoPath) {
           await sendTelegramPhoto(message, photoPath);
         } else {
+          console.log("⏭️ Image rejected or unavailable. Sending text only.");
           await sendTelegramMessage(message);
         }
       } else {
