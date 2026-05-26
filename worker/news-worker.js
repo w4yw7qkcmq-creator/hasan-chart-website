@@ -785,12 +785,7 @@ function readPublishedNewsLinks() {
 
 function savePublishedNewsLink(link, title = "") {
   try {
-    const localPublishedItems = readPublishedNewsRecords();
-    const supabasePublishedItems = await loadPublishedNewsFromSupabase();
-    const publishedItems = [
-      ...supabasePublishedItems,
-      ...localPublishedItems,
-    ];
+    const publishedItems = readPublishedNewsRecords();
     const updatedItems = [
       {
         link,
@@ -1002,7 +997,12 @@ async function fetchForexNews() {
       return dateB - dateA;
     });
 
-    const publishedItems = readPublishedNewsRecords();
+    const localPublishedItems = readPublishedNewsRecords();
+    const supabasePublishedItems = await loadPublishedNewsFromSupabase();
+    const publishedItems = [
+      ...supabasePublishedItems,
+      ...localPublishedItems,
+    ];
     const publishedLinks = publishedItems.map((item) => item.link).filter(Boolean);
     const recentPublishedItems = publishedItems.filter(isRecentPublishedItem);
     const recentTitles = recentPublishedItems
