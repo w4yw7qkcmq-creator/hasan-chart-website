@@ -46,8 +46,8 @@ const MAX_POSTS_PER_HOUR = 5;
 const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = false;
-const MIN_IMAGE_WIDTH = 900;
-const MIN_IMAGE_HEIGHT = 500;
+const MIN_IMAGE_WIDTH = 1280;
+const MIN_IMAGE_HEIGHT = 720;
 
 let isFetchingNews = false;
 
@@ -345,29 +345,7 @@ function selectNewsImage(title) {
 }
 
 function getImageFromNewsItem(item) {
-  const enclosureUrl = item.enclosure?.url;
-  if (enclosureUrl && /^https?:\/\//i.test(enclosureUrl)) {
-    return enclosureUrl;
-  }
-
-  const mediaContent = item["media:content"]?.$.url || item["media:content"]?.url;
-  if (mediaContent && /^https?:\/\//i.test(mediaContent)) {
-    return mediaContent;
-  }
-
-  const mediaThumbnail = item["media:thumbnail"]?.$.url || item["media:thumbnail"]?.url;
-  if (mediaThumbnail && /^https?:\/\//i.test(mediaThumbnail)) {
-    return mediaThumbnail;
-  }
-
-  const html = item.content || item["content:encoded"] || item.summary || item.description || "";
-  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-
-  if (match?.[1] && /^https?:\/\//i.test(match[1])) {
-    return match[1];
-  }
-
-  return null;
+  // Do not use RSS thumbnails or inline HTML images because they are often low-resolution previews.
 }
 
 // Try to extract an image from the article's HTML if not found in the RSS item.
@@ -681,7 +659,14 @@ async function createNewsCard(title, imageUrl) {
       console.log(`⏭️ Skipped low-quality image: ${image.width}x${image.height}`);
       return null;
     }
+    const imageAspectRatio = image.width / image.height;
+    if (imageAspectRatio < 1.35 || imageAspectRatio > 2.2) {
+      console.log(`⏭️ Skipped poorly shaped image: ${image.width}x${image.height}`);
+      return null;
+    }
 
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     const scale = Math.max(width / image.width, height / image.height);
     const scaledWidth = image.width * scale;
     const scaledHeight = image.height * scale;
