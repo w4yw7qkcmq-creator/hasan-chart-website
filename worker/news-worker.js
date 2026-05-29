@@ -1048,6 +1048,32 @@ async function savePublishedNewsToSupabase(item) {
     console.error("❌ Supabase Save Exception:", error.message);
   }
 }
+
+async function saveNewsPostToSupabase(post) {
+  try {
+    const { error } = await supabase
+      .from("news_posts")
+      .upsert(
+        [
+          {
+            title: post.title,
+            content: post.content,
+            image_url: post.image_url || null,
+            impact_level: post.impact_level || "MEDIUM",
+            source_link: post.source_link,
+            created_at: new Date().toISOString(),
+          },
+        ],
+        { onConflict: "source_link" }
+      );
+
+    if (error) {
+      console.error("❌ News Post Save Error:", error.message);
+    }
+  } catch (error) {
+    console.error("❌ News Post Save Exception:", error.message);
+  }
+}
 function readPublishedNewsRecords() {
   try {
     if (!fs.existsSync(LAST_NEWS_FILE)) {
@@ -1523,6 +1549,13 @@ async function fetchForexNews() {
       await sendTelegramMessage(message);
     }
 
+    await saveNewsPostToSupabase({
+      title: latestNews.title || imageTitle,
+      content: message,
+      image_url: finalImage || null,
+      impact_level: latestNews.impactLevel || "MEDIUM",
+      source_link: latestLink,
+    });
     savePublishedNewsLink(latestLink, combinedNewsIdentity);
     await savePublishedNewsToSupabase({
       link: latestLink,
