@@ -44,6 +44,41 @@ const TEMP_ALLOW_ALL_NEWS = false;
 const MAX_NEWS_AGE_HOURS = 24;
 const MAX_POSTS_PER_HOUR = 5;
 const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 10;
+
+const ULTRA_PRIORITY_KEYWORDS = [
+  "fed",
+  "fomc",
+  "interest rate decision",
+  "cpi",
+  "nfp",
+  "consumer confidence",
+  "powell",
+  "war",
+  "iran",
+  "israel",
+  "missile",
+  "attack",
+  "oil spikes",
+  "market crash",
+  "stocks plunge",
+  "liquidations",
+  "crypto liquidations",
+  "bitcoin plunges",
+  "breaking",
+  "الفيدرالي",
+  "قرار الفائدة",
+  "التضخم",
+  "البطالة",
+  "ثقة المستهلك",
+  "تصفيات",
+  "انهيار السوق",
+  "خسائر الأسواق",
+  "ضرب إيران",
+  "تصعيد",
+  "هجوم",
+  "صاروخ",
+  "النفط",
+];
 const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = false;
@@ -1310,6 +1345,9 @@ async function fetchForexNews() {
 
       const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
       const impactLevel = getMarketImpactLevel(titleForImpact);
+      const isUltraPriority = ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
+        titleForImpact.toLowerCase().includes(keyword.toLowerCase())
+      );
 
       if (!isImportant && impactLevel === "LOW") {
         continue;
@@ -1319,7 +1357,11 @@ async function fetchForexNews() {
         console.log("⏭️ Skipped weak/low-impact market story:", item.title);
         continue;
       }
-      if (normalHourlyLimitReached && impactLevel !== "HIGH") {
+      if (
+        normalHourlyLimitReached &&
+        impactLevel !== "HIGH" &&
+        !isUltraPriority
+      ) {
         console.log("⏭️ Hourly limit reached. Skipped non-HIGH impact story:", item.title);
         continue;
       }
