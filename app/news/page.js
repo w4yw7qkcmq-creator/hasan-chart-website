@@ -1,46 +1,129 @@
 "use client";
 
-// صفحة الأخبار الأسبوعية
+import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
 export default function News() {
-  const items = [
-    {
-      title: "ارتفاع البيتكوين بعد إعلان اقتصادي مهم",
-      date: "2026-05-02",
-      excerpt: "شهدت أسعار البيتكوين ارتفاعًا حادًا بعد تصريحات مسؤولي الاحتياطي الفيدرالي بشأن السياسة النقدية.",
-    },
-    {
-      title: "إطلاق شبكة جديدة للعملات البديلة",
-      date: "2026-05-01",
-      excerpt: "مشروع جديد يُعد بتغيير قواعد اللعبة في عالم العملات البديلة من خلال تقنية مبتكرة.",
-    },
-    {
-      title: "تحذير من عمليات احتيال في سوق العملات الرقمية",
-      date: "2026-04-29",
-      excerpt: "تزايد الشكاوى حول منصات تداول مشبوهة يديرها أفراد مجهولو الهوية في آسيا.",
-    },
-  ];
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNews();
+
+    const interval = setInterval(() => {
+      fetchNews();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  async function fetchNews() {
+    try {
+      const { data, error } = await supabase
+        .from("news_posts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setNews(data || []);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#020617] text-white py-12 px-4">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold">أهم الأخبار هذا الأسبوع</h1>
-        <p className="text-slate-400 mb-4">
-          تابع أبرز الأحداث والأخبار التي تؤثر على سوق العملات الرقمية.
-        </p>
-        <div className="space-y-6">
-          {items.map((item, index) => (
-            <div key={index} className="flex flex-col md:flex-row gap-4 bg-white/5 border border-white/10 rounded-2xl p-6">
-              <div className="w-full md:w-1/4 bg-[#111827] rounded-xl h-40 flex items-center justify-center">
-                <span className="text-slate-500">صورة الخبر</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold mb-2">{item.title}</h3>
-                <p className="text-slate-400 text-sm mb-2">{item.date}</p>
-                <p className="text-slate-300 text-sm">{item.excerpt}</p>
-              </div>
-            </div>
-          ))}
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-10">
+          <h1 className="text-4xl font-black mb-3">
+            الأخبار الاقتصادية العاجلة
+          </h1>
+          <p className="text-slate-400 text-lg">
+            تغطية مباشرة لأهم أخبار الاقتصاد والأسواق العالمية والعملات الرقمية.
+          </p>
         </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="w-14 h-14 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : news.length === 0 ? (
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-10 text-center text-slate-400">
+            لا توجد أخبار متاحة حالياً.
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {news.map((item) => {
+              const impactColor =
+                item.impact_level === "HIGH"
+                  ? "bg-red-500/20 text-red-300 border-red-500/30"
+                  : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
+
+              return (
+                <div
+                  key={item.id}
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl hover:border-cyan-400/30 transition-all duration-300"
+                >
+                  {item.image_url ? (
+                    <div className="relative w-full h-[240px] md:h-[420px] overflow-hidden">
+                      <img
+                        src={item.image_url}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/20 to-transparent" />
+
+                      <div className="absolute top-5 right-5 flex items-center gap-3">
+                        <div
+                          className={`px-4 py-2 rounded-full border text-sm font-bold ${impactColor}`}
+                        >
+                          {item.impact_level === "HIGH"
+                            ? "🚨 عاجل"
+                            : "📌 مهم"}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="p-6 md:p-8">
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                      <div className="text-slate-400 text-sm">
+                        {new Date(item.created_at).toLocaleString("ar-SA", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "numeric",
+                        })}
+                      </div>
+                    </div>
+
+                    <h2 className="text-2xl md:text-3xl font-black leading-relaxed mb-5 text-white">
+                      {item.title}
+                    </h2>
+
+                    <div className="text-slate-300 leading-8 whitespace-pre-line text-[17px]">
+                      {item.content}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </main>
   );
