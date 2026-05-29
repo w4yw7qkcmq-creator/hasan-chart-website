@@ -265,6 +265,45 @@ const IMPORTANT_KEYWORDS = [
   "باول",
 ];
 
+const ECONOMIC_CALENDAR_EVENTS = [
+  "interest rate",
+  "rate decision",
+  "fomc",
+  "powell",
+  "cpi",
+  "ppi",
+  "pce",
+  "nfp",
+  "nonfarm payrolls",
+  "unemployment",
+  "consumer confidence",
+  "consumer sentiment",
+  "retail sales",
+  "pmi",
+  "ism",
+  "gdp",
+  "jobless claims",
+  "initial claims",
+  "continuing claims",
+  "الفائدة",
+  "التضخم",
+  "البطالة",
+  "ثقة المستهلك",
+  "مؤشر ثقة المستهلك",
+  "مبيعات التجزئة",
+  "الناتج المحلي",
+  "الوظائف",
+  "طلبات إعانة البطالة",
+];
+
+function isEconomicCalendarNews(title) {
+  const lowerTitle = String(title || "").toLowerCase();
+
+  return ECONOMIC_CALENDAR_EVENTS.some((keyword) =>
+    lowerTitle.includes(keyword.toLowerCase())
+  );
+}
+
 const NEWS_FEEDS = [
   "https://www.forexlive.com/feed/",
   "https://www.investing.com/rss/news_25.rss",
@@ -1341,15 +1380,16 @@ async function fetchForexNews() {
         continue;
       }
 
+      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
+      const isEconomicNews = isEconomicCalendarNews(titleForImpact);
       const isImportant = await isMarketMovingNews(item.title || "");
 
-      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
-      const impactLevel = getMarketImpactLevel(titleForImpact);
+      const impactLevel = isEconomicNews ? "HIGH" : getMarketImpactLevel(titleForImpact);
       const isUltraPriority = ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
         titleForImpact.toLowerCase().includes(keyword.toLowerCase())
       );
 
-      if (!isImportant && impactLevel === "LOW") {
+      if (!isImportant && impactLevel === "LOW" && !isEconomicNews) {
         continue;
       }
 
@@ -1414,6 +1454,18 @@ async function fetchForexNews() {
       "fomc",
       "powell",
       "interest rate",
+      "rate decision",
+      "consumer confidence",
+      "consumer sentiment",
+      "ppi",
+      "pce",
+      "retail sales",
+      "jobless claims",
+      "initial claims",
+      "continuing claims",
+      "pmi",
+      "ism",
+      "unemployment",
       "cpi",
       "inflation",
       "nfp",
