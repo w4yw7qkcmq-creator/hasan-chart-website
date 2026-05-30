@@ -599,6 +599,12 @@ function getStrongDuplicateKey(text) {
     "reserves",
     "treasury",
     "funding",
+    "fundraise",
+    "fundraising",
+    "raises capital",
+    "capital raise",
+    "reserve increase",
+    "reserve boost",
     "donation",
     "donations",
     "surge",
@@ -623,6 +629,12 @@ function getStrongDuplicateKey(text) {
     "احتياطي",
     "احتياطيات",
     "تبرعات",
+    "جمع تبرعات",
+    "جمع تمويل",
+    "زيادة رأس المال",
+    "زيادة راس المال",
+    "رفع الاحتياطي",
+    "زيادة الاحتياطي",
     "تمويل",
     "جولة",
     "هبوط",
@@ -781,7 +793,7 @@ function getNewsTopicCluster(title) {
     },
     {
       key: "bitcoin_crypto",
-      terms: ["bitcoin", "btc", "crypto", "ethereum", "etf", "بيتكوين", "البيتكوين", "كريبتو", "العملات الرقمية", "إيثريوم", "ايثريوم"],
+      terms: ["bitcoin", "btc", "crypto", "ethereum", "eth", "xrp", "ripple", "etf", "بيتكوين", "البيتكوين", "كريبتو", "العملات الرقمية", "إيثريوم", "ايثريوم", "ريبل"],
     },
   ];
 
@@ -1126,6 +1138,33 @@ async function loadPublishedNewsFromSupabase() {
   }
 }
 
+async function loadNewsPostsFromSupabase() {
+  try {
+    const { data, error } = await supabase
+      .from("news_posts")
+      .select("title, content, source_link, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.error("❌ News Posts Load Error:", error.message);
+      return [];
+    }
+
+    return (data || []).map((item) => ({
+      link: item.source_link,
+      title: item.title || item.content || "",
+      normalizedTitle: normalizeNewsTitle(`${item.title || ""} ${item.content || ""}`),
+      topicCluster: getNewsTopicCluster(`${item.title || ""} ${item.content || ""}`),
+      duplicateKey: getStrongDuplicateKey(`${item.title || ""} ${item.content || ""}`),
+      publishedAt: item.created_at || null,
+    }));
+  } catch (error) {
+    console.error("❌ News Posts Load Exception:", error.message);
+    return [];
+  }
+}
+
 async function savePublishedNewsToSupabase(item) {
   try {
     const { error } = await supabase
@@ -1388,8 +1427,10 @@ async function fetchForexNews() {
 
     const localPublishedItems = readPublishedNewsRecords();
     const supabasePublishedItems = await loadPublishedNewsFromSupabase();
+    const supabaseNewsPostItems = await loadNewsPostsFromSupabase();
     const publishedItems = [
       ...supabasePublishedItems,
+      ...supabaseNewsPostItems,
       ...localPublishedItems,
     ];
 
