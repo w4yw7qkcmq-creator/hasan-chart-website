@@ -1295,6 +1295,85 @@ async function sendTelegramMessage(message) {
   }
 }
 
+async function sendScheduledMarketAlerts() {
+  try {
+    const now = new Date();
+
+    const nyParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(now)
+      .reduce((acc, part) => {
+        acc[part.type] = part.value;
+        return acc;
+      }, {});
+
+    const weekday = nyParts.weekday;
+    const hour = Number(nyParts.hour);
+    const minute = Number(nyParts.minute);
+    const eventDateKey = `${nyParts.year}-${nyParts.month}-${nyParts.day}`;
+
+    if (weekday === "Sat" || weekday === "Sun") {
+      return;
+    }
+
+    const scheduledAlerts = [
+      {
+        id: `us-market-open-60m-${eventDateKey}`,
+        hour: 8,
+        minute: 30,
+        message:
+          "⏰ تنبيه مهم\n\n🇺🇸 متبقي ساعة واحدة على افتتاح السوق الأمريكي.\n\n📊 راقب تحركات الدولار، الذهب، ناسداك، داو جونز و S&P 500.\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+      },
+      {
+        id: `us-market-open-5m-${eventDateKey}`,
+        hour: 9,
+        minute: 25,
+        message:
+          "🚨 تنبيه عاجل\n\n🇺🇸 متبقي 5 دقائق على افتتاح السوق الأمريكي.\n\n⚠️ متوقع ارتفاع التذبذب على الدولار، الذهب، المؤشرات الأمريكية والكريبتو.\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+      },
+    ];
+
+    const currentAlert = scheduledAlerts.find(
+      (alert) => alert.hour === hour && alert.minute === minute
+    );
+
+    if (!currentAlert) {
+      return;
+    }
+
+    const publishedItems = await loadPublishedNewsFromSupabase();
+    const alreadySent = publishedItems.some(
+      (item) => item.link === `scheduled-alert:${currentAlert.id}`
+    );
+
+    if (alreadySent) {
+      return;
+    }
+
+    await sendTelegramMessage(currentAlert.message);
+
+    await savePublishedNewsToSupabase({
+      link: `scheduled-alert:${currentAlert.id}`,
+      title: currentAlert.message,
+      normalized_title: normalizeNewsTitle(currentAlert.message).slice(0, 500),
+      topic_cluster: "scheduled_market_alert",
+      published_at: new Date().toISOString(),
+    });
+
+    savePublishedNewsLink(`scheduled-alert:${currentAlert.id}`, currentAlert.message);
+  } catch (error) {
+    console.error("❌ Scheduled Alert Error:", error.message);
+  }
+}
+
 async function sendTelegramPhoto(message, photoPath) {
   try {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
@@ -1402,6 +1481,7 @@ async function fetchForexNews() {
   isFetchingNews = true;
   try {
     console.log("🚀 Fetching forex news...");
+    await sendScheduledMarketAlerts();
 
     const allItems = [];
 
