@@ -81,7 +81,7 @@ const ULTRA_PRIORITY_KEYWORDS = [
 ];
 const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
-const USE_LOCAL_IMAGE_FALLBACK = false;
+const USE_LOCAL_IMAGE_FALLBACK = true;
 const MIN_IMAGE_WIDTH = 1280;
 const MIN_IMAGE_HEIGHT = 720;
 
