@@ -547,6 +547,108 @@ function normalizeNewsTitle(title) {
     .trim();
 }
 
+function getStrongDuplicateKey(text) {
+  const value = normalizeNewsTitle(text || "");
+
+  const assets = [
+    "xrp",
+    "ripple",
+    "bitcoin",
+    "btc",
+    "ethereum",
+    "eth",
+    "gold",
+    "oil",
+    "nasdaq",
+    "dow",
+    "s p 500",
+    "fed",
+    "fomc",
+    "powell",
+    "cpi",
+    "ppi",
+    "pce",
+    "nfp",
+    "consumer confidence",
+    "unemployment",
+    "iran",
+    "israel",
+    "russia",
+    "ukraine",
+    "hormuz",
+    "opec",
+    "البيتكوين",
+    "الذهب",
+    "النفط",
+    "الفيدرالي",
+    "التضخم",
+    "البطالة",
+    "ثقة المستهلك",
+    "إيران",
+    "ايران",
+    "إسرائيل",
+    "اسرائيل",
+    "هرمز",
+  ];
+
+  const actions = [
+    "raise",
+    "raises",
+    "raising",
+    "reserve",
+    "reserves",
+    "treasury",
+    "funding",
+    "donation",
+    "donations",
+    "surge",
+    "jumps",
+    "falls",
+    "plunge",
+    "crash",
+    "selloff",
+    "liquidations",
+    "attack",
+    "missile",
+    "strike",
+    "war",
+    "sanctions",
+    "rate",
+    "decision",
+    "cuts",
+    "hikes",
+    "يرفع",
+    "رفع",
+    "زيادة",
+    "احتياطي",
+    "احتياطيات",
+    "تبرعات",
+    "تمويل",
+    "جولة",
+    "هبوط",
+    "ارتفاع",
+    "انهيار",
+    "تصفيات",
+    "هجوم",
+    "ضرب",
+    "عقوبات",
+    "الفائدة",
+  ];
+
+  const matchedAsset = assets.find((asset) => value.includes(asset));
+  const matchedAction = actions.find((action) => value.includes(action));
+
+  if (matchedAsset && matchedAction) {
+    return `${matchedAsset}_${matchedAction}`;
+  }
+
+  if (matchedAsset && value.split(" ").length <= 14) {
+    return matchedAsset;
+  }
+
+  return null;
+}
+
 function areSimilarNewsTitles(titleA, titleB) {
   const normalizedA = normalizeNewsTitle(titleA);
   const normalizedB = normalizeNewsTitle(titleB);
@@ -1114,6 +1216,7 @@ function savePublishedNewsLink(link, title = "") {
         title,
         normalizedTitle: normalizeNewsTitle(title).slice(0, 500),
         topicCluster: getNewsTopicCluster(title),
+        duplicateKey: getStrongDuplicateKey(title),
         publishedAt: new Date().toISOString(),
       },
       ...publishedItems.filter((item) => item.link !== link),
@@ -1331,6 +1434,36 @@ async function fetchForexNews() {
       );
       const normalizedCurrentTitle = normalizeNewsTitle(item.title || "");
       const currentTopicCluster = getNewsTopicCluster(`${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`);
+      const currentDuplicateKey = getStrongDuplicateKey(`${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`);
+      const hasRecentSameDuplicateKey = currentDuplicateKey
+        ? publishedItems.some((publishedItem) => {
+            const publishedDuplicateKey =
+              publishedItem.duplicateKey ||
+              getStrongDuplicateKey(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
+
+            if (publishedDuplicateKey !== currentDuplicateKey) {
+              return false;
+            }
+
+            const publishedAt = new Date(
+              publishedItem.publishedAt ||
+                publishedItem.published_at ||
+                publishedItem.created_at ||
+                0
+            ).getTime();
+
+            if (Number.isNaN(publishedAt) || !publishedAt) {
+              return true;
+            }
+
+            return Date.now() - publishedAt <= 6 * 60 * 60 * 1000;
+          })
+        : false;
+
+      if (hasRecentSameDuplicateKey) {
+        console.log("⏭️ Skipped repeated strong duplicate key:", currentDuplicateKey, item.title);
+        continue;
+      }
       const hasRecentSameTopicCluster = currentTopicCluster
         ? publishedItems.some((publishedItem) => {
             const publishedCluster = publishedItem.topicCluster || getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
@@ -1527,11 +1660,12 @@ async function fetchForexNews() {
       latestNews.title.toLowerCase().includes(keyword)
     );
 
+    let finalImage = null;
     if (veryImportantNews) {
       const rssImage = getImageFromNewsItem(latestNews);
       const articleImage = rssImage ? null : await getImageFromArticleUrl(latestNews.link);
       const localFallbackImage = USE_LOCAL_IMAGE_FALLBACK ? selectNewsImage(latestNews.title) : null;
-      const finalImage = rssImage || articleImage || localFallbackImage;
+      finalImage = rssImage || articleImage || localFallbackImage;
 
       if (finalImage) {
         const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
