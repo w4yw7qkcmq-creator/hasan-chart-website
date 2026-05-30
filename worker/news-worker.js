@@ -1785,7 +1785,18 @@ async function fetchForexNews() {
     if (veryImportantNews) {
       const rssImage = getImageFromNewsItem(latestNews);
       const articleImage = rssImage ? null : await getImageFromArticleUrl(latestNews.link);
-      const localFallbackImage = USE_LOCAL_IMAGE_FALLBACK ? selectNewsImage(latestNews.title) : null;
+      const shouldUseLocalFallbackImage =
+        latestNews.impactLevel === "HIGH" ||
+        ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
+          `${latestNews.title || ""} ${latestNews.contentSnippet || ""}`
+            .toLowerCase()
+            .includes(keyword.toLowerCase())
+        );
+
+      const localFallbackImage =
+        USE_LOCAL_IMAGE_FALLBACK && shouldUseLocalFallbackImage
+          ? selectNewsImage(latestNews.title)
+          : null;
       finalImage = rssImage || articleImage || localFallbackImage;
 
       if (finalImage) {
