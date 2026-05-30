@@ -503,33 +503,110 @@ async function getImageFromArticleUrl(articleUrl) {
 
   try {
     const response = await axios.get(articleUrl, {
-      timeout: 8000,
+      timeout: 10000,
+      maxRedirects: 5,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
       },
     });
 
-    const html = response.data || "";
+    const html = String(response.data || "");
+    const candidates = new Set();
 
-    const patterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+    const metaPatterns = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/gi,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/gi,
+      /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/gi,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image:secure_url["']/gi,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/gi,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/gi,
+      /<meta[^>]+name=["']twitter:image:src["'][^>]+content=["']([^"']+)["']/gi,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image:src["']/gi,
+      /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/gi,
+      /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/gi,
     ];
 
-    for (const pattern of patterns) {
-      const match = html.match(pattern);
-
-      if (match?.[1]) {
-        const imageUrl = new URL(match[1], articleUrl).href;
-
-        if (/^https?:\/\//i.test(imageUrl)) {
-          return imageUrl;
+    for (const pattern of metaPatterns) {
+      for (const match of html.matchAll(pattern)) {
+        if (match?.[1]) {
+          candidates.add(new URL(match[1], articleUrl).href);
         }
       }
     }
+
+    const jsonLdPatterns = [
+      /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+    ];
+
+    for (const pattern of jsonLdPatterns) {
+      for (const match of html.matchAll(pattern)) {
+        try {
+          const jsonText = String(match?.[1] || "").trim();
+          if (!jsonText) continue;
+
+          const parsed = JSON.parse(jsonText);
+          const nodes = Array.isArray(parsed) ? parsed : [parsed];
+
+          const collectImages = (node) => {
+            if (!node || typeof node !== "object") return;
+
+            const image = node.image || node.thumbnailUrl || node.url;
+
+            if (typeof image === "string") {
+              candidates.add(new URL(image, articleUrl).href);
+            }
+
+            if (Array.isArray(image)) {
+              image.forEach((item) => {
+                if (typeof item === "string") {
+                  candidates.add(new URL(item, articleUrl).href);
+                } else if (item?.url) {
+                  candidates.add(new URL(item.url, articleUrl).href);
+                }
+              });
+            }
+
+            if (image?.url) {
+              candidates.add(new URL(image.url, articleUrl).href);
+            }
+
+            Object.values(node).forEach((value) => {
+              if (value && typeof value === "object") {
+                if (Array.isArray(value)) {
+                  value.forEach(collectImages);
+                } else {
+                  collectImages(value);
+                }
+              }
+            });
+          };
+
+          nodes.forEach(collectImages);
+        } catch (_) {
+          // Ignore broken JSON-LD blocks.
+        }
+      }
+    }
+
+    const imageCandidates = [...candidates]
+      .filter((imageUrl) => /^https?:\/\//i.test(imageUrl))
+      .filter((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
+      .sort((a, b) => {
+        const score = (url) => {
+          let total = 0;
+          if (/1200|1280|1440|1600|1920|2048/i.test(url)) total += 5;
+          if (/og|social|article|lead|hero|main|large/i.test(url)) total += 3;
+          if (/thumb|thumbnail|small|80x|120x|150x|300x/i.test(url)) total -= 5;
+          return total;
+        };
+
+        return score(b) - score(a);
+      });
+
+    return imageCandidates[0] || null;
   } catch (error) {
     console.error("⚠️ Article image fetch failed:", error.message);
   }
