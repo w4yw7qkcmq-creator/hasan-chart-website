@@ -1386,7 +1386,6 @@ async function sendTelegramMessage(message) {
   }
 }
 
-async function sendScheduledMarketAlerts() {
 // Send alerts for major scheduled economic events (custom events)
 async function sendImportantEconomicEventAlerts() {
   try {
@@ -1443,6 +1442,8 @@ async function sendImportantEconomicEventAlerts() {
     console.error("❌ Important Event Alert Error:", error.message);
   }
 }
+
+async function sendScheduledMarketAlerts() {
   try {
     const now = new Date();
 
