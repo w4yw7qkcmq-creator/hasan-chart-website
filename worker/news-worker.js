@@ -82,8 +82,22 @@ const ULTRA_PRIORITY_KEYWORDS = [
 const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = true;
+
 const MIN_IMAGE_WIDTH = 1280;
 const MIN_IMAGE_HEIGHT = 720;
+
+const IMPORTANT_EVENT_ALERTS = [
+  // Add major scheduled events here in UTC time.
+  // Example:
+  // {
+  //   id: "us-cpi-2026-06-10",
+  //   title: "مؤشر التضخم الأمريكي CPI",
+  //   eventTimeUtc: "2026-06-10T12:30:00Z",
+  //   assets: "الدولار، الذهب، الأسهم الأمريكية والكريبتو",
+  // },
+];
+
+const IMPORTANT_EVENT_ALERT_MINUTES = [120, 60, 15, 5];
 
 let isFetchingNews = false;
 
@@ -1373,6 +1387,62 @@ async function sendTelegramMessage(message) {
 }
 
 async function sendScheduledMarketAlerts() {
+// Send alerts for major scheduled economic events (custom events)
+async function sendImportantEconomicEventAlerts() {
+  try {
+    if (!IMPORTANT_EVENT_ALERTS.length) {
+      return;
+    }
+
+    const now = Date.now();
+
+    for (const event of IMPORTANT_EVENT_ALERTS) {
+      const eventTime = new Date(event.eventTimeUtc).getTime();
+
+      if (!eventTime || Number.isNaN(eventTime)) {
+        continue;
+      }
+
+      for (const minutesBefore of IMPORTANT_EVENT_ALERT_MINUTES) {
+        const alertTime = eventTime - minutesBefore * 60 * 1000;
+        const diffMs = now - alertTime;
+
+        if (diffMs < 0 || diffMs > 60 * 1000) {
+          continue;
+        }
+
+        const alertId = `important-event-alert:${event.id}:${minutesBefore}m`;
+        const publishedItems = await loadPublishedNewsFromSupabase();
+        const alreadySent = publishedItems.some((item) => item.link === alertId);
+
+        if (alreadySent) {
+          continue;
+        }
+
+        const message =
+          `🚨 تنبيه اقتصادي مهم\n\n` +
+          `⏳ متبقي ${minutesBefore} دقيقة على: ${event.title}\n\n` +
+          `📊 الأصول المتأثرة: ${event.assets}\n\n` +
+          `⚠️ متوقع ارتفاع التذبذب وقت صدور الخبر.\n\n` +
+          `📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`;
+
+        await sendTelegramMessage(message);
+
+        await savePublishedNewsToSupabase({
+          link: alertId,
+          title: message,
+          normalized_title: normalizeNewsTitle(message).slice(0, 500),
+          topic_cluster: "important_economic_event_alert",
+          published_at: new Date().toISOString(),
+        });
+
+        savePublishedNewsLink(alertId, message);
+      }
+    }
+  } catch (error) {
+    console.error("❌ Important Event Alert Error:", error.message);
+  }
+}
   try {
     const now = new Date();
 
@@ -1559,6 +1629,7 @@ async function fetchForexNews() {
   try {
     console.log("🚀 Fetching forex news...");
     await sendScheduledMarketAlerts();
+    await sendImportantEconomicEventAlerts();
 
     const allItems = [];
 
