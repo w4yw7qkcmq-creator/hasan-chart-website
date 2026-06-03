@@ -1859,7 +1859,7 @@ async function fetchForexNews() {
     );
 
     let finalImage = null;
-    if (veryImportantNews) {
+    if (veryImportantNews || latestNews.impactLevel === "HIGH") {
       const rssImage = getImageFromNewsItem(latestNews);
       const articleImage = rssImage ? null : await getImageFromArticleUrl(latestNews.link);
       const shouldUseLocalFallbackImage =
