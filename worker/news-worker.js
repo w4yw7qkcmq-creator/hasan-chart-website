@@ -1598,11 +1598,7 @@ async function fetchAutomaticEconomicCalendarEvents() {
 // Send alerts for major scheduled economic events (custom events)
 async function sendImportantEconomicEventAlerts() {
   try {
-    const automaticEvents = await fetchAutomaticEconomicCalendarEvents();
-    const allImportantEvents = [
-      ...automaticEvents,
-      ...IMPORTANT_EVENT_ALERTS,
-    ];
+   const allImportantEvents = IMPORTANT_EVENT_ALERTS;
 
     if (!allImportantEvents.length) {
       return;
@@ -1844,8 +1840,9 @@ async function fetchForexNews() {
   isFetchingNews = true;
   try {
     console.log("🚀 Fetching forex news...");
-    await sendScheduledMarketAlerts();
-    await sendImportantEconomicEventAlerts();
+   await sendScheduledMarketAlerts();
+await sendWeeklyEconomicCalendarPost();
+await sendImportantEconomicEventAlerts();
 
     const allItems = [];
 
@@ -2049,6 +2046,7 @@ async function fetchForexNews() {
         console.log("⏭️ Hourly limit reached. Skipped non-HIGH impact story:", item.title);
         continue;
       }
+
 
       item.impactLevel = impactLevel;
       latestNews = item;
