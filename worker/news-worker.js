@@ -141,12 +141,6 @@ const IMPORTANT_EVENT_ALERTS = [
     eventTimeUtc: "2026-07-29T18:00:00Z",
     assets: "الدولار، الذهب، الأسهم الأمريكية، السندات، النفط والكريبتو",
   },
-  {
-    id: "test-alert-now",
-    title: "اختبار تنبيه الأخبار الاقتصادية",
-    eventTimeUtc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    assets: "الدولار، الذهب، الأسهم الأمريكية والكريبتو",
-  },
 ];
 
 const IMPORTANT_EVENT_ALERT_MINUTES = [120, 60, 15, 5];
