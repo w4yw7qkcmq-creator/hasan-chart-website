@@ -1595,6 +1595,106 @@ async function fetchAutomaticEconomicCalendarEvents() {
     return cachedEconomicCalendarEvents || [];
   }
 }
+
+// -----------------------------------------------------------------------
+// Weekly Economic Calendar Telegram Post (every Monday 13:00 Damascus time)
+async function sendWeeklyEconomicCalendarPost() {
+  try {
+    const now = new Date();
+    const syriaParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Damascus",
+      weekday: "short",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(now)
+      .reduce((acc, part) => {
+        acc[part.type] = part.value;
+        return acc;
+      }, {});
+
+    const weekday = syriaParts.weekday;
+    const hour = Number(syriaParts.hour);
+    const minute = Number(syriaParts.minute);
+    const weekKey = `${syriaParts.year}-${syriaParts.month}-${syriaParts.day}`;
+
+    if (weekday !== "Mon" || hour !== 13 || minute !== 0) {
+      return;
+    }
+
+    const alertId = `weekly-economic-calendar:${weekKey}`;
+    const publishedItems = await loadPublishedNewsFromSupabase();
+    const alreadySent = publishedItems.some((item) => item.link === alertId);
+
+    if (alreadySent) {
+      return;
+    }
+
+    const startOfWeek = now.getTime() - 6 * 60 * 60 * 1000;
+    const endOfWeek = now.getTime() + 7 * 24 * 60 * 60 * 1000;
+
+    const weeklyEvents = IMPORTANT_EVENT_ALERTS
+      .map((event) => ({
+        ...event,
+        timestamp: new Date(event.eventTimeUtc).getTime(),
+      }))
+      .filter((event) => !Number.isNaN(event.timestamp))
+      .filter((event) => event.timestamp >= startOfWeek && event.timestamp <= endOfWeek)
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    if (!weeklyEvents.length) {
+      console.log("⏭️ No weekly economic calendar events found for this week.");
+      return;
+    }
+
+    const dayFormatter = new Intl.DateTimeFormat("ar-SY", {
+      timeZone: "Asia/Damascus",
+      weekday: "long",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+    const timeFormatter = new Intl.DateTimeFormat("ar-SY", {
+      timeZone: "Asia/Damascus",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    const eventLines = weeklyEvents
+      .map((event) => {
+        const eventDate = new Date(event.eventTimeUtc);
+        return `• ${dayFormatter.format(eventDate)} - ${timeFormatter.format(eventDate)}\n  ${event.title}\n  الأصول المتأثرة: ${event.assets}`;
+      })
+      .join("\n\n");
+
+    const message =
+      `📅 التقويم الاقتصادي لهذا الأسبوع\n\n` +
+      `${eventLines}\n\n` +
+      `⏰ التوقيت حسب سوريا.\n` +
+      `⚠️ سيتم إرسال تنبيهات قبل الأخبار المهمة بـ 120 / 60 / 15 / 5 دقائق.\n\n` +
+      `📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`;
+
+    await sendTelegramMessage(message);
+
+    await savePublishedNewsToSupabase({
+      link: alertId,
+      title: message,
+      normalized_title: normalizeNewsTitle(message).slice(0, 500),
+      topic_cluster: "weekly_economic_calendar",
+      published_at: new Date().toISOString(),
+    });
+
+    savePublishedNewsLink(alertId, message);
+  } catch (error) {
+    console.error("❌ Weekly Economic Calendar Error:", error.message);
+  }
+}
+// Send alerts for major scheduled economic events (custom events)
 // Send alerts for major scheduled economic events (custom events)
 async function sendImportantEconomicEventAlerts() {
   try {
@@ -1840,9 +1940,9 @@ async function fetchForexNews() {
   isFetchingNews = true;
   try {
     console.log("🚀 Fetching forex news...");
-   await sendScheduledMarketAlerts();
-await sendWeeklyEconomicCalendarPost();
-await sendImportantEconomicEventAlerts();
+    await sendScheduledMarketAlerts();
+    await sendWeeklyEconomicCalendarPost();
+    await sendImportantEconomicEventAlerts();
 
     const allItems = [];
 
