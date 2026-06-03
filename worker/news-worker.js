@@ -27,6 +27,10 @@ const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const TRADING_ECONOMICS_CLIENT =
+  process.env.TRADING_ECONOMICS_CLIENT ||
+  process.env.TRADING_ECONOMICS_API_KEY ||
+  "guest:guest";
 
 const supabase = createClient(
   SUPABASE_URL,
@@ -144,6 +148,9 @@ const IMPORTANT_EVENT_ALERTS = [
 ];
 
 const IMPORTANT_EVENT_ALERT_MINUTES = [120, 60, 15, 5];
+let cachedEconomicCalendarEvents = [];
+let cachedEconomicCalendarEventsAt = 0;
+const ECONOMIC_CALENDAR_CACHE_MS = 60 * 60 * 1000;
 
 let isFetchingNews = false;
 
@@ -1432,16 +1439,178 @@ async function sendTelegramMessage(message) {
   }
 }
 
+function formatDateForCalendar(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function parseTradingEconomicsDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string" && value.includes("/Date(")) {
+    const match = value.match(/\/Date\((\d+)\)\//);
+    if (match?.[1]) {
+      return new Date(Number(match[1]));
+    }
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function isHighImpactCalendarEvent(event) {
+  const importance = String(
+    event.Importance || event.importance || event.importanceLevel || event.Impact || ""
+  ).toLowerCase();
+
+  const eventName = String(event.Event || event.event || event.Name || event.name || "");
+  const category = String(event.Category || event.category || "");
+  const text = `${eventName} ${category}`.toLowerCase();
+
+  const highImportance =
+    importance.includes("high") ||
+    importance === "3" ||
+    importance.includes("3") ||
+    importance.includes("high volatility");
+
+  const importantName = [
+    "fomc",
+    "federal reserve",
+    "interest rate",
+    "rate decision",
+    "fed interest rate",
+    "powell",
+    "cpi",
+    "inflation rate",
+    "core inflation",
+    "ppi",
+    "producer price",
+    "pce",
+    "non farm payrolls",
+    "nonfarm payrolls",
+    "nfp",
+    "unemployment rate",
+    "jobless claims",
+    "gdp",
+    "retail sales",
+    "consumer confidence",
+    "consumer sentiment",
+    "ism manufacturing",
+    "ism services",
+    "manufacturing pmi",
+    "services pmi",
+  ].some((keyword) => text.includes(keyword));
+
+  return highImportance || importantName;
+}
+
+function mapCalendarEventAssets(eventTitle) {
+  const title = String(eventTitle || "").toLowerCase();
+
+  if (title.includes("oil") || title.includes("crude")) {
+    return "النفط، الدولار، الذهب والأسهم الأمريكية";
+  }
+
+  if (title.includes("fomc") || title.includes("interest rate") || title.includes("fed")) {
+    return "الدولار، الذهب، الأسهم الأمريكية، السندات، النفط والكريبتو";
+  }
+
+  if (
+    title.includes("cpi") ||
+    title.includes("ppi") ||
+    title.includes("pce") ||
+    title.includes("inflation") ||
+    title.includes("payroll") ||
+    title.includes("nfp") ||
+    title.includes("unemployment")
+  ) {
+    return "الدولار، الذهب، الأسهم الأمريكية، السندات والكريبتو";
+  }
+
+  return "الدولار، الذهب، الأسهم الأمريكية والكريبتو";
+}
+
+function normalizeCalendarEvent(event) {
+  const eventTitle = String(event.Event || event.event || event.Name || event.name || "").trim();
+  const country = String(event.Country || event.country || "").trim();
+  const eventDate = parseTradingEconomicsDate(event.Date || event.date || event.CalendarDate || event.datetime);
+
+  if (!eventTitle || !eventDate) {
+    return null;
+  }
+
+  const idDate = eventDate.toISOString().slice(0, 16).replace(/[-:T]/g, "");
+  const normalizedTitle = normalizeNewsTitle(eventTitle).replace(/\s+/g, "-").slice(0, 60);
+
+  return {
+    id: `auto-${country || "us"}-${normalizedTitle}-${idDate}`.toLowerCase(),
+    title: eventTitle,
+    eventTimeUtc: eventDate.toISOString(),
+    assets: mapCalendarEventAssets(eventTitle),
+  };
+}
+
+async function fetchAutomaticEconomicCalendarEvents() {
+  try {
+    if (Date.now() - cachedEconomicCalendarEventsAt < ECONOMIC_CALENDAR_CACHE_MS) {
+      return cachedEconomicCalendarEvents;
+    }
+
+    const today = new Date();
+    const endDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const from = formatDateForCalendar(today);
+    const to = formatDateForCalendar(endDate);
+
+    const url = `https://api.tradingeconomics.com/calendar/country/united%20states/${from}/${to}`;
+
+    const response = await axios.get(url, {
+      timeout: 12000,
+      params: {
+        c: TRADING_ECONOMICS_CLIENT,
+        f: "json",
+      },
+    });
+
+    const rawEvents = Array.isArray(response.data) ? response.data : [];
+    const events = rawEvents
+      .filter(isHighImpactCalendarEvent)
+      .map(normalizeCalendarEvent)
+      .filter(Boolean)
+      .filter((event) => new Date(event.eventTimeUtc).getTime() > Date.now())
+      .slice(0, 30);
+
+    cachedEconomicCalendarEvents = events;
+    cachedEconomicCalendarEventsAt = Date.now();
+
+    console.log(`✅ Loaded automatic economic calendar events: ${events.length}`);
+    return events;
+  } catch (error) {
+    console.error("⚠️ Economic calendar fetch failed:", error.response?.data || error.message);
+    return cachedEconomicCalendarEvents || [];
+  }
+}
 // Send alerts for major scheduled economic events (custom events)
 async function sendImportantEconomicEventAlerts() {
   try {
-    if (!IMPORTANT_EVENT_ALERTS.length) {
+    const automaticEvents = await fetchAutomaticEconomicCalendarEvents();
+    const allImportantEvents = [
+      ...automaticEvents,
+      ...IMPORTANT_EVENT_ALERTS,
+    ];
+
+    if (!allImportantEvents.length) {
       return;
     }
 
     const now = Date.now();
 
-    for (const event of IMPORTANT_EVENT_ALERTS) {
+    for (const event of allImportantEvents) {
       const eventTime = new Date(event.eventTimeUtc).getTime();
 
       if (!eventTime || Number.isNaN(eventTime)) {
