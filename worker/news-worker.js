@@ -56,8 +56,15 @@ const ULTRA_PRIORITY_KEYWORDS = [
   "cpi",
   "nfp",
   "jobless claims",
-"initial jobless claims",
-"unemployment claims",
+  "initial jobless claims",
+  "unemployment claims",
+  "weekly jobless claims",
+  "claims",
+  "initial claims",
+  "continuing claims",
+  "labor market",
+  "job market",
+  "employment",
   "consumer confidence",
   "powell",
   "war",
@@ -77,8 +84,11 @@ const ULTRA_PRIORITY_KEYWORDS = [
   "التضخم",
   "البطالة",
   "طلبات إعانة البطالة",
-"إعانات البطالة",
-"الشكاوى من البطالة",
+  "إعانات البطالة",
+  "الشكاوى من البطالة",
+  "طلبات البطالة",
+  "سوق العمل",
+  "العمالة",
   "ثقة المستهلك",
   "تصفيات",
   "انهيار السوق",
@@ -179,6 +189,11 @@ const IMPORTANT_KEYWORDS = [
   "core cpi",
   "core pce",
   "jobless claims",
+  "weekly jobless claims",
+  "claims",
+  "labor market",
+  "job market",
+  "employment",
   "initial claims",
   "continuing claims",
   "ism manufacturing",
@@ -356,6 +371,11 @@ const ECONOMIC_CALENDAR_EVENTS = [
   "ism",
   "gdp",
   "jobless claims",
+  "weekly jobless claims",
+  "claims",
+  "labor market",
+  "job market",
+  "employment",
   "initial claims",
   "continuing claims",
   "الفائدة",
@@ -367,6 +387,10 @@ const ECONOMIC_CALENDAR_EVENTS = [
   "الناتج المحلي",
   "الوظائف",
   "طلبات إعانة البطالة",
+  "إعانات البطالة",
+  "الشكاوى من البطالة",
+  "طلبات البطالة",
+  "سوق العمل",
 ];
 
 function isEconomicCalendarNews(title) {
@@ -400,9 +424,9 @@ function isImportantNews(title) {
 function getMarketImpactLevel(text) {
   const value = String(text || "").toLowerCase();
 
-  const criticalPattern = /fed rate decision|fomc decision|interest rate decision|rate cut|rate hike|powell speaks|powell says|cpi|core cpi|pce inflation|core pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|ism manufacturing|ism services|gdp|market losses|market rout|market crash|selloff|sell-off|stocks plunge|stocks sink|stocks tumble|nasdaq falls|nasdaq plunges|dow falls|s&p falls|futures fall|futures plunge|liquidations|crypto liquidations|futures liquidations|margin call|risk-off|oil prices surge|oil prices jump|oil spikes|gold jumps|bitcoin plunges|bitcoin surges|war breaks out|missile attack|drone attack|airstrike|escalation|retaliation|port attack|ports attack|ship attack|ships attacked|vessel attack|tanker attack|red sea|persian gulf|strait of hormuz|naval attack|hormuz|sanctions announced|tariff announced|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|التضخم|مؤشر ثقة المستهلك|البطالة|الوظائف|خسائر الأسواق|هبوط الأسواق|انهيار السوق|تراجع الأسهم|خسائر الأسهم الأمريكية|تصفيات|تصفيات الفيوتشر|تصفيات العقود الآجلة|تصفية مراكز|النفط|الذهب|هرمز|عقوبات|هجوم|ضرب إيران|ضرب ايران|تصعيد|استهداف السفن|ضرب السفن|استهداف الموانئ|ضرب الموانئ|البحر الأحمر|الخليج العربي|مضيق هرمز|هجوم بطائرات مسيرة|رد انتقامي/i;
+  const criticalPattern = /fed rate decision|fomc decision|interest rate decision|rate cut|rate hike|powell speaks|powell says|cpi|core cpi|pce inflation|core pce|nfp|nonfarm payrolls|unemployment rate|jobless claims|initial jobless claims|weekly jobless claims|unemployment claims|initial claims|continuing claims|claims data|labor market|job market|employment report|consumer confidence|ism manufacturing|ism services|gdp|market losses|market rout|market crash|selloff|sell-off|stocks plunge|stocks sink|stocks tumble|nasdaq falls|nasdaq plunges|dow falls|s&p falls|futures fall|futures plunge|liquidations|crypto liquidations|futures liquidations|margin call|risk-off|oil prices surge|oil prices jump|oil spikes|gold jumps|bitcoin plunges|bitcoin surges|war breaks out|missile attack|drone attack|airstrike|escalation|retaliation|port attack|ports attack|ship attack|ships attacked|vessel attack|tanker attack|red sea|persian gulf|strait of hormuz|naval attack|hormuz|sanctions announced|tariff announced|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|التضخم|مؤشر ثقة المستهلك|البطالة|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|سوق العمل|العمالة|الوظائف|خسائر الأسواق|هبوط الأسواق|انهيار السوق|تراجع الأسهم|خسائر الأسهم الأمريكية|تصفيات|تصفيات الفيوتشر|تصفيات العقود الآجلة|تصفية مراكز|النفط|الذهب|هرمز|عقوبات|هجوم|ضرب إيران|ضرب ايران|تصعيد|استهداف السفن|ضرب السفن|استهداف الموانئ|ضرب الموانئ|البحر الأحمر|الخليج العربي|مضيق هرمز|هجوم بطائرات مسيرة|رد انتقامي/i;
 
-  const mediumPattern = /federal reserve|fomc|powell|interest rate|inflation|ppi|pce|payrolls|jobless claims|retail sales|pmi|ism|treasury yields|dollar index|brent|wti|gold|bitcoin|btc|ethereum|nasdaq|dow jones|s&p 500|futures|liquidation|selloff|risk off|market volatility|nvidia|apple|tesla|microsoft|earnings|revenue|guidance|iran|israel|russia|ukraine|opec|tariff|sanctions|missile|attack|ship|port|red sea|persian gulf|الفائدة|باول|مبيعات التجزئة|طلبات إعانة البطالة|الدولار|البيتكوين|إيران|ايران|إسرائيل|اسرائيل|روسيا|أوكرانيا|اوكرانيا|أرباح|خسائر|هبوط|تصفيات|الفيوتشر|العقود الآجلة|السفن|الموانئ|تصعيد/i;
+  const mediumPattern = /federal reserve|fomc|powell|interest rate|inflation|ppi|pce|payrolls|jobless claims|claims|initial claims|continuing claims|labor market|job market|employment|retail sales|pmi|ism|treasury yields|dollar index|brent|wti|gold|bitcoin|btc|ethereum|nasdaq|dow jones|s&p 500|futures|liquidation|selloff|risk off|market volatility|nvidia|apple|tesla|microsoft|earnings|revenue|guidance|iran|israel|russia|ukraine|opec|tariff|sanctions|missile|attack|ship|port|red sea|persian gulf|الفائدة|باول|مبيعات التجزئة|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|سوق العمل|العمالة|الدولار|البيتكوين|إيران|ايران|إسرائيل|اسرائيل|روسيا|أوكرانيا|اوكرانيا|أرباح|خسائر|هبوط|تصفيات|الفيوتشر|العقود الآجلة|السفن|الموانئ|تصعيد/i;
 
   const weakPattern = /analyst estimates|price target|stock on pace|shares rise modestly|personal care|retailer|upgrade|downgrade|opinion|preview|recap|what to watch|could|may|might|minor|small move|mixed close|little changed/i;
 
@@ -418,12 +442,23 @@ function getMarketImpactLevel(text) {
 }
 
 function pickRandomAsset(fileNames) {
+  const assetsDir = path.join(__dirname, "assets");
   const availableFiles = fileNames
-    .map((fileName) => path.join(__dirname, "assets", fileName))
+    .map((fileName) => path.join(assetsDir, fileName))
     .filter((filePath) => fs.existsSync(filePath));
 
   if (!availableFiles.length) {
-    return path.join(__dirname, "assets", "default.png");
+    const anyImageFile = fs.existsSync(assetsDir)
+      ? fs
+          .readdirSync(assetsDir)
+          .find((fileName) => /\.(png|jpg|jpeg)$/i.test(fileName))
+      : null;
+
+    if (anyImageFile) {
+      return path.join(assetsDir, anyImageFile);
+    }
+
+    return path.join(assetsDir, "default.png");
   }
 
   const randomIndex = Math.floor(Math.random() * availableFiles.length);
@@ -486,7 +521,7 @@ function selectNewsImage(title) {
   ) {
     return pickRandomAsset([
       "Fed.png",
-"Powellpng.png",
+      "Powellpng.png",
       "fed-1.png",
       "fed-2.png",
       "fed-3.png",
@@ -567,8 +602,8 @@ function selectNewsImage(title) {
 
   return pickRandomAsset([
     "Inflation.png",
-"Stockpng.png",
-"Forex.png",
+    "Stockpng.png",
+    "Forex.png",
     "default-1.png",
     "default-2.png",
     "default-3.png",
@@ -579,19 +614,39 @@ function selectNewsImage(title) {
 function getImageFromNewsItem(item) {
   if (!item) return null;
 
-  const candidates = [
-    item.enclosure?.url,
-    item.thumbnail,
-    item.image,
-    item.imageUrl,
-    item.media?.content?.url,
-    item["media:content"]?.url,
-    item["media:thumbnail"]?.url,
-  ].filter(Boolean);
+  const candidates = [];
 
-  return candidates[0] || null;
+  const pushCandidate = (value) => {
+    if (typeof value === "string" && /^https?:\/\//i.test(value)) {
+      candidates.push(value);
+    }
+  };
 
-  // Do not use RSS thumbnails or inline HTML images because they are often low-resolution previews.
+  pushCandidate(item.enclosure?.url);
+  pushCandidate(item.thumbnail);
+  pushCandidate(item.image);
+  pushCandidate(item.imageUrl);
+  pushCandidate(item.media?.content?.url);
+  pushCandidate(item["media:content"]?.url);
+  pushCandidate(item["media:content"]?.$?.url);
+  pushCandidate(item["media:thumbnail"]?.url);
+  pushCandidate(item["media:thumbnail"]?.$?.url);
+
+  if (Array.isArray(item.mediaContent)) {
+    item.mediaContent.forEach((media) => pushCandidate(media?.url));
+  }
+
+  if (Array.isArray(item.mediaThumbnail)) {
+    item.mediaThumbnail.forEach((media) => pushCandidate(media?.url));
+  }
+
+  return (
+    candidates
+      .filter((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
+      .find((imageUrl) => /1200|1280|1440|1600|1920|2048|large|original|hero|main/i.test(imageUrl)) ||
+    candidates.find((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl)) ||
+    null
+  );
 }
 
 // Try to extract an image from the article's HTML if not found in the RSS item.
@@ -2235,6 +2290,11 @@ async function fetchForexNews() {
       "pce",
       "retail sales",
       "jobless claims",
+      "weekly jobless claims",
+      "claims",
+      "labor market",
+      "job market",
+      "employment",
       "initial claims",
       "continuing claims",
       "pmi",
