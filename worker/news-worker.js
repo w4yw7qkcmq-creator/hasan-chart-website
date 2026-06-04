@@ -345,7 +345,7 @@ async function publishEconomicReleaseNow() {
         link: releaseId,
         title: message,
         normalized_title: normalizeNewsTitle(message).slice(0, 500),
-        topic_cluster: 'economic_release',
+        topic_cluster: `economic_release_${normalizeNewsTitle(eventName)}`,
         published_at: new Date().toISOString(),
       });
 
