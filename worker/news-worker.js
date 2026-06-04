@@ -296,7 +296,14 @@ async function publishEconomicReleaseNow() {
         `⬅️ النتيجة : ${impactText}\n\n` +
         `📚 لمتابعة أخبار الأسهم والذهب والعملات:\nhttps://t.me/EconomicNewsi ✅`;
 
-      await sendTelegramMessage(message);
+      const releaseImage = selectNewsImage(`${eventName} ${title}`);
+      const photoPath = await createNewsCard(eventName, releaseImage, "HIGH");
+
+      if (photoPath) {
+        await sendTelegramPhoto(message, photoPath);
+      } else {
+        await sendTelegramMessage(message);
+      }
 
       await savePublishedNewsToSupabase({
         link: releaseId,
