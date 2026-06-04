@@ -169,6 +169,85 @@ let cachedEconomicCalendarEvents = [];
 let cachedEconomicCalendarEventsAt = 0;
 const ECONOMIC_CALENDAR_CACHE_MS = 60 * 60 * 1000;
 const ECONOMIC_RELEASE_LOOKBACK_MINUTES = 15;
+function parseEconomicNumber(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const raw = String(value).trim();
+
+  if (!raw || raw === "-" || raw.toLowerCase() === "na") {
+    return null;
+  }
+
+  const multiplier = /k$/i.test(raw)
+    ? 1_000
+    : /m$/i.test(raw)
+      ? 1_000_000
+      : /b$/i.test(raw)
+        ? 1_000_000_000
+        : 1;
+
+  const cleaned = raw.replace(/[%,$,KkMmBb\s]/g, "");
+  const number = Number(cleaned);
+
+  if (Number.isNaN(number)) {
+    return null;
+  }
+
+  return number * multiplier;
+}
+
+function getEconomicReleaseImpactText(title, actualValue, forecastValue) {
+  const titleText = String(title || "").toLowerCase();
+  const actual = parseEconomicNumber(actualValue);
+  const forecast = parseEconomicNumber(forecastValue);
+
+  if (actual === null || forecast === null) {
+    return "التأثير غير واضح حتى الآن";
+  }
+
+  if (actual === forecast) {
+    return "مطابق للتوقعات، التأثير محدود غالبًا";
+  }
+
+  const actualAboveForecast = actual > forecast;
+
+  if (/jobless claims|initial claims|continuing claims|unemployment claims/i.test(titleText)) {
+    return actualAboveForecast
+      ? "سلبي للدولار الأمريكي / إيجابي للذهب"
+      : "إيجابي للدولار الأمريكي / سلبي للذهب";
+  }
+
+  if (/unemployment rate/i.test(titleText)) {
+    return actualAboveForecast
+      ? "سلبي للدولار الأمريكي / إيجابي للذهب"
+      : "إيجابي للدولار الأمريكي / سلبي للذهب";
+  }
+
+  if (/cpi|core cpi|ppi|pce|inflation/i.test(titleText)) {
+    return actualAboveForecast
+      ? "إيجابي للدولار الأمريكي / سلبي للذهب والأسهم"
+      : "سلبي للدولار الأمريكي / إيجابي للذهب والأسهم";
+  }
+
+  if (/nfp|nonfarm payrolls|payrolls|employment/i.test(titleText)) {
+    return actualAboveForecast
+      ? "إيجابي للدولار الأمريكي / سلبي للذهب"
+      : "سلبي للدولار الأمريكي / إيجابي للذهب";
+  }
+
+  if (/consumer confidence|consumer sentiment|retail sales|gdp|pmi|ism/i.test(titleText)) {
+    return actualAboveForecast
+      ? "إيجابي للدولار الأمريكي والأسهم / سلبي للذهب"
+      : "سلبي للدولار الأمريكي والأسهم / إيجابي للذهب";
+  }
+
+  return actualAboveForecast
+    ? "إيجابي للدولار الأمريكي غالبًا"
+    : "سلبي للدولار الأمريكي غالبًا";
+}
+
 async function publishEconomicReleaseNow() {
   try {
     const now = new Date();
@@ -205,12 +284,7 @@ async function publishEconomicReleaseNow() {
       if (alreadySent) continue;
 
       const eventName = guessArabicEconomicEventName(title);
-
-      let impactText = 'التأثير غير واضح حتى الآن';
-
-      if (actual && forecast) {
-        impactText = 'راجع القراءة الحالية مقارنة بالتوقعات';
-      }
+      const impactText = getEconomicReleaseImpactText(title, actual, forecast);
 
       const message =
         `🟥 صدر الآن :\n\n` +
@@ -230,6 +304,14 @@ async function publishEconomicReleaseNow() {
         normalized_title: normalizeNewsTitle(message).slice(0, 500),
         topic_cluster: 'economic_release',
         published_at: new Date().toISOString(),
+      });
+
+      await saveNewsPostToSupabase({
+        title: eventName,
+        content: message,
+        image_url: null,
+        impact_level: "HIGH",
+        source_link: releaseId,
       });
 
       savePublishedNewsLink(releaseId, message);
