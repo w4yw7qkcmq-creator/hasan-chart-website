@@ -55,6 +55,9 @@ const ULTRA_PRIORITY_KEYWORDS = [
   "interest rate decision",
   "cpi",
   "nfp",
+  "jobless claims",
+"initial jobless claims",
+"unemployment claims",
   "consumer confidence",
   "powell",
   "war",
@@ -73,6 +76,9 @@ const ULTRA_PRIORITY_KEYWORDS = [
   "قرار الفائدة",
   "التضخم",
   "البطالة",
+  "طلبات إعانة البطالة",
+"إعانات البطالة",
+"الشكاوى من البطالة",
   "ثقة المستهلك",
   "تصفيات",
   "انهيار السوق",
@@ -435,6 +441,7 @@ function selectNewsImage(title) {
     lowerTitle.includes("solana")
   ) {
     return pickRandomAsset([
+      "BTC.png",
       "bitcoin-1.png",
       "bitcoin-2.png",
       "bitcoin-3.png",
@@ -447,6 +454,7 @@ function selectNewsImage(title) {
 
   if (lowerTitle.includes("gold") || lowerTitle.includes("xau")) {
     return pickRandomAsset([
+      "Gold.png",
       "gold-1.png",
       "gold-2.png",
       "gold-3.png",
@@ -461,6 +469,7 @@ function selectNewsImage(title) {
     lowerTitle.includes("wti")
   ) {
     return pickRandomAsset([
+      "OIL.png",
       "oil-1.png",
       "oil-2.png",
       "oil-3.png",
@@ -476,6 +485,8 @@ function selectNewsImage(title) {
     lowerTitle.includes("federal reserve")
   ) {
     return pickRandomAsset([
+      "Fed.png",
+"Powellpng.png",
       "fed-1.png",
       "fed-2.png",
       "fed-3.png",
@@ -488,6 +499,7 @@ function selectNewsImage(title) {
 
   if (lowerTitle.includes("trump")) {
     return pickRandomAsset([
+      "Trumppng.png",
       "trump-1.png",
       "trump-2.png",
       "trump-3.png",
@@ -515,6 +527,7 @@ function selectNewsImage(title) {
     lowerTitle.includes("israel")
   ) {
     return pickRandomAsset([
+      "War.png",
       "war-1.png",
       "war-2.png",
       "war-3.png",
@@ -529,6 +542,7 @@ function selectNewsImage(title) {
     lowerTitle.includes("dollar")
   ) {
     return pickRandomAsset([
+      "Forex.png",
       "forex-1.png",
       "forex-2.png",
       "forex-3.png",
@@ -543,6 +557,7 @@ function selectNewsImage(title) {
     lowerTitle.includes("s&p")
   ) {
     return pickRandomAsset([
+      "Stockpng.png",
       "stocks-1.png",
       "stocks-2.png",
       "stocks-3.png",
@@ -551,6 +566,9 @@ function selectNewsImage(title) {
   }
 
   return pickRandomAsset([
+    "Inflation.png",
+"Stockpng.png",
+"Forex.png",
     "default-1.png",
     "default-2.png",
     "default-3.png",
@@ -559,6 +577,20 @@ function selectNewsImage(title) {
 }
 
 function getImageFromNewsItem(item) {
+  if (!item) return null;
+
+  const candidates = [
+    item.enclosure?.url,
+    item.thumbnail,
+    item.image,
+    item.imageUrl,
+    item.media?.content?.url,
+    item["media:content"]?.url,
+    item["media:thumbnail"]?.url,
+  ].filter(Boolean);
+
+  return candidates[0] || null;
+
   // Do not use RSS thumbnails or inline HTML images because they are often low-resolution previews.
 }
 
