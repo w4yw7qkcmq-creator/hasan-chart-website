@@ -168,6 +168,77 @@ const RECURRING_JOBLESS_CLAIMS_WEEKS = 8;
 let cachedEconomicCalendarEvents = [];
 let cachedEconomicCalendarEventsAt = 0;
 const ECONOMIC_CALENDAR_CACHE_MS = 60 * 60 * 1000;
+const ECONOMIC_RELEASE_LOOKBACK_MINUTES = 15;
+async function publishEconomicReleaseNow() {
+  try {
+    const now = new Date();
+    const from = new Date(now.getTime() - ECONOMIC_RELEASE_LOOKBACK_MINUTES * 60 * 1000);
+
+    const url = `https://api.tradingeconomics.com/calendar/country/united%20states/${formatDateForCalendar(from)}/${formatDateForCalendar(now)}`;
+
+    const response = await axios.get(url, {
+      timeout: 12000,
+      params: {
+        c: TRADING_ECONOMICS_CLIENT,
+        f: 'json',
+      },
+    });
+
+    const events = Array.isArray(response.data) ? response.data : [];
+
+    for (const event of events) {
+      const title = String(event.Event || event.event || '').trim();
+      if (!title) continue;
+
+      const actual = String(event.Actual ?? '').trim();
+      const forecast = String(event.Forecast ?? '').trim();
+      const previous = String(event.Previous ?? '').trim();
+
+      const important = isHighImpactCalendarEvent(event);
+      if (!important) continue;
+
+      const releaseId = `economic-release:${title}:${event.Date || event.date || actual}:${forecast}`;
+
+      const publishedItems = await loadPublishedNewsFromSupabase();
+      const alreadySent = publishedItems.some((item) => item.link === releaseId);
+
+      if (alreadySent) continue;
+
+      const eventName = guessArabicEconomicEventName(title);
+
+      let impactText = 'التأثير غير واضح حتى الآن';
+
+      if (actual && forecast) {
+        impactText = 'راجع القراءة الحالية مقارنة بالتوقعات';
+      }
+
+      const message =
+        `🟥 صدر الآن :\n\n` +
+        `📊 أمريكا - 🇺🇸\n` +
+        `💵 ${eventName}\n\n` +
+        `▪️ السابق : ${previous || 'غير متوفر'}\n` +
+        `▪️ التقدير : ${forecast || 'غير متوفر'}\n` +
+        `▫️ الحالي : ${actual || 'غير متوفر'}\n\n` +
+        `⬅️ النتيجة : ${impactText}\n\n` +
+        `📚 لمتابعة أخبار الأسهم والذهب والعملات:\nhttps://t.me/EconomicNewsi ✅`;
+
+      await sendTelegramMessage(message);
+
+      await savePublishedNewsToSupabase({
+        link: releaseId,
+        title: message,
+        normalized_title: normalizeNewsTitle(message).slice(0, 500),
+        topic_cluster: 'economic_release',
+        published_at: new Date().toISOString(),
+      });
+
+      savePublishedNewsLink(releaseId, message);
+    }
+  } catch (error) {
+    console.error('❌ Economic Release Publish Error:', error.response?.data || error.message);
+  }
+}
+
 
 let isFetchingNews = false;
 
@@ -2188,6 +2259,7 @@ async function fetchForexNews() {
     await sendScheduledMarketAlerts();
     await sendWeeklyEconomicCalendarPost();
     await sendImportantEconomicEventAlerts();
+    await publishEconomicReleaseNow();
 
     const allItems = [];
 
