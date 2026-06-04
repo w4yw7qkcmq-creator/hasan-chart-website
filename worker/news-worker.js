@@ -161,6 +161,42 @@ const IMPORTANT_EVENT_ALERTS = [
     eventTimeUtc: "2026-07-29T18:00:00Z",
     assets: "الدولار، الذهب، الأسهم الأمريكية، السندات، النفط والكريبتو",
   },
+  {
+    id: "nvidia-earnings-2026-q2-placeholder",
+    title: "أرباح شركة NVIDIA",
+    eventTimeUtc: "2026-08-26T20:00:00Z",
+    assets: "ناسداك، الأسهم الأمريكية، الذكاء الاصطناعي، الكريبتو",
+  },
+  {
+    id: "apple-earnings-2026-q2-placeholder",
+    title: "أرباح شركة Apple",
+    eventTimeUtc: "2026-07-30T20:00:00Z",
+    assets: "ناسداك، الأسهم الأمريكية، الدولار والكريبتو",
+  },
+  {
+    id: "microsoft-earnings-2026-q2-placeholder",
+    title: "أرباح شركة Microsoft",
+    eventTimeUtc: "2026-07-29T20:00:00Z",
+    assets: "ناسداك، الأسهم الأمريكية، الذكاء الاصطناعي والكريبتو",
+  },
+  {
+    id: "amazon-earnings-2026-q2-placeholder",
+    title: "أرباح شركة Amazon",
+    eventTimeUtc: "2026-07-31T20:00:00Z",
+    assets: "ناسداك، الأسهم الأمريكية، قطاع التكنولوجيا والكريبتو",
+  },
+  {
+    id: "tesla-earnings-2026-q2-placeholder",
+    title: "أرباح شركة Tesla",
+    eventTimeUtc: "2026-07-23T20:00:00Z",
+    assets: "ناسداك، الأسهم الأمريكية، قطاع السيارات والكريبتو",
+  },
+  {
+    id: "meta-earnings-2026-q2-placeholder",
+    title: "أرباح شركة Meta",
+    eventTimeUtc: "2026-07-30T20:00:00Z",
+    assets: "ناسداك، الأسهم الأمريكية، قطاع التكنولوجيا والكريبتو",
+  },
 ];
 
 const IMPORTANT_EVENT_ALERT_MINUTES = [120, 60, 15, 5];
@@ -1979,7 +2015,29 @@ function buildRecurringEconomicEventAlerts() {
   return events;
 }
 
-// Send alerts for major scheduled economic events (custom events)
+function formatAssetsForAlert(assetsText) {
+  return String(assetsText || "")
+    .split(/[،,]/)
+    .map((asset) => asset.trim())
+    .filter(Boolean)
+    .map((asset) => `• ${asset}`)
+    .join("\n");
+}
+
+function buildScheduledAlertMessage(event, minutesBefore) {
+  const assetsLines = formatAssetsForAlert(event.assets);
+
+  return (
+    `🟨 تنبيه اقتصادي هام\n\n` +
+    `🇺🇸 أمريكا\n` +
+    `💵 ${event.title}\n\n` +
+    `⏰ متبقي: ${minutesBefore} دقيقة\n\n` +
+    `📊 الأصول المتأثرة:\n${assetsLines || "• الدولار الأمريكي\n• الذهب\n• المؤشرات الأمريكية"}\n\n` +
+    `⚠️ متوقع ارتفاع التذبذب بشكل ملحوظ وقت صدور الخبر.\n\n` +
+    `📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`
+  );
+}
+
 // Send alerts for major scheduled economic events (custom events)
 async function sendImportantEconomicEventAlerts() {
   try {
@@ -2017,14 +2075,15 @@ async function sendImportantEconomicEventAlerts() {
           continue;
         }
 
-        const message =
-          `🚨 تنبيه اقتصادي مهم\n\n` +
-          `⏳ متبقي ${minutesBefore} دقيقة على: ${event.title}\n\n` +
-          `📊 الأصول المتأثرة: ${event.assets}\n\n` +
-          `⚠️ متوقع ارتفاع التذبذب وقت صدور الخبر.\n\n` +
-          `📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`;
+        const message = buildScheduledAlertMessage(event, minutesBefore);
+        const alertImage = selectNewsImage(event.title);
+        const photoPath = await createNewsCard(event.title, alertImage, "HIGH");
 
-        await sendTelegramMessage(message);
+        if (photoPath) {
+          await sendTelegramPhoto(message, photoPath);
+        } else {
+          await sendTelegramMessage(message);
+        }
 
         await savePublishedNewsToSupabase({
           link: alertId,
