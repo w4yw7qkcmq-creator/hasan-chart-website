@@ -164,6 +164,7 @@ const IMPORTANT_EVENT_ALERTS = [
 ];
 
 const IMPORTANT_EVENT_ALERT_MINUTES = [120, 60, 15, 5];
+const RECURRING_JOBLESS_CLAIMS_WEEKS = 8;
 let cachedEconomicCalendarEvents = [];
 let cachedEconomicCalendarEventsAt = 0;
 const ECONOMIC_CALENDAR_CACHE_MS = 60 * 60 * 1000;
@@ -1781,11 +1782,51 @@ async function sendWeeklyEconomicCalendarPost() {
     console.error("❌ Weekly Economic Calendar Error:", error.message);
   }
 }
+function buildRecurringEconomicEventAlerts() {
+  const events = [];
+  const now = new Date();
+  const start = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    12,
+    30,
+    0
+  ));
+
+  for (let dayOffset = 0; events.length < RECURRING_JOBLESS_CLAIMS_WEEKS && dayOffset < 70; dayOffset += 1) {
+    const candidate = new Date(start.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+
+    // US weekly initial jobless claims usually publish on Thursday at 08:30 New York time.
+    // During US daylight saving time, this equals 12:30 UTC.
+    if (candidate.getUTCDay() !== 4) {
+      continue;
+    }
+
+    if (candidate.getTime() <= Date.now() - 2 * 60 * 60 * 1000) {
+      continue;
+    }
+
+    const dateKey = candidate.toISOString().slice(0, 10);
+    events.push({
+      id: `us-jobless-claims-${dateKey}`,
+      title: "معدلات الشكاوى من البطالة الأمريكية Initial Jobless Claims",
+      eventTimeUtc: candidate.toISOString(),
+      assets: "الدولار، الذهب، الأسهم الأمريكية، السندات والكريبتو",
+    });
+  }
+
+  return events;
+}
+
 // Send alerts for major scheduled economic events (custom events)
 // Send alerts for major scheduled economic events (custom events)
 async function sendImportantEconomicEventAlerts() {
   try {
-   const allImportantEvents = IMPORTANT_EVENT_ALERTS;
+    const allImportantEvents = [
+      ...buildRecurringEconomicEventAlerts(),
+      ...IMPORTANT_EVENT_ALERTS,
+    ];
 
     if (!allImportantEvents.length) {
       return;
@@ -1948,7 +1989,124 @@ async function isMarketMovingNews(title) {
   return isImportantNews(title);
 }
 
+function isEconomicReleaseTitle(title) {
+  const value = String(title || "").toLowerCase();
+  return /jobless claims|initial claims|continuing claims|unemployment claims|cpi|core cpi|ppi|pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|مؤشر ثقة المستهلك|التضخم|البطالة|الوظائف/i.test(value);
+}
+
+function guessArabicEconomicEventName(title) {
+  const value = String(title || "").toLowerCase();
+
+  if (/jobless claims|initial claims|continuing claims|unemployment claims|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة/i.test(value)) {
+    return "معدلات الشكاوى من البطالة";
+  }
+
+  if (/cpi|core cpi|inflation|التضخم/i.test(value)) {
+    return "مؤشر التضخم الأمريكي";
+  }
+
+  if (/ppi|producer price/i.test(value)) {
+    return "مؤشر أسعار المنتجين الأمريكي";
+  }
+
+  if (/nfp|nonfarm payrolls|payrolls|الوظائف/i.test(value)) {
+    return "تقرير الوظائف الأمريكية";
+  }
+
+  if (/consumer confidence|consumer sentiment|ثقة المستهلك/i.test(value)) {
+    return "مؤشر ثقة المستهلك الأمريكي";
+  }
+
+  if (/retail sales|مبيعات التجزئة/i.test(value)) {
+    return "مبيعات التجزئة الأمريكية";
+  }
+
+  if (/pmi|ism/i.test(value)) {
+    return "مؤشر مديري المشتريات الأمريكي";
+  }
+
+  if (/gdp|الناتج المحلي/i.test(value)) {
+    return "الناتج المحلي الإجمالي الأمريكي";
+  }
+
+  return "خبر اقتصادي أمريكي مهم";
+}
+
+async function analyzeEconomicReleaseWithAI(title, link) {
+  const eventName = guessArabicEconomicEventName(title);
+
+  if (!OPENAI_API_KEY) {
+    return {
+      message:
+        `🟥 صدر الآن :\n\n` +
+        `📊 أمريكا - 🇺🇸\n` +
+        `💵 ${eventName}\n\n` +
+        `▫️ التفاصيل : ${title}\n\n` +
+        `⬅️ النتيجة : بانتظار قراءة التأثير على الدولار الأمريكي\n\n` +
+        `📚 لمتابعة أخبار الأسهم والذهب والعملات انضم للقناة:\nhttps://t.me/EconomicNewsi ✅`,
+      imageTitle: eventName,
+    };
+  }
+
+  try {
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4.1-nano",
+        messages: [
+          {
+            role: "system",
+            content:
+              "أنت محرر أخبار اقتصادية عاجلة. حوّل عنوان الخبر إلى منشور عربي منسق مثل قنوات الفوركس الاحترافية. استخدم القالب التالي فقط بدون روابط مصادر وبدون شرح إضافي:\n\n🟥 صدر الآن :\n\n📊 أمريكا - 🇺🇸\n💵 اسم الخبر بالعربي\n\n▪️ السابق : القيمة السابقة إن وجدت\n▪️ التقدير : التوقع أو التقدير إن وجد\n▫️ الحالي : القراءة الحالية إن وجدت\n\n⬅️ النتيجة : اكتب سلبي/إيجابي للدولار الأمريكي أو الذهب أو الأسهم حسب المقارنة بين الحالي والتقدير. إذا لا توجد أرقام كافية اكتب: التأثير غير واضح حتى الآن\n\n📚 لمتابعة أخبار الأسهم والذهب والعملات انضم للقناة:\nhttps://t.me/EconomicNewsi ✅\n\nممنوع اختراع أرقام غير موجودة في العنوان. إذا رقم غير موجود اكتب: غير متوفر.",
+          },
+          {
+            role: "user",
+            content: `عنوان الخبر: ${title}\nاسم الخبر المتوقع بالعربي: ${eventName}`,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 450,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const aiText = response.data.choices?.[0]?.message?.content?.trim();
+
+    if (!aiText) {
+      throw new Error("Empty economic release AI response");
+    }
+
+    return {
+      message: aiText
+        .replace(/Telegram\.me\/ForexBreakingNews/gi, "https://t.me/EconomicNewsi")
+        .replace(/https?:\/\/t\.me\/ForexBreakingNews/gi, "https://t.me/EconomicNewsi")
+        .trim(),
+      imageTitle: eventName,
+    };
+  } catch (error) {
+    console.error("⚠️ Economic Release AI Error:", error.response?.data || error.message);
+    return {
+      message:
+        `🟥 صدر الآن :\n\n` +
+        `📊 أمريكا - 🇺🇸\n` +
+        `💵 ${eventName}\n\n` +
+        `▫️ التفاصيل : ${title}\n\n` +
+        `⬅️ النتيجة : التأثير غير واضح حتى الآن\n\n` +
+        `📚 لمتابعة أخبار الأسهم والذهب والعملات انضم للقناة:\nhttps://t.me/EconomicNewsi ✅`,
+      imageTitle: eventName,
+    };
+  }
+}
+
 async function analyzeNewsWithAI(title, link) {
+  if (isEconomicReleaseTitle(title)) {
+    return analyzeEconomicReleaseWithAI(title, link);
+  }
   if (!OPENAI_API_KEY) {
     return {
       message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
