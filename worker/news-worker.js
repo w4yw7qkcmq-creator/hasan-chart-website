@@ -32,6 +32,9 @@ const TRADING_ECONOMICS_CLIENT =
   process.env.TRADING_ECONOMICS_API_KEY ||
   "guest:guest";
 
+const INVESTING_CALENDAR_URL = "https://www.investing.com/economic-calendar/Service/getCalendarFilteredData";
+const INVESTING_US_COUNTRY_ID = "5";
+
 const supabase = createClient(
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY
@@ -284,43 +287,124 @@ function getEconomicReleaseImpactText(title, actualValue, forecastValue) {
     : "سلبي للدولار الأمريكي غالبًا";
 }
 
+
+function formatDateForInvestingCalendar(date) {
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  return `${month}/${day}/${year}`;
+}
+
+function stripHtml(value) {
+  return String(value || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractInvestingCell(rowHtml, className) {
+  const pattern = new RegExp(`<td[^>]*class=["'][^"']*${className}[^"']*["'][^>]*>([\\s\\S]*?)<\\/td>`, "i");
+  const match = String(rowHtml || "").match(pattern);
+  return stripHtml(match?.[1] || "");
+}
+
+function parseInvestingCalendarDate(value) {
+  if (!value) return null;
+  const parsed = new Date(String(value).trim().replace(" ", "T") + "Z");
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseInvestingCalendarRows(html) {
+  const rows = String(html || "").match(/<tr[^>]+id=["']eventRowId_[^"']+["'][\s\S]*?<\/tr>/gi) || [];
+
+  return rows
+    .map((row) => {
+      const dateMatch = row.match(/data-event-datetime=["']([^"']+)["']/i);
+      const eventDate = parseInvestingCalendarDate(dateMatch?.[1]);
+      const title = extractInvestingCell(row, "event");
+      const actual = extractInvestingCell(row, "act");
+      const forecast = extractInvestingCell(row, "fore");
+      const previous = extractInvestingCell(row, "prev");
+      const importanceStars = (row.match(/grayFullBullishIcon|orangeFullBullishIcon|redFullBullishIcon/g) || []).length;
+
+      if (!title || !eventDate) return null;
+
+      return {
+        Event: title,
+        Date: eventDate.toISOString(),
+        Actual: actual,
+        Forecast: forecast,
+        Previous: previous,
+        Country: "United States",
+        Importance: importanceStars >= 3 ? "high" : importanceStars === 2 ? "medium" : "low",
+      };
+    })
+    .filter(Boolean);
+}
+
+async function fetchInvestingCalendarEvents(fromDate, toDate) {
+  const form = new URLSearchParams();
+  form.append("country[]", INVESTING_US_COUNTRY_ID);
+  form.append("importance[]", "2");
+  form.append("importance[]", "3");
+  form.append("dateFrom", formatDateForInvestingCalendar(fromDate));
+  form.append("dateTo", formatDateForInvestingCalendar(toDate));
+  form.append("timeZone", "0");
+  form.append("timeFilter", "timeRemain");
+  form.append("currentTab", "custom");
+  form.append("submitFilters", "1");
+  form.append("limit_from", "0");
+
+  const response = await axios.post(INVESTING_CALENDAR_URL, form.toString(), {
+    timeout: 15000,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "Accept": "application/json, text/javascript, */*; q=0.01",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      "Referer": "https://www.investing.com/economic-calendar/",
+      "Origin": "https://www.investing.com",
+    },
+  });
+
+  const html = response.data?.data || response.data?.html || response.data;
+  const events = parseInvestingCalendarRows(html);
+  console.log(`✅ Loaded Investing calendar events: ${events.length}`);
+  return events;
+}
+
 async function publishEconomicReleaseNow() {
   try {
     const now = new Date();
     const from = new Date(now.getTime() - ECONOMIC_RELEASE_LOOKBACK_MINUTES * 60 * 1000);
+    const to = new Date(now.getTime() + 5 * 60 * 1000);
 
-    const url = `https://api.tradingeconomics.com/calendar/country/united%20states/${formatDateForCalendar(from)}/${formatDateForCalendar(now)}`;
-
-    const response = await axios.get(url, {
-      timeout: 12000,
-      params: {
-        c: TRADING_ECONOMICS_CLIENT,
-        f: 'json',
-      },
-    });
-
-    const events = Array.isArray(response.data) ? response.data : [];
+    const events = await fetchInvestingCalendarEvents(from, to);
 
     for (const event of events) {
-      const title = String(event.Event || event.event || '').trim();
+      const title = String(event.Event || event.event || "").trim();
       if (!title) continue;
 
-      const actual = String(event.Actual ?? '').trim();
-      const forecast = String(event.Forecast ?? '').trim();
-      const previous = String(event.Previous ?? '').trim();
+      const actual = String(event.Actual ?? "").trim();
+      const forecast = String(event.Forecast ?? "").trim();
+      const previous = String(event.Previous ?? "").trim();
       const important = isHighImpactCalendarEvent(event);
       if (!important) continue;
-      
+
       if (!actual || !forecast) {
-  console.log("⏭️ Skipped release missing actual/forecast:", title);
-  continue;
-}
+        console.log("⏭️ Skipped release missing actual/forecast:", title);
+        continue;
+      }
 
-      const releaseId = `economic-release:${title}:${event.Date || event.date || actual}:${forecast}`;
-
+      const releaseId = `investing-economic-release:${title}:${event.Date || event.date || actual}:${forecast}`;
       const publishedItems = await loadPublishedNewsFromSupabase();
       const alreadySent = publishedItems.some((item) => item.link === releaseId);
-
       if (alreadySent) continue;
 
       const eventName = guessArabicEconomicEventName(title);
@@ -330,9 +414,9 @@ async function publishEconomicReleaseNow() {
         `🟥 صدر الآن :\n\n` +
         `📊 أمريكا - 🇺🇸\n` +
         `💵 ${eventName}\n\n` +
-        `▪️ السابق : ${previous || 'غير متوفر'}\n` +
-        `▪️ التقدير : ${forecast || 'غير متوفر'}\n` +
-        `▫️ الحالي : ${actual || 'غير متوفر'}\n\n` +
+        `▪️ السابق : ${previous || "غير متوفر"}\n` +
+        `▪️ التقدير : ${forecast}\n` +
+        `▫️ الحالي : ${actual}\n\n` +
         `⬅️ النتيجة : ${impactText}\n\n` +
         `📚 لمتابعة أخبار الأسهم والذهب والعملات:\nhttps://t.me/EconomicNewsi ✅`;
 
@@ -364,7 +448,7 @@ async function publishEconomicReleaseNow() {
       savePublishedNewsLink(releaseId, message);
     }
   } catch (error) {
-    console.error('❌ Economic Release Publish Error:', error.response?.data || error.message);
+    console.error("❌ Investing Economic Release Publish Error:", error.response?.data || error.message);
   }
 }
 
