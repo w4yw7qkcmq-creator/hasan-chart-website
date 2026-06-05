@@ -50,7 +50,7 @@ const TEMP_ALLOW_ALL_NEWS = false;
 
 const MAX_NEWS_AGE_HOURS = 24;
 const MAX_POSTS_PER_HOUR = 50;
-const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 10;
+const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 5;
 
 const ULTRA_PRIORITY_KEYWORDS = [
   "fed",
@@ -2276,6 +2276,11 @@ async function sendTelegramPhoto(message, photoPath) {
 }
 
 async function isMarketMovingNews(title) {
+  if (
+  /marvell|micron|paramount|warner bros|individual stock|single stock/i.test(title)
+) {
+  return false;
+}
   if (TEMP_ALLOW_ALL_NEWS) {
     return true;
   }
