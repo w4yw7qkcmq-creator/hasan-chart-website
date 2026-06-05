@@ -1829,7 +1829,7 @@ function mapCalendarEventAssets(eventTitle) {
 function normalizeCalendarEvent(event) {
   const eventTitle = String(event.Event || event.event || event.Name || event.name || "").trim();
   const country = String(event.Country || event.country || "").trim();
-  const eventDate = parseTradingEconomicsDate(event.Date || event.date || event.CalendarDate || event.datetime);
+  const eventDate = parseTradingEconomicsDate(event.Date || event.date || event.CalendarDate || event.datetime || event.eventTimeUtc);
 
   if (!eventTitle || !eventDate) {
     return null;
@@ -1854,20 +1854,8 @@ async function fetchAutomaticEconomicCalendarEvents() {
 
     const today = new Date();
     const endDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    const from = formatDateForCalendar(today);
-    const to = formatDateForCalendar(endDate);
 
-    const url = `https://api.tradingeconomics.com/calendar/country/united%20states/${from}/${to}`;
-
-    const response = await axios.get(url, {
-      timeout: 12000,
-      params: {
-        c: TRADING_ECONOMICS_CLIENT,
-        f: "json",
-      },
-    });
-
-    const rawEvents = Array.isArray(response.data) ? response.data : [];
+    const rawEvents = await fetchInvestingCalendarEvents(today, endDate);
     const events = rawEvents
       .filter(isHighImpactCalendarEvent)
       .map(normalizeCalendarEvent)
@@ -1878,10 +1866,10 @@ async function fetchAutomaticEconomicCalendarEvents() {
     cachedEconomicCalendarEvents = events;
     cachedEconomicCalendarEventsAt = Date.now();
 
-    console.log(`✅ Loaded automatic economic calendar events: ${events.length}`);
+    console.log(`✅ Loaded automatic Investing calendar events: ${events.length}`);
     return events;
   } catch (error) {
-    console.error("⚠️ Economic calendar fetch failed:", error.response?.data || error.message);
+    console.error("⚠️ Investing calendar fetch failed:", error.response?.data || error.message);
     return cachedEconomicCalendarEvents || [];
   }
 }
