@@ -289,11 +289,7 @@ function getEconomicReleaseImpactText(title, actualValue, forecastValue) {
 
 
 function formatDateForInvestingCalendar(date) {
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const year = date.getUTCFullYear();
-
-  return `${day}/${month}/${year}`;
+  return date.toISOString().slice(0, 10);
 }
 
 function stripHtml(value) {
