@@ -1361,15 +1361,18 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
 
   try {
     const image = await loadImage(imageUrl);
-    if (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT) {
-      console.log(`⏭️ Skipped low-quality image: ${image.width}x${image.height}`);
-      return null;
-    }
-    const imageAspectRatio = image.width / image.height;
-    if (imageAspectRatio < 1.35 || imageAspectRatio > 2.2) {
-      console.log(`⏭️ Skipped poorly shaped image: ${image.width}x${image.height}`);
-      return null;
-    }
+const isLocalAssetImage = typeof imageUrl === "string" && !/^https?:\/\//i.test(imageUrl);
+
+if (!isLocalAssetImage && (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT)) {
+  console.log(`⏭️ Skipped low-quality image: ${image.width}x${image.height}`);
+  return null;
+}
+
+const imageAspectRatio = image.width / image.height;
+if (!isLocalAssetImage && (imageAspectRatio < 1.35 || imageAspectRatio > 2.2)) {
+  console.log(`⏭️ Skipped poorly shaped image: ${image.width}x${image.height}`);
+  return null;
+}
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
