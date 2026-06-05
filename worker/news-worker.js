@@ -607,7 +607,6 @@ const NEWS_FEEDS = [
   "https://www.investing.com/rss/news_25.rss",
   "https://www.investing.com/rss/news_1.rss",
   "https://www.coindesk.com/arc/outboundfeeds/rss/",
-  "https://www.fxstreet.com/rss/news",
   "https://feeds.marketwatch.com/marketwatch/topstories/",
   "https://www.cnbc.com/id/100003114/device/rss/rss.html",
   "https://www.investing.com/rss/news_285.rss",
