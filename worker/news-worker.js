@@ -2295,8 +2295,6 @@ async function isMarketMovingNews(title) {
   return getMarketImpactLevel(title) === "HIGH";
 }
 
-  return isImportantNews(title);
-
 
 function hasEconomicReleaseNumbers(title) {
   const value = String(title || "");
