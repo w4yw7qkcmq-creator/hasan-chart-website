@@ -313,23 +313,33 @@ function extractInvestingCell(rowHtml, className) {
 
 function parseInvestingCalendarDate(value) {
   if (!value) return null;
-  const parsed = new Date(String(value).trim().replace(" ", "T") + "Z");
+
+  const normalized = String(value)
+    .trim()
+    .replace(/\//g, "-")
+    .replace(" ", "T");
+
+  const parsed = new Date(normalized.endsWith("Z") ? normalized : `${normalized}Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function parseInvestingCalendarRows(html) {
+  const content = String(html || "");
   const rows =
-    String(html || "").match(/<tr[^>]*class=["'][^"']*js-event-item[^"']*["'][\s\S]*?<\/tr>/gi) ||
-    String(html || "").match(/<tr[^>]+id=["']eventRowId_[^"']+["'][\s\S]*?<\/tr>/gi) ||
+    content.match(/<tr[^>]*id=["']eventRowId_[^"']+["'][\s\S]*?<\/tr>/gi) ||
+    content.match(/<tr[^>]*class=["'][^"']*js-event-item[^"']*["'][\s\S]*?<\/tr>/gi) ||
     [];
 
   return rows
     .map((row) => {
-      const dateMatch =
-        row.match(/data-event-datetime=["']([^"']+)["']/i) ||
-        row.match(/data-event-datetime="([^"]+)"/i);
+      const dateMatch = row.match(/data-event-datetime=["']([^"']+)["']/i);
       const eventDate = parseInvestingCalendarDate(dateMatch?.[1]);
-      const title = extractInvestingCell(row, "event");
+
+      const titleMatch =
+        row.match(/<td[^>]*class=["'][^"']*\bevent\b[^"']*["'][^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/td>/i) ||
+        row.match(/<td[^>]*class=["'][^"']*\bevent\b[^"']*["'][^>]*>([\s\S]*?)<\/td>/i);
+
+      const title = stripHtml(titleMatch?.[1] || "");
       const actual = extractInvestingCell(row, "act");
       const forecast = extractInvestingCell(row, "fore");
       const previous = extractInvestingCell(row, "prev");
