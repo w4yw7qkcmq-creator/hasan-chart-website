@@ -308,6 +308,10 @@ async function publishEconomicReleaseNow() {
       const actual = String(event.Actual ?? '').trim();
       const forecast = String(event.Forecast ?? '').trim();
       const previous = String(event.Previous ?? '').trim();
+      if (!actual && !forecast && !previous) {
+        console.log("⏭️ Skipped economic release with no actual/forecast/previous data:", title);
+        continue;
+      }
 
       const important = isHighImpactCalendarEvent(event);
       if (!important) continue;
@@ -332,7 +336,7 @@ async function publishEconomicReleaseNow() {
         `⬅️ النتيجة : ${impactText}\n\n` +
         `📚 لمتابعة أخبار الأسهم والذهب والعملات:\nhttps://t.me/EconomicNewsi ✅`;
 
-      const releaseImage = selectNewsImage(`${eventName} ${title}`);
+      const releaseImage = selectNewsImage(`${eventName} ${title} fed dollar stocks`);
       const photoPath = await createNewsCard(eventName, releaseImage, "HIGH");
 
       if (photoPath) {
@@ -2211,6 +2215,32 @@ async function isMarketMovingNews(title) {
   return isImportantNews(title);
 }
 
+function hasEconomicReleaseNumbers(title) {
+  const value = String(title || "");
+
+  if (/\b\d+(?:\.\d+)?\s?(?:k|m|b|%|thousand|million|billion)\b/i.test(value)) {
+    return true;
+  }
+
+  if (/actual|forecast|previous|estimate|est\.|consensus|vs\.?/i.test(value)) {
+    return true;
+  }
+
+  if (/السابق|التقدير|الحالي|المتوقع|الفعلي|مقابل/i.test(value)) {
+    return true;
+  }
+
+  return false;
+}
+
+function shouldUseEconomicReleaseTemplate(title) {
+  const value = String(title || "").toLowerCase();
+
+  const directCriticalRelease = /jobless claims|initial claims|continuing claims|unemployment claims|cpi|core cpi|ppi|pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|consumer sentiment|retail sales|ism|pmi|gdp|fomc|rate decision|interest rate decision|powell/i.test(value);
+
+  return directCriticalRelease && hasEconomicReleaseNumbers(title);
+}
+
 function isEconomicReleaseTitle(title) {
   const value = String(title || "").toLowerCase();
   return /fomc|federal reserve|fed rate|interest rate decision|rate decision|rate cut|rate hike|powell|press conference|fed chair|jobless claims|initial claims|continuing claims|unemployment claims|cpi|core cpi|ppi|pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|باول|مؤتمر صحفي|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|مؤشر ثقة المستهلك|التضخم|البطالة|الوظائف/i.test(value);
@@ -2334,7 +2364,7 @@ async function analyzeEconomicReleaseWithAI(title, link) {
 }
 
 async function analyzeNewsWithAI(title, link) {
-  if (isEconomicReleaseTitle(title)) {
+  if (isEconomicReleaseTitle(title) && shouldUseEconomicReleaseTemplate(title)) {
     return analyzeEconomicReleaseWithAI(title, link);
   }
   if (!OPENAI_API_KEY) {
