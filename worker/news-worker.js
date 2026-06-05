@@ -373,6 +373,11 @@ async function fetchInvestingCalendarEvents(fromDate, toDate) {
   const html = response.data?.data || response.data?.html || response.data;
   const events = parseInvestingCalendarRows(html);
   console.log(`✅ Loaded Investing calendar events: ${events.length}`);
+
+  if (!events.length) {
+    console.log("RAW INVESTING RESPONSE:", String(html).slice(0, 1000));
+  }
+
   return events;
 }
 
