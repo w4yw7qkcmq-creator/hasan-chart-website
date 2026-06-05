@@ -318,11 +318,16 @@ function parseInvestingCalendarDate(value) {
 }
 
 function parseInvestingCalendarRows(html) {
-  const rows = String(html || "").match(/<tr[^>]+id=["']eventRowId_[^"']+["'][\s\S]*?<\/tr>/gi) || [];
+  const rows =
+    String(html || "").match(/<tr[^>]*class=["'][^"']*js-event-item[^"']*["'][\s\S]*?<\/tr>/gi) ||
+    String(html || "").match(/<tr[^>]+id=["']eventRowId_[^"']+["'][\s\S]*?<\/tr>/gi) ||
+    [];
 
   return rows
     .map((row) => {
-      const dateMatch = row.match(/data-event-datetime=["']([^"']+)["']/i);
+      const dateMatch =
+        row.match(/data-event-datetime=["']([^"']+)["']/i) ||
+        row.match(/data-event-datetime="([^"]+)"/i);
       const eventDate = parseInvestingCalendarDate(dateMatch?.[1]);
       const title = extractInvestingCell(row, "event");
       const actual = extractInvestingCell(row, "act");
