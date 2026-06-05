@@ -2280,8 +2280,23 @@ async function isMarketMovingNews(title) {
     return true;
   }
 
-  return isImportantNews(title);
+  const value = String(title || "").toLowerCase();
+
+  const blocked =
+    /irs|audit|watchlist|what to watch|top 10|analyst|price target|upgrade|downgrade|options trading|stock offering|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|could soon|may soon|might|reportedly|rumor|rumour/i.test(value);
+
+  const critical =
+    /fed|fomc|powell|cpi|ppi|pce|nfp|nonfarm|jobless claims|unemployment|consumer confidence|retail sales|ism|pmi|gdp|interest rate|rate decision|stocks plunge|market crash|selloff|liquidations|bitcoin plunges|oil spikes|gold jumps|war|attack|iran|israel|hormuz|sanctions/i.test(value);
+
+  if (blocked && !critical) {
+    return false;
+  }
+
+  return getMarketImpactLevel(title) === "HIGH";
 }
+
+  return isImportantNews(title);
+
 
 function hasEconomicReleaseNumbers(title) {
   const value = String(title || "");
