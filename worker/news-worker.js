@@ -2210,11 +2210,19 @@ async function isMarketMovingNews(title) {
 
 function isEconomicReleaseTitle(title) {
   const value = String(title || "").toLowerCase();
-  return /jobless claims|initial claims|continuing claims|unemployment claims|cpi|core cpi|ppi|pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|مؤشر ثقة المستهلك|التضخم|البطالة|الوظائف/i.test(value);
+  return /fomc|federal reserve|fed rate|interest rate decision|rate decision|rate cut|rate hike|powell|press conference|fed chair|jobless claims|initial claims|continuing claims|unemployment claims|cpi|core cpi|ppi|pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|باول|مؤتمر صحفي|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|مؤشر ثقة المستهلك|التضخم|البطالة|الوظائف/i.test(value);
 }
 
 function guessArabicEconomicEventName(title) {
   const value = String(title || "").toLowerCase();
+
+  if (/fomc|federal reserve|fed rate|interest rate decision|rate decision|rate cut|rate hike|قرار الفائدة|الفيدرالي|خفض الفائدة|رفع الفائدة/i.test(value)) {
+    return "قرار الفائدة الأمريكية";
+  }
+
+  if (/powell|press conference|fed chair|باول|مؤتمر صحفي/i.test(value)) {
+    return "تصريحات جيروم باول / المؤتمر الصحفي للفيدرالي";
+  }
 
   if (/jobless claims|initial claims|continuing claims|unemployment claims|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة/i.test(value)) {
     return "معدلات الشكاوى من البطالة";
