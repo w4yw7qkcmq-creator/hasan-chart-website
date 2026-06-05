@@ -1870,35 +1870,15 @@ function isHighImpactCalendarEvent(event) {
     importance.includes("3") ||
     importance.includes("high volatility");
 
-  const importantName = [
-    "fomc",
-    "federal reserve",
-    "interest rate",
-    "rate decision",
-    "fed interest rate",
-    "powell",
-    "cpi",
-    "inflation rate",
-    "core inflation",
-    "ppi",
-    "producer price",
-    "pce",
-    "non farm payrolls",
-    "nonfarm payrolls",
-    "nfp",
-    "unemployment rate",
-    "jobless claims",
-    "gdp",
-    "retail sales",
-    "consumer confidence",
-    "consumer sentiment",
-    "ism manufacturing",
-    "ism services",
-    "manufacturing pmi",
-    "services pmi",
-  ].some((keyword) => text.includes(keyword));
+  const blockedCalendarEvents = /average hourly earnings|participation rate|u6 unemployment|business inventories|wholesale inventories|goods trade balance|trade balance|factory orders|durable goods|housing starts|building permits|existing home sales|new home sales|pending home sales|industrial production|capacity utilization|chicago pmi|michigan 5-year inflation expectations|michigan inflation expectations/i;
 
-  return highImportance || importantName;
+  if (blockedCalendarEvents.test(text)) {
+    return false;
+  }
+
+  const majorCalendarEvent = /fomc|federal reserve|interest rate decision|fed interest rate|rate decision|powell|press conference|cpi|core cpi|consumer price index|ppi|producer price|pce price index|core pce|non farm payrolls|nonfarm payrolls|nfp|unemployment rate|jobless claims|initial claims|continuing claims|unemployment claims|gdp|retail sales|consumer confidence|consumer sentiment|ism manufacturing|ism services|manufacturing pmi|services pmi/i.test(text);
+
+  return highImportance && majorCalendarEvent;
 }
 
 function mapCalendarEventAssets(eventTitle) {
