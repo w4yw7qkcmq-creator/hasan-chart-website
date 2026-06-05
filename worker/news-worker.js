@@ -308,13 +308,13 @@ async function publishEconomicReleaseNow() {
       const actual = String(event.Actual ?? '').trim();
       const forecast = String(event.Forecast ?? '').trim();
       const previous = String(event.Previous ?? '').trim();
-      if (!actual && !forecast && !previous) {
-        console.log("⏭️ Skipped economic release with no actual/forecast/previous data:", title);
-        continue;
-      }
-
       const important = isHighImpactCalendarEvent(event);
       if (!important) continue;
+      
+      if (!actual || !forecast) {
+  console.log("⏭️ Skipped release missing actual/forecast:", title);
+  continue;
+}
 
       const releaseId = `economic-release:${title}:${event.Date || event.date || actual}:${forecast}`;
 
