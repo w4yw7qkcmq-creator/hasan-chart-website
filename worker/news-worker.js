@@ -2421,7 +2421,7 @@ async function analyzeNewsWithAI(title, link) {
       .find((line) => line.trim().length > 10) || title;
 
     return {
-      message: `${cleanedAiText}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`,
+      message: `${cleanedAiText.replace(/\n/g, "\n\n")}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`,
       imageTitle: firstLine
         .replace(/🚨|📌|📈|📉|🔥|⚡|🛢️|💰|🇺🇸|🇮🇷|🔴|🟢|🟡|🎯|📊|📰/g, "")
         .trim(),
