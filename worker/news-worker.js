@@ -2619,6 +2619,12 @@ async function fetchForexNews() {
       const isFresh = Date.now() - newsDate <= maxAge;
       const isNew = item.link && !publishedLinks.includes(item.link);
 
+      if (TEMP_ALLOW_ALL_NEWS && isFresh && isNew) {
+        console.log("🧪 TEMP_ALLOW_ALL_NEWS selected latest item:", item.title);
+        latestNews = item;
+        break;
+      }
+
       const isDuplicateTopic = recentTitles.some((recentTitle) =>
         areSimilarNewsTitles(item.title || "", recentTitle)
       );
