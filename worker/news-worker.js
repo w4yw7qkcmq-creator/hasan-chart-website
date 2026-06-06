@@ -1317,7 +1317,21 @@ function getNewsTopicCluster(title) {
     },
     {
       key: "fed_rates",
-      terms: ["fed", "fomc", "powell", "federal reserve", "interest rate", "rate cut", "rate hike", "الفيدرالي", "باول", "الفائدة", "خفض الفائدة", "رفع الفائدة"],
+      terms: [
+        "fomc",
+        "federal reserve",
+        "interest rate decision",
+        "rate decision",
+        "fed interest rate",
+        "powell",
+        "press conference",
+        "الفيدرالي",
+        "قرار الفائدة",
+        "باول",
+        "مؤتمر صحفي",
+        "خفض الفائدة",
+        "رفع الفائدة",
+      ],
     },
     {
       key: "us_inflation_jobs",
@@ -1358,7 +1372,9 @@ function getNewsTopicCluster(title) {
 
   for (const cluster of topicClusters) {
     const matches = cluster.terms.filter((term) => normalizedTitle.includes(term));
-    if (matches.length >= 2) {
+    const requiredMatches = cluster.key === "fed_rates" ? 1 : 2;
+
+    if (matches.length >= requiredMatches) {
       return cluster.key;
     }
   }
