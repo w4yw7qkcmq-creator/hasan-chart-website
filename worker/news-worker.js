@@ -2303,12 +2303,19 @@ async function isMarketMovingNews(title) {
   const value = String(title || "").toLowerCase();
 
   const blocked =
-    /irs|audit|watchlist|what to watch|top 10|analyst|price target|upgrade|downgrade|options trading|stock offering|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|could soon|may soon|might|reportedly|rumor|rumour/i.test(value);
+    /irs|audit|watchlist|what to watch|street calls|wall street picks|top 10|top stocks|best stocks|stock picks|stock pick|dividend stocks|dividend|buy these stocks|shares to buy|portfolio|investment strategy|investing strategy|how to invest|retail investors|analyst|analysts|price target|upgrade|downgrade|options trading|stock offering|artificial intelligence stocks|ai stocks|tokenization|tokenisation|tokenized assets|opinion|explainer|guide|preview|recap|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|single stock|could soon|may soon|might|reportedly|rumor|rumour|توصية|توصيات|أفضل الأسهم|افضل الأسهم|أسهم للشراء|اسهم للشراء|أسهم توزيعات|اسهم توزيعات|توزيعات أرباح|توزيعات ارباح|استراتيجية استثمار|استراتيجيات استثمار|محفظة استثمارية|المستثمرين الأفراد|المستثمرين الافراد|اختيارات الأسهم|اختيارات الاسهم|وول ستريت يوصي|تحليل وول ستريت|الذكاء الاصطناعي المدعومة|الرهان على التوكنيشن/i.test(value);
 
   const critical =
     /fed|fomc|powell|cpi|ppi|pce|nfp|nonfarm|jobless claims|unemployment|consumer confidence|retail sales|ism|pmi|gdp|interest rate|rate decision|stocks plunge|market crash|selloff|liquidations|bitcoin plunges|oil spikes|gold jumps|war|attack|iran|israel|hormuz|sanctions/i.test(value);
 
   if (blocked && !critical) {
+    return false;
+  }
+
+  const officialMarketMoving =
+    /fed|fomc|powell|cpi|ppi|pce|nfp|nonfarm|jobless claims|initial claims|continuing claims|unemployment|consumer confidence|consumer sentiment|retail sales|ism|pmi|gdp|interest rate|rate decision|stocks plunge|stocks sink|stocks tumble|market crash|selloff|sell-off|liquidations|bitcoin plunges|bitcoin crashes|oil spikes|oil jumps|gold jumps|war|attack|missile|airstrike|iran|israel|hormuz|red sea|sanctions|tariff|الفيدرالي|قرار الفائدة|التضخم|البطالة|الوظائف|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|هبوط الأسواق|خسائر الأسواق|انهيار السوق|تصفيات|البيتكوين|النفط|الذهب|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|عقوبات|تعريفات/i.test(value);
+
+  if (!officialMarketMoving) {
     return false;
   }
 
