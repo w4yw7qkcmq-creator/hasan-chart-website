@@ -2205,6 +2205,19 @@ async function sendScheduledMarketAlerts() {
         message:
           "🚨 تنبيه عاجل\n\n🇺🇸 متبقي 5 دقائق على افتتاح السوق الأمريكي.\n\n⚠️ متوقع ارتفاع التذبذب على الدولار، الذهب، المؤشرات الأمريكية والكريبتو.\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
       },
+      {
+  id: `us-market-open-report-${eventDateKey}`,
+  hour: 9,
+  minute: 30,
+  imageTitle: "US stock market open Nasdaq Dow S&P 500 gold silver",
+  impactLevel: "HIGH",
+  message:
+    "📊 تقرير افتتاح السوق الأمريكي\n\n" +
+    "🇺🇸 بدأ تداول وول ستريت الآن.\n\n" +
+    "راقب حركة ناسداك، داو جونز و S&P 500 مع بداية الجلسة، إضافة إلى الدولار والذهب والفضة والكريبتو.\n\n" +
+    "⚠️ أول 30 دقيقة غالباً تكون الأعلى تذبذباً.\n\n" +
+    "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+},
     ];
 
     const currentAlert = scheduledAlerts.find(
@@ -2224,15 +2237,21 @@ async function sendScheduledMarketAlerts() {
       return;
     }
 
-    await sendTelegramMessage(currentAlert.message);
+   if (currentAlert.imageTitle) {
+  const photoPath = await createNewsCard(
+    currentAlert.imageTitle,
+    selectNewsImage(currentAlert.imageTitle),
+    currentAlert.impactLevel || "MEDIUM"
+  );
 
-    await savePublishedNewsToSupabase({
-      link: `scheduled-alert:${currentAlert.id}`,
-      title: currentAlert.message,
-      normalized_title: normalizeNewsTitle(currentAlert.message).slice(0, 500),
-      topic_cluster: "scheduled_market_alert",
-      published_at: new Date().toISOString(),
-    });
+  if (photoPath) {
+    await sendTelegramPhoto(currentAlert.message, photoPath);
+  } else {
+    await sendTelegramMessage(currentAlert.message);
+  }
+} else {
+  await sendTelegramMessage(currentAlert.message);
+}
 
     savePublishedNewsLink(`scheduled-alert:${currentAlert.id}`, currentAlert.message);
   } catch (error) {
