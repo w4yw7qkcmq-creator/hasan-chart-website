@@ -1530,37 +1530,7 @@ if (!isLocalAssetImage && (imageAspectRatio < 1.35 || imageAspectRatio > 2.2)) {
   }
 
 
-  // --- Title drawing block ---
-  ctx.save();
-  const cleanTitle = String(title || "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const titleBoxX = 56;
-  const titleBoxY = height - 210;
-  const titleBoxWidth = width - 112;
-  const titleBoxHeight = 132;
-
-  ctx.fillStyle = "rgba(2, 6, 23, 0.78)";
-  ctx.roundRect(titleBoxX, titleBoxY, titleBoxWidth, titleBoxHeight, 24);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(56, 189, 248, 0.95)";
-  ctx.roundRect(titleBoxX, titleBoxY, 8, titleBoxHeight, 8);
-  ctx.fill();
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 40px Arabic";
-  ctx.textAlign = /[\u0600-\u06FF]/.test(cleanTitle) ? "right" : "left";
-  ctx.direction = /[\u0600-\u06FF]/.test(cleanTitle) ? "rtl" : "ltr";
-
-  const titleLines = wrapText(ctx, cleanTitle, titleBoxWidth - 80).slice(0, 2);
-  const textX = ctx.direction === "rtl" ? titleBoxX + titleBoxWidth - 40 : titleBoxX + 40;
-  titleLines.forEach((line, index) => {
-    ctx.fillText(line, textX, titleBoxY + 54 + index * 46);
-  });
-  ctx.restore();
-
+  // --- Impact badge only: keep the image clean and avoid empty title boxes ---
   ctx.save();
   const impactBadgeText = impactLevel === "HIGH" ? "عاجل" : "مهم";
   ctx.fillStyle = impactLevel === "HIGH" ? "rgba(220, 38, 38, 0.92)" : "rgba(234, 179, 8, 0.94)";
@@ -1572,7 +1542,7 @@ if (!isLocalAssetImage && (imageAspectRatio < 1.35 || imageAspectRatio > 2.2)) {
   ctx.direction = "rtl";
   ctx.fillText(impactBadgeText, 136, 77);
   ctx.restore();
-  // --- End title drawing block ---
+  // --- End impact badge block ---
 
   // --- Top brand block ---
   ctx.save();
