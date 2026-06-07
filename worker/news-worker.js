@@ -1415,7 +1415,7 @@ function isRecentForTopicCluster(item, topicCluster) {
     "oil_geopolitics",
   ];
 
-  const cooldownHours = longCooldownClusters.includes(topicCluster) ? 18 : 3;
+  const cooldownHours = longCooldownClusters.includes(topicCluster) ? 4 : 1;
 
   return Date.now() - publishedAt <= cooldownHours * 60 * 60 * 1000;
 }
