@@ -49,8 +49,8 @@ const CHANNEL_LOGO_FILE = path.join(__dirname, "assets", "logo.png");
 const TEMP_ALLOW_ALL_NEWS = false;
 
 const MAX_NEWS_AGE_HOURS = 24;
-const MAX_POSTS_PER_HOUR = 15;
-const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 15;
+const MAX_POSTS_PER_HOUR = 5;
+const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 5;
 const ULTRA_PRIORITY_KEYWORDS = [
   "fed",
   "fomc",
@@ -2303,7 +2303,7 @@ async function isMarketMovingNews(title) {
   const value = String(title || "").toLowerCase();
 
   const blocked =
-    /irs|audit|watchlist|what to watch|street calls|wall street picks|top 10|top stocks|best stocks|stock picks|stock pick|dividend stocks|dividend|buy these stocks|shares to buy|portfolio|investment strategy|investing strategy|how to invest|retail investors|analyst|analysts|price target|upgrade|downgrade|options trading|stock offering|artificial intelligence stocks|ai stocks|tokenization|tokenisation|tokenized assets|opinion|explainer|guide|preview|recap|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|single stock|could soon|may soon|might|reportedly|rumor|rumour|توصية|توصيات|أفضل الأسهم|افضل الأسهم|أسهم للشراء|اسهم للشراء|أسهم توزيعات|اسهم توزيعات|توزيعات أرباح|توزيعات ارباح|استراتيجية استثمار|استراتيجيات استثمار|محفظة استثمارية|المستثمرين الأفراد|المستثمرين الافراد|اختيارات الأسهم|اختيارات الاسهم|وول ستريت يوصي|تحليل وول ستريت|الذكاء الاصطناعي المدعومة|الرهان على التوكنيشن/i.test(value);
+    /irs|audit|watchlist|what to watch|street calls|wall street picks|wall street bet|top 10|top stocks|best stocks|stock picks|stock pick|dividend stocks|dividend|buy these stocks|shares to buy|portfolio|investment strategy|investing strategy|how to invest|retail investors|analyst|analysts|analysis|opinion|explainer|guide|preview|recap|why|how|without clear reason|according to|price target|upgrade|downgrade|options trading|stock offering|artificial intelligence stocks|ai stocks|tokenization|tokenisation|tokenized assets|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|single stock|could soon|may soon|might|reportedly|rumor|rumour|توصية|توصيات|أفضل الأسهم|افضل الأسهم|أسهم للشراء|اسهم للشراء|أسهم توزيعات|اسهم توزيعات|توزيعات أرباح|توزيعات ارباح|استراتيجية استثمار|استراتيجيات استثمار|محفظة استثمارية|المستثمرين الأفراد|المستثمرين الافراد|اختيارات الأسهم|اختيارات الاسهم|وول ستريت يوصي|تحليل وول ستريت|تحليل|رأي|توقع|يتوقع|يرى محللون|بدون سبب واضح|وفقاً|وفقا|الذكاء الاصطناعي المدعومة|الرهان على التوكنيشن/i.test(value);
 
   const critical =
     /fed|fomc|powell|cpi|ppi|pce|nfp|nonfarm|jobless claims|unemployment|consumer confidence|retail sales|ism|pmi|gdp|interest rate|rate decision|stocks plunge|market crash|selloff|liquidations|bitcoin plunges|oil spikes|gold jumps|war|attack|iran|israel|hormuz|sanctions/i.test(value);
