@@ -49,9 +49,8 @@ const CHANNEL_LOGO_FILE = path.join(__dirname, "assets", "logo.png");
 const TEMP_ALLOW_ALL_NEWS = false;
 
 const MAX_NEWS_AGE_HOURS = 24;
-const MAX_POSTS_PER_HOUR = 5;
-const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 5;
-
+const MAX_POSTS_PER_HOUR = 15;
+const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 15;
 const ULTRA_PRIORITY_KEYWORDS = [
   "fed",
   "fomc",
