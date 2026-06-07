@@ -2319,7 +2319,7 @@ async function isMarketMovingNews(title) {
     return false;
   }
 
-  return getMarketImpactLevel(title) === "HIGH";
+  return ["HIGH", "MEDIUM"].includes(getMarketImpactLevel(title));
 }
 
 
