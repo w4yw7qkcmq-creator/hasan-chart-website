@@ -2161,6 +2161,83 @@ async function sendImportantEconomicEventAlerts() {
   }
 }
 
+async function fetchYahooQuote(symbol) {
+  try {
+    const response = await axios.get("https://query1.finance.yahoo.com/v7/finance/quote", {
+      timeout: 10000,
+      params: {
+        symbols: symbol,
+        fields: "regularMarketPrice,regularMarketChangePercent,shortName,symbol",
+      },
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
+    });
+
+    const quote = response.data?.quoteResponse?.result?.[0];
+
+    if (!quote) {
+      return null;
+    }
+
+    return {
+      symbol,
+      price: Number(quote.regularMarketPrice),
+      changePercent: Number(quote.regularMarketChangePercent),
+    };
+  } catch (error) {
+    console.error(`⚠️ Yahoo quote fetch failed for ${symbol}:`, error.message);
+    return null;
+  }
+}
+
+function formatMarketChangeLine(label, quote) {
+  if (!quote || Number.isNaN(quote.changePercent)) {
+    return `• ${label}: غير متوفر الآن`;
+  }
+
+  const arrow = quote.changePercent > 0 ? "🟢" : quote.changePercent < 0 ? "🔴" : "⚪";
+  const sign = quote.changePercent > 0 ? "+" : "";
+  return `${arrow} ${label}: ${sign}${quote.changePercent.toFixed(2)}%`;
+}
+
+async function buildUsMarketOpenReportMessage() {
+  const [nasdaq, sp500, dow, gold, silver, dollar] = await Promise.all([
+    fetchYahooQuote("^IXIC"),
+    fetchYahooQuote("^GSPC"),
+    fetchYahooQuote("^DJI"),
+    fetchYahooQuote("GC=F"),
+    fetchYahooQuote("SI=F"),
+    fetchYahooQuote("DX-Y.NYB"),
+  ]);
+
+  const reportLines = [
+    formatMarketChangeLine("ناسداك", nasdaq),
+    formatMarketChangeLine("ستاندرد آند بورز 500", sp500),
+    formatMarketChangeLine("داو جونز", dow),
+    formatMarketChangeLine("الذهب", gold),
+    formatMarketChangeLine("الفضة", silver),
+    formatMarketChangeLine("مؤشر الدولار", dollar),
+  ].join("\n");
+
+  const riskTone =
+    nasdaq?.changePercent > 0 && sp500?.changePercent > 0
+      ? "شهية المخاطرة إيجابية مع بداية الجلسة."
+      : nasdaq?.changePercent < 0 && sp500?.changePercent < 0
+        ? "ضغط بيعي واضح مع بداية الجلسة."
+        : "الأسواق متباينة مع بداية الجلسة.";
+
+  return (
+    "📊 تقرير افتتاح السوق الأمريكي\n\n" +
+    "🇺🇸 بدأ تداول وول ستريت الآن.\n\n" +
+    `${reportLines}\n\n` +
+    `التأثير: ${riskTone}\n\n` +
+    "⚠️ أول 30 دقيقة غالباً تكون الأعلى تذبذباً، خصوصاً على الذهب والفضة والمؤشرات الأمريكية والكريبتو.\n\n" +
+    "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi"
+  );
+}
+
 async function sendScheduledMarketAlerts() {
   try {
     const now = new Date();
@@ -2206,18 +2283,19 @@ async function sendScheduledMarketAlerts() {
           "🚨 تنبيه عاجل\n\n🇺🇸 متبقي 5 دقائق على افتتاح السوق الأمريكي.\n\n⚠️ متوقع ارتفاع التذبذب على الدولار، الذهب، المؤشرات الأمريكية والكريبتو.\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
       },
       {
-  id: `us-market-open-report-${eventDateKey}`,
-  hour: 9,
-  minute: 30,
-  imageTitle: "US stock market open Nasdaq Dow S&P 500 gold silver",
-  impactLevel: "HIGH",
-  message:
-    "📊 تقرير افتتاح السوق الأمريكي\n\n" +
-    "🇺🇸 بدأ تداول وول ستريت الآن.\n\n" +
-    "راقب حركة ناسداك، داو جونز و S&P 500 مع بداية الجلسة، إضافة إلى الدولار والذهب والفضة والكريبتو.\n\n" +
-    "⚠️ أول 30 دقيقة غالباً تكون الأعلى تذبذباً.\n\n" +
-    "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
-},
+        id: `us-market-open-report-${eventDateKey}`,
+        hour: 9,
+        minute: 30,
+        imageTitle: "US stock market open Nasdaq Dow S&P 500 gold silver",
+        impactLevel: "HIGH",
+        buildMarketOpenReport: true,
+        message:
+          "📊 تقرير افتتاح السوق الأمريكي\n\n" +
+          "🇺🇸 بدأ تداول وول ستريت الآن.\n\n" +
+          "راقب حركة ناسداك، داو جونز و S&P 500 مع بداية الجلسة، إضافة إلى الدولار والذهب والفضة والكريبتو.\n\n" +
+          "⚠️ أول 30 دقيقة غالباً تكون الأعلى تذبذباً.\n\n" +
+          "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+      },
     ];
 
     const currentAlert = scheduledAlerts.find(
@@ -2237,23 +2315,35 @@ async function sendScheduledMarketAlerts() {
       return;
     }
 
-   if (currentAlert.imageTitle) {
-  const photoPath = await createNewsCard(
-    currentAlert.imageTitle,
-    selectNewsImage(currentAlert.imageTitle),
-    currentAlert.impactLevel || "MEDIUM"
-  );
+    const alertMessage = currentAlert.buildMarketOpenReport
+      ? await buildUsMarketOpenReportMessage()
+      : currentAlert.message;
 
-  if (photoPath) {
-    await sendTelegramPhoto(currentAlert.message, photoPath);
-  } else {
-    await sendTelegramMessage(currentAlert.message);
-  }
-} else {
-  await sendTelegramMessage(currentAlert.message);
-}
+    if (currentAlert.imageTitle) {
+      const photoPath = await createNewsCard(
+        currentAlert.imageTitle,
+        selectNewsImage(currentAlert.imageTitle),
+        currentAlert.impactLevel || "MEDIUM"
+      );
 
-    savePublishedNewsLink(`scheduled-alert:${currentAlert.id}`, currentAlert.message);
+      if (photoPath) {
+        await sendTelegramPhoto(alertMessage, photoPath);
+      } else {
+        await sendTelegramMessage(alertMessage);
+      }
+    } else {
+      await sendTelegramMessage(alertMessage);
+    }
+
+    await savePublishedNewsToSupabase({
+      link: `scheduled-alert:${currentAlert.id}`,
+      title: alertMessage,
+      normalized_title: normalizeNewsTitle(alertMessage).slice(0, 500),
+      topic_cluster: "scheduled_market_alert",
+      published_at: new Date().toISOString(),
+    });
+
+    savePublishedNewsLink(`scheduled-alert:${currentAlert.id}`, alertMessage);
   } catch (error) {
     console.error("❌ Scheduled Alert Error:", error.message);
   }
