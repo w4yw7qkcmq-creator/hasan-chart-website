@@ -719,6 +719,11 @@ function isImportantNews(title) {
 
 function getMarketImpactLevel(text) {
   const value = String(text || "").toLowerCase();
+  if (
+    /weight loss drug|drug maker|pharma|pharmaceutical|biotech|healthcare company|medical company|clinical trial|fda approval|fda|obesity drug|safety data|drug safety|weight-loss|weight loss|أدوية خسارة الوزن|ادوية خسارة الوزن|دواء خسارة الوزن|مصنع أدوية|مصنع ادوية|شركة أدوية|شركة ادوية|بيانات سلامة|تجربة سريرية|التجارب السريرية|اعتماد هيئة الغذاء والدواء|الدواء والغذاء|الرعاية الصحية/i.test(value)
+  ) {
+    return "LOW";
+  }
 
   const criticalPattern = /fed rate decision|fomc decision|interest rate decision|rate cut|rate hike|powell speaks|powell says|cpi|core cpi|pce inflation|core pce|nfp|nonfarm payrolls|unemployment rate|jobless claims|initial jobless claims|weekly jobless claims|unemployment claims|initial claims|continuing claims|claims data|labor market|job market|employment report|consumer confidence|ism manufacturing|ism services|gdp|market losses|market rout|market crash|selloff|sell-off|stocks plunge|stocks sink|stocks tumble|nasdaq falls|nasdaq plunges|dow falls|s&p falls|futures fall|futures plunge|liquidations|crypto liquidations|futures liquidations|margin call|risk-off|oil prices surge|oil prices jump|oil spikes|gold jumps|bitcoin plunges|bitcoin surges|war breaks out|missile attack|drone attack|airstrike|escalation|retaliation|port attack|ports attack|ship attack|ships attacked|vessel attack|tanker attack|red sea|persian gulf|strait of hormuz|naval attack|hormuz|sanctions announced|tariff announced|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|التضخم|مؤشر ثقة المستهلك|البطالة|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|سوق العمل|العمالة|الوظائف|خسائر الأسواق|هبوط الأسواق|انهيار السوق|تراجع الأسهم|خسائر الأسهم الأمريكية|تصفيات|تصفيات الفيوتشر|تصفيات العقود الآجلة|تصفية مراكز|النفط|الذهب|هرمز|عقوبات|هجوم|ضرب إيران|ضرب ايران|تصعيد|استهداف السفن|ضرب السفن|استهداف الموانئ|ضرب الموانئ|البحر الأحمر|الخليج العربي|مضيق هرمز|هجوم بطائرات مسيرة|رد انتقامي/i;
 
@@ -2381,6 +2386,11 @@ async function isMarketMovingNews(title) {
   }
 
   const value = String(title || "").toLowerCase();
+  if (
+    /weight loss drug|drug maker|pharma|pharmaceutical|biotech|healthcare company|medical company|clinical trial|fda approval|fda|obesity drug|safety data|drug safety|weight-loss|weight loss|أدوية خسارة الوزن|ادوية خسارة الوزن|دواء خسارة الوزن|مصنع أدوية|مصنع ادوية|شركة أدوية|شركة ادوية|بيانات سلامة|تجربة سريرية|التجارب السريرية|اعتماد هيئة الغذاء والدواء|الدواء والغذاء|الرعاية الصحية/i.test(value)
+  ) {
+    return false;
+  }
 
   const blocked =
     /irs|audit|watchlist|what to watch|street calls|wall street picks|wall street bet|top 10|top stocks|best stocks|stock picks|stock pick|dividend stocks|dividend|buy these stocks|shares to buy|portfolio|investment strategy|investing strategy|how to invest|retail investors|analyst|analysts|analysis|opinion|explainer|guide|preview|recap|why|how|without clear reason|according to|price target|upgrade|downgrade|options trading|stock offering|artificial intelligence stocks|ai stocks|tokenization|tokenisation|tokenized assets|morning moves|currencies focus|focus on|weekly outlook|week ahead|market outlook|market focus|morning briefing|at the close|close of trading|stocks closed|moscow index|intervention likely|investor sentiment|institutional sentiment|near 60000|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|single stock|could soon|may soon|might|reportedly|rumor|rumour|توصية|توصيات|أفضل الأسهم|افضل الأسهم|أسهم للشراء|اسهم للشراء|أسهم توزيعات|اسهم توزيعات|توزيعات أرباح|توزيعات ارباح|استراتيجية استثمار|استراتيجيات استثمار|محفظة استثمارية|المستثمرين الأفراد|المستثمرين الافراد|اختيارات الأسهم|اختيارات الاسهم|وول ستريت يوصي|تحليل وول ستريت|تحليل|رأي|توقع|يتوقع|يرى محللون|بدون سبب واضح|وفقاً|وفقا|تحركات العملات|أسبوع حاسم|اسبوع حاسم|أسبوع الأسواق|اسبوع الأسواق|عند الإغلاق|عند الاغلاق|مؤشر موسكو|معنويات المستثمرين|الذكاء الاصطناعي المدعومة|الرهان على التوكنيشن|serena|williams|real estate|tennis|celebrity|softbank|nvidia|samsung|sk hynix|ipo|valuation|quant strategy|red flags|asian tech|korean tech|nasdaq analysis|stock strategy|technical support level|moving average|سيرينا|عقارات|مشاهير|سوفت بنك|نفيديا|سامسونج|طرح عام أولي|التقييم|تحليل في مؤشر|متوسطه المتحرك|مستويات الدعم/i.test(value);
