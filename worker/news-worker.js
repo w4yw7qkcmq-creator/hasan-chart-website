@@ -1480,19 +1480,26 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
   ctx.fillRect(0, 0, width, height);
 
   try {
-    const image = await loadImage(imageUrl);
-const isLocalAssetImage = typeof imageUrl === "string" && !/^https?:\/\//i.test(imageUrl);
+    let finalImageUrl = imageUrl;
+    let image = await loadImage(finalImageUrl);
+    let isLocalAssetImage = typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl);
 
-if (!isLocalAssetImage && (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT)) {
-  console.log(`⏭️ Skipped low-quality image: ${image.width}x${image.height}`);
-  return null;
-}
+    const useLocalFallbackImage = async (reason) => {
+      console.log(`⏭️ ${reason}: ${image.width}x${image.height}. Using local fallback image.`);
+      finalImageUrl = selectNewsImage(title);
+      image = await loadImage(finalImageUrl);
+      isLocalAssetImage = typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl);
+      console.log(`✅ Local fallback image loaded: ${image.width}x${image.height}`);
+    };
 
-const imageAspectRatio = image.width / image.height;
-if (!isLocalAssetImage && (imageAspectRatio < 1.35 || imageAspectRatio > 2.2)) {
-  console.log(`⏭️ Skipped poorly shaped image: ${image.width}x${image.height}`);
-  return null;
-}
+    if (!isLocalAssetImage && (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT)) {
+      await useLocalFallbackImage("Skipped low-quality external image");
+    }
+
+    const imageAspectRatio = image.width / image.height;
+    if (!isLocalAssetImage && (imageAspectRatio < 1.35 || imageAspectRatio > 2.2)) {
+      await useLocalFallbackImage("Skipped poorly shaped external image");
+    }
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
