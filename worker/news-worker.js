@@ -105,8 +105,8 @@ const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = true;
 
-const MIN_IMAGE_WIDTH = 1280;
-const MIN_IMAGE_HEIGHT = 720;
+const MIN_IMAGE_WIDTH = 1920;
+const MIN_IMAGE_HEIGHT = 1080;
 
 const IMPORTANT_EVENT_ALERTS = [
   {
@@ -1466,8 +1466,8 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
-  const width = 1280;
-  const height = 720;
+  const width = 1920;
+  const height = 1080;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
