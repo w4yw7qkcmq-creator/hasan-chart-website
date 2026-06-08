@@ -2681,8 +2681,7 @@ async function fetchForexNews() {
     const hardHourlyLimitReached = publishStats.postsLastHour >= MAX_HIGH_IMPACT_POSTS_PER_HOUR;
 
     if (hardHourlyLimitReached) {
-      console.log(`⏭️ Hard hourly post limit reached: ${publishStats.postsLastHour}/${MAX_HIGH_IMPACT_POSTS_PER_HOUR}`);
-      return;
+      console.log(`⚠️ Hard hourly post limit reached: ${publishStats.postsLastHour}/${MAX_HIGH_IMPACT_POSTS_PER_HOUR}. Only ULTRA priority news can pass now.`);
     }
 
     if (normalHourlyLimitReached) {
@@ -2850,6 +2849,15 @@ async function fetchForexNews() {
         !isUltraPriority
       ) {
         console.log("⏭️ Hourly limit reached. Skipped non-HIGH impact story:", item.title);
+        continue;
+      }
+
+      if (
+        hardHourlyLimitReached &&
+        !isUltraPriority &&
+        !isEconomicNews
+      ) {
+        console.log("⏭️ Hard hourly limit reached. Skipped non-ULTRA priority story:", item.title);
         continue;
       }
 
