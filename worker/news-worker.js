@@ -1493,12 +1493,12 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
     };
 
     if (!isLocalAssetImage && (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT)) {
-      await useLocalFallbackImage("Skipped low-quality external image");
+      console.log(`⚠️ External image is below preferred quality: ${image.width}x${image.height}. Using it anyway for variety.`);
     }
 
     const imageAspectRatio = image.width / image.height;
     if (!isLocalAssetImage && (imageAspectRatio < 1.35 || imageAspectRatio > 2.2)) {
-      await useLocalFallbackImage("Skipped poorly shaped external image");
+      console.log(`⚠️ External image shape is not ideal: ${image.width}x${image.height}. Using it anyway for variety.`);
     }
 
     ctx.imageSmoothingEnabled = true;
