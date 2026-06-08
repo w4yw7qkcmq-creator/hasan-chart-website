@@ -703,14 +703,10 @@ function isEconomicCalendarNews(title) {
 }
 
 const NEWS_FEEDS = [
-  "https://www.forexlive.com/feed/",
   "https://www.investing.com/rss/news_25.rss",
-  "https://www.investing.com/rss/news_1.rss",
   "https://www.coindesk.com/arc/outboundfeeds/rss/",
   "https://feeds.marketwatch.com/marketwatch/topstories/",
   "https://www.cnbc.com/id/100003114/device/rss/rss.html",
-  "https://www.investing.com/rss/news_285.rss",
-  "https://www.investing.com/rss/news_301.rss",
 ];
 
 
