@@ -1516,16 +1516,16 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
     ctx.restore();
 
     const imageOverlay = ctx.createLinearGradient(0, 0, 0, height);
-    imageOverlay.addColorStop(0, "rgba(2, 6, 23, 0.08)");
-    imageOverlay.addColorStop(1, "rgba(2, 6, 23, 0.18)");
+    imageOverlay.addColorStop(0, "rgba(2, 6, 23, 0.00)");
+    imageOverlay.addColorStop(1, "rgba(2, 6, 23, 0.05)");
     ctx.fillStyle = imageOverlay;
     ctx.fillRect(0, 0, width, height);
 
     // --- New design overlay block ---
-    const bottomFade = ctx.createLinearGradient(0, height * 0.42, 0, height);
-    bottomFade.addColorStop(0, "rgba(2, 6, 23, 0.05)");
-    bottomFade.addColorStop(0.55, "rgba(2, 6, 23, 0.60)");
-    bottomFade.addColorStop(1, "rgba(2, 6, 23, 0.94)");
+    const bottomFade = ctx.createLinearGradient(0, height * 0.58, 0, height);
+    bottomFade.addColorStop(0, "rgba(2, 6, 23, 0.00)");
+    bottomFade.addColorStop(0.62, "rgba(2, 6, 23, 0.18)");
+    bottomFade.addColorStop(1, "rgba(2, 6, 23, 0.46)");
     ctx.fillStyle = bottomFade;
     ctx.fillRect(0, 0, width, height);
 
@@ -1592,8 +1592,8 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
     const watermarkX = width - watermarkWidth - 24;
     const watermarkY = height - watermarkHeight - 22;
 
-    ctx.globalAlpha = 0.78;
-    ctx.fillStyle = "rgba(2, 6, 23, 0.76)";
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = "rgba(2, 6, 23, 0.58)";
     ctx.roundRect(watermarkX, watermarkY, watermarkWidth, watermarkHeight, 18);
     ctx.fill();
 
