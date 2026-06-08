@@ -2371,6 +2371,16 @@ async function sendTelegramPhoto(message, photoPath) {
 
 async function isMarketMovingNews(title) {
   if (
+    /technical analysis|market outlook|week ahead|outlook|signs of|what to expect|investor sentiment|analysis after|forecast|technical|support level|moving average|glimmer of hope|better start|healthy reset|تحليل فني|توقعات السوق|توقعات الأسبوع|الأسبوع القادم|مستوى دعم|المتوسط المتحرك|بداية أسبوع|معنويات المستثمرين/i.test(title)
+  ) {
+    return false;
+  }
+  if (
+    /technical analysis|market outlook|week ahead|outlook|signs of|what to expect|investor sentiment|analysis after|forecast|technical|support level|moving average|glimmer of hope|better start|healthy reset|تحليل فني|توقعات السوق|توقعات الأسبوع|الأسبوع القادم|مستوى دعم|المتوسط المتحرك|بداية أسبوع|معنويات المستثمرين/i.test(title)
+  ) {
+    return false;
+  }
+  if (
     /marvell|micron|paramount|warner bros|softbank|nvidia|samsung|sk hynix|ipo|serena|williams|individual stock|single stock/i.test(title)
   ) {
     return false;
