@@ -912,6 +912,12 @@ function selectNewsImage(title) {
   ]);
 }
 
+function shouldUseLocalImageForMajorTopic(title) {
+  const value = String(title || "").toLowerCase();
+
+  return /bitcoin|btc|crypto|ethereum|gold|xau|oil|crude|brent|wti|fed|fomc|powell|federal reserve|interest rate|cpi|ppi|nfp|jobless claims|unemployment|nasdaq|dow|s&p|stock market open|market open|war|missile|attack|iran|israel|hormuz|red sea|البيتكوين|الكريبتو|الذهب|النفط|الفيدرالي|باول|قرار الفائدة|التضخم|البطالة|الوظائف|طلبات إعانة البطالة|ناسداك|داو جونز|افتتاح السوق|حرب|هجوم|صاروخ|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر/i.test(value);
+}
+
 function getImageFromNewsItem(item) {
   if (!item) return null;
 
@@ -1481,6 +1487,16 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
 
   try {
     let finalImageUrl = imageUrl;
+
+    if (
+      shouldUseLocalImageForMajorTopic(title) &&
+      typeof finalImageUrl === "string" &&
+      /^https?:\/\//i.test(finalImageUrl)
+    ) {
+      console.log("✅ Major topic detected. Using local high-quality image for better relevance:", title);
+      finalImageUrl = selectNewsImage(title);
+    }
+
     let image = await loadImage(finalImageUrl);
     let isLocalAssetImage = typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl);
 
@@ -2403,7 +2419,7 @@ async function isMarketMovingNews(title) {
   }
 
   const blocked =
-    /irs|audit|watchlist|what to watch|street calls|wall street picks|wall street bet|top 10|top stocks|best stocks|stock picks|stock pick|dividend stocks|dividend|buy these stocks|shares to buy|portfolio|investment strategy|investing strategy|how to invest|retail investors|analyst|analysts|analysis|opinion|explainer|guide|preview|recap|why|how|without clear reason|according to|price target|upgrade|downgrade|options trading|stock offering|artificial intelligence stocks|ai stocks|tokenization|tokenisation|tokenized assets|morning moves|currencies focus|focus on|weekly outlook|week ahead|market outlook|market focus|morning briefing|at the close|close of trading|stocks closed|moscow index|intervention likely|investor sentiment|institutional sentiment|near 60000|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|single stock|could soon|may soon|might|reportedly|rumor|rumour|توصية|توصيات|أفضل الأسهم|افضل الأسهم|أسهم للشراء|اسهم للشراء|أسهم توزيعات|اسهم توزيعات|توزيعات أرباح|توزيعات ارباح|استراتيجية استثمار|استراتيجيات استثمار|محفظة استثمارية|المستثمرين الأفراد|المستثمرين الافراد|اختيارات الأسهم|اختيارات الاسهم|وول ستريت يوصي|تحليل وول ستريت|تحليل|رأي|توقع|يتوقع|يرى محللون|بدون سبب واضح|وفقاً|وفقا|تحركات العملات|أسبوع حاسم|اسبوع حاسم|أسبوع الأسواق|اسبوع الأسواق|عند الإغلاق|عند الاغلاق|مؤشر موسكو|معنويات المستثمرين|الذكاء الاصطناعي المدعومة|الرهان على التوكنيشن|serena|williams|real estate|tennis|celebrity|softbank|nvidia|samsung|sk hynix|ipo|valuation|quant strategy|red flags|asian tech|korean tech|nasdaq analysis|stock strategy|technical support level|moving average|سيرينا|عقارات|مشاهير|سوفت بنك|نفيديا|سامسونج|طرح عام أولي|التقييم|تحليل في مؤشر|متوسطه المتحرك|مستويات الدعم/i.test(value);
+    /irs|audit|watchlist|what to watch|forced labor|forced labour|labor abuses|cotton field|cotton import|cotton ban|العمل القسري|القطن|حقل القطن|street calls|wall street picks|wall street bet|top 10|top stocks|best stocks|stock picks|stock pick|dividend stocks|dividend|buy these stocks|shares to buy|portfolio|investment strategy|investing strategy|how to invest|retail investors|analyst|analysts|analysis|opinion|explainer|guide|preview|recap|why|how|without clear reason|according to|price target|upgrade|downgrade|options trading|stock offering|artificial intelligence stocks|ai stocks|tokenization|tokenisation|tokenized assets|morning moves|currencies focus|focus on|weekly outlook|week ahead|market outlook|market focus|morning briefing|at the close|close of trading|stocks closed|moscow index|intervention likely|investor sentiment|institutional sentiment|near 60000|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|single stock|could soon|may soon|might|reportedly|rumor|rumour|توصية|توصيات|أفضل الأسهم|افضل الأسهم|أسهم للشراء|اسهم للشراء|أسهم توزيعات|اسهم توزيعات|توزيعات أرباح|توزيعات ارباح|استراتيجية استثمار|استراتيجيات استثمار|محفظة استثمارية|المستثمرين الأفراد|المستثمرين الافراد|اختيارات الأسهم|اختيارات الاسهم|وول ستريت يوصي|تحليل وول ستريت|تحليل|رأي|توقع|يتوقع|يرى محللون|بدون سبب واضح|وفقاً|وفقا|تحركات العملات|أسبوع حاسم|اسبوع حاسم|أسبوع الأسواق|اسبوع الأسواق|عند الإغلاق|عند الاغلاق|مؤشر موسكو|معنويات المستثمرين|الذكاء الاصطناعي المدعومة|الرهان على التوكنيشن|serena|williams|real estate|tennis|celebrity|softbank|nvidia|samsung|sk hynix|ipo|valuation|quant strategy|red flags|asian tech|korean tech|nasdaq analysis|stock strategy|technical support level|moving average|سيرينا|عقارات|مشاهير|سوفت بنك|نفيديا|سامسونج|طرح عام أولي|التقييم|تحليل في مؤشر|متوسطه المتحرك|مستويات الدعم/i.test(value);
 
   const critical =
     /fed|fomc|powell|cpi|ppi|pce|nfp|nonfarm|jobless claims|unemployment|consumer confidence|retail sales|ism|pmi|gdp|interest rate|rate decision|stocks plunge|market crash|selloff|liquidations|bitcoin plunges|oil spikes|gold jumps|war|attack|iran|israel|hormuz|sanctions/i.test(value);
