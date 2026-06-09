@@ -1512,7 +1512,9 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
+    ctx.filter = "contrast(115%) saturate(120%) brightness(105%)";
     ctx.drawImage(image, x, y, scaledWidth, scaledHeight);
+    ctx.filter = "none";
     ctx.restore();
 
     const imageOverlay = ctx.createLinearGradient(0, 0, 0, height);
@@ -1634,6 +1636,7 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
     console.error("⚠️ Watermark failed:", error.message);
   }
 
+  ctx.filter = "none";
   const buffer = canvas.toBuffer("image/png");
   fs.writeFileSync(NEWS_CARD_FILE, buffer);
 
