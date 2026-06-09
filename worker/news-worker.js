@@ -2445,6 +2445,12 @@ async function isMarketMovingNews(title) {
     return false;
   }
 
+  if (
+    /social security|retirement|pension|acquisition opportunities|acquisition target|merger talks|takeover talks|morgan stanley follows|how to calculate|guide|explains|explainer|الضمان الاجتماعي|التقاعد|المعاشات|كيف تحسب|كيفية حساب|شرح|دليل|فرص الاستحواذ|صفقات الاستحواذ|عمليات الاستحواذ/i.test(value)
+  ) {
+    return false;
+  }
+
   const blocked =
     /irs|audit|watchlist|what to watch|forced labor|forced labour|labor abuses|cotton field|cotton import|cotton ban|العمل القسري|القطن|حقل القطن|street calls|wall street picks|wall street bet|top 10|top stocks|best stocks|stock picks|stock pick|dividend stocks|dividend|buy these stocks|shares to buy|portfolio|investment strategy|investing strategy|how to invest|retail investors|analyst|analysts|analysis|opinion|explainer|guide|preview|recap|why|how|without clear reason|according to|price target|upgrade|downgrade|options trading|stock offering|artificial intelligence stocks|ai stocks|tokenization|tokenisation|tokenized assets|morning moves|currencies focus|focus on|weekly outlook|week ahead|market outlook|market focus|morning briefing|at the close|close of trading|stocks closed|moscow index|intervention likely|investor sentiment|institutional sentiment|near 60000|near 61000|near 61k|above 61k|below 61k|helicopter|chopper|rumor|rumour|reportedly|unconfirmed|تحديث عاجل|هليكوبتر|طائرة هليكوبتر|غير مؤكد|تقارير عن|يتراجع إلى 61|61 ألف|sports|world cup|football|soccer|lawsuit|legal action|paramount|warner bros|boeing 737|retailer|individual stock|single stock|could soon|may soon|might|توصية|توصيات|أفضل الأسهم|افضل الأسهم|أسهم للشراء|اسهم للشراء|أسهم توزيعات|اسهم توزيعات|توزيعات أرباح|توزيعات ارباح|استراتيجية استثمار|استراتيجيات استثمار|محفظة استثمارية|المستثمرين الأفراد|المستثمرين الافراد|اختيارات الأسهم|اختيارات الاسهم|وول ستريت يوصي|تحليل وول ستريت|تحليل|رأي|توقع|يتوقع|يرى محللون|بدون سبب واضح|وفقاً|وفقا|تحركات العملات|أسبوع حاسم|اسبوع حاسم|أسبوع الأسواق|اسبوع الأسواق|عند الإغلاق|عند الاغلاق|مؤشر موسكو|معنويات المستثمرين|الذكاء الاصطناعي المدعومة|الرهان على التوكنيشن|serena|williams|real estate|tennis|celebrity|softbank|nvidia|samsung|sk hynix|ipo|valuation|quant strategy|red flags|asian tech|korean tech|nasdaq analysis|stock strategy|technical support level|moving average|سيرينا|عقارات|مشاهير|سوفت بنك|نفيديا|سامسونج|طرح عام أولي|التقييم|تحليل في مؤشر|متوسطه المتحرك|مستويات الدعم/i.test(value);
 
