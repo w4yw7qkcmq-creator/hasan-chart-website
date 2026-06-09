@@ -2241,6 +2241,11 @@ async function buildUsMarketOpenReportMessage() {
     fetchYahooQuote("SI=F"),
     fetchYahooQuote("DX-Y.NYB"),
   ]);
+  
+  if (!nasdaq || !sp500 || !dow || !gold || !silver || !dollar) {
+  console.log("⏭️ Skipped US market open report: missing market quotes");
+  return null;
+}
 
   const reportLines = [
     formatMarketChangeLine("ناسداك", nasdaq),
