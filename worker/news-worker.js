@@ -2354,6 +2354,14 @@ async function sendScheduledMarketAlerts() {
       ? await buildUsMarketOpenReportMessage()
       : currentAlert.message;
 
+    if (!alertMessage) {
+      console.log(
+        "⏭️ Scheduled alert skipped because message builder returned null:",
+        currentAlert.id
+      );
+      return;
+    }
+
     if (currentAlert.imageTitle) {
       const photoPath = await createNewsCard(
         currentAlert.imageTitle,
