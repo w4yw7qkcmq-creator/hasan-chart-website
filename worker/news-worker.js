@@ -105,6 +105,9 @@ const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
 const USE_LOCAL_IMAGE_FALLBACK = true;
 
+// Professional breaking-news mode: publish only market-moving items, not general articles.
+const FOREX_BREAKING_STYLE = true;
+
 const MIN_IMAGE_WIDTH = 1920;
 const MIN_IMAGE_HEIGHT = 1080;
 
@@ -2412,6 +2415,17 @@ async function isMarketMovingNews(title) {
   }
 
   const value = String(title || "").toLowerCase();
+  if (FOREX_BREAKING_STYLE) {
+    const weakArticlePattern =
+      /rebound|rebounds|eases|steady|mixed|unchanged|little changed|set to|could|may|might|what to buy|how to|why|guide|explainer|opinion|survey|household worries|consumer worries|video game|videogame|console|merger|private equity|bidding|shares rise|shares fall|stock jumps|stock sinks|single stock|individual stock|analyst says|research firm|top things|watch this week|better hardware|red flags|healthy reset|nasdaq rebound|s&p rebound|dow seesaws|أسهم شركة|سهم شركة|توصي|توصية|يرى محللون|لماذا|كيف|قد|ربما|استطلاع|قلق الأسر|مخاوف الأسر|يتعافى|ينتعش|متباين|بدون تغيير|أسهم فردية|اندماج|استحواذ|ملكية خاصة|ألعاب الفيديو|الألعاب|اختيارات|أفضل الأسهم/i;
+
+    const directMarketEventPattern =
+      /breaking|urgent|fed|fomc|powell|interest rate|rate decision|rate cut|rate hike|cpi|ppi|pce|inflation|nfp|nonfarm|payrolls|jobless claims|initial claims|continuing claims|unemployment|consumer confidence|retail sales|gdp|ism|pmi|nasdaq plunges|nasdaq falls|dow falls|s&p falls|stock futures fall|stock futures plunge|stocks plunge|stocks sink|market crash|selloff|sell-off|liquidations|bitcoin plunges|bitcoin surges|btc plunges|btc surges|gold jumps|gold plunges|oil spikes|oil jumps|crude jumps|brent jumps|war|missile|attack|airstrike|hormuz|red sea|iran|israel|sanctions|tariff|عاجل|الفيدرالي|باول|قرار الفائدة|خفض الفائدة|رفع الفائدة|التضخم|مؤشر أسعار|البطالة|الوظائف|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|ناسداك يهبط|داو جونز يهبط|ستاندرد آند بورز يهبط|انهيار|خسائر حادة|هبوط حاد|تصفيات|البيتكوين يهبط|البيتكوين يرتفع|الذهب يرتفع|الذهب يهبط|النفط يرتفع|النفط يقفز|حرب|هجوم|صاروخ|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|عقوبات|تعريفات/i;
+
+    if (weakArticlePattern.test(value) && !directMarketEventPattern.test(value)) {
+      return false;
+    }
+  }
   if (
     /weight loss drug|drug maker|pharma|pharmaceutical|biotech|healthcare company|medical company|clinical trial|fda approval|fda|obesity drug|safety data|drug safety|weight-loss|weight loss|أدوية خسارة الوزن|ادوية خسارة الوزن|دواء خسارة الوزن|مصنع أدوية|مصنع ادوية|شركة أدوية|شركة ادوية|بيانات سلامة|تجربة سريرية|التجارب السريرية|اعتماد هيئة الغذاء والدواء|الدواء والغذاء|الرعاية الصحية/i.test(value)
   ) {
@@ -2429,7 +2443,7 @@ async function isMarketMovingNews(title) {
   }
 
   const officialMarketMoving =
-    /fed|fomc|powell|cpi|ppi|pce|nfp|nonfarm|jobless claims|initial claims|continuing claims|unemployment|consumer confidence|consumer sentiment|retail sales|ism|pmi|gdp|interest rate|rate decision|stocks plunge|stocks sink|stocks tumble|market crash|selloff|sell-off|liquidations|bitcoin plunges|bitcoin crashes|oil spikes|oil jumps|gold jumps|war|attack|missile|airstrike|iran|israel|hormuz|red sea|sanctions|tariff|الفيدرالي|قرار الفائدة|التضخم|البطالة|الوظائف|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|هبوط الأسواق|خسائر الأسواق|انهيار السوق|تصفيات|البيتكوين|النفط|الذهب|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|عقوبات|تعريفات/i.test(value);
+    /breaking|urgent|fed|fomc|powell|cpi|core cpi|ppi|pce|nfp|nonfarm|payrolls|jobless claims|initial claims|continuing claims|unemployment|consumer confidence|retail sales|ism|pmi|gdp|interest rate|rate decision|rate cut|rate hike|treasury yields spike|dollar jumps|dollar plunges|gold jumps|gold plunges|oil spikes|oil jumps|crude jumps|brent jumps|bitcoin plunges|bitcoin surges|btc plunges|btc surges|crypto liquidations|liquidations|stocks plunge|stocks sink|stocks tumble|nasdaq falls|nasdaq plunges|dow falls|s&p falls|stock futures fall|stock futures plunge|market crash|selloff|sell-off|risk-off|war|attack|missile|airstrike|iran|israel|hormuz|red sea|sanctions|tariff|عاجل|الفيدرالي|باول|قرار الفائدة|خفض الفائدة|رفع الفائدة|التضخم|مؤشر أسعار|البطالة|الوظائف|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|هبوط الأسواق|خسائر الأسواق|انهيار السوق|هبوط حاد|خسائر حادة|تصفيات|البيتكوين|النفط|الذهب|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|عقوبات|تعريفات/i.test(value);
 
   if (!officialMarketMoving) {
     return false;
