@@ -2812,9 +2812,9 @@ async function fetchForexNews() {
   try {
     console.log("🚀 Fetching forex news...");
     await sendScheduledMarketAlerts();
-    await sendWeeklyEconomicCalendarPost();
-    await sendImportantEconomicEventAlerts();
-    await publishEconomicReleaseNow();
+    // sendWeeklyEconomicCalendarPost();
+    // sendImportantEconomicEventAlerts();
+    // publishEconomicReleaseNow();
 
     const allItems = [];
 
