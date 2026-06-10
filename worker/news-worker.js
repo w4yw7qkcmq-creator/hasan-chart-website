@@ -729,6 +729,23 @@ function decodeTelegramHtml(value) {
     .trim();
 }
 
+function cleanTelegramSourceText(value) {
+  return String(value || "")
+    .replace(/https?:\/\/t\.me\/\S+/gi, "")
+    .replace(/@ForexBreakingNews/gi, "")
+    .replace(/@ForexNewspaper/gi, "")
+    .replace(/ForexBreakingNews/gi, "")
+    .replace(/ForexNewspaper/gi, "")
+    .replace(/JOIN OUR CHANNEL/gi, "")
+    .replace(/SUBSCRIBE/gi, "")
+    .replace(/اشترك|تابعنا/gi, "")
+    .replace(/لمتابعة آخر أخبار الفوركس/gi, "")
+    .replace(/نشرة أخبار الفوركس/gi, "")
+    .replace(/#[^\s#]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function fetchTelegramChannelPosts() {
   const posts = [];
 
@@ -751,7 +768,7 @@ async function fetchTelegramChannelPosts() {
       ];
 
       for (const match of textMatches.slice(-15)) {
-        const text = decodeTelegramHtml(match[1]);
+        const text = cleanTelegramSourceText(decodeTelegramHtml(match[1]));
 
         if (!text || text.length < 15) continue;
 
@@ -2799,10 +2816,7 @@ async function fetchForexNews() {
 
     // Telegram source channels (ForexBreakingNews + ForexNewspaper)
     try {
-      const telegramSources = [
-        "https://t.me/s/ForexBreakingNews",
-        "https://t.me/s/ForexNewspaper",
-      ];
+      const telegramSources = TELEGRAM_SOURCE_CHANNELS.map((channel) => channel.url);
 
       for (const sourceUrl of telegramSources) {
         try {
@@ -2817,11 +2831,9 @@ async function fetchForexNews() {
           const matches = [...html.matchAll(/tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/gi)];
 
           for (const match of matches.slice(-10)) {
-            const text = String(match[1] || "")
-              .replace(/<[^>]+>/g, " ")
-              .replace(/&nbsp;/g, " ")
-              .replace(/\s+/g, " ")
-              .trim();
+            const text = cleanTelegramSourceText(
+  decodeTelegramHtml(String(match[1] || ""))
+);
 
             if (text.length < 40) continue;
 
