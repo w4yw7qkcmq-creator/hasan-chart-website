@@ -2419,7 +2419,7 @@ async function isMarketMovingNews(title) {
     return false;
   }
   if (
-    /marvell|micron|paramount|warner bros|softbank|nvidia|samsung|sk hynix|ipo|serena|williams|individual stock|single stock/i.test(title)
+    /marvell|micron|paramount|warner bros|softbank|nvidia|samsung|sk hynix|ipo|serena|williams|individual stock|single stock|openai|open ai|oracle|starbucks|airport|airline|sports team|data center|datacenter|أوراكل|اوراكل|ستاربكس|مطار|طيران|شركة رياضية|مركز بيانات/i.test(title)
   ) {
     return false;
   }
@@ -2449,6 +2449,17 @@ async function isMarketMovingNews(title) {
     /social security|retirement|pension|acquisition opportunities|acquisition target|merger talks|takeover talks|morgan stanley follows|how to calculate|guide|explains|explainer|الضمان الاجتماعي|التقاعد|المعاشات|كيف تحسب|كيفية حساب|شرح|دليل|فرص الاستحواذ|صفقات الاستحواذ|عمليات الاستحواذ/i.test(value)
   ) {
     return false;
+  }
+
+  if (
+    /openai|open ai|oracle|starbucks|airport|airline|sports|sports team|ipo|share offering|stock offering|data center|datacenter|lease|rental|analyst says|analyst expects|company plans|company considers|company explores|company studies|studies leasing|studies renting|plans to lease|plans to rent|could buy|could sell|may buy|may sell|might buy|might sell|potential deal|possible deal|استئجار مركز بيانات|مركز بيانات|ستاربكس|أوراكل|اوراكل|مطار|طيران|شركة طيران|رياضة|شركة رياضية|طرح أسهم|طرح اسهم|طرح عام|اكتتاب|بيع حصة|شراء حصة|يدرس|تدرس|تخطط|تبحث|قد تبيع|قد تشتري|صفقة محتملة|محلل يقول|يقول محلل/i.test(value)
+  ) {
+    const allowIfMajorMarketEvent =
+      /fed|fomc|powell|cpi|ppi|pce|nfp|nonfarm|jobless claims|initial claims|continuing claims|unemployment|consumer confidence|retail sales|gdp|ism|pmi|rate decision|interest rate|war|attack|missile|airstrike|hormuz|red sea|iran|israel|sanctions|tariff|stocks plunge|stocks sink|market crash|selloff|liquidations|bitcoin plunges|bitcoin surges|gold jumps|gold plunges|oil spikes|oil jumps|الفيدرالي|باول|قرار الفائدة|التضخم|البطالة|طلبات إعانة البطالة|ثقة المستهلك|الناتج المحلي|مبيعات التجزئة|حرب|هجوم|صاروخ|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|عقوبات|تعريفات|انهيار السوق|هبوط حاد|خسائر حادة|تصفيات|البيتكوين يهبط|البيتكوين يرتفع|الذهب يرتفع|الذهب يهبط|النفط يرتفع|النفط يقفز/i.test(value);
+
+    if (!allowIfMajorMarketEvent) {
+      return false;
+    }
   }
 
   const blocked =
