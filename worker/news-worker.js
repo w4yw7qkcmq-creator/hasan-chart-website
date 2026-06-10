@@ -1318,7 +1318,7 @@ function areSimilarNewsTitles(titleA, titleB) {
   const commonWords = [...wordsA].filter((word) => wordsB.has(word)).length;
   const smallerSetSize = Math.min(wordsA.size, wordsB.size);
 
-  return commonWords / smallerSetSize >= 0.42;
+  return commonWords / smallerSetSize >= 0.78;
 }
 
 function getNewsTopicCluster(title) {
@@ -1494,7 +1494,7 @@ function isRecentPublishedItem(item) {
     return true;
   }
 
-  const maxDuplicateWindowHours = 2;
+  const maxDuplicateWindowHours = 0.5;
   return Date.now() - publishedAt <= maxDuplicateWindowHours * 60 * 60 * 1000;
 }
 
@@ -1516,7 +1516,7 @@ function isRecentForTopicCluster(item, topicCluster) {
     "oil_geopolitics",
   ];
 
-  const cooldownHours = longCooldownClusters.includes(topicCluster) ? 4 : 1;
+  const cooldownHours = longCooldownClusters.includes(topicCluster) ? 0.5 : 0.25;
 
   return Date.now() - publishedAt <= cooldownHours * 60 * 60 * 1000;
 }
