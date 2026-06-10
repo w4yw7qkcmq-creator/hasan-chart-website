@@ -990,6 +990,10 @@ function shouldUseLocalImageForMajorTopic(title) {
 function getImageFromNewsItem(item) {
   if (!item) return null;
 
+  if (item.isTelegramSource) {
+  return null;
+}
+
   const candidates = [];
 
   const pushCandidate = (value) => {
@@ -2829,6 +2833,15 @@ async function fetchForexNews() {
               link: `${sourceUrl}#${Buffer.from(text).toString("base64").slice(0, 24)}`,
               isoDate: new Date().toISOString(),
               feedUrl: sourceUrl,
+              sourceName: "ForexBreakingNews",
+isTelegramSource: true,
+imageUrl: null,
+enclosure: null,
+thumbnail: null,
+image: null,
+media: null,
+mediaContent: null,
+mediaThumbnail: null,
             });
           }
         } catch (error) {
