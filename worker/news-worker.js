@@ -705,12 +705,9 @@ function isEconomicCalendarNews(title) {
   );
 }
 
-const NEWS_FEEDS = [
-  "https://www.investing.com/rss/news_25.rss",
-  "https://www.coindesk.com/arc/outboundfeeds/rss/",
-  "https://feeds.marketwatch.com/marketwatch/topstories/",
-  "https://www.cnbc.com/id/100003114/device/rss/rss.html",
-];
+// RSS news feeds disabled. Main live-news source is now ForexBreakingNews Telegram channel only.
+// Economic calendar functions remain active separately for scheduled alerts and official releases.
+const NEWS_FEEDS = [];
 
 const TELEGRAM_SOURCE_CHANNELS = [
   {
