@@ -712,6 +712,76 @@ const NEWS_FEEDS = [
   "https://www.cnbc.com/id/100003114/device/rss/rss.html",
 ];
 
+const TELEGRAM_SOURCE_CHANNELS = [
+  {
+    name: "ForexBreakingNews",
+    url: "https://t.me/s/ForexBreakingNews",
+  },
+  {
+    name: "ForexNewspaper",
+    url: "https://t.me/s/ForexNewspaper",
+  },
+];
+
+function decodeTelegramHtml(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchTelegramChannelPosts() {
+  const posts = [];
+
+  for (const channel of TELEGRAM_SOURCE_CHANNELS) {
+    try {
+      const response = await axios.get(channel.url, {
+        timeout: 12000,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        },
+      });
+
+      const html = String(response.data || "");
+
+      const textMatches = [
+        ...html.matchAll(
+          /tgme_widget_message_text[\s\S]*?<div[^>]*>([\s\S]*?)<\/div>/gi
+        ),
+      ];
+
+      for (const match of textMatches.slice(-15)) {
+        const text = decodeTelegramHtml(match[1]);
+
+        if (!text || text.length < 15) continue;
+
+        posts.push({
+          title: text,
+          link: `telegram-${channel.name}-${normalizeNewsTitle(text).slice(0, 80)}`,
+          contentSnippet: text,
+          sourceName: channel.name,
+          isTelegramSource: true,
+          pubDate: new Date().toISOString(),
+        });
+      }
+
+      console.log(
+        `✅ Telegram source loaded ${channel.name}: ${posts.length}`
+      );
+    } catch (error) {
+      console.error(
+        `⚠️ Telegram source error ${channel.name}:`,
+        error.message
+      );
+    }
+  }
+
+  return posts;
+}
 
 function isImportantNews(title) {
   const lowerTitle = title.toLowerCase();
@@ -2724,6 +2794,52 @@ async function fetchForexNews() {
     await sendWeeklyEconomicCalendarPost();
     await sendImportantEconomicEventAlerts();
     await publishEconomicReleaseNow();
+
+    // Telegram source channels (ForexBreakingNews + ForexNewspaper)
+    try {
+      const telegramSources = [
+        "https://t.me/s/ForexBreakingNews",
+        "https://t.me/s/ForexNewspaper",
+      ];
+
+      for (const sourceUrl of telegramSources) {
+        try {
+          const response = await axios.get(sourceUrl, {
+            timeout: 15000,
+            headers: {
+              "User-Agent": "Mozilla/5.0"
+            }
+          });
+
+          const html = String(response.data || "");
+          const matches = [...html.matchAll(/tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/gi)];
+
+          for (const match of matches.slice(-10)) {
+            const text = String(match[1] || "")
+              .replace(/<[^>]+>/g, " ")
+              .replace(/&nbsp;/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+
+            if (text.length < 40) continue;
+
+            allItems.push({
+              title: text,
+              contentSnippet: text,
+              summary: text,
+              description: text,
+              link: `${sourceUrl}#${Buffer.from(text).toString("base64").slice(0, 24)}`,
+              isoDate: new Date().toISOString(),
+              feedUrl: sourceUrl,
+            });
+          }
+        } catch (error) {
+          console.error(`⚠️ Telegram source failed: ${sourceUrl}`, error.message);
+        }
+      }
+    } catch (error) {
+      console.error("⚠️ Telegram sources error:", error.message);
+    }
 
     const allItems = [];
 
