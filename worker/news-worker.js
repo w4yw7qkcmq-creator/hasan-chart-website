@@ -2795,6 +2795,8 @@ async function fetchForexNews() {
     await sendImportantEconomicEventAlerts();
     await publishEconomicReleaseNow();
 
+    const allItems = [];
+
     // Telegram source channels (ForexBreakingNews + ForexNewspaper)
     try {
       const telegramSources = [
@@ -2841,7 +2843,7 @@ async function fetchForexNews() {
       console.error("⚠️ Telegram sources error:", error.message);
     }
 
-    const allItems = [];
+
 
     for (const feedUrl of NEWS_FEEDS) {
       try {
