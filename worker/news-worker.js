@@ -717,10 +717,6 @@ const TELEGRAM_SOURCE_CHANNELS = [
     name: "ForexBreakingNews",
     url: "https://t.me/s/ForexBreakingNews",
   },
-  {
-    name: "ForexNewspaper",
-    url: "https://t.me/s/ForexNewspaper",
-  },
 ];
 
 function decodeTelegramHtml(value) {
