@@ -974,11 +974,15 @@ function selectNewsImage(title) {
     lowerTitle.includes("dollar")
   ) {
     return pickRandomAsset([
-      "Forex.png",
-      "forex-1.png",
-      "forex-2.png",
-      "forex-3.png",
-      "forex.png",
+      "Stockpng.png",
+"stocks-1.png",
+"stocks-2.png",
+"stocks-3.png",
+"Inflation.png",
+"default-1.png",
+"default-2.png",
+"default-3.png",
+"default.png",
     ]);
   }
 
@@ -1017,7 +1021,7 @@ function shouldUseLocalImageForMajorTopic(title) {
 function getImageFromNewsItem(item) {
   if (!item) return null;
 
-  if (item.isTelegramSource) {
+ if (item.isTelegramSource) {
   return null;
 }
 
@@ -3195,8 +3199,8 @@ mediaThumbnail: null,
 
     let finalImage = null;
     if (veryImportantNews || latestNews.impactLevel === "HIGH") {
-      const rssImage = getImageFromNewsItem(latestNews);
-      const articleImage = rssImage ? null : await getImageFromArticleUrl(latestNews.link);
+      const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
+const articleImage = latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
       const shouldUseLocalFallbackImage =
         latestNews.impactLevel === "HIGH" ||
         ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
