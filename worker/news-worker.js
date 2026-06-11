@@ -399,76 +399,9 @@ async function fetchInvestingCalendarEvents(fromDate, toDate) {
 }
 
 async function publishEconomicReleaseNow() {
-  try {
-    const now = new Date();
-    const from = new Date(now.getTime() - ECONOMIC_RELEASE_LOOKBACK_MINUTES * 60 * 1000);
-    const to = new Date(now.getTime() + 5 * 60 * 1000);
-
-    const events = await fetchInvestingCalendarEvents(from, to);
-
-    for (const event of events) {
-      const title = String(event.Event || event.event || "").trim();
-      if (!title) continue;
-
-      const actual = String(event.Actual ?? "").trim();
-      const forecast = String(event.Forecast ?? "").trim();
-      const previous = String(event.Previous ?? "").trim();
-      const important = isHighImpactCalendarEvent(event);
-      if (!important) continue;
-
-      if (!actual || !forecast) {
-        console.log("⏭️ Skipped release missing actual/forecast:", title);
-        continue;
-      }
-
-      const releaseId = `investing-economic-release:${title}:${event.Date || event.date || actual}:${forecast}`;
-      const publishedItems = await loadPublishedNewsFromSupabase();
-      const alreadySent = publishedItems.some((item) => item.link === releaseId);
-      if (alreadySent) continue;
-
-      const eventName = guessArabicEconomicEventName(title);
-      const impactText = getEconomicReleaseImpactText(title, actual, forecast);
-
-      const message =
-        `🟥 صدر الآن :\n\n` +
-        `📊 أمريكا - 🇺🇸\n` +
-        `💵 ${eventName}\n\n` +
-        `▪️ السابق : ${previous || "غير متوفر"}\n` +
-        `▪️ التقدير : ${forecast}\n` +
-        `▫️ الحالي : ${actual}\n\n` +
-        `⬅️ النتيجة : ${impactText}\n\n` +
-        `📚 لمتابعة أخبار الأسهم والذهب والعملات:\nhttps://t.me/EconomicNewsi ✅`;
-
-      const releaseImage = selectNewsImage(`${eventName} ${title} fed dollar stocks`);
-      const photoPath = await createNewsCard(eventName, releaseImage, "HIGH");
-
-      if (photoPath) {
-        await sendTelegramPhoto(message, photoPath);
-      } else {
-        await sendTelegramMessage(message);
-      }
-
-      await savePublishedNewsToSupabase({
-        link: releaseId,
-        title: message,
-        normalized_title: normalizeNewsTitle(message).slice(0, 500),
-        topic_cluster: `economic_release_${normalizeNewsTitle(eventName)}`,
-        published_at: new Date().toISOString(),
-      });
-
-      await saveNewsPostToSupabase({
-        title: eventName,
-        content: message,
-        image_url: null,
-        impact_level: "HIGH",
-        source_link: releaseId,
-      });
-
-      savePublishedNewsLink(releaseId, message);
-    }
-  } catch (error) {
-    console.error("❌ Investing Economic Release Publish Error:", error.response?.data || error.message);
-  }
+  // Official economic releases must come only from Telegram channels.
+  // Disable Investing-based CPI/PPI/NFP/FOMC publishing.
+  return;
 }
 
 
@@ -705,6 +638,12 @@ function isEconomicCalendarNews(title) {
   );
 }
 
+function isOfficialEconomicReleaseText(title) {
+  const value = String(title || "").toLowerCase();
+
+  return /fomc|fed rate|federal reserve|interest rate decision|rate decision|rate cut|rate hike|cpi|core cpi|consumer price index|ppi|producer price index|pce|core pce|nfp|nonfarm|payrolls|jobless claims|initial claims|continuing claims|unemployment rate|consumer confidence|consumer sentiment|retail sales|gdp|ism|pmi|actual|forecast|previous|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|تثبيت الفائدة|التضخم|مؤشر أسعار المستهلك|مؤشر أسعار المنتجين|الوظائف|البطالة|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|الحالي|المتوقع|السابق|صدر الآن|صدر الان/i.test(value);
+}
+
 // RSS news feeds disabled. Main live-news source is now ForexBreakingNews Telegram channel only.
 // Economic calendar functions remain active separately for scheduled alerts and official releases.
 const NEWS_FEEDS = [
@@ -791,11 +730,9 @@ async function fetchTelegramChannelPosts() {
 
         if (!text || text.length < 15) continue;
 
-        if (
-  !/fomc|fed rate|interest rate decision|rate decision|cpi|ppi|pce|nfp|nonfarm|payrolls|jobless claims|initial claims|unemployment|consumer confidence|retail sales|gdp|pmi|ism|actual|forecast|previous|الفيدرالي|قرار الفائدة|التضخم|الوظائف|البطالة|طلبات إعانة البطالة|الحالي|المتوقع|السابق/i.test(text)
-) {
-  continue;
-}
+        if (!isOfficialEconomicReleaseText(text)) {
+          continue;
+        }
 
         posts.push({
           title: text,
@@ -1029,6 +966,9 @@ function selectNewsImage(title) {
 
 function shouldUseLocalImageForMajorTopic(title) {
   const value = String(title || "").toLowerCase();
+  if (isOfficialEconomicReleaseText(value)) {
+    return false;
+  }
 
   return /bitcoin|btc|crypto|ethereum|gold|xau|oil|crude|brent|wti|fed|fomc|powell|federal reserve|interest rate|cpi|ppi|nfp|jobless claims|unemployment|nasdaq|dow|s&p|stock market open|market open|war|missile|attack|iran|israel|hormuz|red sea|البيتكوين|الكريبتو|الذهب|النفط|الفيدرالي|باول|قرار الفائدة|التضخم|البطالة|الوظائف|طلبات إعانة البطالة|ناسداك|داو جونز|افتتاح السوق|حرب|هجوم|صاروخ|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر/i.test(value);
 }
