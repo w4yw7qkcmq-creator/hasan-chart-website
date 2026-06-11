@@ -707,7 +707,16 @@ function isEconomicCalendarNews(title) {
 
 // RSS news feeds disabled. Main live-news source is now ForexBreakingNews Telegram channel only.
 // Economic calendar functions remain active separately for scheduled alerts and official releases.
-const NEWS_FEEDS = [];
+const NEWS_FEEDS = [
+  "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+  "https://www.marketwatch.com/rss/topstories",
+  "https://www.marketwatch.com/rss/marketpulse",
+  "https://www.forexlive.com/feed/",
+  "https://www.investing.com/rss/news.rss",
+  "https://www.investing.com/rss/forex.rss",
+  "https://www.investing.com/rss/commodities.rss",
+  "https://www.coindesk.com/arc/outboundfeeds/rss/",
+];
 
 const TELEGRAM_SOURCE_CHANNELS = [
   {
@@ -781,6 +790,12 @@ async function fetchTelegramChannelPosts() {
         const text = cleanTelegramSourceText(decodeTelegramHtml(match[1]));
 
         if (!text || text.length < 15) continue;
+
+        if (
+  !/fomc|fed rate|interest rate decision|rate decision|cpi|ppi|pce|nfp|nonfarm|payrolls|jobless claims|initial claims|unemployment|consumer confidence|retail sales|gdp|pmi|ism|actual|forecast|previous|الفيدرالي|قرار الفائدة|التضخم|الوظائف|البطالة|طلبات إعانة البطالة|الحالي|المتوقع|السابق/i.test(text)
+) {
+  continue;
+}
 
         posts.push({
           title: text,
@@ -1065,7 +1080,7 @@ async function getImageFromArticleUrl(articleUrl) {
   if (!articleUrl || !/^https?:\/\//i.test(articleUrl)) {
     return null;
   }
-  
+
 if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
   return null;
 }
