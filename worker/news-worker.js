@@ -2387,6 +2387,45 @@ async function buildUsMarketOpenReportMessage() {
   );
 }
 
+async function buildUsMarketOpenFollowupMessage() {
+  const [nasdaq, sp500, dow] = await Promise.all([
+    fetchYahooQuote("^IXIC"),
+    fetchYahooQuote("^GSPC"),
+    fetchYahooQuote("^DJI"),
+  ]);
+
+  if (!nasdaq || !sp500 || !dow) {
+    console.log("⏭️ Skipped US market open follow-up: missing market quotes");
+    return null;
+  }
+
+  const lines = [
+    formatMarketChangeLine("ناسداك", nasdaq),
+    formatMarketChangeLine("ستاندرد آند بورز 500", sp500),
+    formatMarketChangeLine("داو جونز", dow),
+  ].join("\n");
+
+  let summary = "افتتاح متوازن نسبياً مع ترقب اتجاه الجلسة خلال الدقائق القادمة.";
+
+  if (nasdaq.changePercent > 0.5 && sp500.changePercent > 0.3) {
+    summary = "أسهم التكنولوجيا تقود المكاسب بعد الافتتاح، مع تحسن شهية المخاطرة في وول ستريت.";
+  } else if (nasdaq.changePercent < -0.5 && sp500.changePercent < -0.3) {
+    summary = "ضغوط بيعية واضحة على الأسهم الأمريكية بعد الافتتاح، خصوصاً في قطاع التكنولوجيا.";
+  } else if (dow.changePercent > 0.3 && nasdaq.changePercent < 0) {
+    summary = "افتتاح متباين؛ داو جونز يحاول التماسك بينما يتعرض ناسداك لضغط نسبي.";
+  } else if (nasdaq.changePercent > 0 && dow.changePercent < 0) {
+    summary = "افتتاح متباين؛ ناسداك يتماسك بدعم أسهم التكنولوجيا بينما يتراجع داو جونز.";
+  }
+
+  return (
+    "📊 تحديث السوق الأمريكي بعد الافتتاح\n\n" +
+    "🇺🇸 مرور 15 دقيقة تقريباً على افتتاح وول ستريت.\n\n" +
+    `${lines}\n\n` +
+    `📈 ${summary}\n\n` +
+    "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi"
+  );
+}
+
 async function sendScheduledMarketAlerts() {
   try {
     const now = new Date();
@@ -2445,6 +2484,18 @@ async function sendScheduledMarketAlerts() {
           "⚠️ أول 30 دقيقة غالباً تكون الأعلى تذبذباً.\n\n" +
           "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
       },
+      {
+        id: `us-market-open-followup-${eventDateKey}`,
+        hour: 9,
+        minute: 45,
+        imageTitle: "US market update Nasdaq Dow S&P 500 Wall Street",
+        impactLevel: "HIGH",
+        buildMarketOpenFollowup: true,
+        message:
+          "📊 تحديث السوق الأمريكي بعد الافتتاح\n\n" +
+          "متابعة لأداء ناسداك وداو جونز و S&P 500 بعد أول 15 دقيقة من التداول.\n\n" +
+          "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+      },
     ];
 
     const currentAlert = scheduledAlerts.find(
@@ -2466,7 +2517,9 @@ async function sendScheduledMarketAlerts() {
 
     const alertMessage = currentAlert.buildMarketOpenReport
       ? await buildUsMarketOpenReportMessage()
-      : currentAlert.message;
+      : currentAlert.buildMarketOpenFollowup
+        ? await buildUsMarketOpenFollowupMessage()
+        : currentAlert.message;
 
     if (!alertMessage) {
       console.log(
