@@ -730,23 +730,11 @@ async function fetchTelegramChannelPosts() {
 
         if (!text || text.length < 15) continue;
 
-        const telegramImpactLevel = getMarketImpactLevel(text);
-        const telegramTopicCluster = getNewsTopicCluster(text);
-        const isStrongTelegramNews =
-          telegramImpactLevel === "HIGH" ||
-          isOfficialEconomicReleaseText(text) ||
-          [
-            "hormuz_iran_us",
-            "iran_israel_middle_east",
-            "russia_ukraine",
-            "oil_geopolitics",
-            "bitcoin_crypto",
-            "fed_rates",
-            "us_inflation_jobs",
-          ].includes(telegramTopicCluster);
-
-        if (!isStrongTelegramNews) {
-          console.log("⏭️ Skipped weak Telegram news:", text.slice(0, 120));
+        // Telegram is used only for official economic releases.
+        // Everything else (gold, oil, crypto, wars, stocks, geopolitics)
+        // should come from RSS/external sources.
+        if (!isOfficialEconomicReleaseText(text)) {
+          console.log("⏭️ Skipped non-economic Telegram news:", text.slice(0, 120));
           continue;
         }
 
