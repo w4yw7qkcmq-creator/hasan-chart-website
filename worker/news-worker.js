@@ -2535,6 +2535,21 @@ async function isMarketMovingNews(title) {
   }
 
   const value = String(title || "").toLowerCase();
+  // External RSS/news sources must be strictly market-moving.
+  // Do not publish light or medium stories just because they mention markets.
+  const majorMarketImpactPattern =
+    /breaking|urgent|fed|fomc|powell|interest rate decision|rate decision|rate cut|rate hike|cpi|ppi|pce|nfp|nonfarm|payrolls|jobless claims|initial claims|continuing claims|unemployment|consumer confidence|retail sales|gdp|ism|pmi|central bank decision|ecb decision|boe decision|boj decision|stocks plunge|stocks sink|stocks tumble|stock futures plunge|market crash|selloff|sell-off|nasdaq plunges|nasdaq falls sharply|dow plunges|s&p falls sharply|treasury yields spike|dollar surges|dollar plunges|gold jumps|gold surges|gold hits record|gold falls sharply|gold plunges|oil spikes|oil surges|oil jumps|oil plunges|crude jumps|brent jumps|bitcoin plunges|bitcoin surges|btc plunges|btc surges|crypto liquidations|liquidations top|billion liquidations|war|missile attack|airstrike|drone attack|military strike|attack on ships|tanker attack|red sea|hormuz|iran attacks|israel attacks|us strikes|sanctions announced|tariffs announced|عاجل|الفيدرالي|باول|قرار الفائدة|خفض الفائدة|رفع الفائدة|التضخم|مؤشر أسعار|البطالة|الوظائف|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|قرار بنك مركزي|انهيار السوق|خسائر حادة|هبوط حاد|ناسداك يهبط بقوة|داو جونز يهبط بقوة|تصفيات|تصفيات كبرى|البيتكوين يهبط بقوة|البيتكوين يرتفع بقوة|الذهب يرتفع بقوة|الذهب يقفز|الذهب يسجل مستوى قياسي|الذهب يهبط بقوة|النفط يقفز|النفط يرتفع بقوة|النفط يهبط بقوة|حرب|هجوم صاروخي|ضربة جوية|هجوم بطائرات مسيرة|ضربة عسكرية|استهداف سفن|ناقلة نفط|البحر الأحمر|هرمز|إيران تهاجم|ايران تهاجم|إسرائيل تهاجم|اسرائيل تهاجم|ضربات أمريكية|ضربات امريكية|عقوبات|تعريفات/i;
+
+  const lightOrMediumStoryPattern =
+    /edges higher|edges lower|little changed|steady|mixed|rebounds|rebound|eases|slips|ticks up|ticks down|modestly|slightly|near|around|holds above|holds below|set to|could|may|might|expected to|analyst says|forecast|outlook|technical|support|resistance|what to watch|preview|recap|opinion|guide|explainer|توقعات|تحليل|فني|دعم|مقاومة|يرى محللون|قد|ربما|قرب|حول|يتماسك|يتراجع قليلاً|يرتفع قليلاً|متباين|مستقر|توقع|نظرة|قراءة فنية/i;
+
+  if (!majorMarketImpactPattern.test(value)) {
+    return false;
+  }
+
+  if (lightOrMediumStoryPattern.test(value) && !majorMarketImpactPattern.test(value)) {
+    return false;
+  }
   if (FOREX_BREAKING_STYLE) {
     const weakArticlePattern =
       /rebound|rebounds|eases|steady|mixed|unchanged|little changed|set to|could|may|might|what to buy|how to|why|guide|explainer|opinion|survey|household worries|consumer worries|video game|videogame|console|merger|private equity|bidding|shares rise|shares fall|stock jumps|stock sinks|single stock|individual stock|analyst says|research firm|top things|watch this week|better hardware|red flags|healthy reset|nasdaq rebound|s&p rebound|dow seesaws|أسهم شركة|سهم شركة|توصي|توصية|يرى محللون|لماذا|كيف|قد|ربما|استطلاع|قلق الأسر|مخاوف الأسر|يتعافى|ينتعش|متباين|بدون تغيير|أسهم فردية|اندماج|استحواذ|ملكية خاصة|ألعاب الفيديو|الألعاب|اختيارات|أفضل الأسهم/i;
