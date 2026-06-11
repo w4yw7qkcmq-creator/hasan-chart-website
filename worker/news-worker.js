@@ -974,16 +974,16 @@ function selectNewsImage(title) {
     lowerTitle.includes("dollar")
   ) {
     return pickRandomAsset([
-      "Stockpng.png",
-"stocks-1.png",
-"stocks-2.png",
-"stocks-3.png",
-"Inflation.png",
-"default-1.png",
-"default-2.png",
-"default-3.png",
-"default.png",
-    ]);
+  "Inflation.png",
+  "Stockpng.png",
+  "stocks-1.png",
+  "stocks-2.png",
+  "stocks-3.png",
+  "default-1.png",
+  "default-2.png",
+  "default-3.png",
+  "default.png",
+]);
   }
 
   if (
@@ -1065,7 +1065,10 @@ async function getImageFromArticleUrl(articleUrl) {
   if (!articleUrl || !/^https?:\/\//i.test(articleUrl)) {
     return null;
   }
-
+  
+if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
+  return null;
+}
   try {
     const response = await axios.get(articleUrl, {
       timeout: 10000,
@@ -1592,14 +1595,9 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
   try {
     let finalImageUrl = imageUrl;
 
-    if (
-      shouldUseLocalImageForMajorTopic(title) &&
-      typeof finalImageUrl === "string" &&
-      /^https?:\/\//i.test(finalImageUrl)
-    ) {
-      console.log("✅ Major topic detected. Using local high-quality image for better relevance:", title);
-      finalImageUrl = selectNewsImage(title);
-    }
+    if (!finalImageUrl) {
+  finalImageUrl = selectNewsImage(title);
+}
 
     let image = await loadImage(finalImageUrl);
     let isLocalAssetImage = typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl);
