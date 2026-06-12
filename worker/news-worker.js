@@ -3174,17 +3174,24 @@ mediaThumbnail: null,
       if (/wall st futures|wall street futures|spacex|space x|debut in focus|peace hopes|earnings|quarterly results|eps|revenue|guidance|ipo/i.test(titleForImpact)) {
         continue;
       }
+      if (
+  /portfolio review|investor portfolio|hidden mistake|investment mistake|civil society|imf loan|loan program|reparations|compensation deadline|stock compensation|gallagher|hankook|google liability|ai claims|perpetual futures|perpetual swaps|crypto perpetuals|investors remain invested|oil to 100|oil above 100|مراجعة المحفظة|محفظة المستثمرين|خطأ خفي|أخطاء الاستثمار|منظمات المجتمع المدني|المجتمع المدني|صندوق النقد الدولي|برنامج قرض|قرض لأوكرانيا|تعويضات الأسهم|تعويضات|موعد نهائي|مسؤولية الذكاء الاصطناعي|ادعاءات كاذبة|العقود الدائمة|العقود المستمرة|مخاطر ارتفاع النفط إلى|النفط إلى 100/i.test(titleForImpact)
+) {
+  console.log("⏭️ Skipped weak/general RSS story by strict blocklist:", item.title);
+  continue;
+}
       const isEconomicNews = isEconomicCalendarNews(titleForImpact);
-      const isImportant = await isMarketMovingNews(item.title || "");
+      const isImportant = await isMarketMovingNews(titleForImpact);
 
       const impactLevel = isEconomicNews ? "HIGH" : getMarketImpactLevel(titleForImpact);
       const isUltraPriority = ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
         titleForImpact.toLowerCase().includes(keyword.toLowerCase())
       );
 
-      if (!isImportant && impactLevel === "LOW" && !isEconomicNews) {
-        continue;
-      }
+      if (!isImportant && !isEconomicNews && !isUltraPriority) {
+  console.log("⏭️ Skipped non-market-moving story:", item.title);
+  continue;
+}
 
       if (impactLevel === "LOW") {
         console.log("⏭️ Skipped weak/low-impact market story:", item.title);
