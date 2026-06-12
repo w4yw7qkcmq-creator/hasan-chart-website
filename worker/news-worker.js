@@ -49,8 +49,8 @@ const CHANNEL_LOGO_FILE = path.join(__dirname, "assets", "logo.png");
 const TEMP_ALLOW_ALL_NEWS = false;
 
 const MAX_NEWS_AGE_HOURS = 24;
-const MAX_POSTS_PER_HOUR = 8;
-const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 12;
+const MAX_POSTS_PER_HOUR = 5;
+const MAX_HIGH_IMPACT_POSTS_PER_HOUR = 5;
 const ULTRA_PRIORITY_KEYWORDS = [
   "fed",
   "fomc",
@@ -3192,7 +3192,10 @@ mediaThumbnail: null,
   console.log("⏭️ Skipped non-market-moving story:", item.title);
   continue;
 }
-
+if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority) {
+  console.log("⏭️ Skipped medium/low RSS story. Only HIGH impact is allowed:", item.title);
+  continue;
+}
       if (impactLevel === "LOW") {
         console.log("⏭️ Skipped weak/low-impact market story:", item.title);
         continue;
