@@ -641,7 +641,29 @@ function isEconomicCalendarNews(title) {
 function isOfficialEconomicReleaseText(title) {
   const value = String(title || "").toLowerCase();
 
-  return /fomc|fed rate|federal reserve|interest rate decision|rate decision|rate cut|rate hike|cpi|core cpi|consumer price index|ppi|producer price index|pce|core pce|nfp|nonfarm|payrolls|jobless claims|initial claims|continuing claims|unemployment rate|consumer confidence|consumer sentiment|retail sales|gdp|ism|pmi|actual|forecast|previous|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|تثبيت الفائدة|التضخم|مؤشر أسعار المستهلك|مؤشر أسعار المنتجين|الوظائف|البطالة|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|الحالي|المتوقع|السابق|صدر الآن|صدر الان/i.test(value);
+  const isOfficialKeyword =
+    /fomc|fed rate|federal reserve|interest rate decision|rate decision|rate cut|rate hike|cpi|core cpi|consumer price index|ppi|producer price index|pce|core pce|nfp|nonfarm|payrolls|jobless claims|initial claims|continuing claims|unemployment rate|consumer confidence|consumer sentiment|retail sales|gdp|ism|pmi|actual|forecast|previous|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|تثبيت الفائدة|التضخم|مؤشر أسعار المستهلك|مؤشر أسعار المنتجين|الوظائف|البطالة|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|الحالي|المتوقع|التقدير|السابق|صدر الآن|صدر الان/i.test(value);
+
+  const hasReleaseValues = /actual|forecast|previous|الحالي|المتوقع|التقدير|السابق/i.test(value);
+
+  const isUsRelease =
+    /united states|usa|america|u\.s\.|us |usd|dollar|أمريكا|امريكا|الولايات المتحدة|الأمريكي|الامريكي|الدولار/i.test(value);
+
+  const isMajorCentralBank =
+    /fomc|federal reserve|fed rate|ecb|european central bank|boe|bank of england|boj|bank of japan|powell|lagarde|الفيدرالي|البنك المركزي الأوروبي|المركزي الأوروبي|المركزي البريطاني|بنك إنجلترا|بنك انجلترا|المركزي الياباني|باول|لاغارد|قرار الفائدة/i.test(value);
+
+  const blockedCountryRelease =
+    /germany|deutschland|spain|italy|france|britain|uk\b|united kingdom|canada|australia|new zealand|switzerland|japan|china|ألـمانيا|المانيا|ألمانيا|إسبانيا|اسبانيا|إيطاليا|ايطاليا|فرنسا|بريطانيا|المملكة المتحدة|كندا|أستراليا|استراليا|نيوزيلندا|سويسرا|اليابان|الصين/i.test(value);
+
+  if (!isOfficialKeyword) {
+    return false;
+  }
+
+  if (blockedCountryRelease && !isMajorCentralBank) {
+    return false;
+  }
+
+  return (isUsRelease || isMajorCentralBank) && (hasReleaseValues || isMajorCentralBank);
 }
 
 // RSS news feeds disabled. Main live-news source is now ForexBreakingNews Telegram channel only.
@@ -960,7 +982,9 @@ function selectNewsImage(title) {
   return pickRandomAsset([
     "Inflation.png",
     "Stockpng.png",
-    "Forex.png",
+    "stocks-1.png",
+    "stocks-2.png",
+    "stocks-3.png",
     "default-1.png",
     "default-2.png",
     "default-3.png",
@@ -980,9 +1004,9 @@ function shouldUseLocalImageForMajorTopic(title) {
 function getImageFromNewsItem(item) {
   if (!item) return null;
 
- if (item.isTelegramSource) {
-  return null;
-}
+  if (item.isTelegramSource) {
+    return null;
+  }
 
   const candidates = [];
 
@@ -1012,9 +1036,9 @@ function getImageFromNewsItem(item) {
 
   return (
     candidates
-      .filter((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
+      .filter((imageUrl) => !/investing\.com|logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
       .find((imageUrl) => /1200|1280|1440|1600|1920|2048|large|original|hero|main/i.test(imageUrl)) ||
-    candidates.find((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl)) ||
+    candidates.find((imageUrl) => !/investing\.com|logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl)) ||
     null
   );
 }
@@ -1120,7 +1144,7 @@ if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
 
     const imageCandidates = [...candidates]
       .filter((imageUrl) => /^https?:\/\//i.test(imageUrl))
-      .filter((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
+      .filter((imageUrl) => !/t\.me|telegram\.me|telegram\.org|investing\.com|logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
       .sort((a, b) => {
         const score = (url) => {
           let total = 0;
@@ -2539,6 +2563,17 @@ async function isMarketMovingNews(title) {
   }
 
   const value = String(title || "").toLowerCase();
+
+  if (isOfficialEconomicReleaseText(value)) {
+    return false;
+  }
+
+  const blockedNoisePattern =
+    /earnings|quarterly results|eps|revenue|guidance|stock earnings|ipo|spacex debut|wall st futures gain|wall st futures rise|wall street futures gain|peace hopes|blockbuster|company results|shares of|تريب\.كوم|أرباح شركة|الأرباح الفصلية|تراجع الأرباح|رغم تجاوز الإيرادات|افتتاح وول ستريت.*سبيس إكس|عقود وول ستريت الآجلة.*سبيس إكس|توقعات حاسمة قبل افتتاح وول ستريت/i;
+
+  if (blockedNoisePattern.test(value)) {
+    return false;
+  }
   // External RSS/news sources must be strictly market-moving.
   // Do not publish light or medium stories just because they mention markets.
   const majorMarketImpactPattern =
