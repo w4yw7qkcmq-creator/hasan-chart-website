@@ -818,6 +818,9 @@ function getMarketImpactLevel(text) {
 
 function pickRandomAsset(fileNames) {
   const assetsDir = path.join(__dirname, "assets");
+  const usageFile = path.join(__dirname, "last-used-images.json");
+  const todayKey = new Date().toISOString().slice(0, 10);
+
   const availableFiles = fileNames
     .map((fileName) => path.join(assetsDir, fileName))
     .filter((filePath) => fs.existsSync(filePath));
@@ -829,15 +832,43 @@ function pickRandomAsset(fileNames) {
           .find((fileName) => /\.(png|jpg|jpeg)$/i.test(fileName))
       : null;
 
-    if (anyImageFile) {
-      return path.join(assetsDir, anyImageFile);
-    }
-
-    return path.join(assetsDir, "default.png");
+    return anyImageFile ? path.join(assetsDir, anyImageFile) : path.join(assetsDir, "default.png");
   }
 
-  const randomIndex = Math.floor(Math.random() * availableFiles.length);
-  return availableFiles[randomIndex];
+  let usage = { date: todayKey, files: [] };
+
+  try {
+    if (fs.existsSync(usageFile)) {
+      usage = JSON.parse(fs.readFileSync(usageFile, "utf8"));
+    }
+  } catch (_) {
+    usage = { date: todayKey, files: [] };
+  }
+
+  if (usage.date !== todayKey) {
+    usage = { date: todayKey, files: [] };
+  }
+
+  const unusedFiles = availableFiles.filter(
+    (filePath) => !usage.files.includes(path.basename(filePath))
+  );
+
+  const candidateFiles = unusedFiles.length ? unusedFiles : availableFiles;
+  const selected = candidateFiles[Math.floor(Math.random() * candidateFiles.length)];
+  const selectedName = path.basename(selected);
+
+  try {
+    usage.files = [
+      selectedName,
+      ...usage.files.filter((fileName) => fileName !== selectedName),
+    ].slice(0, 40);
+
+    fs.writeFileSync(usageFile, JSON.stringify(usage, null, 2));
+  } catch (_) {
+    // Ignore local image usage cache write errors.
+  }
+
+  return selected;
 }
 
 function selectNewsImage(title) {
