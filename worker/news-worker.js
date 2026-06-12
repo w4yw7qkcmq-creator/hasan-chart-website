@@ -3192,8 +3192,12 @@ mediaThumbnail: null,
   console.log("⏭️ Skipped non-market-moving story:", item.title);
   continue;
 }
-if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority) {
-  console.log("⏭️ Skipped medium/low RSS story. Only HIGH impact is allowed:", item.title);
+const isStrongRssMarketStory =
+  !item.isTelegramSource &&
+  /iran|israel|hormuz|red sea|missile|airstrike|attack|war|sanctions|tariffs|oil|crude|brent|wti|gold|bitcoin|btc|crypto liquidations|liquidations|nasdaq|dow|s&p|market crash|selloff|stocks plunge|stocks sink|risk-off|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|البحر الاحمر|صاروخ|ضربة|هجوم|حرب|عقوبات|تعريفات|النفط|خام|برنت|الذهب|البيتكوين|تصفيات|ناسداك|داو جونز|انهيار السوق|هبوط حاد|خسائر الأسواق/i.test(titleForImpact);
+
+if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isStrongRssMarketStory) {
+  console.log("⏭️ Skipped medium/low RSS story. Only strong market stories are allowed:", item.title);
   continue;
 }
       if (impactLevel === "LOW") {
