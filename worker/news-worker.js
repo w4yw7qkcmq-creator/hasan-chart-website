@@ -640,6 +640,11 @@ function isEconomicCalendarNews(title) {
 
 function isOfficialEconomicReleaseText(title) {
   const value = String(title || "").toLowerCase();
+  if (
+    /spacex|space x|ipo|earnings|quarterly results|eps|revenue|guidance|google liability|artificial intelligence liability|crypto perpetuals|futures or swaps|coindesk tv|investors remain invested|court ruling|legal ruling|sk hynix|perpetual contracts|perpetual futures|ai-generated claims|false ai claims|lawsuit|court decision|court ruling|regulation debate|debate over|صناديق البيتكوين|العقود الدائمة|العقود المستمرة|العقود الآجلة الدائمة|مسؤولية الذكاء الاصطناعي|الادعاءات الكاذبة|حكم قضائي|قرار قضائي|محكمة|قانونياً|قانونيا|جدل قانوني|نقاشات تدور|طرح عام|اكتتاب|أرباح|إيرادات|شركة جوجل|جوجل/i.test(value)
+  ) {
+    return false;
+  }
 
   const isOfficialKeyword =
     /fomc|fed rate|federal reserve|interest rate decision|rate decision|rate cut|rate hike|cpi|core cpi|consumer price index|ppi|producer price index|pce|core pce|nfp|nonfarm|payrolls|jobless claims|initial claims|continuing claims|unemployment rate|consumer confidence|consumer sentiment|retail sales|gdp|ism|pmi|actual|forecast|previous|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|تثبيت الفائدة|التضخم|مؤشر أسعار المستهلك|مؤشر أسعار المنتجين|الوظائف|البطالة|طلبات إعانة البطالة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|الحالي|المتوقع|التقدير|السابق|صدر الآن|صدر الان/i.test(value);
