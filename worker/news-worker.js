@@ -2912,6 +2912,11 @@ async function fetchForexNews() {
 
             if (text.length < 40) continue;
 
+            if (!isOfficialEconomicReleaseText(text)) {
+  console.log("⏭️ Skipped non-official Telegram item:", text.slice(0, 120));
+  continue;
+}
+
             allItems.push({
               title: text,
               contentSnippet: text,
@@ -3122,6 +3127,17 @@ mediaThumbnail: null,
       }
 
       const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
+      if (item.isTelegramSource && !isOfficialEconomicReleaseText(titleForImpact)) {
+        continue;
+      }
+
+      if (!item.isTelegramSource && isOfficialEconomicReleaseText(titleForImpact)) {
+        continue;
+      }
+
+      if (/wall st futures|wall street futures|spacex|space x|debut in focus|peace hopes|earnings|quarterly results|eps|revenue|guidance|ipo/i.test(titleForImpact)) {
+        continue;
+      }
       const isEconomicNews = isEconomicCalendarNews(titleForImpact);
       const isImportant = await isMarketMovingNews(item.title || "");
 
