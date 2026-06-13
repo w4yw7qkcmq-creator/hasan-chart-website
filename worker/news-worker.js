@@ -3399,6 +3399,7 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
       const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
       const articleImage = latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
       const topicExternalImage = getExternalImageByNewsTopic(imageTitle || latestNews.title, latestNews.impactLevel || "MEDIUM");
+      console.log("🖼️ Topic external image candidate:", topicExternalImage || "none", "| title:", imageTitle || latestNews.title);
       const shouldUseLocalFallbackImage =
         latestNews.impactLevel === "HIGH" ||
         ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
