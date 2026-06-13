@@ -103,7 +103,7 @@ const ULTRA_PRIORITY_KEYWORDS = [
 ];
 const MIN_MINUTES_BETWEEN_POSTS = 0;
 // Prefer real images from the news source. Keep local images only as an optional emergency fallback.
-const USE_LOCAL_IMAGE_FALLBACK = true;
+const USE_LOCAL_IMAGE_FALLBACK = false;
 
 // Professional breaking-news mode: publish only market-moving items, not general articles.
 const FOREX_BREAKING_STYLE = true;
@@ -1615,7 +1615,8 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
     let finalImageUrl = imageUrl;
 
     if (!finalImageUrl) {
-  finalImageUrl = selectNewsImage(title);
+  console.log("⏭️ No external image found");
+  return null;
 }
 
     let image = await loadImage(finalImageUrl);
@@ -2599,6 +2600,13 @@ async function isMarketMovingNews(title) {
   }
 
   const value = String(title || "").toLowerCase();
+
+  const blockedPoliticalNoise =
+  /peace deal|peace talks|agreement expected|expected agreement|activist|deported|deportation|lawsuit|court|legal|negotiations|talks|scientists|researchers|quantum|portfolio review|hidden mistake|civil society|اتفاق سلام|مفاوضات سلام|محادثات|توقع اتفاق|ناشط|ترحيل|محكمة|قضية|دعوى|قانوني|باحثون|علماء|نقاش|استعراض محفظة|خطأ خفي|منظمات المجتمع المدني/i;
+
+if (blockedPoliticalNoise.test(value)) {
+  return false;
+}
 
   if (isOfficialEconomicReleaseText(value)) {
     return false;
