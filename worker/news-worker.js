@@ -204,7 +204,7 @@ const IMPORTANT_EVENT_ALERTS = [
   },
 ];
 
-const IMPORTANT_EVENT_ALERT_MINUTES = [120, 60, 15, 5];
+const IMPORTANT_EVENT_ALERT_MINUTES = [1440, 120, 60, 15, 5];
 const RECURRING_JOBLESS_CLAIMS_WEEKS = 8;
 let cachedEconomicCalendarEvents = [];
 let cachedEconomicCalendarEventsAt = 0;
@@ -2168,7 +2168,7 @@ async function sendWeeklyEconomicCalendarPost() {
     const message =
       `📅 التقويم الاقتصادي لهذا الأسبوع\n\n` +
       `${eventLines}\n\n` +
-      `⏰ التوقيت حسب سوريا.\n` +
+      `⏰ التوقيت حسب مكة المكرمة.\n` +
       `⚠️ سيتم إرسال تنبيهات قبل الأخبار المهمة بـ 120 / 60 / 15 / 5 دقائق.\n\n` +
       `📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`;
 
@@ -2236,11 +2236,14 @@ function formatAssetsForAlert(assetsText) {
 function buildScheduledAlertMessage(event, minutesBefore) {
   const assetsLines = formatAssetsForAlert(event.assets);
 
+  const timeLabel = minutesBefore === 1440 ? "غداً" : `${minutesBefore} دقيقة`;
+
   return (
     `🟨 تنبيه اقتصادي هام\n\n` +
     `🇺🇸 أمريكا\n` +
     `💵 ${event.title}\n\n` +
-    `⏰ متبقي: ${minutesBefore} دقيقة\n\n` +
+    `⏰ الموعد: ${timeLabel}\n` +
+    `🕋 بتوقيت مكة المكرمة\n\n` +
     `📊 الأصول المتأثرة:\n${assetsLines || "• الدولار الأمريكي\n• الذهب\n• المؤشرات الأمريكية"}\n\n` +
     `⚠️ متوقع ارتفاع التذبذب بشكل ملحوظ وقت صدور الخبر.\n\n` +
     `📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`
@@ -2269,6 +2272,12 @@ async function sendImportantEconomicEventAlerts() {
       }
 
       for (const minutesBefore of IMPORTANT_EVENT_ALERT_MINUTES) {
+        const major24hEvents =
+          /fomc|interest rate|rate decision|cpi|ppi|nfp|unemployment|jobless claims|powell|ecb|boe|fed|الفيدرالي|قرار الفائدة|التضخم|البطالة|الوظائف|طلبات إعانة البطالة|باول/i.test(event.title);
+
+        if (minutesBefore === 1440 && !major24hEvents) {
+          continue;
+        }
         const alertTime = eventTime - minutesBefore * 60 * 1000;
         const diffMs = now - alertTime;
 
