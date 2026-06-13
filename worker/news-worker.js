@@ -1614,6 +1614,42 @@ function wrapText(ctx, text, maxWidth) {
   return lines.slice(0, 3);
 }
 
+function getExternalImageByNewsTopic(title, impactLevel = "MEDIUM") {
+  const value = String(title || "").toLowerCase();
+
+  const isMajorEconomicRelease =
+    /fomc|fed|federal reserve|powell|interest rate|rate decision|cpi|ppi|pce|nfp|nonfarm|payrolls|jobless claims|unemployment|consumer confidence|consumer sentiment|retail sales|gdp|ism|pmi|الفيدرالي|باول|قرار الفائدة|التضخم|مؤشر أسعار|الوظائف|البطالة|طلبات إعانة البطالة|ثقة المستهلك|الناتج المحلي/i.test(value);
+
+  const isStrongMarketNews =
+    /gold|xau|oil|crude|brent|wti|bitcoin|btc|crypto|nasdaq|dow|s&p|stock market|market crash|selloff|liquidations|iran|israel|hormuz|red sea|war|missile|attack|airstrike|sanctions|tariffs|الذهب|النفط|خام|برنت|البيتكوين|الكريبتو|ناسداك|داو جونز|الأسهم|الاسهم|تصفيات|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|حرب|هجوم|ضربة|عقوبات|تعريفات/i.test(value);
+
+  if (impactLevel !== "HIGH" && !isMajorEconomicRelease && !isStrongMarketNews) {
+    return null;
+  }
+
+  let query = "financial markets trading floor";
+
+  if (/fomc|fed|federal reserve|powell|interest rate|rate decision|الفيدرالي|باول|قرار الفائدة/i.test(value)) {
+    query = "federal reserve building washington";
+  } else if (/cpi|ppi|pce|inflation|consumer price|producer price|التضخم|مؤشر أسعار/i.test(value)) {
+    query = "inflation economy financial markets";
+  } else if (/nfp|nonfarm|payrolls|jobless claims|unemployment|jobs|الوظائف|البطالة|طلبات إعانة البطالة/i.test(value)) {
+    query = "us jobs report labor market";
+  } else if (/gold|xau|ذهب|الذهب/i.test(value)) {
+    query = "gold bullion market";
+  } else if (/oil|crude|brent|wti|نفط|النفط|خام|برنت/i.test(value)) {
+    query = "crude oil market";
+  } else if (/bitcoin|btc|crypto|ethereum|بيتكوين|البيتكوين|كريبتو|العملات الرقمية/i.test(value)) {
+    query = "bitcoin cryptocurrency market";
+  } else if (/iran|israel|hormuz|red sea|war|missile|attack|airstrike|sanctions|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|حرب|هجوم|ضربة|عقوبات/i.test(value)) {
+    query = "middle east geopolitics oil market";
+  } else if (/nasdaq|dow|s&p|stocks|stock market|market crash|selloff|ناسداك|داو جونز|الأسهم|الاسهم|انهيار السوق/i.test(value)) {
+    query = "wall street stock market";
+  }
+
+  return `https://source.unsplash.com/1920x1080/?${encodeURIComponent(query)}`;
+}
+
 async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
   const width = 1920;
   const height = 1080;
@@ -1631,19 +1667,21 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
     let finalImageUrl = imageUrl;
 
     if (!finalImageUrl) {
-  console.log("⏭️ No external image found");
-  return null;
-}
+      console.log("⏭️ No external image found");
+      return null;
+    }
+
+    if (!USE_LOCAL_IMAGE_FALLBACK && typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl)) {
+      console.log("⏭️ Local image fallback is disabled. Skipping image card:", finalImageUrl);
+      return null;
+    }
 
     let image = await loadImage(finalImageUrl);
     let isLocalAssetImage = typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl);
 
     const useLocalFallbackImage = async (reason) => {
-      console.log(`⏭️ ${reason}: ${image.width}x${image.height}. Using local fallback image.`);
-      finalImageUrl = selectNewsImage(title);
-      image = await loadImage(finalImageUrl);
-      isLocalAssetImage = typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl);
-      console.log(`✅ Local fallback image loaded: ${image.width}x${image.height}`);
+      console.log(`⏭️ ${reason}: ${image.width}x${image.height}. Local fallback disabled.`);
+      throw new Error("Local image fallback disabled");
     };
 
     if (!isLocalAssetImage && (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT)) {
@@ -3359,7 +3397,8 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
     let finalImage = null;
     if (veryImportantNews || latestNews.impactLevel === "HIGH") {
       const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
-const articleImage = latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
+      const articleImage = latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
+      const topicExternalImage = getExternalImageByNewsTopic(imageTitle || latestNews.title, latestNews.impactLevel || "MEDIUM");
       const shouldUseLocalFallbackImage =
         latestNews.impactLevel === "HIGH" ||
         ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
@@ -3372,7 +3411,7 @@ const articleImage = latestNews.isTelegramSource || rssImage ? null : await getI
         USE_LOCAL_IMAGE_FALLBACK && shouldUseLocalFallbackImage
           ? selectNewsImage(latestNews.title)
           : null;
-      finalImage = rssImage || articleImage || localFallbackImage;
+      finalImage = rssImage || articleImage || topicExternalImage || localFallbackImage;
 
       if (finalImage) {
         const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
