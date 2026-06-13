@@ -670,6 +670,22 @@ function isOfficialEconomicReleaseText(title) {
 
   return (isUsRelease || isMajorCentralBank) && (hasReleaseValues || isMajorCentralBank);
 }
+function shouldShowImpactForNews(title) {
+  const value = String(title || "").toLowerCase();
+
+  return /fomc|fed rate|federal reserve|interest rate decision|rate decision|rate cut|rate hike|cpi|ppi|pce|nfp|jobless claims|unemployment rate|consumer confidence|gdp|pmi|ism|الفيدرالي|قرار الفائدة|التضخم|البطالة|الوظائف|طلبات إعانة البطالة|ثقة المستهلك|الناتج المحلي/i.test(value);
+}
+
+function removeImpactLineIfNotAllowed(message, title) {
+  if (shouldShowImpactForNews(title)) {
+    return message;
+  }
+
+  return String(message || "")
+    .replace(/^.*(?:⬅️\s*النتيجة|التأثير|تأثير الخبر).*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 // RSS news feeds disabled. Main live-news source is now ForexBreakingNews Telegram channel only.
 // Economic calendar functions remain active separately for scheduled alerts and official releases.
