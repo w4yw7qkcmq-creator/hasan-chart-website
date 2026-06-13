@@ -46,7 +46,7 @@ const CHANNEL_LOGO_FILE = path.join(__dirname, "assets", "logo.png");
 
 // Temporary test mode: true = publish any latest news to test the image design.
 // After testing, change this to false to activate the important-news filter again.
-const TEMP_ALLOW_ALL_NEWS = false;
+const TEMP_ALLOW_ALL_NEWS = true;
 
 const MAX_NEWS_AGE_HOURS = 24;
 const MAX_POSTS_PER_HOUR = 5;
