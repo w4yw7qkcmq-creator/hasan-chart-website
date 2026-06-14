@@ -4,6 +4,9 @@ export default function robots() {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://www.hasanchartworld.com/sitemap.xml",
+    sitemap: [
+      "https://www.hasanchartworld.com/sitemap.xml",
+      "https://www.hasanchartworld.com/news-sitemap.xml",
+    ],
   };
 }
