@@ -88,9 +88,21 @@ export async function generateMetadata({ params }) {
   const image = getNewsImage(news) || `${SITE_URL}/favicon.png`;
   const url = `${SITE_URL}/news/${news.id}`;
 
+  const keywords = [
+    title,
+    "أخبار اقتصادية",
+    "أخبار الفوركس",
+    "أخبار العملات الرقمية",
+    "أخبار الأسهم",
+    "أخبار الذهب",
+    "أخبار النفط",
+    "HasaN CharT World",
+  ].join(", ");
+
   return {
     title: `${title} - HasaN CharT World`,
     description,
+    keywords,
     alternates: {
       canonical: url,
     },
@@ -100,6 +112,8 @@ export async function generateMetadata({ params }) {
       url,
       siteName: "HasaN CharT World",
       type: "article",
+      section: "Economic News",
+      tags: [title, "اقتصاد", "أسواق مالية", "فوركس", "كريبتو"],
       images: [
         {
           url: image,
@@ -140,9 +154,42 @@ export default async function NewsDetailsPage({ params }) {
   const isHighImpact = news.impact_level === "HIGH";
   const articleUrl = `${SITE_URL}/news/${news.id}`;
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "الرئيسية",
+        item: SITE_URL,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "الأخبار",
+        item: `${SITE_URL}/news`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: title,
+        item: articleUrl,
+      },
+    ],
+  };
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
+    keywords: [
+      title,
+      "أخبار اقتصادية",
+      "فوركس",
+      "عملات رقمية",
+      "أسواق عالمية",
+    ],
+    articleSection: "Economic News",
     headline: title,
     description: content.slice(0, 180),
     image: image ? [image] : [`${SITE_URL}/favicon.png`],
@@ -168,6 +215,10 @@ export default async function NewsDetailsPage({ params }) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <script
         dangerouslySetInnerHTML={{
