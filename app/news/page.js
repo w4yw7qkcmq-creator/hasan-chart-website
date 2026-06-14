@@ -56,6 +56,7 @@ export default function News() {
       .replace(/https?:\/\/t\.me\/EconomicNewsi/gi, "")
       .replace(/قناة الأخبار الرسمية\s*:*/gi, "")
       .replace(/🔊|📢/g, "")
+      .replace(/\b(Reuters|CNBC|Investing\.com|MarketWatch|CoinDesk)\b\s*[-–—:]?\s*/gi, "")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -67,22 +68,45 @@ export default function News() {
     return `${cleaned.slice(0, maxLength).trim()}...`;
   }
 
-  function getValidImage(url) {
-    if (!url) return null;
+  function getValidImage(...urls) {
+    const candidates = urls.flat().filter(Boolean);
 
-    const imageUrl = String(url).trim();
+    for (const url of candidates) {
+      const imageUrl = String(url).trim();
 
-    if (imageUrl.startsWith("/app/assets/")) return null;
-    if (imageUrl.includes("default.png")) return null;
+      if (!imageUrl) continue;
+      if (imageUrl.startsWith("/app/assets/")) continue;
+      if (imageUrl.includes("default.png")) continue;
+      if (imageUrl.includes("placeholder")) continue;
+      if (imageUrl.includes("sprite")) continue;
+      if (imageUrl.includes("logo")) continue;
+      if (imageUrl.includes("avatar")) continue;
 
-    if (
-      imageUrl.startsWith("https://") ||
-      imageUrl.startsWith("http://")
-    ) {
-      return imageUrl;
+      if (imageUrl.startsWith("//")) {
+        return `https:${imageUrl}`;
+      }
+
+      if (imageUrl.startsWith("https://") || imageUrl.startsWith("http://")) {
+        return imageUrl;
+      }
     }
 
     return null;
+  }
+
+  function getNewsImage(item) {
+    return getValidImage(
+      item.image_url,
+      item.image,
+      item.thumbnail_url,
+      item.thumbnail,
+      item.urlToImage,
+      item.url_to_image,
+      item.media_url,
+      item.source_image_url,
+      item.og_image,
+      item.cover_image
+    );
   }
 
   function extractArabicTitle(item) {
@@ -198,10 +222,11 @@ export default function News() {
                 item.content || item.summary || item.description || item.ai_summary || item.normalized_title,
                 260
               );
-              const newsImage = getValidImage(item.image_url || item.image || item.thumbnail_url);
+              const newsImage = getNewsImage(item);
               const sourceName = getSourceName(sourceLink);
               const category = getNewsCategory(item);
               const visual = categoryVisual(category);
+              const hasRealImage = Boolean(newsImage);
 
               return (
                 <article
@@ -209,7 +234,7 @@ export default function News() {
                   className={`group overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
                 >
                   <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
-                    <div className="absolute inset-0 hidden items-center justify-center text-center fallback-news-image">
+                    <div className={`absolute inset-0 ${hasRealImage ? "hidden" : "flex"} items-center justify-center text-center fallback-news-image`}>
                       <div className="px-6">
                         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-cyan-300/25 bg-cyan-400/15 text-4xl shadow-[0_0_40px_rgba(34,211,238,0.18)]">
                           {visual.icon}
@@ -226,7 +251,8 @@ export default function News() {
                           event.currentTarget.style.display = "none";
                           const fallback = event.currentTarget.parentElement?.querySelector(".fallback-news-image");
                           if (fallback) {
-                            fallback.style.display = "flex";
+                            fallback.classList.remove("hidden");
+                            fallback.classList.add("flex");
                           }
                         }}
                         className="relative z-10 h-full w-full object-cover transition duration-700 group-hover:scale-105"
