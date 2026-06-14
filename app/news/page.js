@@ -25,7 +25,7 @@ export default function News() {
   async function fetchNews() {
     try {
       const { data, error } = await supabase
-        .from("news_posts")
+        .from("published_news")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50);
@@ -71,16 +71,27 @@ export default function News() {
                   ? "bg-red-500/20 text-red-300 border-red-500/30"
                   : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
 
+              const newsTitle = item.title || item.normalized_title || "خبر اقتصادي";
+              const newsContent =
+                item.content ||
+                item.summary ||
+                item.description ||
+                item.ai_summary ||
+                item.normalized_title ||
+                "اضغط على المصدر لقراءة تفاصيل الخبر.";
+              const newsImage = item.image_url || item.image || item.thumbnail_url || null;
+              const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
+
               return (
                 <div
                   key={item.id}
                   className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl hover:border-cyan-400/30 transition-all duration-300"
                 >
-                  {item.image_url ? (
+                  {newsImage ? (
                     <div className="relative w-full h-[240px] md:h-[420px] overflow-hidden">
                       <img
-                        src={item.image_url}
-                        alt={item.title}
+                        src={newsImage}
+                        alt={newsTitle}
                         className="w-full h-full object-cover"
                       />
 
@@ -90,9 +101,7 @@ export default function News() {
                         <div
                           className={`px-4 py-2 rounded-full border text-sm font-bold ${impactColor}`}
                         >
-                          {item.impact_level === "HIGH"
-                            ? "🚨 عاجل"
-                            : "📌 مهم"}
+                          {newsImpact === "HIGH" ? "🚨 عاجل" : "📌 مهم"}
                         </div>
                       </div>
                     </div>
@@ -112,12 +121,23 @@ export default function News() {
                     </div>
 
                     <h2 className="text-2xl md:text-3xl font-black leading-relaxed mb-5 text-white">
-                      {item.title}
+                      {newsTitle}
                     </h2>
 
                     <div className="text-slate-300 leading-8 whitespace-pre-line text-[17px]">
-                      {item.content}
+                      {newsContent}
                     </div>
+
+                    {item.link ? (
+                      <a
+                        href={item.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-5 inline-flex rounded-2xl border border-cyan-400/30 px-4 py-2 text-sm font-bold text-cyan-200 hover:bg-cyan-400/10"
+                      >
+                        قراءة المصدر
+                      </a>
+                    ) : null}
                   </div>
                 </div>
               );
