@@ -1099,11 +1099,15 @@ function getImageFromNewsItem(item) {
     item.mediaThumbnail.forEach((media) => pushCandidate(media?.url));
   }
 
+  const validCandidates = candidates
+    .map((imageUrl) => String(imageUrl || "").trim())
+    .filter(Boolean)
+    .filter((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon|placeholder|default/i.test(imageUrl))
+    .filter((imageUrl) => /\.(jpg|jpeg|png|webp)(\?|$)/i.test(imageUrl) || /image|photo|media|cdn|static|prod/i.test(imageUrl));
+
   return (
-    candidates
-      .filter((imageUrl) => !/investing\.com|logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
-      .find((imageUrl) => /1200|1280|1440|1600|1920|2048|large|original|hero|main/i.test(imageUrl)) ||
-    candidates.find((imageUrl) => !/investing\.com|logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl)) ||
+    validCandidates.find((imageUrl) => /1200|1280|1440|1600|1920|2048|large|original|hero|main|lead/i.test(imageUrl)) ||
+    validCandidates[0] ||
     null
   );
 }
@@ -1149,6 +1153,29 @@ if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
       for (const match of html.matchAll(pattern)) {
         if (match?.[1]) {
           candidates.add(new URL(match[1], articleUrl).href);
+        }
+      }
+    }
+
+    const imgPatterns = [
+      /<img[^>]+(?:src|data-src|data-original|data-lazy-src|data-srcset)=['"]([^'"]+)['"][^>]*>/gi,
+      /<img[^>]+srcset=['"]([^'"]+)['"][^>]*>/gi,
+    ];
+
+    for (const pattern of imgPatterns) {
+      for (const match of html.matchAll(pattern)) {
+        const rawValue = String(match?.[1] || "").trim();
+        if (!rawValue) continue;
+
+        const firstSrcsetItem = rawValue.split(",")[0]?.trim()?.split(" ")[0];
+        const candidate = firstSrcsetItem || rawValue;
+
+        if (candidate) {
+          try {
+            candidates.add(new URL(candidate, articleUrl).href);
+          } catch (_) {
+            // Ignore invalid image URLs.
+          }
         }
       }
     }
@@ -1209,13 +1236,14 @@ if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
 
     const imageCandidates = [...candidates]
       .filter((imageUrl) => /^https?:\/\//i.test(imageUrl))
-      .filter((imageUrl) => !/t\.me|telegram\.me|telegram\.org|investing\.com|logo|icon|avatar|author|profile|sprite|favicon/i.test(imageUrl))
+      .filter((imageUrl) => !/t\.me|telegram\.me|telegram\.org|logo|icon|avatar|author|profile|sprite|favicon|placeholder|default/i.test(imageUrl))
       .sort((a, b) => {
         const score = (url) => {
           let total = 0;
           if (/1200|1280|1440|1600|1920|2048/i.test(url)) total += 5;
-          if (/og|social|article|lead|hero|main|large/i.test(url)) total += 3;
-          if (/thumb|thumbnail|small|80x|120x|150x|300x/i.test(url)) total -= 5;
+          if (/og|social|article|lead|hero|main|large|photo|image|cdn|prod/i.test(url)) total += 3;
+          if (/thumb|thumbnail|small|80x|120x|150x|300x|1x1/i.test(url)) total -= 5;
+          if (/investing\.com|i-invdn\.com|cnbc\.com|marketwatch\.com|coindesk\.com/i.test(url)) total += 2;
           return total;
         };
 
@@ -1928,6 +1956,9 @@ async function savePublishedNewsToSupabase(item) {
 
 async function saveNewsPostToSupabase(post) {
   try {
+    if (!post.image_url && post.source_link) {
+      post.image_url = await getImageFromArticleUrl(post.source_link);
+    }
     const { error } = await supabase
       .from("news_posts")
       .upsert(
