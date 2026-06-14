@@ -106,6 +106,45 @@ export default function News() {
     }
   }
 
+  function getNewsCategory(item) {
+    const text = `${item.title || ""} ${item.content || ""} ${item.topic_cluster || ""}`.toLowerCase();
+
+    if (text.includes("bitcoin") || text.includes("crypto") || text.includes("btc") || text.includes("ethereum")) {
+      return "crypto";
+    }
+
+    if (text.includes("gold") || text.includes("oil") || text.includes("silver") || text.includes("commodit")) {
+      return "commodities";
+    }
+
+    if (text.includes("stock") || text.includes("nasdaq") || text.includes("s&p") || text.includes("dow") || text.includes("earnings")) {
+      return "stocks";
+    }
+
+    if (text.includes("fed") || text.includes("inflation") || text.includes("jobs") || text.includes("cpi") || text.includes("pmi") || text.includes("gdp")) {
+      return "economy";
+    }
+
+    if (text.includes("iran") || text.includes("israel") || text.includes("war") || text.includes("gaza") || text.includes("ukraine") || text.includes("russia")) {
+      return "geopolitics";
+    }
+
+    return "markets";
+  }
+
+  function categoryVisual(category) {
+    const visuals = {
+      crypto: { icon: "₿", label: "Crypto Market", gradient: "from-orange-950 via-slate-950 to-cyan-950" },
+      commodities: { icon: "✦", label: "Commodities", gradient: "from-amber-950 via-slate-950 to-cyan-950" },
+      stocks: { icon: "↗", label: "Stock Market", gradient: "from-emerald-950 via-slate-950 to-cyan-950" },
+      economy: { icon: "▦", label: "Economic Data", gradient: "from-blue-950 via-slate-950 to-cyan-950" },
+      geopolitics: { icon: "⚑", label: "Global Impact", gradient: "from-red-950 via-slate-950 to-cyan-950" },
+      markets: { icon: "◆", label: "Market News", gradient: "from-cyan-950 via-blue-950 to-slate-900" },
+    };
+
+    return visuals[category] || visuals.markets;
+  }
+
   return (
     <main className="min-h-screen px-4 py-10 text-slate-950">
       <div className="mx-auto max-w-7xl">
@@ -137,7 +176,7 @@ export default function News() {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {news.map((item) => {
+            {news.map((item, index) => {
               const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
               const isHighImpact = newsImpact === "HIGH";
               const impactColor = isHighImpact
@@ -148,23 +187,25 @@ export default function News() {
               const newsTitle = extractArabicTitle(item);
               const newsContent = shortText(
                 item.content || item.summary || item.description || item.ai_summary || item.normalized_title,
-                150
+                115
               );
               const newsImage = getValidImage(item.image_url || item.image || item.thumbnail_url);
               const sourceName = getSourceName(sourceLink);
+              const category = getNewsCategory(item);
+              const visual = categoryVisual(category);
 
               return (
                 <article
                   key={item.id}
-                  className="group overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/80 text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
+                  className={`group overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
                 >
-                  <div className="relative h-56 overflow-hidden bg-gradient-to-br from-cyan-950 via-blue-950 to-slate-900">
+                  <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
                     <div className="absolute inset-0 flex items-center justify-center text-center">
                       <div className="px-6">
                         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-cyan-300/25 bg-cyan-400/15 text-4xl shadow-[0_0_40px_rgba(34,211,238,0.18)]">
-                          📰
+                          {visual.icon}
                         </div>
-                        <div className="text-base font-black text-cyan-50">HasaN CharT News</div>
+                        <div className="text-base font-black text-cyan-50">{visual.label}</div>
                         <div className="mt-2 text-xs font-bold text-cyan-100/70">تغطية اقتصادية مباشرة</div>
                       </div>
                     </div>
@@ -184,7 +225,7 @@ export default function News() {
                       {sourceName}
                     </div>
                     <div className={`absolute right-4 top-4 z-30 rounded-full border px-3 py-1 text-xs font-black backdrop-blur ${impactColor}`}>
-                      {isHighImpact ? "🚨 عاجل" : "📌 مهم"}
+                      {isHighImpact ? "🔴 عاجل" : "🟡 مهم"}
                     </div>
                   </div>
 
@@ -198,11 +239,11 @@ export default function News() {
                       })}
                     </div>
 
-                    <h2 className="mb-4 line-clamp-3 min-h-[96px] text-xl font-black leading-relaxed text-slate-950">
+                    <h2 className={`${index === 0 ? "text-2xl md:text-3xl" : "text-xl"} mb-4 line-clamp-2 min-h-[72px] font-black leading-relaxed text-slate-950`}>
                       {newsTitle}
                     </h2>
 
-                    <p className="line-clamp-3 min-h-[84px] text-[15px] leading-7 text-slate-600">
+                    <p className="line-clamp-2 min-h-[56px] text-[15px] leading-7 text-slate-600">
                       {newsContent}
                     </p>
 
