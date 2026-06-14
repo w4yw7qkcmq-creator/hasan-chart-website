@@ -60,6 +60,28 @@ function getNewsImage(news) {
   return null;
 }
 
+async function isImageReachable(url) {
+  if (!url) return false;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const response = await fetch(url, {
+      method: "HEAD",
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    clearTimeout(timeout);
+
+    const contentType = response.headers.get("content-type") || "";
+    return response.ok && contentType.toLowerCase().startsWith("image/");
+  } catch {
+    return false;
+  }
+}
+
 function detectCategory(news) {
   const text = `${news?.title || ""} ${news?.content || ""} ${news?.topic_cluster || ""}`.toLowerCase();
 
@@ -136,7 +158,8 @@ export async function generateMetadata({ params }) {
 
   const title = getNewsTitle(news);
   const description = cleanText(news.content || news.summary || news.description || title).slice(0, 160);
-  const image = getNewsImage(news) || `${SITE_URL}/favicon.png`;
+  const rawImage = getNewsImage(news);
+  const image = rawImage && (await isImageReachable(rawImage)) ? rawImage : `${SITE_URL}/favicon.png`;
   const url = `${SITE_URL}/news/${news.id}`;
 
   const keywords = [
@@ -195,7 +218,8 @@ export default async function NewsDetailsPage({ params }) {
 
   const title = getNewsTitle(news);
   const content = cleanText(news.content || news.summary || news.description || title);
-  const image = getNewsImage(news);
+  const rawImage = getNewsImage(news);
+  const image = rawImage && (await isImageReachable(rawImage)) ? rawImage : null;
   const publishedDate = new Date(news.created_at).toLocaleString("ar-SA", {
     year: "numeric",
     month: "long",
@@ -334,7 +358,7 @@ export default async function NewsDetailsPage({ params }) {
 
       <article className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/50 bg-white/85 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl">
         <div className="relative h-[320px] overflow-hidden bg-gradient-to-br from-cyan-950 via-sky-950 to-slate-950 text-center md:h-[460px]">
-          <div className={`absolute inset-0 ${image ? "hidden" : "flex"} items-center justify-center fallback-article-image`}>
+          <div className={`absolute inset-0 ${image ? "hidden" : "flex"} items-center justify-center fallback-article-image`} style={{ zIndex: 15 }}>
             <div>
               <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
                 📰
