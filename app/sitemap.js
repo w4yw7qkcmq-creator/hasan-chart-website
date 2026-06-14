@@ -28,5 +28,37 @@ export default function sitemap() {
       url: "https://www.hasanchartworld.com/register",
       lastModified: new Date(),
     },
+    {
+      url: "https://www.hasanchartworld.com/account-management",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/alerts",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/analysis",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/dashboard",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/my-dashboard",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/my-analysis",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/vip-spot",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/vip-futures",
+      lastModified: new Date(),
+    },
   ];
 }
