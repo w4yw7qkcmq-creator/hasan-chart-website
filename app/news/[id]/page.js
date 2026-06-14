@@ -53,7 +53,7 @@ function getNewsImage(news) {
   const value = String(imageUrl).trim();
   if (!value) return null;
   if (value.startsWith("/app/assets/")) return null;
-  if (/default|placeholder|sprite|logo|avatar/i.test(value)) return null;
+  if (/default|placeholder|sprite|logo|avatar|blank|pixel|1x1/i.test(value)) return null;
   if (value.startsWith("//")) return `https:${value}`;
   if (value.startsWith("http://") || value.startsWith("https://")) return value;
 
@@ -108,9 +108,15 @@ async function getRelatedNews(currentNews) {
     .order("created_at", { ascending: false })
     .limit(80);
 
-  return (data || [])
+  const categoryMatches = (data || [])
     .filter((item) => detectCategory(item) === currentCategory)
     .slice(0, 6);
+
+  if (categoryMatches.length > 0) {
+    return categoryMatches;
+  }
+
+  return (data || []).slice(0, 6);
 }
 
 export async function generateMetadata({ params }) {
@@ -322,16 +328,8 @@ export default async function NewsDetailsPage({ params }) {
       </div>
 
       <article className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/50 bg-white/85 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl">
-        {image ? (
-          <div className="relative h-[320px] overflow-hidden bg-slate-950 md:h-[460px]">
-            <img src={image} alt={title} className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/15 to-transparent" />
-            <div className="absolute right-6 top-6 rounded-full border border-white/40 bg-white/90 px-4 py-2 text-sm font-black text-slate-800 backdrop-blur">
-              {isHighImpact ? "🔴 عاجل" : "🟡 مهم"}
-            </div>
-          </div>
-        ) : (
-          <div className="relative flex h-[320px] items-center justify-center bg-gradient-to-br from-cyan-950 via-sky-950 to-slate-950 text-center md:h-[420px]">
+        <div className="relative h-[320px] overflow-hidden bg-gradient-to-br from-cyan-950 via-sky-950 to-slate-950 text-center md:h-[460px]">
+          <div className={`absolute inset-0 ${image ? "hidden" : "flex"} items-center justify-center fallback-article-image`}>
             <div>
               <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
                 📰
@@ -340,7 +338,28 @@ export default async function NewsDetailsPage({ params }) {
               <div className="mt-2 text-sm font-bold text-cyan-100/75">تغطية اقتصادية مباشرة</div>
             </div>
           </div>
-        )}
+
+          {image ? (
+            <img
+              src={image}
+              alt={title}
+              className="relative z-10 h-full w-full object-cover"
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+                const fallback = event.currentTarget.parentElement?.querySelector(".fallback-article-image");
+                if (fallback) {
+                  fallback.classList.remove("hidden");
+                  fallback.classList.add("flex");
+                }
+              }}
+            />
+          ) : null}
+
+          <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/80 via-slate-950/15 to-transparent" />
+          <div className="absolute right-6 top-6 z-30 rounded-full border border-white/40 bg-white/90 px-4 py-2 text-sm font-black text-slate-800 backdrop-blur">
+            {isHighImpact ? "🔴 عاجل" : "🟡 مهم"}
+          </div>
+        </div>
 
         <div className="p-7 md:p-10" dir="rtl">
           <div className="mb-5 inline-flex rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">
@@ -374,12 +393,12 @@ export default async function NewsDetailsPage({ params }) {
         </div>
       </article>
 
-      {relatedNews.length > 0 ? (
+      {relatedNews.length > 0 && news ? (
         <section className="mx-auto mt-10 max-w-4xl rounded-[2rem] border border-white/50 bg-white/75 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.10)] backdrop-blur-xl" dir="rtl">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="mb-2 text-sm font-black text-cyan-600">{categoryLabel}</div>
-              <h2 className="text-2xl font-black text-slate-950">أخبار ذات صلة</h2>
+              <h2 className="text-2xl font-black text-slate-950">أخبار ذات صلة قد تهمك</h2>
             </div>
             <Link
               href={`/news/category/${category}`}
