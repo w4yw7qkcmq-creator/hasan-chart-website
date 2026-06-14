@@ -69,10 +69,19 @@ export default function News() {
 
   function getValidImage(url) {
     if (!url) return null;
-    if (url.startsWith("/app/assets/")) return null;
-    if (url.includes("default.png")) return null;
-    if (url.includes("trkd-in")) return null;
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+
+    const imageUrl = String(url).trim();
+
+    if (imageUrl.startsWith("/app/assets/")) return null;
+    if (imageUrl.includes("default.png")) return null;
+
+    if (
+      imageUrl.startsWith("https://") ||
+      imageUrl.startsWith("http://")
+    ) {
+      return imageUrl;
+    }
+
     return null;
   }
 
@@ -200,7 +209,7 @@ export default function News() {
                   className={`group overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
                 >
                   <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
-                    <div className="absolute inset-0 flex items-center justify-center text-center">
+                    <div className="absolute inset-0 hidden items-center justify-center text-center fallback-news-image">
                       <div className="px-6">
                         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-cyan-300/25 bg-cyan-400/15 text-4xl shadow-[0_0_40px_rgba(34,211,238,0.18)]">
                           {visual.icon}
@@ -215,7 +224,10 @@ export default function News() {
                         alt={newsTitle}
                         onError={(event) => {
                           event.currentTarget.style.display = "none";
-                          event.currentTarget.removeAttribute("src");
+                          const fallback = event.currentTarget.parentElement?.querySelector(".fallback-news-image");
+                          if (fallback) {
+                            fallback.style.display = "flex";
+                          }
                         }}
                         className="relative z-10 h-full w-full object-cover transition duration-700 group-hover:scale-105"
                       />
