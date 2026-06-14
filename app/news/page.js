@@ -157,6 +157,14 @@ export default function News() {
                   className="group overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/80 text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
                 >
                   <div className="relative h-56 overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950">
+                    <div className="absolute inset-0 flex items-center justify-center text-center">
+                      <div>
+                        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl bg-cyan-400/20 text-3xl">
+                          📰
+                        </div>
+                        <div className="text-sm font-black text-cyan-100">HasaN CharT News</div>
+                      </div>
+                    </div>
                     {newsImage ? (
                       <img
                         src={newsImage}
@@ -164,26 +172,16 @@ export default function News() {
                         onError={(event) => {
                           event.currentTarget.style.display = "none";
                         }}
-                        className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                        className="relative z-10 h-full w-full object-cover transition duration-700 group-hover:scale-105"
                       />
                     ) : null}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
-                    <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">
+                    <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+                    <div className="absolute left-4 top-4 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">
                       {sourceName}
                     </div>
-                    <div className={`absolute right-4 top-4 rounded-full border px-3 py-1 text-xs font-black backdrop-blur ${impactColor}`}>
+                    <div className={`absolute right-4 top-4 z-30 rounded-full border px-3 py-1 text-xs font-black backdrop-blur ${impactColor}`}>
                       {isHighImpact ? "🚨 عاجل" : "📌 مهم"}
                     </div>
-                    {!newsImage ? (
-                      <div className="absolute inset-0 flex items-center justify-center text-center">
-                        <div>
-                          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl bg-cyan-400/20 text-3xl">
-                            📰
-                          </div>
-                          <div className="text-sm font-black text-cyan-100">HasaN CharT News</div>
-                        </div>
-                      </div>
-                    ) : null}
                   </div>
 
                   <div className="p-6">
@@ -211,7 +209,7 @@ export default function News() {
                           href={sourceLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-cyan-700"
+                          className="inline-flex rounded-2xl bg-cyan-600 px-4 py-2 text-sm font-black text-white shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-700"
                         >
                           قراءة المصدر ←
                         </a>
