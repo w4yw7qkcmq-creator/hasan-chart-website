@@ -566,12 +566,12 @@ export default function Home() {
           <h2 className="sectionTitle text-center lg:text-right">الخدمات</h2>
 
           <div className="grid md:grid-cols-3 gap-5">
-            <Service title="توصيات Spot" text="باقات سبوت شهرية وربع سنوية وسنوية." />
-            <Service title="توصيات Futures" text="فرص فيوتشر مع متابعة وإدارة مخاطر." />
-            <Service title="HasaN CharT Academy" text="محتوى تعليمي صور وفيديوهات للمشتركين." />
-            <Service title="إدارة حسابات Spot" text="إدارة محافظ سبوت باحتراف." />
-            <Service title="إدارة حسابات Futures" text="إدارة حسابات فيوتشر." />
-            <Service title="أخبار وتحليلات" text="أهم الأخبار والتحليلات اليومية." />
+            <Service title="توصيات Spot" text="باقات سبوت شهرية وربع سنوية وسنوية." onRequireLogin={requireLogin} />
+            <Service title="توصيات Futures" text="فرص فيوتشر مع متابعة وإدارة مخاطر." onRequireLogin={requireLogin} />
+            <Service title="HasaN CharT Academy" text="محتوى تعليمي صور وفيديوهات للمشتركين." onRequireLogin={requireLogin} />
+            <Service title="إدارة حسابات Spot" text="إدارة محافظ سبوت باحتراف." onRequireLogin={requireLogin} />
+            <Service title="إدارة حسابات Futures" text="إدارة حسابات فيوتشر." onRequireLogin={requireLogin} />
+            <Service title="أخبار وتحليلات" text="أهم الأخبار والتحليلات اليومية." onRequireLogin={requireLogin} />
           </div>
         </section>
 
@@ -682,12 +682,19 @@ function MiniTicker({ symbol, price }) {
   );
 }
 
-function Service({ title, text }) {
+function Service({ title, text, onRequireLogin }) {
   return (
-    <div className="box">
+    <button
+      type="button"
+      onClick={onRequireLogin}
+      className="box w-full text-right transition hover:scale-[1.02] hover:border-blue-400/40"
+    >
       <h3 className="text-xl font-black mb-3">{title}</h3>
       <p className="text-slate-400 leading-7">{text}</p>
-    </div>
+      <span className="mt-5 inline-block rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white">
+        اطلب الخدمة
+      </span>
+    </button>
   );
 }
 

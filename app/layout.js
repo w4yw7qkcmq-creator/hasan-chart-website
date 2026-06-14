@@ -415,7 +415,9 @@ export default function RootLayout({ children }) {
           content="منصة احترافية لمتابعة السوق وطلب التحليلات والتنبيهات السعرية، تشمل نوافذ السوق السريعة والأسعار المباشرة والشارت الحي وطلبات تحليل العملات."
         />
         <meta name="application-name" content="HasaN CharT World" />
-        <meta name="apple-mobile-web-app-title" content="HasaN CharT" />
+        <meta name="apple-mobile-web-app-title" content="HasaN CharT World" />
+        <meta name="name" content="HasaN CharT World" />
+        <meta itemProp="name" content="HasaN CharT World" />
         <meta name="theme-color" content="#020617" />
         <link rel="icon" href="/favicon.png" />
         <link rel="shortcut icon" href="/favicon.png" />
@@ -426,6 +428,7 @@ export default function RootLayout({ children }) {
         <meta property="og:url" content="https://www.hasanchartworld.com" />
         <meta property="og:site_name" content="HasaN CharT World" />
         <meta property="og:title" content="HasaN CharT World" />
+        <meta property="og:determiner" content="" />
         <meta
           property="og:description"
           content="تابع الأسواق، اطلب تحليل عملة، فعّل التنبيهات السعرية، واطّلع على الشارت الحي من منصة HasaN CharT World."
