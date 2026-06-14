@@ -74,17 +74,50 @@ export default function News() {
     return null;
   }
 
+  function extractArabicTitle(item) {
+    const content = cleanNewsText(item.content || "");
+    const title = cleanNewsText(item.title || item.normalized_title || "");
+    const arabicSentences = content
+      .split(/[.!؟\n]/)
+      .map((part) => part.trim())
+      .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
+
+    if (arabicSentences.length > 0) {
+      return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "").slice(0, 120);
+    }
+
+    return title || "خبر اقتصادي عاجل";
+  }
+
+  function getSourceName(url) {
+    if (!url) return "مصدر الخبر";
+    try {
+      const host = new URL(url).hostname.replace("www.", "");
+      if (host.includes("investing")) return "Investing";
+      if (host.includes("cnbc")) return "CNBC";
+      if (host.includes("marketwatch")) return "MarketWatch";
+      if (host.includes("coindesk")) return "CoinDesk";
+      if (host.includes("t.me")) return "Telegram";
+      return host;
+    } catch {
+      return "مصدر الخبر";
+    }
+  }
+
   return (
-    <main className="min-h-screen bg-[#020617] text-white py-12 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-10">
-          <h1 className="text-4xl font-black mb-3">
+    <main className="min-h-screen px-4 py-10 text-slate-950">
+      <div className="mx-auto max-w-7xl">
+        <section className="mb-10 overflow-hidden rounded-[2rem] border border-white/40 bg-white/55 p-8 text-center shadow-[0_20px_80px_rgba(14,165,233,0.12)] backdrop-blur-xl md:p-12">
+          <div className="mx-auto mb-4 inline-flex rounded-full border border-cyan-300/40 bg-cyan-100/70 px-5 py-2 text-sm font-black text-cyan-800">
+            Live Economic News
+          </div>
+          <h1 className="mb-4 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">
             الأخبار الاقتصادية العاجلة
           </h1>
-          <p className="text-slate-400 text-lg">
-            تغطية مباشرة لأهم أخبار الاقتصاد والأسواق العالمية والعملات الرقمية.
+          <p className="mx-auto max-w-2xl text-lg leading-8 text-slate-600">
+            تغطية مباشرة لأهم أخبار الاقتصاد، الأسواق العالمية، الأسهم، العملات الرقمية، والبيانات المؤثرة على حركة السوق.
           </p>
-        </div>
+        </section>
 
         {loading ? (
           <div className="flex items-center justify-center py-24">
@@ -97,83 +130,95 @@ export default function News() {
             <span className="text-sm text-red-100/80">{errorMessage}</span>
           </div>
         ) : news.length === 0 ? (
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-10 text-center text-slate-400">
+          <div className="rounded-3xl border border-white/40 bg-white/70 p-10 text-center text-slate-500 shadow-xl backdrop-blur-xl">
             لا توجد أخبار متاحة حالياً. تأكد من وجود سياسة قراءة عامة لجدول news_posts في Supabase.
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {news.map((item) => {
               const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
               const isHighImpact = newsImpact === "HIGH";
               const impactColor = isHighImpact
                 ? "bg-red-500/15 text-red-300 border-red-400/30"
                 : "bg-amber-500/15 text-amber-300 border-amber-400/30";
-              const newsTitle = cleanNewsText(item.title || item.normalized_title || "خبر اقتصادي");
+
+              const sourceLink = item.source_link || item.link || null;
+              const newsTitle = extractArabicTitle(item);
               const newsContent = shortText(
                 item.content || item.summary || item.description || item.ai_summary || item.normalized_title,
-                260
+                150
               );
               const newsImage = getValidImage(item.image_url || item.image || item.thumbnail_url);
-              const sourceLink = item.source_link || item.link || null;
+              const sourceName = getSourceName(sourceLink);
 
               return (
-                <div
+                <article
                   key={item.id}
-                  className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/80 text-slate-950 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/50 hover:shadow-[0_24px_80px_rgba(14,165,233,0.20)]"
+                  className="group overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/80 text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
                 >
-                  {newsImage ? (
-                    <div className="relative w-full h-[220px] md:h-[360px] overflow-hidden bg-slate-900">
+                  <div className="relative h-56 overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950">
+                    {newsImage ? (
                       <img
                         src={newsImage}
                         alt={newsTitle}
-                        className="h-full w-full object-cover transition duration-500 hover:scale-105"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                        className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                       />
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
-
-                      <div className="absolute top-5 right-5 flex items-center gap-3">
-                        <div
-                          className={`px-4 py-2 rounded-full border text-sm font-bold ${impactColor}`}
-                        >
-                          {isHighImpact ? "🚨 عاجل" : "📌 مهم"}
+                    ) : null}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+                    <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">
+                      {sourceName}
+                    </div>
+                    <div className={`absolute right-4 top-4 rounded-full border px-3 py-1 text-xs font-black backdrop-blur ${impactColor}`}>
+                      {isHighImpact ? "🚨 عاجل" : "📌 مهم"}
+                    </div>
+                    {!newsImage ? (
+                      <div className="absolute inset-0 flex items-center justify-center text-center">
+                        <div>
+                          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl bg-cyan-400/20 text-3xl">
+                            📰
+                          </div>
+                          <div className="text-sm font-black text-cyan-100">HasaN CharT News</div>
                         </div>
                       </div>
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
 
-                  <div className="p-6 md:p-8">
-                    <div className="flex flex-wrap items-center gap-3 mb-4">
-                      <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">
-                        {new Date(item.created_at).toLocaleString("ar-SA", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "numeric",
-                        })}
-                      </div>
+                  <div className="p-6">
+                    <div className="mb-4 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
+                      {new Date(item.created_at).toLocaleString("ar-SA", {
+                        month: "long",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "numeric",
+                      })}
                     </div>
 
-                    <h2 className="mb-5 text-2xl font-black leading-relaxed text-slate-950 md:text-3xl">
+                    <h2 className="mb-4 line-clamp-3 min-h-[96px] text-xl font-black leading-relaxed text-slate-950">
                       {newsTitle}
                     </h2>
 
-                    <div className="text-[17px] leading-8 text-slate-600">
+                    <p className="line-clamp-3 min-h-[84px] text-[15px] leading-7 text-slate-600">
                       {newsContent}
-                    </div>
+                    </p>
 
-                    {sourceLink ? (
-                      <a
-                        href={sourceLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-6 inline-flex rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-cyan-700"
-                      >
-                        قراءة المصدر ←
-                      </a>
-                    ) : null}
+                    <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-200 pt-5">
+                      <span className="text-xs font-bold text-slate-400">تحديث مباشر</span>
+                      {sourceLink ? (
+                        <a
+                          href={sourceLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-cyan-700"
+                        >
+                          قراءة المصدر ←
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
