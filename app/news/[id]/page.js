@@ -169,29 +169,52 @@ export default async function NewsDetailsPage({ params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            document.addEventListener("click", async function (event) {
+              const button = event.target.closest("[data-copy-article-url]");
+              if (!button) return;
+
+              const url = button.getAttribute("data-copy-article-url");
+              if (!url) return;
+
+              try {
+                await navigator.clipboard.writeText(url);
+                const originalText = button.textContent;
+                button.textContent = "تم نسخ الرابط ✅";
+                setTimeout(function () {
+                  button.textContent = originalText;
+                }, 1800);
+              } catch (error) {
+                window.prompt("انسخ رابط الخبر:", url);
+              }
+            });
+          `,
+        }}
+      />
 
       <div className="mx-auto mb-6 flex max-w-4xl flex-wrap items-center justify-between gap-3" dir="rtl">
         <Link
           href="/news"
-          className="inline-flex items-center gap-2 rounded-2xl border border-white/50 bg-white/80 px-5 py-3 text-sm font-black text-slate-700 no-underline shadow-lg backdrop-blur-xl transition hover:border-cyan-300 hover:bg-white"
+          className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-600 px-5 py-3 text-sm font-black text-white no-underline shadow-xl shadow-emerald-600/20 transition hover:scale-105 hover:bg-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-emerald-400/20 dark:hover:bg-emerald-300"
         >
           ← العودة لصفحة الأخبار الرئيسية
         </Link>
 
         <div className="flex flex-wrap items-center gap-3">
-          <a
-            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white no-underline shadow-lg transition hover:bg-blue-700"
+          <button
+            type="button"
+            data-copy-article-url={articleUrl}
+            className="inline-flex items-center rounded-2xl border border-sky-500/40 bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-xl shadow-sky-600/20 transition hover:scale-105 hover:bg-sky-700 dark:border-sky-300/40 dark:bg-sky-400 dark:text-slate-950 dark:shadow-sky-400/20 dark:hover:bg-sky-300"
           >
-            مشاركة فيسبوك
-          </a>
+            نسخ الرابط
+          </button>
           <a
             href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(title)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white no-underline shadow-lg transition hover:bg-slate-800"
+            className="inline-flex items-center rounded-2xl border border-violet-500/40 bg-violet-600 px-4 py-3 text-sm font-black text-white no-underline shadow-xl shadow-violet-600/20 transition hover:scale-105 hover:bg-violet-700 dark:border-violet-300/40 dark:bg-violet-400 dark:text-slate-950 dark:shadow-violet-400/20 dark:hover:bg-violet-300"
           >
             مشاركة X
           </a>
@@ -224,11 +247,11 @@ export default async function NewsDetailsPage({ params }) {
             {publishedDate}
           </div>
 
-          <h1 className="mb-7 text-3xl font-black leading-relaxed text-slate-950 md:text-5xl">
+          <h1 className="mb-7 text-2xl font-black leading-relaxed text-slate-950 md:text-4xl">
             {title}
           </h1>
 
-          <div className="prose prose-lg max-w-none text-slate-700 prose-p:leading-9">
+          <div className="prose max-w-none text-[16px] leading-8 text-slate-700 prose-p:leading-8">
             {content
               .split(/(?<=[.!؟])\s+/)
               .filter(Boolean)
@@ -243,7 +266,7 @@ export default async function NewsDetailsPage({ params }) {
             </div>
             <Link
               href="/news"
-              className="inline-flex rounded-2xl bg-cyan-600 px-6 py-3 text-sm font-black text-white no-underline shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-700"
+              className="inline-flex rounded-2xl border border-emerald-500/40 bg-emerald-600 px-6 py-3 text-sm font-black text-white no-underline shadow-xl shadow-emerald-600/20 transition hover:scale-105 hover:bg-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-emerald-400/20 dark:hover:bg-emerald-300"
             >
               العودة لصفحة الأخبار الرئيسية
             </Link>
