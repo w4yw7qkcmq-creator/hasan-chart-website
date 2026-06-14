@@ -196,7 +196,7 @@ export default function News() {
               const newsTitle = extractArabicTitle(item);
               const newsContent = shortText(
                 item.content || item.summary || item.description || item.ai_summary || item.normalized_title,
-                115
+                260
               );
               const newsImage = getValidImage(item.image_url || item.image || item.thumbnail_url);
               const sourceName = getSourceName(sourceLink);
@@ -251,11 +251,11 @@ export default function News() {
                       })}
                     </div>
 
-                    <h2 className={`${index === 0 ? "text-2xl md:text-3xl" : "text-xl"} mb-4 line-clamp-2 min-h-[72px] font-black leading-relaxed text-slate-950`}>
+                    <h2 className={`${index === 0 ? "text-2xl md:text-3xl" : "text-xl"} mb-4 font-black leading-relaxed text-slate-950`}>
                       {newsTitle}
                     </h2>
 
-                    <p className="line-clamp-2 min-h-[56px] text-[15px] leading-7 text-slate-600">
+                    <p className="text-[15px] leading-7 text-slate-600">
                       {newsContent}
                     </p>
 
