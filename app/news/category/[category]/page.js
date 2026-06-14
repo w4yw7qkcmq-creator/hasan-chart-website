@@ -114,10 +114,10 @@ function extractArabicTitle(item) {
     .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
 
   if (arabicSentences.length > 0) {
-    return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "").slice(0, 120);
+    return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "").slice(0, 95);
   }
 
-  return title || "خبر اقتصادي عاجل";
+  return (title || "خبر اقتصادي عاجل").slice(0, 95);
 }
 
 function getSourceName(url) {
@@ -240,7 +240,7 @@ export default async function CategoryPage({ params }) {
             لا توجد أخبار متاحة حالياً ضمن هذا التصنيف.
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid auto-rows-fr gap-6 md:grid-cols-2 xl:grid-cols-3">
             {news.map((item, index) => {
               const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
               const isHighImpact = newsImpact === "HIGH";
@@ -262,16 +262,16 @@ export default async function CategoryPage({ params }) {
                 <Link
                   key={item.id}
                   href={`/news/${item.id}`}
-                  className={`group block overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
+                  className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
                 >
-                  <div className={`relative overflow-hidden bg-gradient-to-br ${config.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
+                  <div className={`relative h-56 overflow-hidden bg-gradient-to-br ${config.gradient}`}>
                     <div className={`absolute inset-0 ${hasRealImage ? "hidden" : "flex"} items-center justify-center text-center fallback-news-image`}>
                       <div className="px-6">
                         <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
                           {config.icon}
                         </div>
-                        <div className="text-xl font-black text-cyan-50">{config.title}</div>
-                        <div className="mt-2 text-xs font-bold text-cyan-100/75">{config.description}</div>
+                        <div className="text-lg font-black text-cyan-50">{config.title}</div>
+                        <div className="mt-2 line-clamp-1 text-xs font-bold text-cyan-100/75">{config.description}</div>
                         <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
                           HasaN CharT News
                         </div>
@@ -295,7 +295,7 @@ export default async function CategoryPage({ params }) {
                     </div>
                   </div>
 
-                  <div className="p-6">
+                  <div className="flex flex-1 flex-col p-6">
                     <div className="mb-4 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
                       {new Date(item.created_at).toLocaleString("ar-SA", {
                         month: "long",
@@ -305,15 +305,15 @@ export default async function CategoryPage({ params }) {
                       })}
                     </div>
 
-                    <h2 className={`${index === 0 ? "text-2xl md:text-3xl" : "text-xl"} mb-4 font-black leading-relaxed text-slate-950`}>
+                    <h2 className="mb-4 line-clamp-3 min-h-[5.25rem] text-xl font-black leading-relaxed text-slate-950">
                       {newsTitle}
                     </h2>
 
-                    <p className="text-[15px] leading-7 text-slate-600">
+                    <p className="line-clamp-4 text-[15px] leading-7 text-slate-600">
                       {newsContent}
                     </p>
 
-                    <div className="mt-6 border-t border-slate-200 pt-5 text-center">
+                    <div className="mt-auto border-t border-slate-200 pt-5 text-center">
                       <span className="text-xs font-bold text-slate-400">
                         تحديث مباشر • HasaN CharT News
                       </span>
