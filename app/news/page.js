@@ -70,6 +70,8 @@ export default function News() {
   function getValidImage(url) {
     if (!url) return null;
     if (url.startsWith("/app/assets/")) return null;
+    if (url.includes("default.png")) return null;
+    if (url.includes("trkd-in")) return null;
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
     return null;
   }
@@ -202,18 +204,10 @@ export default function News() {
                       {newsContent}
                     </p>
 
-                    <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-200 pt-5">
-                      <span className="text-xs font-bold text-slate-400">تحديث مباشر</span>
-                      {sourceLink ? (
-                        <a
-                          href={sourceLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex rounded-2xl bg-cyan-600 px-4 py-2 text-sm font-black text-white shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-700"
-                        >
-                          قراءة المصدر ←
-                        </a>
-                      ) : null}
+                    <div className="mt-6 border-t border-slate-200 pt-5 text-center">
+                      <span className="text-xs font-bold text-slate-400">
+                        تحديث مباشر • HasaN CharT News
+                      </span>
                     </div>
                   </div>
                 </article>
