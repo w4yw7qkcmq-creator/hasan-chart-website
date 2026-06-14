@@ -424,6 +424,20 @@ export default async function NewsDetailsPage({ params }) {
         </div>
 
         <div className="p-7 md:p-10" dir="rtl">
+          <nav className="mb-5 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-500" aria-label="مسار التنقل">
+            <Link href="/" className="text-slate-500 no-underline transition hover:text-cyan-700">
+              الرئيسية
+            </Link>
+            <span className="text-slate-300">/</span>
+            <Link href="/news" className="text-slate-500 no-underline transition hover:text-cyan-700">
+              الأخبار
+            </Link>
+            <span className="text-slate-300">/</span>
+            <Link href={`/news/category/${category}`} className="text-cyan-700 no-underline transition hover:text-cyan-900">
+              {categoryLabel}
+            </Link>
+          </nav>
+
           <div className="mb-5 inline-flex rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">
             {publishedDate}
           </div>
