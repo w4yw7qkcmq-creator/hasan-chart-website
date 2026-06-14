@@ -409,11 +409,17 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ar" dir="rtl" data-theme={theme}>
       <head>
-        <title>HasaN CharT World</title>
+        <title>HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول</title>
         <meta
           name="description"
-          content="منصة احترافية لمتابعة السوق وطلب التحليلات والتنبيهات السعرية، تشمل نوافذ السوق السريعة والأسعار المباشرة والشارت الحي وطلبات تحليل العملات."
+          content="HasaN CharT World منصة احترافية لمتابعة أسواق المال، تشمل تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، تنبيهات سعرية، أخبار اقتصادية، وطلبات تحليل العملات."
         />
+        <meta
+          name="keywords"
+          content="HasaN CharT World, حسن شارت, تحليل بيتكوين, تحليل العملات الرقمية, توصيات كريبتو, توصيات فوركس, توصيات Spot, توصيات Futures, أخبار اقتصادية, تنبيهات سعرية, إدارة حسابات التداول"
+        />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://www.hasanchartworld.com" />
         <meta name="application-name" content="HasaN CharT World" />
         <meta name="apple-mobile-web-app-title" content="HasaN CharT World" />
         <meta name="name" content="HasaN CharT World" />
@@ -427,11 +433,11 @@ export default function RootLayout({ children }) {
         <meta property="og:locale" content="ar_AR" />
         <meta property="og:url" content="https://www.hasanchartworld.com" />
         <meta property="og:site_name" content="HasaN CharT World" />
-        <meta property="og:title" content="HasaN CharT World" />
+        <meta property="og:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
         <meta property="og:determiner" content="" />
         <meta
           property="og:description"
-          content="تابع الأسواق، اطلب تحليل عملة، فعّل التنبيهات السعرية، واطّلع على الشارت الحي من منصة HasaN CharT World."
+          content="منصة HasaN CharT World تقدم تحليلات للأسواق المالية، توصيات Spot و Futures، أخبار اقتصادية، تنبيهات سعرية، وخدمات احترافية للمتداولين."
         />
         <meta property="og:image" content="https://www.hasanchartworld.com/favicon.png" />
         <meta property="og:image:secure_url" content="https://www.hasanchartworld.com/favicon.png" />
@@ -440,10 +446,10 @@ export default function RootLayout({ children }) {
         <meta property="og:image:alt" content="HasaN CharT World Logo" />
 
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="HasaN CharT World" />
+        <meta name="twitter:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
         <meta
           name="twitter:description"
-          content="منصة احترافية لمتابعة السوق وطلب التحليلات والتنبيهات السعرية."
+          content="تابع تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، الأخبار الاقتصادية، والتنبيهات السعرية عبر منصة HasaN CharT World."
         />
         <meta name="twitter:image" content="https://www.hasanchartworld.com/favicon.png" />
         <script
@@ -456,7 +462,7 @@ export default function RootLayout({ children }) {
               alternateName: ["HasaN CharT", "Hasan Chart World", "حسن شارت"],
               url: "https://www.hasanchartworld.com",
               description:
-                "منصة احترافية لمتابعة السوق وطلب التحليلات والتنبيهات السعرية.",
+                "منصة احترافية لمتابعة أسواق المال، تحليلات العملات الرقمية والفوركس، توصيات التداول، الأخبار الاقتصادية والتنبيهات السعرية.",
               publisher: {
                 "@type": "Organization",
                 name: "HasaN CharT World",
