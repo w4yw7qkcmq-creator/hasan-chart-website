@@ -1,7 +1,6 @@
-
-
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 
 const SITE_URL = "https://www.hasanchartworld.com";
 
@@ -139,6 +138,7 @@ export default async function NewsDetailsPage({ params }) {
     minute: "numeric",
   });
   const isHighImpact = news.impact_level === "HIGH";
+  const articleUrl = `${SITE_URL}/news/${news.id}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -148,7 +148,7 @@ export default async function NewsDetailsPage({ params }) {
     image: image ? [image] : [`${SITE_URL}/favicon.png`],
     datePublished: news.created_at,
     dateModified: news.created_at,
-    mainEntityOfPage: `${SITE_URL}/news/${news.id}`,
+    mainEntityOfPage: articleUrl,
     author: {
       "@type": "Organization",
       name: "HasaN CharT News",
@@ -169,6 +169,34 @@ export default async function NewsDetailsPage({ params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+
+      <div className="mx-auto mb-6 flex max-w-4xl flex-wrap items-center justify-between gap-3" dir="rtl">
+        <Link
+          href="/news"
+          className="inline-flex items-center gap-2 rounded-2xl border border-white/50 bg-white/80 px-5 py-3 text-sm font-black text-slate-700 no-underline shadow-lg backdrop-blur-xl transition hover:border-cyan-300 hover:bg-white"
+        >
+          ← العودة لصفحة الأخبار الرئيسية
+        </Link>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white no-underline shadow-lg transition hover:bg-blue-700"
+          >
+            مشاركة فيسبوك
+          </a>
+          <a
+            href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(title)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white no-underline shadow-lg transition hover:bg-slate-800"
+          >
+            مشاركة X
+          </a>
+        </div>
+      </div>
 
       <article className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/50 bg-white/85 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl">
         {image ? (
@@ -209,8 +237,16 @@ export default async function NewsDetailsPage({ params }) {
               ))}
           </div>
 
-          <div className="mt-10 border-t border-slate-200 pt-6 text-center text-sm font-bold text-slate-400">
-            تحديث مباشر • HasaN CharT News
+          <div className="mt-10 border-t border-slate-200 pt-6 text-center">
+            <div className="mb-5 text-sm font-bold text-slate-400">
+              تحديث مباشر • HasaN CharT News
+            </div>
+            <Link
+              href="/news"
+              className="inline-flex rounded-2xl bg-cyan-600 px-6 py-3 text-sm font-black text-white no-underline shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-700"
+            >
+              العودة لصفحة الأخبار الرئيسية
+            </Link>
           </div>
         </div>
       </article>
