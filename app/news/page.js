@@ -11,6 +11,7 @@ const supabase = createClient(
 export default function News() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     fetchNews();
@@ -24,6 +25,7 @@ export default function News() {
 
   async function fetchNews() {
     try {
+      setErrorMessage("");
       const { data, error } = await supabase
         .from("published_news")
         .select("*")
@@ -31,13 +33,17 @@ export default function News() {
         .limit(50);
 
       if (error) {
-        console.error(error);
+        console.error("News fetch error:", error);
+        setErrorMessage(error.message || "تعذر تحميل الأخبار من قاعدة البيانات.");
+        setNews([]);
         return;
       }
 
+      console.log("Fetched published_news count:", data?.length || 0);
       setNews(data || []);
     } catch (error) {
-      console.error(error);
+      console.error("Unexpected news error:", error);
+      setErrorMessage(error.message || "حدث خطأ غير متوقع أثناء تحميل الأخبار.");
     } finally {
       setLoading(false);
     }
@@ -59,9 +65,15 @@ export default function News() {
           <div className="flex items-center justify-center py-24">
             <div className="w-14 h-14 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : errorMessage ? (
+          <div className="bg-red-500/10 border border-red-400/20 rounded-3xl p-10 text-center text-red-200 leading-8">
+            تعذر تحميل الأخبار حالياً.
+            <br />
+            <span className="text-sm text-red-100/80">{errorMessage}</span>
+          </div>
         ) : news.length === 0 ? (
           <div className="bg-white/5 border border-white/10 rounded-3xl p-10 text-center text-slate-400">
-            لا توجد أخبار متاحة حالياً.
+            لا توجد أخبار متاحة حالياً. تأكد من وجود سياسة قراءة عامة لجدول published_news في Supabase.
           </div>
         ) : (
           <div className="space-y-8">
