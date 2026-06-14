@@ -670,6 +670,19 @@ function isOfficialEconomicReleaseText(title) {
 
   return (isUsRelease || isMajorCentralBank) && (hasReleaseValues || isMajorCentralBank);
 }
+function isBlockedGeneralNews(title) {
+  const value = String(title || "").toLowerCase();
+
+  return /social security|retirement|pension|benefits|student loan|tax plan|mayor|murder|crime|lawsuit|legal|healthcare|drugmaker|pharma|obesity drug|ai jobs|white-collar jobs|الضمان الاجتماعي|التقاعد|المعاشات|قرض طلاب|خطة ضريبية|رئيس بلدية|مقتل|جريمة|محكمة|دعوى|الرعاية الصحية|الأدوية|الوظائف الإدارية/i.test(value);
+}
+
+function isStrongExternalMarketNews(title) {
+  const value = String(title || "").toLowerCase();
+
+  if (isBlockedGeneralNews(value)) return false;
+
+  return /fed|fomc|powell|interest rate|cpi|ppi|nfp|jobless claims|gold|oil|bitcoin|crypto|nasdaq|dow jones|s&p 500|wall street|market crash|selloff|liquidations|iran|israel|hormuz|war|missile|attack|sanctions|tariffs|opec|الفيدرالي|باول|قرار الفائدة|التضخم|الذهب|النفط|البيتكوين|ناسداك|داو جونز|إيران|اسرائيل|هرمز|حرب|هجوم|عقوبات/i.test(value);
+}
 function shouldShowImpactForNews(title) {
   const value = String(title || "").toLowerCase();
 
@@ -3245,12 +3258,16 @@ mediaThumbnail: null,
       if (/wall st futures|wall street futures|spacex|space x|debut in focus|peace hopes|earnings|quarterly results|eps|revenue|guidance|ipo/i.test(titleForImpact)) {
         continue;
       }
-    if (
-  /portfolio review|investor portfolio|hidden mistake|investment mistake|civil society|imf loan|loan program|reparations|compensation deadline|stock compensation|gallagher|hankook|google liability|ai claims|perpetual futures|perpetual swaps|crypto perpetuals|investors remain invested|oil to 100|oil above 100|مراجعة المحفظة|محفظة المستثمرين|خطأ خفي|أخطاء الاستثمار|منظمات المجتمع المدني|المجتمع المدني|صندوق النقد الدولي|برنامج قرض|قرض لأوكرانيا|تعويضات الأسهم|تعويضات|موعد نهائي|مسؤولية الذكاء الاصطناعي|ادعاءات كاذبة|العقود الدائمة|العقود المستمرة|مخاطر ارتفاع النفط إلى|النفط إلى 100/i.test(titleForImpact)
-) {
-  console.log("⏭️ Skipped weak/general RSS story by strict blocklist:", item.title);
-  continue;
-}
+
+      if (isBlockedGeneralNews(titleForImpact)) {
+        console.log("⏭️ Skipped blocked general story:", item.title);
+        continue;
+      }
+
+      if (!item.isTelegramSource && !isStrongExternalMarketNews(titleForImpact)) {
+        console.log("⏭️ Skipped external story without strong market impact:", item.title);
+        continue;
+      }
       const isEconomicNews = isEconomicCalendarNews(titleForImpact);
       const isImportant = await isMarketMovingNews(titleForImpact);
 
@@ -3263,9 +3280,7 @@ mediaThumbnail: null,
   console.log("⏭️ Skipped non-market-moving story:", item.title);
   continue;
 }
-const isStrongRssMarketStory =
-  !item.isTelegramSource &&
-  /iran|israel|hormuz|red sea|missile|airstrike|attack|war|sanctions|tariffs|oil|crude|brent|wti|gold|bitcoin|btc|crypto liquidations|liquidations|nasdaq|dow|s&p|market crash|selloff|stocks plunge|stocks sink|risk-off|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|البحر الاحمر|صاروخ|ضربة|هجوم|حرب|عقوبات|تعريفات|النفط|خام|برنت|الذهب|البيتكوين|تصفيات|ناسداك|داو جونز|انهيار السوق|هبوط حاد|خسائر الأسواق/i.test(titleForImpact);
+const isStrongRssMarketStory = !item.isTelegramSource && isStrongExternalMarketNews(titleForImpact);
 
 if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isStrongRssMarketStory) {
   console.log("⏭️ Skipped medium/low RSS story. Only strong market stories are allowed:", item.title);
