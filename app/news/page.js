@@ -12,6 +12,7 @@ export default function News() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   useEffect(() => {
     fetchNews();
@@ -208,6 +209,20 @@ export default function News() {
     return visuals[category] || visuals.markets;
   }
 
+  const categories = [
+    { key: "all", label: "الكل" },
+    { key: "geopolitics", label: "أخبار جيوسياسية" },
+    { key: "economy", label: "الاقتصاد الأمريكي" },
+    { key: "stocks", label: "الأسواق العالمية" },
+    { key: "crypto", label: "العملات الرقمية" },
+    { key: "commodities", label: "النفط والطاقة" },
+  ];
+
+  const filteredNews = news.filter((item) => {
+    if (selectedCategory === "all") return true;
+    return getNewsCategory(item) === selectedCategory;
+  });
+
   return (
     <main className="min-h-screen px-4 py-10 text-slate-950">
       <div className="mx-auto max-w-7xl">
@@ -223,6 +238,27 @@ export default function News() {
           </p>
         </section>
 
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
+          {categories.map((category) => {
+            const isActive = selectedCategory === category.key;
+
+            return (
+              <button
+                key={category.key}
+                type="button"
+                onClick={() => setSelectedCategory(category.key)}
+                className={`rounded-2xl border px-5 py-3 text-sm font-black transition-all ${
+                  isActive
+                    ? "border-cyan-300 bg-cyan-500 text-white shadow-lg shadow-cyan-500/25"
+                    : "border-white/50 bg-white/65 text-slate-600 hover:border-cyan-300 hover:bg-white/90"
+                }`}
+              >
+                {category.label}
+              </button>
+            );
+          })}
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="w-14 h-14 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
@@ -233,13 +269,13 @@ export default function News() {
             <br />
             <span className="text-sm text-red-100/80">{errorMessage}</span>
           </div>
-        ) : news.length === 0 ? (
+        ) : filteredNews.length === 0 ? (
           <div className="rounded-3xl border border-white/40 bg-white/70 p-10 text-center text-slate-500 shadow-xl backdrop-blur-xl">
-            لا توجد أخبار متاحة حالياً. تأكد من وجود سياسة قراءة عامة لجدول news_posts في Supabase.
+            لا توجد أخبار متاحة حالياً ضمن هذا التصنيف.
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {news.map((item, index) => {
+            {filteredNews.map((item, index) => {
               const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
               const isHighImpact = newsImpact === "HIGH";
               const impactColor = isHighImpact
