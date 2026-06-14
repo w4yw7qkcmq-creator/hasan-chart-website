@@ -1066,6 +1066,75 @@ function shouldUseLocalImageForMajorTopic(title) {
   return /bitcoin|btc|crypto|ethereum|gold|xau|oil|crude|brent|wti|fed|fomc|powell|federal reserve|interest rate|cpi|ppi|nfp|jobless claims|unemployment|nasdaq|dow|s&p|stock market open|market open|war|missile|attack|iran|israel|hormuz|red sea|البيتكوين|الكريبتو|الذهب|النفط|الفيدرالي|باول|قرار الفائدة|التضخم|البطالة|الوظائف|طلبات إعانة البطالة|ناسداك|داو جونز|افتتاح السوق|حرب|هجوم|صاروخ|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر/i.test(value);
 }
 
+function normalizeExternalImageUrl(value, baseUrl = "https://www.investing.com") {
+  if (!value) return null;
+
+  const rawValue = String(value).trim();
+  if (!rawValue) return null;
+
+  const firstSrcsetItem = rawValue
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .pop()
+    ?.split(" ")?.[0];
+
+  const candidate = firstSrcsetItem || rawValue;
+
+  try {
+    const normalizedUrl = candidate.startsWith("//")
+      ? `https:${candidate}`
+      : new URL(candidate, baseUrl).href;
+
+    if (!/^https?:\/\//i.test(normalizedUrl)) return null;
+    if (/t\.me|telegram\.me|telegram\.org/i.test(normalizedUrl)) return null;
+    if (/logo|icon|avatar|author|profile|sprite|favicon|placeholder|default|blank|pixel|1x1/i.test(normalizedUrl)) return null;
+    if (/\.svg(\?|$)/i.test(normalizedUrl)) return null;
+
+    return normalizedUrl;
+  } catch (_) {
+    return null;
+  }
+}
+
+function extractImageUrlsFromHtml(html, baseUrl) {
+  const content = String(html || "");
+  const images = [];
+
+  const patterns = [
+    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/gi,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/gi,
+    /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/gi,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/gi,
+    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/gi,
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/gi,
+    /<img[^>]+(?:src|data-src|data-original|data-lazy-src|data-srcset|srcset)=["']([^"']+)["'][^>]*>/gi,
+    /"(?:url|image|thumbnailUrl|thumbnail|imageUrl)"\s*:\s*"([^"\\]+(?:jpg|jpeg|png|webp)[^"\\]*)"/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of content.matchAll(pattern)) {
+      const imageUrl = normalizeExternalImageUrl(match?.[1], baseUrl);
+      if (imageUrl) images.push(imageUrl);
+    }
+  }
+
+  return images;
+}
+
+function scoreImageUrl(url) {
+  let total = 0;
+  const value = String(url || "").toLowerCase();
+
+  if (/1200|1280|1440|1600|1920|2048|2560/.test(value)) total += 8;
+  if (/og|social|article|lead|hero|main|large|photo|image|cdn|prod|original|primary/.test(value)) total += 5;
+  if (/i-invdn\.com|cnbc\.com|marketwatch\.com|coindesk\.com|images\.investinglive\.com|images\.financemagnates\.com/.test(value)) total += 4;
+  if (/thumb|thumbnail|small|80x|120x|150x|300x|sprite|avatar|logo|icon|favicon|placeholder|default/.test(value)) total -= 8;
+  if (/\.webp(\?|$)|\.jpg(\?|$)|\.jpeg(\?|$)|\.png(\?|$)/.test(value)) total += 3;
+
+  return total;
+}
+
 function getImageFromNewsItem(item) {
   if (!item) return null;
 
@@ -1075,9 +1144,10 @@ function getImageFromNewsItem(item) {
 
   const candidates = [];
 
-  const pushCandidate = (value) => {
-    if (typeof value === "string" && /^https?:\/\//i.test(value)) {
-      candidates.push(value);
+  const pushCandidate = (value, baseUrl = item.link || item.guid || "https://www.investing.com") => {
+    const imageUrl = normalizeExternalImageUrl(value, baseUrl);
+    if (imageUrl) {
+      candidates.push(imageUrl);
     }
   };
 
@@ -1099,17 +1169,15 @@ function getImageFromNewsItem(item) {
     item.mediaThumbnail.forEach((media) => pushCandidate(media?.url));
   }
 
-  const validCandidates = candidates
-    .map((imageUrl) => String(imageUrl || "").trim())
-    .filter(Boolean)
-    .filter((imageUrl) => !/logo|icon|avatar|author|profile|sprite|favicon|placeholder|default/i.test(imageUrl))
-    .filter((imageUrl) => /\.(jpg|jpeg|png|webp)(\?|$)/i.test(imageUrl) || /image|photo|media|cdn|static|prod/i.test(imageUrl));
+  extractImageUrlsFromHtml(item.content, item.link).forEach((imageUrl) => pushCandidate(imageUrl, item.link));
+  extractImageUrlsFromHtml(item.contentSnippet, item.link).forEach((imageUrl) => pushCandidate(imageUrl, item.link));
+  extractImageUrlsFromHtml(item.description, item.link).forEach((imageUrl) => pushCandidate(imageUrl, item.link));
 
-  return (
-    validCandidates.find((imageUrl) => /1200|1280|1440|1600|1920|2048|large|original|hero|main|lead/i.test(imageUrl)) ||
-    validCandidates[0] ||
-    null
-  );
+  const validCandidates = [...new Set(candidates)]
+    .filter((imageUrl) => /\.(jpg|jpeg|png|webp)(\?|$)/i.test(imageUrl) || /image|photo|media|cdn|static|prod/i.test(imageUrl))
+    .sort((a, b) => scoreImageUrl(b) - scoreImageUrl(a));
+
+  return validCandidates[0] || null;
 }
 
 // Try to extract an image from the article's HTML if not found in the RSS item.
@@ -1135,50 +1203,7 @@ if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
 
     const html = String(response.data || "");
     const candidates = new Set();
-
-    const metaPatterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/gi,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/gi,
-      /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/gi,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image:secure_url["']/gi,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/gi,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/gi,
-      /<meta[^>]+name=["']twitter:image:src["'][^>]+content=["']([^"']+)["']/gi,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image:src["']/gi,
-      /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/gi,
-      /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/gi,
-    ];
-
-    for (const pattern of metaPatterns) {
-      for (const match of html.matchAll(pattern)) {
-        if (match?.[1]) {
-          candidates.add(new URL(match[1], articleUrl).href);
-        }
-      }
-    }
-
-    const imgPatterns = [
-      /<img[^>]+(?:src|data-src|data-original|data-lazy-src|data-srcset)=['"]([^'"]+)['"][^>]*>/gi,
-      /<img[^>]+srcset=['"]([^'"]+)['"][^>]*>/gi,
-    ];
-
-    for (const pattern of imgPatterns) {
-      for (const match of html.matchAll(pattern)) {
-        const rawValue = String(match?.[1] || "").trim();
-        if (!rawValue) continue;
-
-        const firstSrcsetItem = rawValue.split(",")[0]?.trim()?.split(" ")[0];
-        const candidate = firstSrcsetItem || rawValue;
-
-        if (candidate) {
-          try {
-            candidates.add(new URL(candidate, articleUrl).href);
-          } catch (_) {
-            // Ignore invalid image URLs.
-          }
-        }
-      }
-    }
+    extractImageUrlsFromHtml(html, articleUrl).forEach((imageUrl) => candidates.add(imageUrl));
 
     const jsonLdPatterns = [
       /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
@@ -1199,21 +1224,25 @@ if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
             const image = node.image || node.thumbnailUrl || node.url;
 
             if (typeof image === "string") {
-              candidates.add(new URL(image, articleUrl).href);
+              const imageUrl = normalizeExternalImageUrl(image, articleUrl);
+              if (imageUrl) candidates.add(imageUrl);
             }
 
             if (Array.isArray(image)) {
               image.forEach((item) => {
                 if (typeof item === "string") {
-                  candidates.add(new URL(item, articleUrl).href);
+                  const imageUrl = normalizeExternalImageUrl(item, articleUrl);
+                  if (imageUrl) candidates.add(imageUrl);
                 } else if (item?.url) {
-                  candidates.add(new URL(item.url, articleUrl).href);
+                  const imageUrl = normalizeExternalImageUrl(item.url, articleUrl);
+                  if (imageUrl) candidates.add(imageUrl);
                 }
               });
             }
 
             if (image?.url) {
-              candidates.add(new URL(image.url, articleUrl).href);
+              const imageUrl = normalizeExternalImageUrl(image.url, articleUrl);
+              if (imageUrl) candidates.add(imageUrl);
             }
 
             Object.values(node).forEach((value) => {
@@ -1233,24 +1262,21 @@ if (/t\.me|telegram\.me|telegram\.org/i.test(articleUrl)) {
         }
       }
     }
+    const imageCandidates = [...new Set(candidates)]
+      .map((imageUrl) => normalizeExternalImageUrl(imageUrl, articleUrl))
+      .filter(Boolean)
+      .filter((imageUrl) => /\.(jpg|jpeg|png|webp)(\?|$)/i.test(imageUrl) || /image|photo|media|cdn|static|prod/i.test(imageUrl))
+      .sort((a, b) => scoreImageUrl(b) - scoreImageUrl(a));
 
-    const imageCandidates = [...candidates]
-      .filter((imageUrl) => /^https?:\/\//i.test(imageUrl))
-      .filter((imageUrl) => !/t\.me|telegram\.me|telegram\.org|logo|icon|avatar|author|profile|sprite|favicon|placeholder|default/i.test(imageUrl))
-      .sort((a, b) => {
-        const score = (url) => {
-          let total = 0;
-          if (/1200|1280|1440|1600|1920|2048/i.test(url)) total += 5;
-          if (/og|social|article|lead|hero|main|large|photo|image|cdn|prod/i.test(url)) total += 3;
-          if (/thumb|thumbnail|small|80x|120x|150x|300x|1x1/i.test(url)) total -= 5;
-          if (/investing\.com|i-invdn\.com|cnbc\.com|marketwatch\.com|coindesk\.com/i.test(url)) total += 2;
-          return total;
-        };
+    const selectedImage = imageCandidates[0] || null;
 
-        return score(b) - score(a);
-      });
+    if (selectedImage) {
+      console.log("✅ Article image extracted:", selectedImage);
+    } else {
+      console.log("⚠️ No article image candidates found for:", articleUrl);
+    }
 
-    return imageCandidates[0] || null;
+    return selectedImage;
   } catch (error) {
     console.error("⚠️ Article image fetch failed:", error.message);
   }
@@ -1959,6 +1985,13 @@ async function saveNewsPostToSupabase(post) {
     if (!post.image_url && post.source_link) {
       post.image_url = await getImageFromArticleUrl(post.source_link);
     }
+
+    if (post.image_url) {
+      console.log("🖼️ Saving news image:", post.image_url);
+    } else {
+      console.log("⚠️ Saving news without image:", post.source_link || post.title);
+    }
+
     const { error } = await supabase
       .from("news_posts")
       .upsert(
