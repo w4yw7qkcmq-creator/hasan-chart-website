@@ -132,7 +132,7 @@ export default function News() {
       if (host.includes("cnbc")) return "CNBC";
       if (host.includes("marketwatch")) return "MarketWatch";
       if (host.includes("coindesk")) return "CoinDesk";
-      if (host.includes("t.me")) return "Telegram";
+      if (host.includes("t.me")) return "HasaN CharT News";
       return host;
     } catch {
       return "مصدر الخبر";
@@ -189,7 +189,7 @@ export default function News() {
         icon: "🇺🇸",
         label: "الاقتصاد الأمريكي",
         subtitle: "فائدة • تضخم • وظائف",
-        gradient: "from-blue-950 via-slate-950 to-cyan-950",
+        gradient: "from-blue-950 via-indigo-950 to-slate-950",
       },
       geopolitics: {
         icon: "🌍",
@@ -201,7 +201,7 @@ export default function News() {
         icon: "📊",
         label: "تحديثات الأسواق",
         subtitle: "تحركات مؤثرة على التداول",
-        gradient: "from-cyan-950 via-blue-950 to-slate-900",
+        gradient: "from-cyan-950 via-sky-950 to-slate-950",
       },
     };
 
@@ -266,12 +266,12 @@ export default function News() {
                   <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
                     <div className={`absolute inset-0 ${hasRealImage ? "hidden" : "flex"} items-center justify-center text-center fallback-news-image`}>
                       <div className="px-6">
-                        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-cyan-300/25 bg-cyan-400/15 text-4xl shadow-[0_0_40px_rgba(34,211,238,0.18)]">
+                        <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
                           {visual.icon}
                         </div>
                         <div className="text-xl font-black text-cyan-50">{visual.label}</div>
                         <div className="mt-2 text-xs font-bold text-cyan-100/75">{visual.subtitle}</div>
-                        <div className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-cyan-200/60">
+                        <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
                           HasaN CharT News
                         </div>
                       </div>
