@@ -197,7 +197,7 @@ export default async function NewsDetailsPage({ params }) {
       <div className="mx-auto mb-6 flex max-w-4xl flex-wrap items-center justify-between gap-3" dir="rtl">
         <Link
           href="/news"
-          className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-600 px-5 py-3 text-sm font-black text-white no-underline shadow-xl shadow-emerald-600/20 transition hover:scale-105 hover:bg-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-emerald-400/20 dark:hover:bg-emerald-300"
+          className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-600 px-5 py-3 text-sm font-black text-white no-underline shadow-xl shadow-emerald-600/20 transition hover:scale-105 hover:bg-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400"
         >
           ← العودة لصفحة الأخبار الرئيسية
         </Link>
@@ -206,7 +206,7 @@ export default async function NewsDetailsPage({ params }) {
           <button
             type="button"
             data-copy-article-url={articleUrl}
-            className="inline-flex items-center rounded-2xl border border-sky-500/40 bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-xl shadow-sky-600/20 transition hover:scale-105 hover:bg-sky-700 dark:border-sky-300/40 dark:bg-sky-400 dark:text-slate-950 dark:shadow-sky-400/20 dark:hover:bg-sky-300"
+            className="inline-flex items-center rounded-2xl border border-sky-500/40 bg-sky-600 px-4 py-3 text-sm font-black text-white shadow-xl shadow-sky-600/20 transition hover:scale-105 hover:bg-sky-700 dark:border-sky-300/40 dark:bg-sky-400"
           >
             نسخ الرابط
           </button>
@@ -214,7 +214,7 @@ export default async function NewsDetailsPage({ params }) {
             href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(title)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-2xl border border-violet-500/40 bg-violet-600 px-4 py-3 text-sm font-black text-white no-underline shadow-xl shadow-violet-600/20 transition hover:scale-105 hover:bg-violet-700 dark:border-violet-300/40 dark:bg-violet-400 dark:text-slate-950 dark:shadow-violet-400/20 dark:hover:bg-violet-300"
+            className="inline-flex items-center rounded-2xl border border-violet-500/40 bg-violet-600 px-4 py-3 text-sm font-black text-white no-underline shadow-xl shadow-violet-600/20 transition hover:scale-105 hover:bg-violet-700 dark:border-violet-300/40 dark:bg-violet-400"
           >
             مشاركة X
           </a>
@@ -266,7 +266,7 @@ export default async function NewsDetailsPage({ params }) {
             </div>
             <Link
               href="/news"
-              className="inline-flex rounded-2xl border border-emerald-500/40 bg-emerald-600 px-6 py-3 text-sm font-black text-white no-underline shadow-xl shadow-emerald-600/20 transition hover:scale-105 hover:bg-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-emerald-400/20 dark:hover:bg-emerald-300"
+              className="inline-flex rounded-2xl border border-emerald-500/40 bg-emerald-600 px-6 py-3 text-sm font-black text-white no-underline shadow-xl shadow-emerald-600/20 transition hover:scale-105 hover:bg-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400"
             >
               العودة لصفحة الأخبار الرئيسية
             </Link>
