@@ -183,6 +183,30 @@ async function getRelatedNews(currentNews) {
   return (data || []).slice(0, 6);
 }
 
+async function getAdjacentNews(currentNews) {
+  const supabase = getSupabaseClient();
+
+  const [{ data: previousData }, { data: nextData }] = await Promise.all([
+    supabase
+      .from("news_posts")
+      .select("id,title,content,created_at")
+      .lt("created_at", currentNews.created_at)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("news_posts")
+      .select("id,title,content,created_at")
+      .gt("created_at", currentNews.created_at)
+      .order("created_at", { ascending: true })
+      .limit(1),
+  ]);
+
+  return {
+    previous: previousData?.[0] || null,
+    next: nextData?.[0] || null,
+  };
+}
+
 export async function generateMetadata({ params }) {
   const news = await getNewsPost(params.id);
 
@@ -248,6 +272,7 @@ export async function generateMetadata({ params }) {
 export default async function NewsDetailsPage({ params }) {
   const news = await getNewsPost(params.id);
   const relatedNews = news ? await getRelatedNews(news) : [];
+  const adjacentNews = news ? await getAdjacentNews(news) : { previous: null, next: null };
 
   if (!news) {
     notFound();
@@ -468,6 +493,38 @@ export default async function NewsDetailsPage({ params }) {
           </div>
         </div>
       </article>
+
+      {(adjacentNews.previous || adjacentNews.next) ? (
+        <section className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2" dir="rtl">
+          {adjacentNews.previous ? (
+            <Link
+              href={`/news/${adjacentNews.previous.id}`}
+              className="rounded-[1.5rem] border border-white/50 bg-white/75 p-5 no-underline shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
+            >
+              <div className="mb-3 text-sm font-black text-cyan-600">الخبر السابق</div>
+              <h3 className="line-clamp-2 text-lg font-black leading-relaxed text-slate-950">
+                {getNewsTitle(adjacentNews.previous)}
+              </h3>
+            </Link>
+          ) : (
+            <div />
+          )}
+
+          {adjacentNews.next ? (
+            <Link
+              href={`/news/${adjacentNews.next.id}`}
+              className="rounded-[1.5rem] border border-white/50 bg-white/75 p-5 no-underline shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
+            >
+              <div className="mb-3 text-sm font-black text-cyan-600">الخبر التالي</div>
+              <h3 className="line-clamp-2 text-lg font-black leading-relaxed text-slate-950">
+                {getNewsTitle(adjacentNews.next)}
+              </h3>
+            </Link>
+          ) : (
+            <div />
+          )}
+        </section>
+      ) : null}
 
       {relatedNews.length > 0 && news ? (
         <section className="mx-auto mt-10 max-w-4xl rounded-[2rem] border border-white/50 bg-white/75 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.10)] backdrop-blur-xl" dir="rtl">
