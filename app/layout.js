@@ -419,9 +419,9 @@ export default function RootLayout({ children }) {
         <meta name="name" content="HasaN CharT World" />
         <meta itemProp="name" content="HasaN CharT World" />
         <meta name="theme-color" content="#020617" />
-        <link rel="icon" href="/favicon.png" />
-        <link rel="shortcut icon" href="/favicon.png" />
-        <link rel="apple-touch-icon" href="/favicon.png" />
+        <link rel="icon" type="image/png" sizes="1024x1024" href="/favicon.png" />
+        <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" sizes="1024x1024" href="/favicon.png" />
 
         <meta property="og:type" content="website" />
         <meta property="og:locale" content="ar_AR" />
@@ -434,6 +434,7 @@ export default function RootLayout({ children }) {
           content="تابع الأسواق، اطلب تحليل عملة، فعّل التنبيهات السعرية، واطّلع على الشارت الحي من منصة HasaN CharT World."
         />
         <meta property="og:image" content="https://www.hasanchartworld.com/favicon.png" />
+        <meta property="og:image:secure_url" content="https://www.hasanchartworld.com/favicon.png" />
         <meta property="og:image:width" content="512" />
         <meta property="og:image:height" content="512" />
         <meta property="og:image:alt" content="HasaN CharT World Logo" />
