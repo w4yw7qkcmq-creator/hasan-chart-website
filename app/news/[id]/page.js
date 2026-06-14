@@ -101,12 +101,17 @@ async function getRelatedNews(currentNews) {
   const supabase = getSupabaseClient();
   const currentCategory = detectCategory(currentNews);
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("news_posts")
-    .select("id,title,content,created_at,topic_cluster,impact_level")
+    .select("id,title,content,created_at,impact_level")
     .neq("id", currentNews.id)
     .order("created_at", { ascending: false })
     .limit(80);
+
+  if (error) {
+    console.error("Related news fetch error:", error.message);
+    return [];
+  }
 
   const categoryMatches = (data || [])
     .filter((item) => detectCategory(item) === currentCategory)
