@@ -167,12 +167,42 @@ export default function News() {
 
   function categoryVisual(category) {
     const visuals = {
-      crypto: { icon: "₿", label: "Crypto Market", gradient: "from-orange-950 via-slate-950 to-cyan-950" },
-      commodities: { icon: "✦", label: "Commodities", gradient: "from-amber-950 via-slate-950 to-cyan-950" },
-      stocks: { icon: "↗", label: "Stock Market", gradient: "from-emerald-950 via-slate-950 to-cyan-950" },
-      economy: { icon: "▦", label: "Economic Data", gradient: "from-blue-950 via-slate-950 to-cyan-950" },
-      geopolitics: { icon: "⚑", label: "Global Impact", gradient: "from-red-950 via-slate-950 to-cyan-950" },
-      markets: { icon: "◆", label: "Market News", gradient: "from-cyan-950 via-blue-950 to-slate-900" },
+      crypto: {
+        icon: "₿",
+        label: "العملات الرقمية",
+        subtitle: "بيتكوين • كريبتو • بلوكتشين",
+        gradient: "from-orange-950 via-slate-950 to-cyan-950",
+      },
+      commodities: {
+        icon: "✦",
+        label: "النفط والطاقة",
+        subtitle: "نفط • ذهب • سلع",
+        gradient: "from-amber-950 via-slate-950 to-cyan-950",
+      },
+      stocks: {
+        icon: "↗",
+        label: "الأسواق العالمية",
+        subtitle: "أسهم • مؤشرات • وول ستريت",
+        gradient: "from-emerald-950 via-slate-950 to-cyan-950",
+      },
+      economy: {
+        icon: "▦",
+        label: "الاقتصاد الأمريكي",
+        subtitle: "فائدة • تضخم • وظائف",
+        gradient: "from-blue-950 via-slate-950 to-cyan-950",
+      },
+      geopolitics: {
+        icon: "⚑",
+        label: "أخبار جيوسياسية",
+        subtitle: "توترات • حروب • تأثيرات السوق",
+        gradient: "from-red-950 via-slate-950 to-cyan-950",
+      },
+      markets: {
+        icon: "◆",
+        label: "تحديثات الأسواق",
+        subtitle: "تحركات مؤثرة على التداول",
+        gradient: "from-cyan-950 via-blue-950 to-slate-900",
+      },
     };
 
     return visuals[category] || visuals.markets;
@@ -183,7 +213,7 @@ export default function News() {
       <div className="mx-auto max-w-7xl">
         <section className="mb-10 overflow-hidden rounded-[2rem] border border-white/40 bg-white/55 p-8 text-center shadow-[0_20px_80px_rgba(14,165,233,0.12)] backdrop-blur-xl md:p-12">
           <div className="mx-auto mb-4 inline-flex rounded-full border border-cyan-300/40 bg-cyan-100/70 px-5 py-2 text-sm font-black text-cyan-800">
-            Live Economic News
+            أخبار اقتصادية مباشرة
           </div>
           <h1 className="mb-4 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">
             الأخبار الاقتصادية العاجلة
@@ -239,8 +269,11 @@ export default function News() {
                         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-cyan-300/25 bg-cyan-400/15 text-4xl shadow-[0_0_40px_rgba(34,211,238,0.18)]">
                           {visual.icon}
                         </div>
-                        <div className="text-base font-black text-cyan-50">{visual.label}</div>
-                        <div className="mt-2 text-xs font-bold text-cyan-100/70">تغطية اقتصادية مباشرة</div>
+                        <div className="text-xl font-black text-cyan-50">{visual.label}</div>
+                        <div className="mt-2 text-xs font-bold text-cyan-100/75">{visual.subtitle}</div>
+                        <div className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-cyan-200/60">
+                          HasaN CharT News
+                        </div>
                       </div>
                     </div>
                     {newsImage ? (
