@@ -60,6 +60,30 @@ function getNewsImage(news) {
   return null;
 }
 
+function detectCategory(news) {
+  const text = `${news?.title || ""} ${news?.content || ""} ${news?.topic_cluster || ""}`.toLowerCase();
+
+  if (/bitcoin|btc|crypto|ethereum/.test(text)) return "crypto";
+  if (/gold|oil|silver|commodit/.test(text)) return "commodities";
+  if (/nasdaq|dow|s&p|stock|earnings/.test(text)) return "stocks";
+  if (/fed|inflation|cpi|pmi|gdp|jobs/.test(text)) return "economy";
+  if (/iran|israel|war|ukraine|russia|gaza/.test(text)) return "geopolitics";
+
+  return "stocks";
+}
+
+function getCategoryLabel(category) {
+  const labels = {
+    crypto: "العملات الرقمية",
+    commodities: "النفط والطاقة",
+    stocks: "الأسواق العالمية",
+    economy: "الاقتصاد الأمريكي",
+    geopolitics: "أخبار جيوسياسية",
+  };
+
+  return labels[category] || "الأخبار";
+}
+
 async function getNewsPost(id) {
   const supabase = getSupabaseClient();
 
@@ -71,6 +95,22 @@ async function getNewsPost(id) {
 
   if (error || !data) return null;
   return data;
+}
+
+async function getRelatedNews(currentNews) {
+  const supabase = getSupabaseClient();
+  const currentCategory = detectCategory(currentNews);
+
+  const { data } = await supabase
+    .from("news_posts")
+    .select("id,title,content,created_at,topic_cluster,impact_level")
+    .neq("id", currentNews.id)
+    .order("created_at", { ascending: false })
+    .limit(80);
+
+  return (data || [])
+    .filter((item) => detectCategory(item) === currentCategory)
+    .slice(0, 6);
 }
 
 export async function generateMetadata({ params }) {
@@ -136,6 +176,7 @@ export async function generateMetadata({ params }) {
 
 export default async function NewsDetailsPage({ params }) {
   const news = await getNewsPost(params.id);
+  const relatedNews = news ? await getRelatedNews(news) : [];
 
   if (!news) {
     notFound();
@@ -153,6 +194,8 @@ export default async function NewsDetailsPage({ params }) {
   });
   const isHighImpact = news.impact_level === "HIGH";
   const articleUrl = `${SITE_URL}/news/${news.id}`;
+  const category = detectCategory(news);
+  const categoryLabel = getCategoryLabel(category);
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -173,6 +216,12 @@ export default async function NewsDetailsPage({ params }) {
       {
         "@type": "ListItem",
         position: 3,
+        name: categoryLabel,
+        item: `${SITE_URL}/news/category/${category}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 4,
         name: title,
         item: articleUrl,
       },
@@ -189,7 +238,7 @@ export default async function NewsDetailsPage({ params }) {
       "عملات رقمية",
       "أسواق عالمية",
     ],
-    articleSection: "Economic News",
+    articleSection: categoryLabel,
     headline: title,
     description: content.slice(0, 180),
     image: image ? [image] : [`${SITE_URL}/favicon.png`],
@@ -324,6 +373,48 @@ export default async function NewsDetailsPage({ params }) {
           </div>
         </div>
       </article>
+
+      {relatedNews.length > 0 ? (
+        <section className="mx-auto mt-10 max-w-4xl rounded-[2rem] border border-white/50 bg-white/75 p-6 shadow-[0_20px_70px_rgba(15,23,42,0.10)] backdrop-blur-xl" dir="rtl">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="mb-2 text-sm font-black text-cyan-600">{categoryLabel}</div>
+              <h2 className="text-2xl font-black text-slate-950">أخبار ذات صلة</h2>
+            </div>
+            <Link
+              href={`/news/category/${category}`}
+              className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black !text-white no-underline shadow-lg transition hover:bg-cyan-700"
+            >
+              عرض كل أخبار التصنيف
+            </Link>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {relatedNews.map((item) => (
+              <Link
+                key={item.id}
+                href={`/news/${item.id}`}
+                className="group rounded-3xl border border-slate-200 bg-white/85 p-5 no-underline shadow-sm transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
+              >
+                <div className="mb-3 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
+                  {new Date(item.created_at).toLocaleString("ar-SA", {
+                    month: "long",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "numeric",
+                  })}
+                </div>
+                <h3 className="mb-3 line-clamp-2 text-lg font-black leading-relaxed text-slate-950 transition group-hover:text-cyan-700">
+                  {getNewsTitle(item)}
+                </h3>
+                <p className="line-clamp-2 text-sm leading-7 text-slate-600">
+                  {cleanText(item.content || item.title || "").slice(0, 160)}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
