@@ -106,6 +106,43 @@ function getCategoryLabel(category) {
   return labels[category] || "الأخبار";
 }
 
+function getCategoryVisual(category) {
+  const visuals = {
+    crypto: {
+      icon: "₿",
+      label: "العملات الرقمية",
+      subtitle: "بيتكوين • كريبتو • بلوكتشين",
+      gradient: "from-orange-900 via-orange-950 to-slate-950",
+    },
+    commodities: {
+      icon: "🛢️",
+      label: "النفط والطاقة",
+      subtitle: "نفط • ذهب • سلع",
+      gradient: "from-yellow-900 via-amber-950 to-slate-950",
+    },
+    stocks: {
+      icon: "📊",
+      label: "تحديثات الأسواق",
+      subtitle: "تحركات مؤثرة على التداول",
+      gradient: "from-cyan-950 via-sky-950 to-slate-950",
+    },
+    economy: {
+      icon: "🇺🇸",
+      label: "الاقتصاد الأمريكي",
+      subtitle: "فائدة • تضخم • وظائف",
+      gradient: "from-blue-950 via-indigo-950 to-slate-950",
+    },
+    geopolitics: {
+      icon: "🌍",
+      label: "أخبار جيوسياسية",
+      subtitle: "توترات • حروب • تأثيرات السوق",
+      gradient: "from-red-950 via-red-900 to-slate-950",
+    },
+  };
+
+  return visuals[category] || visuals.stocks;
+}
+
 async function getNewsPost(id) {
   const supabase = getSupabaseClient();
 
@@ -231,6 +268,7 @@ export default async function NewsDetailsPage({ params }) {
   const articleUrl = `${SITE_URL}/news/${news.id}`;
   const category = detectCategory(news);
   const categoryLabel = getCategoryLabel(category);
+  const categoryVisual = getCategoryVisual(category);
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -357,14 +395,17 @@ export default async function NewsDetailsPage({ params }) {
       </div>
 
       <article className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/50 bg-white/85 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl">
-        <div className="relative h-[320px] overflow-hidden bg-gradient-to-br from-cyan-950 via-sky-950 to-slate-950 text-center md:h-[460px]">
+        <div className={`relative h-[320px] overflow-hidden bg-gradient-to-br ${categoryVisual.gradient} text-center md:h-[460px]`}>
           <div className={`absolute inset-0 ${image ? "hidden" : "flex"} items-center justify-center fallback-article-image`} style={{ zIndex: 15 }}>
             <div>
               <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
-                📰
+                {categoryVisual.icon}
               </div>
-              <div className="text-2xl font-black text-cyan-50">HasaN CharT News</div>
-              <div className="mt-2 text-sm font-bold text-cyan-100/75">تغطية اقتصادية مباشرة</div>
+              <div className="text-2xl font-black text-cyan-50">{categoryVisual.label}</div>
+              <div className="mt-2 text-sm font-bold text-cyan-100/75">{categoryVisual.subtitle}</div>
+              <div className="mt-5 text-[11px] font-black uppercase tracking-[0.35em] text-cyan-200/45">
+                HasaN CharT News
+              </div>
             </div>
           </div>
 
