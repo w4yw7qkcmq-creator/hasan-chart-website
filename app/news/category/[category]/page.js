@@ -9,24 +9,43 @@ const CATEGORY_CONFIG = {
   geopolitics: {
     title: "أخبار جيوسياسية",
     description: "آخر الأخبار الجيوسياسية وتأثيرها على الأسواق العالمية.",
+    icon: "🌍",
+    gradient: "from-red-950 via-red-900 to-slate-950",
   },
   economy: {
     title: "الاقتصاد الأمريكي",
     description: "أهم أخبار الفيدرالي والتضخم والوظائف والاقتصاد الأمريكي.",
+    icon: "🇺🇸",
+    gradient: "from-blue-950 via-indigo-950 to-slate-950",
   },
   stocks: {
     title: "الأسواق العالمية",
     description: "متابعة الأسهم والمؤشرات العالمية ونتائج الشركات.",
+    icon: "📊",
+    gradient: "from-cyan-950 via-sky-950 to-slate-950",
   },
   crypto: {
     title: "العملات الرقمية",
     description: "أخبار البيتكوين والعملات الرقمية وأسواق الكريبتو.",
+    icon: "₿",
+    gradient: "from-orange-900 via-orange-950 to-slate-950",
   },
   commodities: {
     title: "النفط والطاقة",
     description: "أخبار النفط والذهب والسلع والطاقة العالمية.",
+    icon: "🛢️",
+    gradient: "from-yellow-900 via-amber-950 to-slate-950",
   },
 };
+
+const CATEGORIES = [
+  { key: "all", label: "الكل", href: "/news" },
+  { key: "geopolitics", label: "أخبار جيوسياسية", href: "/news/category/geopolitics" },
+  { key: "economy", label: "الاقتصاد الأمريكي", href: "/news/category/economy" },
+  { key: "stocks", label: "الأسواق العالمية", href: "/news/category/stocks" },
+  { key: "crypto", label: "العملات الرقمية", href: "/news/category/crypto" },
+  { key: "commodities", label: "النفط والطاقة", href: "/news/category/commodities" },
+];
 
 function getSupabaseClient() {
   return createClient(
@@ -35,8 +54,90 @@ function getSupabaseClient() {
   );
 }
 
+function cleanNewsText(text) {
+  if (!text) return "";
+
+  return String(text)
+    .replace(/https?:\/\/t\.me\/EconomicNewsi/gi, "")
+    .replace(/قناة الأخبار الرسمية\s*:*/gi, "")
+    .replace(/🔊|📢/g, "")
+    .replace(/\b(Reuters|CNBC|Investing\.com|MarketWatch|CoinDesk)\b\s*[-–—:]?\s*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shortText(text, maxLength = 260) {
+  const cleaned = cleanNewsText(text);
+  if (!cleaned) return "تفاصيل الخبر متاحة عند فتح الصفحة.";
+  if (cleaned.length <= maxLength) return cleaned;
+  return `${cleaned.slice(0, maxLength).trim()}...`;
+}
+
+function getValidImage(...urls) {
+  const candidates = urls.flat().filter(Boolean);
+
+  for (const url of candidates) {
+    const imageUrl = String(url).trim();
+
+    if (!imageUrl) continue;
+    if (imageUrl.startsWith("/app/assets/")) continue;
+    if (/default|placeholder|sprite|logo|avatar/i.test(imageUrl)) continue;
+
+    if (imageUrl.startsWith("//")) return `https:${imageUrl}`;
+    if (imageUrl.startsWith("https://") || imageUrl.startsWith("http://")) return imageUrl;
+  }
+
+  return null;
+}
+
+function getNewsImage(item) {
+  return getValidImage(
+    item.image_url,
+    item.image,
+    item.thumbnail_url,
+    item.thumbnail,
+    item.urlToImage,
+    item.url_to_image,
+    item.media_url,
+    item.source_image_url,
+    item.og_image,
+    item.cover_image
+  );
+}
+
+function extractArabicTitle(item) {
+  const content = cleanNewsText(item.content || "");
+  const title = cleanNewsText(item.title || item.normalized_title || "");
+  const arabicSentences = content
+    .split(/[.!؟\n]/)
+    .map((part) => part.trim())
+    .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
+
+  if (arabicSentences.length > 0) {
+    return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "").slice(0, 120);
+  }
+
+  return title || "خبر اقتصادي عاجل";
+}
+
+function getSourceName(url) {
+  if (!url) return "مصدر الخبر";
+
+  try {
+    const host = new URL(url).hostname.replace("www.", "");
+    if (host.includes("investing")) return "Investing";
+    if (host.includes("cnbc")) return "CNBC";
+    if (host.includes("marketwatch")) return "MarketWatch";
+    if (host.includes("coindesk")) return "CoinDesk";
+    if (host.includes("t.me")) return "HasaN CharT News";
+    return host;
+  } catch {
+    return "مصدر الخبر";
+  }
+}
+
 function detectCategory(item) {
-  const text = `${item.title || ""} ${item.content || ""}`.toLowerCase();
+  const text = `${item.title || ""} ${item.content || ""} ${item.topic_cluster || ""}`.toLowerCase();
 
   if (/bitcoin|btc|crypto|ethereum/.test(text)) return "crypto";
   if (/gold|oil|silver|commodit/.test(text)) return "commodities";
@@ -53,6 +154,7 @@ export async function generateMetadata({ params }) {
   if (!config) {
     return {
       title: "الأخبار - HasaN CharT World",
+      robots: { index: false, follow: false },
     };
   }
 
@@ -62,6 +164,14 @@ export async function generateMetadata({ params }) {
     alternates: {
       canonical: `${SITE_URL}/news/category/${params.category}`,
     },
+    openGraph: {
+      title: `${config.title} | HasaN CharT World`,
+      description: config.description,
+      url: `${SITE_URL}/news/category/${params.category}`,
+      siteName: "HasaN CharT World",
+      type: "website",
+      locale: "ar_AR",
+    },
   };
 }
 
@@ -70,8 +180,11 @@ export default async function CategoryPage({ params }) {
 
   if (!config) {
     return (
-      <main className="p-10 text-center">
-        <h1>التصنيف غير موجود</h1>
+      <main className="min-h-screen px-4 py-10 text-center text-slate-950">
+        <h1 className="text-3xl font-black">التصنيف غير موجود</h1>
+        <Link href="/news" className="mt-6 inline-flex rounded-2xl bg-cyan-600 px-6 py-3 font-black !text-white no-underline">
+          العودة للأخبار
+        </Link>
       </main>
     );
   }
@@ -80,36 +193,137 @@ export default async function CategoryPage({ params }) {
 
   const { data } = await supabase
     .from("news_posts")
-    .select("id,title,content,created_at")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(300);
 
-  const news = (data || []).filter(
-    (item) => detectCategory(item) === params.category
-  );
+  const news = (data || []).filter((item) => detectCategory(item) === params.category);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <div className="mb-8 text-center">
-        <h1 className="mb-4 text-4xl font-black">{config.title}</h1>
-        <p className="text-slate-500">{config.description}</p>
-      </div>
+    <main className="min-h-screen px-4 py-10 text-slate-950">
+      <div className="mx-auto max-w-7xl">
+        <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/40 bg-white/55 p-8 text-center shadow-[0_20px_80px_rgba(14,165,233,0.12)] backdrop-blur-xl md:p-12">
+          <div className="mx-auto mb-4 inline-flex rounded-full border border-cyan-300/40 bg-cyan-100/70 px-5 py-2 text-sm font-black text-cyan-800">
+            تصنيف الأخبار
+          </div>
+          <h1 className="mb-4 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">
+            {config.title}
+          </h1>
+          <p className="mx-auto max-w-2xl text-lg leading-8 text-slate-600">
+            {config.description}
+          </p>
+        </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {news.map((item) => (
-          <Link
-            key={item.id}
-            href={`/news/${item.id}`}
-            className="rounded-3xl border border-slate-200 bg-white p-6 no-underline shadow-sm transition hover:shadow-xl"
-          >
-            <h2 className="mb-3 text-xl font-black text-slate-900">
-              {item.title || "خبر اقتصادي"}
-            </h2>
-            <p className="line-clamp-3 text-slate-600">
-              {String(item.content || "").slice(0, 220)}
-            </p>
-          </Link>
-        ))}
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
+          {CATEGORIES.map((category) => {
+            const isActive = category.key === params.category;
+            const isAll = category.key === "all";
+
+            return (
+              <Link
+                key={category.key}
+                href={category.href}
+                className={`rounded-2xl border px-5 py-3 text-sm font-black no-underline transition-all ${
+                  isActive || (isAll && !params.category)
+                    ? "border-cyan-300 bg-cyan-500 !text-white shadow-lg shadow-cyan-500/25"
+                    : "border-white/50 bg-white/65 text-slate-600 hover:border-cyan-300 hover:bg-cyan-500 hover:!text-white hover:shadow-lg hover:shadow-cyan-500/25"
+                }`}
+              >
+                {category.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {news.length === 0 ? (
+          <div className="rounded-3xl border border-white/40 bg-white/70 p-10 text-center text-slate-500 shadow-xl backdrop-blur-xl">
+            لا توجد أخبار متاحة حالياً ضمن هذا التصنيف.
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {news.map((item, index) => {
+              const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
+              const isHighImpact = newsImpact === "HIGH";
+              const impactColor = isHighImpact
+                ? "bg-red-500/15 text-red-300 border-red-400/30"
+                : "bg-amber-500/15 text-amber-300 border-amber-400/30";
+
+              const sourceLink = item.source_link || item.link || null;
+              const newsTitle = extractArabicTitle(item);
+              const newsContent = shortText(
+                item.content || item.summary || item.description || item.ai_summary || item.normalized_title,
+                260
+              );
+              const newsImage = getNewsImage(item);
+              const sourceName = getSourceName(sourceLink);
+              const hasRealImage = Boolean(newsImage);
+
+              return (
+                <Link
+                  key={item.id}
+                  href={`/news/${item.id}`}
+                  className={`group block overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
+                >
+                  <div className={`relative overflow-hidden bg-gradient-to-br ${config.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
+                    <div className={`absolute inset-0 ${hasRealImage ? "hidden" : "flex"} items-center justify-center text-center fallback-news-image`}>
+                      <div className="px-6">
+                        <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
+                          {config.icon}
+                        </div>
+                        <div className="text-xl font-black text-cyan-50">{config.title}</div>
+                        <div className="mt-2 text-xs font-bold text-cyan-100/75">{config.description}</div>
+                        <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
+                          HasaN CharT News
+                        </div>
+                      </div>
+                    </div>
+
+                    {newsImage ? (
+                      <img
+                        src={newsImage}
+                        alt={newsTitle}
+                        className="relative z-10 h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                      />
+                    ) : null}
+
+                    <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
+                    <div className="absolute left-4 top-4 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">
+                      {sourceName}
+                    </div>
+                    <div className={`absolute right-4 top-4 z-30 rounded-full border px-3 py-1 text-xs font-black backdrop-blur ${impactColor}`}>
+                      {isHighImpact ? "🔴 عاجل" : "🟡 مهم"}
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="mb-4 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
+                      {new Date(item.created_at).toLocaleString("ar-SA", {
+                        month: "long",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "numeric",
+                      })}
+                    </div>
+
+                    <h2 className={`${index === 0 ? "text-2xl md:text-3xl" : "text-xl"} mb-4 font-black leading-relaxed text-slate-950`}>
+                      {newsTitle}
+                    </h2>
+
+                    <p className="text-[15px] leading-7 text-slate-600">
+                      {newsContent}
+                    </p>
+
+                    <div className="mt-6 border-t border-slate-200 pt-5 text-center">
+                      <span className="text-xs font-bold text-slate-400">
+                        تحديث مباشر • HasaN CharT News
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </main>
   );
