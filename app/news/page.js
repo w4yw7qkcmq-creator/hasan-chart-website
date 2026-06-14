@@ -158,13 +158,14 @@ export default function News() {
                   key={item.id}
                   className="group overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/80 text-slate-950 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
                 >
-                  <div className="relative h-56 overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950">
+                  <div className="relative h-56 overflow-hidden bg-gradient-to-br from-cyan-950 via-blue-950 to-slate-900">
                     <div className="absolute inset-0 flex items-center justify-center text-center">
-                      <div>
-                        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl bg-cyan-400/20 text-3xl">
+                      <div className="px-6">
+                        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-cyan-300/25 bg-cyan-400/15 text-4xl shadow-[0_0_40px_rgba(34,211,238,0.18)]">
                           📰
                         </div>
-                        <div className="text-sm font-black text-cyan-100">HasaN CharT News</div>
+                        <div className="text-base font-black text-cyan-50">HasaN CharT News</div>
+                        <div className="mt-2 text-xs font-bold text-cyan-100/70">تغطية اقتصادية مباشرة</div>
                       </div>
                     </div>
                     {newsImage ? (
@@ -173,11 +174,12 @@ export default function News() {
                         alt={newsTitle}
                         onError={(event) => {
                           event.currentTarget.style.display = "none";
+                          event.currentTarget.removeAttribute("src");
                         }}
                         className="relative z-10 h-full w-full object-cover transition duration-700 group-hover:scale-105"
                       />
                     ) : null}
-                    <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+                    <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
                     <div className="absolute left-4 top-4 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">
                       {sourceName}
                     </div>
