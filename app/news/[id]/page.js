@@ -344,14 +344,6 @@ export default async function NewsDetailsPage({ params }) {
               src={image}
               alt={title}
               className="relative z-10 h-full w-full object-cover"
-              onError={(event) => {
-                event.currentTarget.style.display = "none";
-                const fallback = event.currentTarget.parentElement?.querySelector(".fallback-article-image");
-                if (fallback) {
-                  fallback.classList.remove("hidden");
-                  fallback.classList.add("flex");
-                }
-              }}
             />
           ) : null}
 
