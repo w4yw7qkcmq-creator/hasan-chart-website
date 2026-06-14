@@ -9,6 +9,26 @@ export default function sitemap() {
       lastModified: new Date(),
     },
     {
+      url: "https://www.hasanchartworld.com/news/category/geopolitics",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/category/economy",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/category/stocks",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/category/crypto",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/category/commodities",
+      lastModified: new Date(),
+    },
+    {
       url: "https://www.hasanchartworld.com/daily-analysis",
       lastModified: new Date(),
     },
