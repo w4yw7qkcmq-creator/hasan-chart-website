@@ -210,6 +210,10 @@ export default function News() {
     return visuals[category] || visuals.markets;
   }
 
+  function getNewsHref(item) {
+    return `/news/${item?.slug || item?.id}`;
+  }
+
   const categories = [
     { key: "all", label: "الكل" },
     { key: "geopolitics", label: "أخبار جيوسياسية" },
@@ -298,7 +302,7 @@ export default function News() {
               return (
                 <Link
                   key={item.id}
-                  href={`/news/${item.id}`}
+                  href={getNewsHref(item)}
                   className={`group block overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
                 >
                   <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
