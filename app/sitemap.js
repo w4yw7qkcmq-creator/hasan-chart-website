@@ -29,6 +29,38 @@ export default function sitemap() {
       lastModified: new Date(),
     },
     {
+      url: "https://www.hasanchartworld.com/news/tag/bitcoin",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/tag/crypto",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/tag/gold",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/tag/oil",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/tag/fed",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/tag/inflation",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/tag/forex",
+      lastModified: new Date(),
+    },
+    {
+      url: "https://www.hasanchartworld.com/news/tag/stocks",
+      lastModified: new Date(),
+    },
+    {
       url: "https://www.hasanchartworld.com/daily-analysis",
       lastModified: new Date(),
     },
