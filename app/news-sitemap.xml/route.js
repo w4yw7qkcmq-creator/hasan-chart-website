@@ -12,7 +12,7 @@ export async function GET() {
 
   const { data: news } = await supabase
     .from("news_posts")
-    .select("id, created_at")
+    .select("id, slug, created_at")
     .order("created_at", { ascending: false })
     .limit(1000);
 
@@ -20,7 +20,7 @@ export async function GET() {
     .map(
       (item) => `
   <url>
-    <loc>${SITE_URL}/news/${item.id}</loc>
+    <loc>${SITE_URL}/news/${item.slug || item.id}</loc>
     <lastmod>${new Date(item.created_at).toISOString()}</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
