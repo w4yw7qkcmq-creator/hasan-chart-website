@@ -1,5 +1,12 @@
 "use client";
 import { useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+import SuccessModal from "../components/SuccessModal";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export default function AccountManagement() {
   const [spot, setSpot] = useState({
@@ -25,49 +32,104 @@ export default function AccountManagement() {
     server: "",
     file: null,
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [successModal, setSuccessModal] = useState({
+    open: false,
+    title: "تم إرسال الطلب بنجاح",
+    message: "تم إرسال طلب إدارة الحساب إلى فريق الإدارة وسيتم التواصل معك قريباً.",
+  });
 
-  const saveRequest = (type, data) => {
-    const oldRequests = JSON.parse(
-      localStorage.getItem("accountRequests") || "[]"
-    );
+  const saveRequest = async (type, data) => {
+    setSubmitting(true);
 
-    const newRequest = {
-      id: Date.now(),
-      type,
-      ...data,
-      fileName: data.file ? data.file.name : "لا يوجد صورة",
-      status: "قيد المراجعة",
-      createdAt: new Date().toLocaleString("ar"),
-    };
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    localStorage.setItem(
-      "accountRequests",
-      JSON.stringify([newRequest, ...oldRequests])
-    );
+      if (!session?.access_token) {
+        setSuccessModal({
+          open: true,
+          title: "يجب تسجيل الدخول أولاً",
+          message: "يرجى تسجيل الدخول قبل إرسال طلب إدارة الحساب.",
+        });
+        return false;
+      }
 
-    alert("تم إرسال طلب إدارة الحساب إلى لوحة الإدارة");
+      const response = await fetch("/api/account-management", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          platform: type,
+          accountType: type,
+          capital: data.capital || data.account || "غير محدد",
+          contactMethod: data.telegram,
+          notes: data.server ? `Server: ${data.server}` : null,
+          apiKey: data.apiKey,
+          secretKey: data.secretKey,
+          tradingPassword: data.password,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setSuccessModal({
+          open: true,
+          title: "تعذر إرسال الطلب",
+          message: result.error || "حدث خطأ أثناء إرسال الطلب، يرجى المحاولة مرة أخرى.",
+        });
+        return false;
+      }
+
+      setSuccessModal({
+        open: true,
+        title: "تم إرسال الطلب بنجاح",
+        message: "تم إرسال طلب إدارة الحساب إلى فريق الإدارة وسيتم التواصل معك قريباً.",
+      });
+
+      return true;
+    } catch (error) {
+      setSuccessModal({
+        open: true,
+        title: "تعذر إرسال الطلب",
+        message: "حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.",
+      });
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSpotSubmit = (e) => {
+  const handleSpotSubmit = async (e) => {
     e.preventDefault();
-    saveRequest("إدارة حساب سبوت", spot);
-    setSpot({ telegram: "", capital: "", apiKey: "", secretKey: "", file: null });
+    const ok = await saveRequest("إدارة حساب سبوت", spot);
+    if (ok) setSpot({ telegram: "", capital: "", apiKey: "", secretKey: "", file: null });
   };
 
-  const handleFuturesSubmit = (e) => {
+  const handleFuturesSubmit = async (e) => {
     e.preventDefault();
-    saveRequest("إدارة حساب فيوتشر", futures);
-    setFutures({ telegram: "", capital: "", apiKey: "", secretKey: "", file: null });
+    const ok = await saveRequest("إدارة حساب فيوتشر", futures);
+    if (ok) setFutures({ telegram: "", capital: "", apiKey: "", secretKey: "", file: null });
   };
 
-  const handleForexSubmit = (e) => {
+  const handleForexSubmit = async (e) => {
     e.preventDefault();
-    saveRequest("إدارة حساب فوركس", forex);
-    setForex({ telegram: "", account: "", password: "", server: "", file: null });
+    const ok = await saveRequest("إدارة حساب فوركس", forex);
+    if (ok) setForex({ telegram: "", account: "", password: "", server: "", file: null });
   };
 
   return (
     <main className="min-h-screen bg-[#020617] text-white py-12 px-4">
+      <SuccessModal
+        open={successModal.open}
+        title={successModal.title}
+        message={successModal.message}
+        onClose={() => setSuccessModal((current) => ({ ...current, open: false }))}
+      />
       <div className="max-w-5xl mx-auto space-y-10">
         <h1 className="text-3xl font-bold">إدارة الحسابات</h1>
 
@@ -119,8 +181,8 @@ export default function AccountManagement() {
             </div>
           </div>
 
-          <button type="submit" className="blueBtn">
-            إرسال طلب السبوت
+          <button type="submit" className="blueBtn" disabled={submitting}>
+            {submitting ? "جاري الإرسال..." : "إرسال طلب السبوت"}
           </button>
         </form>
 
@@ -172,8 +234,8 @@ export default function AccountManagement() {
             </div>
           </div>
 
-          <button type="submit" className="blueBtn">
-            إرسال طلب الفيوتشر
+          <button type="submit" className="blueBtn" disabled={submitting}>
+            {submitting ? "جاري الإرسال..." : "إرسال طلب الفيوتشر"}
           </button>
         </form>
 
@@ -225,8 +287,8 @@ export default function AccountManagement() {
             </div>
           </div>
 
-          <button type="submit" className="blueBtn">
-            إرسال طلب الفوركس
+          <button type="submit" className="blueBtn" disabled={submitting}>
+            {submitting ? "جاري الإرسال..." : "إرسال طلب الفوركس"}
           </button>
         </form>
       </div>
