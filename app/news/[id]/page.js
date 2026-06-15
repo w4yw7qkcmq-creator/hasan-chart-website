@@ -106,6 +106,7 @@ function getCategoryLabel(category) {
   return labels[category] || "الأخبار";
 }
 
+
 function getCategoryVisual(category) {
   const visuals = {
     crypto: {
@@ -143,17 +144,29 @@ function getCategoryVisual(category) {
   return visuals[category] || visuals.stocks;
 }
 
-async function getNewsPost(id) {
+function getNewsHref(news) {
+  return `/news/${news?.slug || news?.id}`;
+}
+
+async function getNewsPost(identifier) {
   const supabase = getSupabaseClient();
 
-  const { data, error } = await supabase
+  const { data: slugData, error: slugError } = await supabase
     .from("news_posts")
     .select("*")
-    .eq("id", id)
-    .single();
+    .eq("slug", identifier)
+    .maybeSingle();
 
-  if (error || !data) return null;
-  return data;
+  if (!slugError && slugData) return slugData;
+
+  const { data: idData, error: idError } = await supabase
+    .from("news_posts")
+    .select("*")
+    .eq("id", identifier)
+    .maybeSingle();
+
+  if (idError || !idData) return null;
+  return idData;
 }
 
 async function getRelatedNews(currentNews) {
@@ -162,7 +175,7 @@ async function getRelatedNews(currentNews) {
 
   const { data, error } = await supabase
     .from("news_posts")
-    .select("id,title,content,created_at,impact_level")
+    .select("id,slug,title,content,created_at,impact_level")
     .neq("id", currentNews.id)
     .order("created_at", { ascending: false })
     .limit(80);
@@ -189,13 +202,13 @@ async function getAdjacentNews(currentNews) {
   const [{ data: previousData }, { data: nextData }] = await Promise.all([
     supabase
       .from("news_posts")
-      .select("id,title,content,created_at")
+      .select("id,slug,title,content,created_at")
       .lt("created_at", currentNews.created_at)
       .order("created_at", { ascending: false })
       .limit(1),
     supabase
       .from("news_posts")
-      .select("id,title,content,created_at")
+      .select("id,slug,title,content,created_at")
       .gt("created_at", currentNews.created_at)
       .order("created_at", { ascending: true })
       .limit(1),
@@ -221,7 +234,7 @@ export async function generateMetadata({ params }) {
   const description = cleanText(news.content || news.summary || news.description || title).slice(0, 160);
   const rawImage = getNewsImage(news);
   const image = rawImage && (await isImageReachable(rawImage)) ? rawImage : `${SITE_URL}/favicon.png`;
-  const url = `${SITE_URL}/news/${news.id}`;
+  const url = `${SITE_URL}${getNewsHref(news)}`;
 
   const keywords = [
     title,
@@ -290,7 +303,7 @@ export default async function NewsDetailsPage({ params }) {
     minute: "numeric",
   });
   const isHighImpact = news.impact_level === "HIGH";
-  const articleUrl = `${SITE_URL}/news/${news.id}`;
+  const articleUrl = `${SITE_URL}${getNewsHref(news)}`;
   const category = detectCategory(news);
   const categoryLabel = getCategoryLabel(category);
   const categoryVisual = getCategoryVisual(category);
@@ -498,7 +511,7 @@ export default async function NewsDetailsPage({ params }) {
         <section className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2" dir="rtl">
           {adjacentNews.previous ? (
             <Link
-              href={`/news/${adjacentNews.previous.id}`}
+              href={getNewsHref(adjacentNews.previous)}
               className="rounded-[1.5rem] border border-white/50 bg-white/75 p-5 no-underline shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
             >
               <div className="mb-3 text-sm font-black text-cyan-600">الخبر السابق</div>
@@ -512,7 +525,7 @@ export default async function NewsDetailsPage({ params }) {
 
           {adjacentNews.next ? (
             <Link
-              href={`/news/${adjacentNews.next.id}`}
+              href={getNewsHref(adjacentNews.next)}
               className="rounded-[1.5rem] border border-white/50 bg-white/75 p-5 no-underline shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
             >
               <div className="mb-3 text-sm font-black text-cyan-600">الخبر التالي</div>
@@ -545,7 +558,7 @@ export default async function NewsDetailsPage({ params }) {
             {relatedNews.map((item) => (
               <Link
                 key={item.id}
-                href={`/news/${item.id}`}
+                href={getNewsHref(item)}
                 className="group rounded-3xl border border-slate-200 bg-white/85 p-5 no-underline shadow-sm transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
               >
                 <div className="mb-3 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
