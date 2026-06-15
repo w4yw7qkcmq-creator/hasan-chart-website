@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const Parser = require("rss-parser");
 const axios = require("axios");
 const FormData = require("form-data");
@@ -1294,6 +1295,106 @@ function normalizeNewsTitle(title) {
     .trim();
 }
 
+function createNewsSlug(title, fallback = "market-news") {
+  const stopWords = new Set([
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "but",
+    "to",
+    "of",
+    "in",
+    "on",
+    "for",
+    "with",
+    "as",
+    "by",
+    "from",
+    "after",
+    "before",
+    "over",
+    "under",
+    "into",
+    "at",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "this",
+    "that",
+    "these",
+    "those",
+    "says",
+    "said",
+    "breaking",
+    "news",
+    "update",
+    "latest",
+    "live",
+  ]);
+
+  const latinWords = String(title || "")
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/&amp;/g, " and ")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 1 && !stopWords.has(word));
+
+  const slug = latinWords
+    .slice(0, 8)
+    .join("-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return slug || fallback;
+}
+
+function shortStableHash(value) {
+  return crypto
+    .createHash("sha1")
+    .update(String(value || Date.now()))
+    .digest("hex")
+    .slice(0, 6);
+}
+
+async function buildUniqueNewsSlug(title, sourceLink) {
+  const baseSlug = createNewsSlug(title);
+  const hash = shortStableHash(sourceLink || title);
+  const preferredSlug = baseSlug;
+  const fallbackSlug = `${baseSlug}-${hash}`;
+
+  try {
+    const { data, error } = await supabase
+      .from("news_posts")
+      .select("id,source_link,slug")
+      .in("slug", [preferredSlug, fallbackSlug])
+      .limit(2);
+
+    if (error) {
+      console.error("⚠️ Slug check error:", error.message);
+      return fallbackSlug;
+    }
+
+    const samePreferred = (data || []).find((item) => item.slug === preferredSlug);
+
+    if (!samePreferred || samePreferred.source_link === sourceLink) {
+      return preferredSlug;
+    }
+
+    return fallbackSlug;
+  } catch (error) {
+    console.error("⚠️ Slug build exception:", error.message);
+    return fallbackSlug;
+  }
+}
+
 function getStrongDuplicateKey(text) {
   const value = normalizeNewsTitle(text || "");
 
@@ -1992,6 +2093,9 @@ async function saveNewsPostToSupabase(post) {
       console.log("⚠️ Saving news without image:", post.source_link || post.title);
     }
 
+    const slug = post.slug || (await buildUniqueNewsSlug(post.title || post.content, post.source_link));
+    console.log("🔗 News slug:", slug);
+
     const { error } = await supabase
       .from("news_posts")
       .upsert(
@@ -2002,6 +2106,7 @@ async function saveNewsPostToSupabase(post) {
             image_url: post.image_url || null,
             impact_level: post.impact_level || "MEDIUM",
             source_link: post.source_link,
+            slug,
             created_at: new Date().toISOString(),
           },
         ],
