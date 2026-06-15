@@ -383,8 +383,17 @@ export default async function NewsDetailsPage({ params }) {
     image: image ? [image] : [`${SITE_URL}/favicon.png`],
     datePublished: news.created_at,
     dateModified: news.created_at,
-    mainEntityOfPage: articleUrl,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": articleUrl,
+    },
     thumbnailUrl: image || `${SITE_URL}/favicon.png`,
+    genre: categoryLabel,
+    isPartOf: {
+      "@type": "WebSite",
+      name: "HasaN CharT World",
+      url: SITE_URL,
+    },
     author: {
       "@type": "Organization",
       name: "HasaN CharT News",
@@ -395,6 +404,8 @@ export default async function NewsDetailsPage({ params }) {
       logo: {
         "@type": "ImageObject",
         url: `${SITE_URL}/favicon.png`,
+        width: 512,
+        height: 512,
       },
     },
   };
