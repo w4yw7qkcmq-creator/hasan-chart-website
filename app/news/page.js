@@ -63,11 +63,10 @@ export default function News() {
       .trim();
   }
 
-  function shortText(text, maxLength = 240) {
+  function fullText(text) {
     const cleaned = cleanNewsText(text);
-    if (!cleaned) return "اضغط على المصدر لقراءة تفاصيل الخبر.";
-    if (cleaned.length <= maxLength) return cleaned;
-    return `${cleaned.slice(0, maxLength).trim()}...`;
+    if (!cleaned) return "تفاصيل الخبر غير متاحة حالياً.";
+    return cleaned;
   }
 
   function getValidImage(...urls) {
@@ -289,9 +288,8 @@ export default function News() {
 
               const sourceLink = item.source_link || item.link || null;
               const newsTitle = extractArabicTitle(item);
-              const newsContent = shortText(
-                item.content || item.summary || item.description || item.ai_summary || item.normalized_title,
-                260
+              const newsContent = fullText(
+                item.content || item.summary || item.description || item.ai_summary || item.normalized_title
               );
               const newsImage = getNewsImage(item);
               const sourceName = getSourceName(sourceLink);
