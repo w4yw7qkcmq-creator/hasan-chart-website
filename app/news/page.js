@@ -130,7 +130,7 @@ export default function News() {
       .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
 
     if (arabicSentences.length > 0) {
-      return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "").slice(0, 120);
+      return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "");
     }
 
     return title || "خبر اقتصادي عاجل";
