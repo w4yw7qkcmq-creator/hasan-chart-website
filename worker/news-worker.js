@@ -730,10 +730,17 @@ const TELEGRAM_SOURCE_CHANNELS = [
 function decodeTelegramHtml(value) {
   return String(value || "")
     .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s+/g, "\n")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -757,7 +764,11 @@ function cleanTelegramSourceText(value) {
     .replace(/&#39;/gi, "'")
     .replace(/&amp;/gi, "&")
     .replace(/#[^\s#]+/g, "")
-    .replace(/\s+/g, " ")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -784,20 +795,21 @@ async function fetchTelegramChannelPosts() {
 
       for (const match of textMatches.slice(-15)) {
         const text = cleanTelegramSourceText(decodeTelegramHtml(match[1]));
+        const compactText = text.replace(/\s+/g, " ").trim();
 
-        if (!text || text.length < 15) continue;
+        if (!compactText || compactText.length < 15) continue;
 
         // Telegram is used only for official economic releases.
         // Everything else (gold, oil, crypto, wars, stocks, geopolitics)
         // should come from RSS/external sources.
-        if (!isOfficialEconomicReleaseText(text)) {
-          console.log("⏭️ Skipped non-economic Telegram news:", text.slice(0, 120));
+        if (!isOfficialEconomicReleaseText(compactText)) {
+          console.log("⏭️ Skipped non-economic Telegram news:", compactText.slice(0, 120));
           continue;
         }
 
         posts.push({
-          title: text,
-          link: `telegram-${channel.name}-${normalizeNewsTitle(text).slice(0, 80)}`,
+          title: compactText,
+          link: `telegram-${channel.name}-${normalizeNewsTitle(compactText).slice(0, 80)}`,
           contentSnippet: text,
           sourceName: channel.name,
           isTelegramSource: true,
