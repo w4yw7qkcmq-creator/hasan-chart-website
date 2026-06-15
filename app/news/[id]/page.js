@@ -144,8 +144,25 @@ function getCategoryVisual(category) {
   return visuals[category] || visuals.stocks;
 }
 
+
 function getNewsHref(news) {
   return `/news/${news?.slug || news?.id}`;
+}
+
+function detectTags(news = {}) {
+  const text = `${news.title || ""} ${news.content || ""} ${news.slug || ""}`.toLowerCase();
+  const tags = [];
+
+  if (/(bitcoin|btc|بيتكوين)/i.test(text)) tags.push({ label: "بيتكوين", href: "/news/tag/bitcoin" });
+  if (/(crypto|ethereum|blockchain|كريبتو|عملات رقمية)/i.test(text)) tags.push({ label: "كريبتو", href: "/news/tag/crypto" });
+  if (/(gold|xau|ذهب)/i.test(text)) tags.push({ label: "الذهب", href: "/news/tag/gold" });
+  if (/(oil|brent|crude|opec|hormuz|نفط|أوبك|هرمز)/i.test(text)) tags.push({ label: "النفط", href: "/news/tag/oil" });
+  if (/(fed|powell|federal reserve|rate|interest|فيدرالي|الفائدة|باول)/i.test(text)) tags.push({ label: "الفيدرالي", href: "/news/tag/fed" });
+  if (/(inflation|cpi|pce|تضخم)/i.test(text)) tags.push({ label: "التضخم", href: "/news/tag/inflation" });
+  if (/(forex|usd|eur|gbp|jpy|dollar|فوركس|الدولار|اليورو)/i.test(text)) tags.push({ label: "فوركس", href: "/news/tag/forex" });
+  if (/(stocks|nasdaq|dow|s&p|earnings|أسهم|ناسداك|داو)/i.test(text)) tags.push({ label: "الأسهم", href: "/news/tag/stocks" });
+
+  return tags.slice(0, 5);
 }
 
 async function getNewsPost(identifier) {
@@ -307,6 +324,7 @@ export default async function NewsDetailsPage({ params }) {
   const category = detectCategory(news);
   const categoryLabel = getCategoryLabel(category);
   const categoryVisual = getCategoryVisual(category);
+  const newsTags = detectTags(news);
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -485,6 +503,20 @@ export default async function NewsDetailsPage({ params }) {
               {categoryLabel}
             </Link>
           </nav>
+
+          {newsTags.length > 0 ? (
+            <div className="mb-5 flex flex-wrap items-center gap-3">
+              {newsTags.map((tag) => (
+                <Link
+                  key={tag.href}
+                  href={tag.href}
+                  className="rounded-full border border-cyan-300/50 bg-cyan-500 px-4 py-2 text-sm font-black !text-white no-underline shadow-lg shadow-cyan-500/20 transition hover:scale-105 hover:bg-cyan-600"
+                >
+                  #{tag.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
 
           <div className="mb-5 inline-flex rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">
             {publishedDate}
