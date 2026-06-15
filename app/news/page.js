@@ -9,6 +9,17 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+const POPULAR_TAGS = [
+  { label: "بيتكوين", href: "/news/tag/bitcoin" },
+  { label: "كريبتو", href: "/news/tag/crypto" },
+  { label: "الذهب", href: "/news/tag/gold" },
+  { label: "النفط", href: "/news/tag/oil" },
+  { label: "الفيدرالي", href: "/news/tag/fed" },
+  { label: "التضخم", href: "/news/tag/inflation" },
+  { label: "فوركس", href: "/news/tag/forex" },
+  { label: "الأسهم", href: "/news/tag/stocks" },
+];
+
 export default function News() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -261,6 +272,24 @@ export default function News() {
               </button>
             );
           })}
+        </div>
+
+        <div className="mb-8 rounded-[1.75rem] border border-white/50 bg-white/75 p-5 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="mb-4 text-center text-lg font-black text-slate-950">
+            الوسوم الشائعة
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {POPULAR_TAGS.map((tag) => (
+              <Link
+                key={tag.href}
+                href={tag.href}
+                className="rounded-full bg-cyan-600 px-4 py-2 text-sm font-black !text-white no-underline shadow-lg transition hover:scale-105 hover:bg-cyan-700"
+              >
+                #{tag.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
         {loading ? (
