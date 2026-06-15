@@ -342,6 +342,10 @@ export default async function NewsDetailsPage({ params }) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
+    "@id": articleUrl,
+    url: articleUrl,
+    inLanguage: "ar",
+    isAccessibleForFree: true,
     keywords: [
       title,
       "أخبار اقتصادية",
@@ -350,12 +354,18 @@ export default async function NewsDetailsPage({ params }) {
       "أسواق عالمية",
     ],
     articleSection: categoryLabel,
+    wordCount: content.split(/\s+/).filter(Boolean).length,
+    about: {
+      "@type": "Thing",
+      name: categoryLabel,
+    },
     headline: title,
     description: content.slice(0, 180),
     image: image ? [image] : [`${SITE_URL}/favicon.png`],
     datePublished: news.created_at,
     dateModified: news.created_at,
     mainEntityOfPage: articleUrl,
+    thumbnailUrl: image || `${SITE_URL}/favicon.png`,
     author: {
       "@type": "Organization",
       name: "HasaN CharT News",
