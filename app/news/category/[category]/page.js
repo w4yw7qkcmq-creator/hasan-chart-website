@@ -1,5 +1,3 @@
-
-
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -45,6 +43,17 @@ const CATEGORIES = [
   { key: "stocks", label: "الأسواق العالمية", href: "/news/category/stocks" },
   { key: "crypto", label: "العملات الرقمية", href: "/news/category/crypto" },
   { key: "commodities", label: "النفط والطاقة", href: "/news/category/commodities" },
+];
+
+const POPULAR_TAGS = [
+  { label: "بيتكوين", href: "/news/tag/bitcoin" },
+  { label: "كريبتو", href: "/news/tag/crypto" },
+  { label: "الذهب", href: "/news/tag/gold" },
+  { label: "النفط", href: "/news/tag/oil" },
+  { label: "الفيدرالي", href: "/news/tag/fed" },
+  { label: "التضخم", href: "/news/tag/inflation" },
+  { label: "فوركس", href: "/news/tag/forex" },
+  { label: "الأسهم", href: "/news/tag/stocks" },
 ];
 
 function getSupabaseClient() {
@@ -237,6 +246,24 @@ export default async function CategoryPage({ params }) {
               </Link>
             );
           })}
+        </div>
+
+        <div className="mb-8 rounded-[1.75rem] border border-white/50 bg-white/75 p-5 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="mb-4 text-center text-lg font-black text-slate-950">
+            الوسوم الشائعة
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {POPULAR_TAGS.map((tag) => (
+              <Link
+                key={tag.href}
+                href={tag.href}
+                className="rounded-full bg-cyan-600 px-4 py-2 text-sm font-black !text-white no-underline shadow-lg transition hover:scale-105 hover:bg-cyan-700"
+              >
+                #{tag.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
         {news.length === 0 ? (
