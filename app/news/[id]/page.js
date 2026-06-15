@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import CopyArticleButton from "../../components/CopyArticleButton";
 
 const SITE_URL = "https://www.hasanchartworld.com";
 
@@ -408,30 +409,6 @@ export default async function NewsDetailsPage({ params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            document.addEventListener("click", async function (event) {
-              const button = event.target.closest("[data-copy-article-url]");
-              if (!button) return;
-
-              const url = button.getAttribute("data-copy-article-url");
-              if (!url) return;
-
-              try {
-                await navigator.clipboard.writeText(url);
-                const originalText = button.textContent;
-                button.textContent = "تم نسخ الرابط ✅";
-                setTimeout(function () {
-                  button.textContent = originalText;
-                }, 1800);
-              } catch (error) {
-                window.prompt("انسخ رابط الخبر:", url);
-              }
-            });
-          `,
-        }}
-      />
 
       <div className="mx-auto mb-6 flex max-w-4xl flex-wrap items-center justify-between gap-3" dir="rtl">
         <Link
@@ -442,13 +419,7 @@ export default async function NewsDetailsPage({ params }) {
         </Link>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            data-copy-article-url={articleUrl}
-            className="inline-flex appearance-none items-center rounded-2xl border border-sky-500/40 bg-sky-600 px-4 py-3 text-sm font-black !text-white dark:!text-white shadow-xl shadow-sky-600/20 transition hover:scale-105 hover:bg-sky-700 dark:border-sky-300/40 dark:bg-sky-400"
-          >
-            نسخ الرابط
-          </button>
+          <CopyArticleButton url={articleUrl} />
           <a
             href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(title)}`}
             target="_blank"
