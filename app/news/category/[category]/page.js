@@ -148,6 +148,10 @@ function detectCategory(item) {
   return "stocks";
 }
 
+function getNewsHref(item) {
+  return `/news/${item?.slug || item?.id}`;
+}
+
 export async function generateMetadata({ params }) {
   const config = CATEGORY_CONFIG[params.category];
 
@@ -261,7 +265,7 @@ export default async function CategoryPage({ params }) {
               return (
                 <Link
                   key={item.id}
-                  href={`/news/${item.id}`}
+                  href={getNewsHref(item)}
                   className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
                 >
                   <div className={`relative h-56 overflow-hidden bg-gradient-to-br ${config.gradient}`}>
