@@ -664,8 +664,8 @@ function Price({ title, symbol, price, source = "Binance Live" }) {
 
 function TradingViewPrice({ title, symbol, tvSymbol }) {
   return (
-    <div className="rounded-[28px] border border-slate-700/70 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.28)] transition hover:scale-[1.02]">
-      <p className="text-sm font-bold text-slate-300">{title}</p>
+    <div className="rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
+      <p className="text-sm font-bold text-white/90">{title}</p>
       <h3 className="mt-2 mb-3 text-2xl font-black text-white">{symbol}</h3>
       <TradingViewWidget symbol={tvSymbol} height="120" />
       <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
@@ -676,7 +676,7 @@ function TradingViewPrice({ title, symbol, tvSymbol }) {
 function MiniTicker({ symbol, price }) {
   return (
     <div className="flex items-center justify-between rounded-2xl bg-white/5 border border-white/10 p-4">
-      <span className="font-black">{symbol}</span>
+      <span className="font-black text-white">{symbol}</span>
       <span className="text-emerald-400 font-black">${price}</span>
     </div>
   );
@@ -700,8 +700,8 @@ function Service({ title, text, onRequireLogin }) {
 
 function MarketWindow({ title, label, symbol }) {
   return (
-    <div className="min-h-[230px] overflow-hidden rounded-[28px] border border-slate-700/70 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.28)] transition hover:scale-[1.02]">
-      <p className="text-sm font-bold text-slate-300">{label}</p>
+    <div className="min-h-[230px] overflow-hidden rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
+      <p className="text-sm font-bold text-white/90">{label}</p>
       <h3 className="mt-2 mb-3 text-2xl font-black text-white">{title}</h3>
       <TradingViewWidget symbol={symbol} height="120" />
       <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
@@ -727,7 +727,7 @@ function TradingViewWidget({ symbol, height = "120" }) {
     script.innerHTML = JSON.stringify({
       symbol,
       width: "100%",
-      isTransparent: true,
+      isTransparent: false,
       colorTheme: "dark",
       locale: "ar",
     });
@@ -738,7 +738,7 @@ function TradingViewWidget({ symbol, height = "120" }) {
   return (
     <div
       ref={containerRef}
-      className="tradingview-widget-container overflow-hidden rounded-2xl border border-slate-700/70 bg-black/35"
+      className="tradingview-widget-container overflow-hidden rounded-2xl border border-slate-800 bg-black shadow-[inset_0_0_30px_rgba(0,0,0,0.65)]"
       style={{ height }}
     />
   );
