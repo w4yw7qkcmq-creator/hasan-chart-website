@@ -716,7 +716,7 @@ function TradingViewPrice({ title, symbol, tvSymbol }) {
 
 function MiniTicker({ symbol, price }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-cyan-200/60 bg-gradient-to-r from-sky-200 to-blue-200 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+    <div className="flex items-center justify-between rounded-2xl border border-blue-300/70 bg-gradient-to-r from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_8px_22px_rgba(37,99,235,0.22)]">
       <span
         className="font-black tracking-wide"
         style={{
