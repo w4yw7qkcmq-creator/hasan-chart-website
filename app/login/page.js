@@ -227,15 +227,15 @@ export default function LoginPage() {
 
     localStorage.removeItem("currentUser");
     sessionStorage.removeItem("currentUser");
-    localStorage.removeItem("hasan-chart-auth-session");
-    localStorage.removeItem("sb-lzgsxdsumnteuwtjfqlm-auth-token");
-    localStorage.removeItem("supabase.auth.token");
-    sessionStorage.removeItem("hasan-chart-auth-session");
-    sessionStorage.removeItem("sb-lzgsxdsumnteuwtjfqlm-auth-token");
-    sessionStorage.removeItem("supabase.auth.token");
 
     try {
-      const { user, session, error } = await loginDirectlyWithSupabase(cleanEmail, password);
+      const {
+        data: { user, session },
+        error,
+      } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
 
       if (error || !user) {
         alert(error || "بيانات الدخول غير صحيحة");
@@ -263,17 +263,6 @@ export default function LoginPage() {
       localStorage.setItem("currentUser", JSON.stringify(userData));
       sessionStorage.setItem("currentUser", JSON.stringify(userData));
 
-      if (session) {
-        localStorage.setItem("hasan-chart-auth-session", JSON.stringify(session));
-        localStorage.setItem(
-          "sb-lzgsxdsumnteuwtjfqlm-auth-token",
-          JSON.stringify({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            user: session.user,
-          })
-        );
-      }
 
       window.dispatchEvent(new Event("storage"));
       window.location.href = role === "admin" ? "/admin" : "/my-dashboard";
