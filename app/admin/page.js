@@ -489,40 +489,65 @@ export default function AdminPage() {
   };
 
   const updateSubscriptionRequest = async (request, newStatus) => {
-    const updated = subscriptionRequests.map((item) =>
-      item.id === request.id ? { ...item, status: newStatus } : item
-    );
+    const needsConfirm = newStatus === "مفعل" || newStatus === "مرفوض";
 
-    if (dataMode === "supabase") {
-      const { error } = await supabase
-        .from("subscription_requests")
-        .update({ status: newStatus })
-        .eq("id", request.id);
+    if (needsConfirm) {
+      const confirmed = await confirmAdminAction(
+        newStatus === "مفعل"
+          ? "هل تريد تفعيل هذا الاشتراك للمستخدم؟"
+          : "هل تريد رفض طلب الاشتراك؟"
+      );
 
-      if (error) {
-        showAdminNotice("لم يتم تحديث طلب الاشتراك في Supabase: " + error.message, "error");
-        return;
-      }
-
-      if (newStatus === "مفعل") {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({
-            subscription_plan: request.planName,
-            subscription_status: "نشط",
-          })
-          .eq("email", request.userEmail);
-
-        if (profileError) {
-          showAdminNotice("تم تفعيل الطلب، لكن لم يتم تحديث اشتراك المستخدم في profiles: " + profileError.message, "error");
-        }
-      }
-    } else {
-      localStorage.setItem("subscriptionRequests", JSON.stringify(updated));
+      if (!confirmed) return;
     }
 
-    setSubscriptionRequests(updated);
-    showAdminNotice(newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك");
+    try {
+      const response = await fetch("/api/admin/dashboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "update-subscription-request",
+          requestId: request.id,
+          status: newStatus,
+          userEmail: request.userEmail,
+          planName: request.planName,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر تحديث حالة طلب الاشتراك");
+      }
+
+      setSubscriptionRequests((prev) =>
+        prev.map((item) =>
+          item.id === request.id ? { ...item, status: newStatus } : item
+        )
+      );
+
+      if (newStatus === "مفعل") {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.email === request.userEmail
+              ? {
+                  ...user,
+                  subscription_plan: request.planName,
+                  subscription_status: "نشط",
+                }
+              : user
+          )
+        );
+      }
+
+      showAdminNotice(
+        newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك"
+      );
+    } catch (error) {
+      showAdminNotice(error?.message || "تعذر تحديث حالة طلب الاشتراك", "error");
+    }
   };
 
   const stats = useMemo(() => {

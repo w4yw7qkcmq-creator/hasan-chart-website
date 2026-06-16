@@ -248,21 +248,53 @@ export async function POST(request) {
       return Response.json({ success: true });
     }
 
-    if (action === "delete-analysis-request") {
+    if (action === "update-subscription-request") {
+      const newStatus = String(payload.status || "").trim();
+      const userEmail = String(payload.userEmail || "").trim().toLowerCase();
+      const planName = String(payload.planName || "").trim();
+
+      if (!newStatus) {
+        return Response.json(
+          { success: false, error: "حالة الاشتراك مطلوبة" },
+          { status: 400 }
+        );
+      }
+
       const { error } = await supabase
-        .from("analysis_requests")
-        .delete()
+        .from("subscription_requests")
+        .update({ status: newStatus })
         .eq("id", requestId);
 
       if (error) {
-        throw new Error(error.message || "تعذر حذف طلب التحليل");
+        throw new Error(error.message || "تعذر تحديث طلب الاشتراك");
+      }
+
+      if (newStatus === "مفعل" && userEmail) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            subscription_plan: planName || "اشتراك مفعل",
+            subscription_status: "نشط",
+          })
+          .eq("email", userEmail);
+
+        if (profileError) {
+          throw new Error(
+            profileError.message || "تم تحديث الطلب لكن تعذر تفعيل اشتراك المستخدم"
+          );
+        }
       }
 
       await writeAdminLog({
         admin: adminUser,
-        action: "delete-analysis-request",
-        targetTable: "analysis_requests",
+        action: "update-subscription-request",
+        targetTable: "subscription_requests",
         targetId: requestId,
+        details: {
+          status: newStatus,
+          userEmail,
+          planName,
+        },
       });
 
       return Response.json({ success: true });
@@ -282,6 +314,26 @@ export async function POST(request) {
         admin: adminUser,
         action: "approve-account-request",
         targetTable: "account_management_requests",
+        targetId: requestId,
+      });
+
+      return Response.json({ success: true });
+    }
+
+    if (action === "delete-analysis-request") {
+      const { error } = await supabase
+        .from("analysis_requests")
+        .delete()
+        .eq("id", requestId);
+
+      if (error) {
+        throw new Error(error.message || "تعذر حذف طلب التحليل");
+      }
+
+      await writeAdminLog({
+        admin: adminUser,
+        action: "delete-analysis-request",
+        targetTable: "analysis_requests",
         targetId: requestId,
       });
 
