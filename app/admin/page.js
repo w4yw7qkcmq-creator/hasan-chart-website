@@ -7,23 +7,23 @@ import { supabase } from "../../lib/supabase";
 function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
   const glow =
     tone === "green"
-      ? "from-emerald-400/14 to-[#f0b90b]/5"
+      ? "from-emerald-400/20 to-cyan-400/10"
       : tone === "orange"
-      ? "from-[#f0b90b]/18 to-orange-400/8"
+      ? "from-amber-400/20 to-orange-400/10"
       : tone === "red"
-      ? "from-red-500/16 to-[#f0b90b]/6"
-      : "from-sky-500/14 to-[#f0b90b]/5";
+      ? "from-red-400/20 to-orange-400/10"
+      : "from-blue-500/20 to-cyan-400/10";
 
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-[#263142] bg-[#111827]/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+    <div className="relative overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
       <div className={`absolute inset-0 bg-gradient-to-br ${glow}`} />
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-[#b7bdc6]">{title}</p>
-          <h3 className="mt-3 text-4xl font-black text-[#eaecef] drop-shadow-[0_0_18px_rgba(255,255,255,0.18)]">{value}</h3>
-          <p className="mt-2 text-sm text-[#b7bdc6]">{subtitle}</p>
+          <p className="text-sm font-bold text-slate-300">{title}</p>
+          <h3 className="mt-3 text-4xl font-black text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.18)]">{value}</h3>
+          <p className="mt-2 text-sm text-slate-300">{subtitle}</p>
         </div>
-        <div className="grid h-14 w-14 place-items-center rounded-2xl border border-[#334155] bg-[#0b0f14]/70 text-2xl shadow-[0_0_28px_rgba(240,185,11,0.12)]">
+        <div className="grid h-14 w-14 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)]">
           {icon}
         </div>
       </div>
@@ -892,7 +892,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="relative overflow-hidden rounded-[34px] border border-[#263142] bg-[#0b0f14] text-[#eaecef] shadow-[0_28px_100px_rgba(0,0,0,0.45)]">
+    <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
       {adminNotice.open && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-4 backdrop-blur-md">
           <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
@@ -936,28 +936,28 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_8%,rgba(240,185,11,0.13),transparent_28%),radial-gradient(circle_at_88%_28%,rgba(14,165,233,0.10),transparent_30%),linear-gradient(135deg,#0b0f14,#111827_48%,#070a0f)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.08] bg-[linear-gradient(90deg,rgba(240,185,11,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:82px_82px]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
 
-      <div className="relative z-10 space-y-8 p-4 text-[#eaecef] md:p-6">
-        <section className="relative overflow-hidden rounded-[34px] border border-[#263142] bg-gradient-to-br from-[#151a21]/95 via-[#0f1720]/95 to-[#0b0f14]/95 p-7 md:p-9 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
-          <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-[#f0b90b]/10 blur-3xl" />
-          <div className="absolute bottom-0 right-20 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
+      <div className="relative z-10 space-y-8 p-4 text-slate-100 md:p-6">
+        <section className="relative overflow-hidden rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
+          <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
+          <div className="absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
           <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div>
-              <span className="inline-flex rounded-full border border-[#334155] bg-[#151a21] px-4 py-2 text-xs font-black text-[#f0b90b]">
+              <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-100">
                 ADMIN CONTROL CENTER
               </span>
               <h1 className="mt-5 text-4xl font-black leading-tight md:text-5xl">لوحة الإدارة</h1>
               <p className="mt-4 max-w-3xl leading-8 text-slate-200">
                 إدارة طلبات التحليل، إرسال الردود مع الصور، ومراجعة طلبات إدارة الحسابات من مكان واحد. يتم تحديث الطلبات لحظيًا بدون إعادة تحميل اللوحة كاملة.
               </p>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-[#263142] bg-[#111827]/80 p-4 text-sm text-[#d1d4dc] shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
-          <span className="font-bold text-[#f0b90b]">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 text-sm text-slate-200 shadow-2xl backdrop-blur-2xl">
+          <span className="font-bold text-cyan-100">
             {isRefreshing ? "جاري تحديث بيانات اللوحة..." : "التحديث اللحظي مفعل"}
           </span>
-          <span className="text-[#b7bdc6]">
+          <span className="text-slate-300">
             {lastUpdatedAt ? `آخر تحديث: ${lastUpdatedAt}` : "بانتظار أول تحديث"}
           </span>
           <button
@@ -965,7 +965,7 @@ export default function AdminPage() {
               const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
               loadAdminData(currentUser);
             }}
-            className="rounded-2xl border border-[#334155] bg-[#151a21] px-4 py-2 font-black text-[#f0b90b] transition hover:bg-[#151a21]/80"
+            className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 font-black text-cyan-100 transition hover:bg-cyan-400/20"
           >
             تحديث الآن
           </button>
@@ -993,58 +993,58 @@ export default function AdminPage() {
         <section className="space-y-5">
           <div>
             <h2 className="text-3xl font-black">نشر توصيات VIP</h2>
-            <p className="mt-2 text-[#848e9c]">أضف توصية منفصلة لمشتركي Spot أو Futures فقط.</p>
+            <p className="mt-2 text-slate-400">أضف توصية منفصلة لمشتركي Spot أو Futures فقط.</p>
           </div>
 
-          <div className="rounded-[30px] border border-[#263142] bg-[#111827]/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+          <div className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <input
                 value={vipSignalForm.coin}
                 onChange={(e) => setVipSignalForm((prev) => ({ ...prev, coin: e.target.value }))}
                 placeholder="العملة مثل BTCUSDT"
-                className="rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-4 text-[#eaecef] outline-none placeholder:text-[#6f7785] focus:border-[#f0b90b]/60 focus:ring-4 focus:ring-[#f0b90b]/10"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
               />
 
               <input
                 value={vipSignalForm.entry}
                 onChange={(e) => setVipSignalForm((prev) => ({ ...prev, entry: e.target.value }))}
                 placeholder="منطقة الدخول"
-                className="rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-4 text-[#eaecef] outline-none placeholder:text-[#6f7785] focus:border-[#f0b90b]/60 focus:ring-4 focus:ring-[#f0b90b]/10"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
               />
 
               <input
                 value={vipSignalForm.targets}
                 onChange={(e) => setVipSignalForm((prev) => ({ ...prev, targets: e.target.value }))}
                 placeholder="الأهداف"
-                className="rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-4 text-[#eaecef] outline-none placeholder:text-[#6f7785] focus:border-[#f0b90b]/60 focus:ring-4 focus:ring-[#f0b90b]/10"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
               />
 
               <input
                 value={vipSignalForm.stop_loss}
                 onChange={(e) => setVipSignalForm((prev) => ({ ...prev, stop_loss: e.target.value }))}
                 placeholder="وقف الخسارة"
-                className="rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-4 text-[#eaecef] outline-none placeholder:text-[#6f7785] focus:border-[#f0b90b]/60 focus:ring-4 focus:ring-[#f0b90b]/10"
+                className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
               />
 
               <textarea
                 value={vipSignalForm.notes}
                 onChange={(e) => setVipSignalForm((prev) => ({ ...prev, notes: e.target.value }))}
                 placeholder="ملاحظات التوصية"
-                className="min-h-28 rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-4 text-[#eaecef] outline-none placeholder:text-[#6f7785] focus:border-[#f0b90b]/60 focus:ring-4 focus:ring-[#f0b90b]/10 md:col-span-2"
+                className="min-h-28 rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10 md:col-span-2"
               />
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <button
                 onClick={() => publishVipSignal("spot")}
-                className="rounded-2xl bg-gradient-to-l from-[#c99400] via-[#f0b90b] to-[#ffd766] px-6 py-4 font-black text-[#0b0f14] shadow-[0_18px_50px_rgba(240,185,11,0.28)] transition hover:scale-[1.01] hover:brightness-110"
+                className="rounded-2xl bg-gradient-to-l from-amber-600 via-yellow-500 to-amber-300 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(245,158,11,0.35)] transition hover:scale-[1.01] hover:brightness-110"
               >
                 نشر توصية VIP Spot ⭐
               </button>
 
               <button
                 onClick={() => publishVipSignal("futures")}
-                className="rounded-2xl bg-gradient-to-l from-[#1e40af] via-[#2563eb] to-[#38bdf8] px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.28)] transition hover:scale-[1.01] hover:brightness-110"
+                className="rounded-2xl bg-gradient-to-l from-fuchsia-700 via-purple-600 to-pink-400 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(192,38,211,0.35)] transition hover:scale-[1.01] hover:brightness-110"
               >
                 نشر توصية VIP Futures 🔥
               </button>
@@ -1056,11 +1056,11 @@ export default function AdminPage() {
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h2 className="text-3xl font-black">إدارة المستخدمين والاشتراكات</h2>
-              <p className="mt-2 text-[#848e9c]">
+              <p className="mt-2 text-slate-400">
                 عرض المستخدمين، تغيير الصلاحية، وتفعيل باقات Spot & Futures.
               </p>
             </div>
-            <span className="rounded-full border border-[#334155] bg-[#151a21] px-4 py-2 text-sm font-black text-[#f0b90b]">
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100">
               الوضع الحالي: {dataMode === "secure-api" ? "Secure API" : dataMode === "supabase" ? "Supabase" : "LocalStorage"}
             </span>
           </div>
@@ -1073,16 +1073,16 @@ export default function AdminPage() {
           ) : (
             <div className="grid gap-5">
               {users.map((user) => (
-                <article key={user.id} className="rounded-[30px] border border-[#263142] bg-[#111827]/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+                <article key={user.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
                   <div className="grid gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
                     <div className="flex items-center gap-4">
                       <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-300 text-lg font-black shadow-[0_0_30px_rgba(0,163,255,0.25)]">
                         {(user.username || user.email || "U").slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="truncate text-xl font-black text-[#eaecef]">{user.username || "مستخدم"}</h3>
-                        <p className="truncate text-sm text-[#b7bdc6]">{user.email}</p>
-                        <p className="mt-1 text-xs text-[#f0b90b]/60">{user.telegram || "لا يوجد تليجرام"}</p>
+                        <h3 className="truncate text-xl font-black text-slate-100">{user.username || "مستخدم"}</h3>
+                        <p className="truncate text-sm text-slate-300">{user.email}</p>
+                        <p className="mt-1 text-xs text-cyan-100/60">{user.telegram || "لا يوجد تليجرام"}</p>
                       </div>
                     </div>
 
@@ -1090,7 +1090,7 @@ export default function AdminPage() {
                       <select
                         value={user.role || "user"}
                         onChange={(e) => updateUserRole(user.id, e.target.value)}
-                        className="rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-3 font-bold text-[#eaecef] outline-none"
+                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
                       >
                         <option value="user">user</option>
                         <option value="admin">admin</option>
@@ -1099,7 +1099,7 @@ export default function AdminPage() {
                       <select
                         value={user.subscription_plan || "بدون اشتراك"}
                         onChange={(e) => updateUserSubscription(user.id, e.target.value, user.subscription_status || "نشط")}
-                        className="rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-3 font-bold text-[#eaecef] outline-none"
+                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
                       >
                         <option value="بدون اشتراك">بدون اشتراك</option>
                         <option value="Spot - شهر">Spot - شهر</option>
@@ -1113,7 +1113,7 @@ export default function AdminPage() {
                       <select
                         value={user.subscription_status || "غير نشط"}
                         onChange={(e) => updateUserSubscription(user.id, user.subscription_plan || "بدون اشتراك", e.target.value)}
-                        className="rounded-2xl border border-[#263142] bg-[#0b0f14]/90 px-4 py-3 font-bold text-[#eaecef] outline-none"
+                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
                       >
                         <option value="غير نشط">غير نشط</option>
                         <option value="نشط">نشط</option>
@@ -1124,17 +1124,17 @@ export default function AdminPage() {
                   </div>
 
                   <div className="mt-5 grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl border border-[#263142] bg-[#0b0f14]/70 p-4">
-                      <p className="text-xs font-bold text-[#6f7785]">الصلاحية</p>
-                      <p className="mt-2 font-black text-[#f0b90b]">{user.role || "user"}</p>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs font-bold text-slate-500">الصلاحية</p>
+                      <p className="mt-2 font-black text-cyan-100">{user.role || "user"}</p>
                     </div>
-                    <div className="rounded-2xl border border-[#263142] bg-[#0b0f14]/70 p-4">
-                      <p className="text-xs font-bold text-[#6f7785]">الباقة</p>
-                      <p className="mt-2 font-black text-[#f0b90b]">{user.subscription_plan || "بدون اشتراك"}</p>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs font-bold text-slate-500">الباقة</p>
+                      <p className="mt-2 font-black text-cyan-100">{user.subscription_plan || "بدون اشتراك"}</p>
                     </div>
-                    <div className="rounded-2xl border border-[#263142] bg-[#0b0f14]/70 p-4">
-                      <p className="text-xs font-bold text-[#6f7785]">حالة الاشتراك</p>
-                      <p className="mt-2 font-black text-[#f0b90b]">{user.subscription_status || "غير نشط"}</p>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs font-bold text-slate-500">حالة الاشتراك</p>
+                      <p className="mt-2 font-black text-cyan-100">{user.subscription_status || "غير نشط"}</p>
                     </div>
                   </div>
                 </article>
@@ -1143,7 +1143,7 @@ export default function AdminPage() {
           )}
         </section>
 
-        <section className="rounded-[30px] border border-[#263142] bg-[#111827]/80 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl md:p-5">
+        <section className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-2xl backdrop-blur-2xl md:p-5">
           <div className="flex flex-wrap gap-3">
             {[
               ["all", "كل طلبات التحليل"],
@@ -1155,8 +1155,8 @@ export default function AdminPage() {
                 onClick={() => setFilter(key)}
                 className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
                   filter === key
-                    ? "border-[#334155] bg-[#151a21] text-[#f0b90b] shadow-[0_0_25px_rgba(240,185,11,0.13)]"
-                    : "border-[#263142] bg-[#0b0f14]/70 text-[#b7bdc6] hover:border-[#334155] hover:bg-[#151a21]"
+                    ? "border-cyan-300/20 bg-cyan-400/10 text-cyan-100 shadow-[0_0_25px_rgba(0,163,255,0.13)]"
+                    : "border-cyan-300/15 bg-black/20 text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10"
                 }`}
               >
                 {label}
@@ -1181,23 +1181,23 @@ export default function AdminPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredAnalysis.map((req) => (
-                <article key={req.id} className="relative overflow-hidden rounded-[24px] border border-[#263142] bg-[#111827]/80 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+                <article key={req.id} className="relative overflow-hidden rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-2xl backdrop-blur-2xl">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,0.12),transparent_30%)]" />
                   <div className="relative z-10 space-y-5">
                     <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
                       <div>
                         <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-3xl font-black text-[#eaecef]">{req.coin}</h3>
+                          <h3 className="text-3xl font-black text-slate-100">{req.coin}</h3>
                           <StatusBadge status={req.status} />
                         </div>
                         <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                          <span className="rounded-full border border-[#263142] bg-[#0b0f14]/70 px-4 py-2 text-[#b7bdc6]">
-                            المستخدم: <b className="text-[#f0b90b]">{req.username || req.userEmail}</b>
+                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
+                            المستخدم: <b className="text-cyan-100">{req.username || req.userEmail}</b>
                           </span>
-                          <span className="rounded-full border border-[#263142] bg-[#0b0f14]/70 px-4 py-2 text-[#b7bdc6]">
-                            الفريم: <b className="text-[#f0b90b]">{req.frame}</b>
+                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
+                            الفريم: <b className="text-cyan-100">{req.frame}</b>
                           </span>
-                          <span className="rounded-full border border-[#263142] bg-[#0b0f14]/70 px-4 py-2 text-[#b7bdc6]">
+                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
                             التاريخ: {req.createdAt}
                           </span>
                         </div>
@@ -1210,7 +1210,7 @@ export default function AdminPage() {
                             [req.id]: !prev[req.id],
                           }))
                         }
-                        className="rounded-2xl border border-[#334155] bg-[#151a21] px-5 py-3 font-black text-[#f0b90b] transition hover:bg-[#151a21]/80"
+                        className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-5 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20"
                       >
                         {expandedAnalysis[req.id] ? "إخفاء التفاصيل" : "عرض التفاصيل"}
                       </button>
@@ -1226,13 +1226,13 @@ export default function AdminPage() {
                       <div className="space-y-5 border-t border-white/10 pt-5">
 
                     {req.reply && (
-                      <div className="rounded-[26px] border border-[#263142] bg-[#151a21]/80 p-5">
-                        <p className="text-sm font-bold text-[#f0b90b]">الرد الحالي</p>
-                        <p className="mt-2 leading-8 text-[#eaecef]">{req.reply}</p>
+                      <div className="rounded-[26px] border border-cyan-300/15 bg-white/[0.045] p-5">
+                        <p className="text-sm font-bold text-cyan-100">الرد الحالي</p>
+                        <p className="mt-2 leading-8 text-slate-100">{req.reply}</p>
                         {req.replyImage && (
                           <img
                             src={req.replyImage}
-                            className="mt-4 max-h-[260px] rounded-2xl border border-[#263142] object-contain"
+                            className="mt-4 max-h-[260px] rounded-2xl border border-cyan-300/15 object-contain"
                             alt="صورة التحليل"
                           />
                         )}
@@ -1251,22 +1251,22 @@ export default function AdminPage() {
                         }))
                       }
                       placeholder="اكتب تحليل العملة هنا..."
-                      className="min-h-32 w-full rounded-[20px] border border-[#263142] bg-[#0b0f14]/90 p-4 text-[#eaecef] outline-none transition placeholder:text-[#6f7785] focus:border-[#f0b90b]/60 focus:ring-4 focus:ring-[#f0b90b]/10"
+                      className="min-h-32 w-full rounded-[20px] border border-cyan-300/15 bg-black/30 p-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
                     />
 
-                    <div className="rounded-[24px] border border-[#263142] bg-[#0b0f14]/70 p-4">
-                      <label className="block text-sm font-bold text-[#b7bdc6]">أرفق صورة التحليل / الشارت</label>
+                    <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                      <label className="block text-sm font-bold text-slate-300">أرفق صورة التحليل / الشارت</label>
                       <input
                         type="file"
                         accept="image/*"
                         onChange={(e) => handleReplyImage(req.id, e.target.files[0])}
-                        className="mt-3 w-full rounded-2xl border border-[#263142] bg-[#0b0f14]/90 p-3 text-[#eaecef]"
+                        className="mt-3 w-full rounded-2xl border border-cyan-300/15 bg-black/30 p-3 text-slate-100"
                       />
 
                       {replies[req.id]?.image && (
                         <img
                           src={replies[req.id].image}
-                          className="mt-4 max-h-[220px] rounded-2xl border border-[#263142] object-contain"
+                          className="mt-4 max-h-[220px] rounded-2xl border border-cyan-300/15 object-contain"
                           alt="معاينة الصورة"
                         />
                       )}
@@ -1389,9 +1389,9 @@ export default function AdminPage() {
                     }]
                       .filter((item) => item.value)
                       .map((item) => (
-                        <div key={item.label} className="rounded-2xl border border-[#263142] bg-[#0b0f14]/70 p-4">
-                          <p className="text-xs font-bold text-[#6f7785]">{item.label}</p>
-                          <p className="mt-2 break-all font-bold text-[#eaecef]">{item.value}</p>
+                        <div key={item.label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                          <p className="text-xs font-bold text-slate-500">{item.label}</p>
+                          <p className="mt-2 break-all font-bold text-slate-100">{item.value}</p>
                         </div>
                       ))}
                   </div>
@@ -1415,7 +1415,7 @@ export default function AdminPage() {
           ) : (
             <div className="grid gap-5">
               {subscriptionRequests.map((req) => (
-                <article key={req.id} className="rounded-[30px] border border-[#263142] bg-[#111827]/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+                <article key={req.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
                   <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
@@ -1423,16 +1423,16 @@ export default function AdminPage() {
                         <StatusBadge status={req.status} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                        <span className="rounded-full border border-[#263142] bg-[#0b0f14]/70 px-4 py-2 text-[#b7bdc6]">
-                          المستخدم: <b className="text-[#f0b90b]">{req.username || req.userEmail}</b>
+                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
+                          المستخدم: <b className="text-cyan-100">{req.username || req.userEmail}</b>
                         </span>
-                        <span className="rounded-full border border-[#263142] bg-[#0b0f14]/70 px-4 py-2 text-[#b7bdc6]">
-                          النوع: <b className="text-[#f0b90b]">{req.category}</b>
+                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
+                          النوع: <b className="text-cyan-100">{req.category}</b>
                         </span>
-                        <span className="rounded-full border border-[#263142] bg-[#0b0f14]/70 px-4 py-2 text-[#b7bdc6]">
-                          السعر: <b className="text-[#f0b90b]">{req.price}</b>
+                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
+                          السعر: <b className="text-cyan-100">{req.price}</b>
                         </span>
-                        <span className="rounded-full border border-[#263142] bg-[#0b0f14]/70 px-4 py-2 text-[#b7bdc6]">
+                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
                           التاريخ: {req.createdAt}
                         </span>
                       </div>
