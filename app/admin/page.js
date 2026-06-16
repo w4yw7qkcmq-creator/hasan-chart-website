@@ -555,17 +555,16 @@ export default function AdminPage() {
     setReplySending((prev) => ({ ...prev, [id]: true }));
 
     try {
-      const response = await fetch("/api/admin-reply", {
+      const response = await fetch("/api/admin/dashboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          request_id: id,
+          action: "send-analysis-reply",
+          requestId: id,
           reply: replyText,
-          reply_image: replyImage,
-          user_email: targetRequest?.userEmail || "",
-          coin: targetRequest?.coin || "",
+          replyImage,
         }),
       });
 

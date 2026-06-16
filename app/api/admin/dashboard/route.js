@@ -180,13 +180,41 @@ export async function POST(request) {
   try {
     await verifyAdminUserForAction();
 
-    const { action, requestId } = await request.json();
+    const payload = await request.json();
+    const { action, requestId } = payload;
 
     if (!action || !requestId) {
       return Response.json(
         { success: false, error: "بيانات الطلب غير مكتملة" },
         { status: 400 }
       );
+    }
+
+    if (action === "send-analysis-reply") {
+      const reply = String(payload.reply || "").trim();
+      const replyImage = String(payload.replyImage || "").trim();
+
+      if (!reply) {
+        return Response.json(
+          { success: false, error: "الرد مطلوب" },
+          { status: 400 }
+        );
+      }
+
+      const { error } = await supabase
+        .from("analysis_requests")
+        .update({
+          reply,
+          reply_image: replyImage || null,
+          status: "مكتمل",
+        })
+        .eq("id", requestId);
+
+      if (error) {
+        throw new Error(error.message || "تعذر إرسال الرد");
+      }
+
+      return Response.json({ success: true });
     }
 
     if (action === "delete-analysis-request") {
