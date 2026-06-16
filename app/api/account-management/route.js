@@ -1,6 +1,5 @@
-
-
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
@@ -56,8 +55,8 @@ function sanitizeText(value, maxLength = 2000) {
 export async function POST(request) {
   try {
     const supabase = getAdminSupabase();
-    const authHeader = request.headers.get("authorization") || "";
-    const token = authHeader.replace("Bearer ", "").trim();
+    const cookieStore = await cookies();
+    const token = cookieStore.get("hc_access_token")?.value;
 
     if (!token) {
       return NextResponse.json(

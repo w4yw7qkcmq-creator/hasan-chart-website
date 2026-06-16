@@ -1,12 +1,6 @@
 "use client";
 import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import SuccessModal from "../components/SuccessModal";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export default function AccountManagement() {
   const [spot, setSpot] = useState({
@@ -32,6 +26,7 @@ export default function AccountManagement() {
     server: "",
     file: null,
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [successModal, setSuccessModal] = useState({
     open: false,
@@ -43,24 +38,10 @@ export default function AccountManagement() {
     setSubmitting(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        setSuccessModal({
-          open: true,
-          title: "يجب تسجيل الدخول أولاً",
-          message: "يرجى تسجيل الدخول قبل إرسال طلب إدارة الحساب.",
-        });
-        return false;
-      }
-
       const response = await fetch("/api/account-management", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           platform: type,
