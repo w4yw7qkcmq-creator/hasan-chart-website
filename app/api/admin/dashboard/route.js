@@ -176,9 +176,30 @@ async function verifyAdminUserForAction() {
   return user;
 }
 
+async function writeAdminLog({
+  admin,
+  action,
+  targetTable,
+  targetId,
+  details = {},
+}) {
+  try {
+    await supabase.from("admin_logs").insert({
+      admin_id: admin?.id || null,
+      admin_email: admin?.email || null,
+      action,
+      target_table: targetTable,
+      target_id: String(targetId || ""),
+      details,
+    });
+  } catch (error) {
+    console.error("Admin log error:", error.message);
+  }
+}
+
 export async function POST(request) {
   try {
-    await verifyAdminUserForAction();
+    const adminUser = await verifyAdminUserForAction();
 
     const payload = await request.json();
     const { action, requestId } = payload;
@@ -214,6 +235,16 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر إرسال الرد");
       }
 
+      await writeAdminLog({
+        admin: adminUser,
+        action: "send-analysis-reply",
+        targetTable: "analysis_requests",
+        targetId: requestId,
+        details: {
+          hasImage: Boolean(replyImage),
+        },
+      });
+
       return Response.json({ success: true });
     }
 
@@ -226,6 +257,13 @@ export async function POST(request) {
       if (error) {
         throw new Error(error.message || "تعذر حذف طلب التحليل");
       }
+
+      await writeAdminLog({
+        admin: adminUser,
+        action: "delete-analysis-request",
+        targetTable: "analysis_requests",
+        targetId: requestId,
+      });
 
       return Response.json({ success: true });
     }
@@ -240,6 +278,13 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر تحديث الطلب");
       }
 
+      await writeAdminLog({
+        admin: adminUser,
+        action: "approve-account-request",
+        targetTable: "account_management_requests",
+        targetId: requestId,
+      });
+
       return Response.json({ success: true });
     }
 
@@ -252,6 +297,13 @@ export async function POST(request) {
       if (error) {
         throw new Error(error.message || "تعذر حذف الطلب");
       }
+
+      await writeAdminLog({
+        admin: adminUser,
+        action: "delete-account-request",
+        targetTable: "account_management_requests",
+        targetId: requestId,
+      });
 
       return Response.json({ success: true });
     }
