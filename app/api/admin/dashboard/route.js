@@ -1,5 +1,3 @@
-
-
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 
@@ -34,11 +32,21 @@ export async function GET() {
       );
     }
 
-    const adminEmails = [
-      "msjdudieneign@gmail.com",
+    const normalizedEmail = (user.email || "").toLowerCase();
+    const fallbackAdminEmails = [
+      "ahmaagahmaadd@gmail.com",
     ];
 
-    if (!adminEmails.includes((user.email || "").toLowerCase())) {
+    const { data: adminProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,email,role")
+      .or(`id.eq.${user.id},email.eq.${normalizedEmail}`)
+      .maybeSingle();
+
+    const isAdminByProfile = adminProfile?.role === "admin";
+    const isAdminByFallback = fallbackAdminEmails.includes(normalizedEmail);
+
+    if (profileError || (!isAdminByProfile && !isAdminByFallback)) {
       return Response.json(
         { success: false, error: "غير مصرح لك بالدخول" },
         { status: 403 }
@@ -46,11 +54,20 @@ export async function GET() {
     }
 
     const [analysis, accounts, subscriptions, profiles] = await Promise.all([
-      supabase.from("analysis_requests").select("*").order("created_at", { ascending: false }),
-      supabase.from("account_management_requests").select("*").order("created_at", { ascending: false }),
-      supabase.from("subscription_requests").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*"),
+      supabase.from("analysis_requests").select("*").order("created_at", { ascending: false }).limit(200),
+      supabase.from("account_management_requests").select("*").order("created_at", { ascending: false }).limit(200),
+      supabase.from("subscription_requests").select("*").order("created_at", { ascending: false }).limit(200),
+      supabase.from("profiles").select("*").limit(500),
     ]);
+
+    if (analysis.error || accounts.error || subscriptions.error || profiles.error) {
+      console.error("Admin dashboard data load error:", {
+        analysis: analysis.error?.message,
+        accounts: accounts.error?.message,
+        subscriptions: subscriptions.error?.message,
+        profiles: profiles.error?.message,
+      });
+    }
 
     return Response.json({
       success: true,
