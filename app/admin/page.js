@@ -232,6 +232,32 @@ export default function AdminPage() {
       };
     });
   };
+
+  // Helper for admin API calls with auto session refresh
+  const adminFetch = async (url, options = {}) => {
+    const requestOptions = {
+      ...options,
+      credentials: "same-origin",
+    };
+
+    let response = await fetch(url, requestOptions);
+
+    if (response.status !== 401) {
+      return response;
+    }
+
+    const refreshResponse = await fetch("/api/auth/refresh", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+
+    if (!refreshResponse.ok) {
+      return response;
+    }
+
+    response = await fetch(url, requestOptions);
+    return response;
+  };
   const loadAccountKeys = async (requestId) => {
     if (accountKeys[requestId]) {
       setAccountKeys((prev) => {
@@ -247,7 +273,7 @@ export default function AdminPage() {
     setAccountKeysLoading((prev) => ({ ...prev, [requestId]: true }));
 
     try {
-      const response = await fetch("/api/admin/account-keys", {
+      const response = await adminFetch("/api/admin/account-keys", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -386,7 +412,7 @@ export default function AdminPage() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
 
-      const response = await fetch("/api/admin/dashboard", {
+      const response = await adminFetch("/api/admin/dashboard", {
         method: "GET",
         cache: "no-store",
         signal: controller.signal,
@@ -502,7 +528,7 @@ export default function AdminPage() {
     }
 
     try {
-      const response = await fetch("/api/admin/dashboard", {
+      const response = await adminFetch("/api/admin/dashboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -590,7 +616,7 @@ export default function AdminPage() {
     if (!confirmed) return;
 
     try {
-      const response = await fetch("/api/admin/dashboard", {
+      const response = await adminFetch("/api/admin/dashboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -649,7 +675,7 @@ export default function AdminPage() {
     setReplySending((prev) => ({ ...prev, [id]: true }));
 
     try {
-      const response = await fetch("/api/admin/dashboard", {
+      const response = await adminFetch("/api/admin/dashboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -766,7 +792,7 @@ export default function AdminPage() {
     if (!(await confirmAdminAction("هل تريد حذف طلب التحليل؟"))) return;
 
     try {
-      const response = await fetch("/api/admin/dashboard", {
+      const response = await adminFetch("/api/admin/dashboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -792,7 +818,7 @@ export default function AdminPage() {
 
   const approveAccountRequest = async (id) => {
     try {
-      const response = await fetch("/api/admin/dashboard", {
+      const response = await adminFetch("/api/admin/dashboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -827,7 +853,7 @@ export default function AdminPage() {
     if (!(await confirmAdminAction("هل تريد حذف طلب إدارة الحساب؟"))) return;
 
     try {
-      const response = await fetch("/api/admin/dashboard", {
+      const response = await adminFetch("/api/admin/dashboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
