@@ -187,6 +187,51 @@ export default function AdminPage() {
   });
   const [accountKeys, setAccountKeys] = useState({});
   const [accountKeysLoading, setAccountKeysLoading] = useState({});
+
+  // Admin Notice/Confirm modals
+  const [adminNotice, setAdminNotice] = useState({
+    open: false,
+    type: "success",
+    title: "تم بنجاح",
+    message: "تم تنفيذ العملية بنجاح",
+  });
+  const [adminConfirm, setAdminConfirm] = useState({
+    open: false,
+    message: "",
+    resolve: null,
+  });
+
+  const showAdminNotice = (message, type = "success", title) => {
+    setAdminNotice({
+      open: true,
+      type,
+      title: title || (type === "error" ? "تعذر تنفيذ العملية" : "تم بنجاح"),
+      message,
+    });
+  };
+
+  const confirmAdminAction = (message) =>
+    new Promise((resolve) => {
+      setAdminConfirm({
+        open: true,
+        message,
+        resolve,
+      });
+    });
+
+  const closeAdminConfirm = (value) => {
+    setAdminConfirm((current) => {
+      if (typeof current.resolve === "function") {
+        current.resolve(value);
+      }
+
+      return {
+        open: false,
+        message: "",
+        resolve: null,
+      };
+    });
+  };
   const loadAccountKeys = async (requestId) => {
     if (accountKeys[requestId]) {
       setAccountKeys((prev) => {
@@ -221,7 +266,7 @@ export default function AdminPage() {
         [requestId]: result.keys || {},
       }));
     } catch (error) {
-      alert(error?.message || "تعذر عرض المفاتيح الحساسة");
+      showAdminNotice(error?.message || "تعذر عرض المفاتيح الحساسة", "error");
     } finally {
       setAccountKeysLoading((prev) => ({ ...prev, [requestId]: false }));
     }
@@ -232,13 +277,13 @@ export default function AdminPage() {
     const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
 
     if (!currentUser) {
-      alert("يجب تسجيل الدخول أولاً");
+      showAdminNotice("يجب تسجيل الدخول أولاً", "error", "تنبيه");
       router.push("/login");
       return;
     }
 
     if (currentUser.role !== "admin") {
-      alert("هذه الصفحة خاصة بالإدارة فقط");
+      showAdminNotice("هذه الصفحة خاصة بالإدارة فقط", "error", "غير مصرح");
       router.push("/login");
       return;
     }
@@ -375,10 +420,11 @@ export default function AdminPage() {
       setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
 
       if (!options.silent) {
-        alert(
+        showAdminNotice(
           err?.name === "AbortError"
             ? "انتهت مهلة تحميل لوحة الإدارة. جرّب تحديث الصفحة."
-            : err?.message || "فشل تحميل بيانات لوحة الإدارة"
+            : err?.message || "فشل تحميل بيانات لوحة الإدارة",
+          "error"
         );
       }
     } finally {
@@ -400,7 +446,7 @@ export default function AdminPage() {
         .eq("id", userId);
 
       if (error) {
-        alert("لم يتم تحديث الدور في Supabase. تأكد من صلاحيات الأدمن أو سياسات RLS.");
+        showAdminNotice("لم يتم تحديث الدور في Supabase. تأكد من صلاحيات الأدمن أو سياسات RLS.", "error");
         return;
       }
     } else {
@@ -410,7 +456,7 @@ export default function AdminPage() {
       );
     }
 
-    alert("تم تحديث صلاحية المستخدم");
+    showAdminNotice("تم تحديث صلاحية المستخدم");
   };
 
   const updateUserSubscription = async (userId, plan, status) => {
@@ -429,7 +475,7 @@ export default function AdminPage() {
         .eq("id", userId);
 
       if (error) {
-        alert("لم يتم تحديث الاشتراك في Supabase. تأكد أن أعمدة subscription_plan و subscription_status موجودة.");
+        showAdminNotice("لم يتم تحديث الاشتراك في Supabase. تأكد أن أعمدة subscription_plan و subscription_status موجودة.", "error");
         return;
       }
     } else {
@@ -439,7 +485,7 @@ export default function AdminPage() {
       );
     }
 
-    alert("تم تحديث اشتراك المستخدم");
+    showAdminNotice("تم تحديث اشتراك المستخدم");
   };
 
   const updateSubscriptionRequest = async (request, newStatus) => {
@@ -454,7 +500,7 @@ export default function AdminPage() {
         .eq("id", request.id);
 
       if (error) {
-        alert("لم يتم تحديث طلب الاشتراك في Supabase: " + error.message);
+        showAdminNotice("لم يتم تحديث طلب الاشتراك في Supabase: " + error.message, "error");
         return;
       }
 
@@ -468,7 +514,7 @@ export default function AdminPage() {
           .eq("email", request.userEmail);
 
         if (profileError) {
-          alert("تم تفعيل الطلب، لكن لم يتم تحديث اشتراك المستخدم في profiles: " + profileError.message);
+          showAdminNotice("تم تفعيل الطلب، لكن لم يتم تحديث اشتراك المستخدم في profiles: " + profileError.message, "error");
         }
       }
     } else {
@@ -476,7 +522,7 @@ export default function AdminPage() {
     }
 
     setSubscriptionRequests(updated);
-    alert(newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك");
+    showAdminNotice(newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك");
   };
 
   const stats = useMemo(() => {
@@ -506,7 +552,7 @@ export default function AdminPage() {
 
   const publishVipSignal = async (signalType) => {
     if (!vipSignalForm.coin.trim()) {
-      alert("اكتب اسم العملة أولاً");
+      showAdminNotice("اكتب اسم العملة أولاً", "error", "تنبيه");
       return;
     }
 
@@ -523,11 +569,11 @@ export default function AdminPage() {
     const { error } = await supabase.from("vip_signals").insert(payload);
 
     if (error) {
-      alert("فشل نشر توصية VIP: " + error.message);
+      showAdminNotice("فشل نشر توصية VIP: " + error.message, "error");
       return;
     }
 
-    alert(signalType === "spot" ? "تم نشر توصية VIP Spot" : "تم نشر توصية VIP Futures");
+    showAdminNotice(signalType === "spot" ? "تم نشر توصية VIP Spot" : "تم نشر توصية VIP Futures");
     setVipSignalForm({
       signal_type: signalType,
       coin: "",
@@ -542,7 +588,7 @@ export default function AdminPage() {
     const data = replies[id];
 
     if (!data?.text || data.text.trim() === "") {
-      alert("اكتب الرد أولاً");
+      showAdminNotice("اكتب الرد أولاً", "error", "تنبيه");
       return;
     }
 
@@ -591,10 +637,10 @@ export default function AdminPage() {
       setReplies((prev) => ({ ...prev, [id]: { text: "", image: "" } }));
       setExpandedAnalysis((prev) => ({ ...prev, [id]: false }));
 
-      alert("تم إرسال الرد بنجاح ✅");
+      showAdminNotice("تم إرسال الرد بنجاح ✅");
     } catch (err) {
       console.error("Admin reply error:", err);
-      alert(err?.message || "حدث خطأ أثناء إرسال الرد");
+      showAdminNotice(err?.message || "حدث خطأ أثناء إرسال الرد", "error");
     } finally {
       setReplySending((prev) => ({ ...prev, [id]: false }));
     }
@@ -623,7 +669,7 @@ export default function AdminPage() {
         canvas.toBlob(
           async (blob) => {
             if (!blob) {
-              alert("تعذر ضغط الصورة");
+              showAdminNotice("تعذر ضغط الصورة", "error");
               return;
             }
 
@@ -637,7 +683,7 @@ export default function AdminPage() {
               });
 
             if (uploadError) {
-              alert("فشل رفع الصورة: " + uploadError.message);
+              showAdminNotice("فشل رفع الصورة: " + uploadError.message, "error");
               return;
             }
 
@@ -658,7 +704,7 @@ export default function AdminPage() {
         );
       } catch (err) {
         console.error("Image upload error:", err);
-        alert("حدث خطأ أثناء تجهيز الصورة");
+        showAdminNotice("حدث خطأ أثناء تجهيز الصورة", "error");
       }
     };
 
@@ -669,7 +715,7 @@ export default function AdminPage() {
 };
 
   const deleteAnalysisRequest = async (id) => {
-    if (!confirm("هل تريد حذف طلب التحليل؟")) return;
+    if (!(await confirmAdminAction("هل تريد حذف طلب التحليل؟"))) return;
 
     try {
       const response = await fetch("/api/admin/dashboard", {
@@ -690,9 +736,9 @@ export default function AdminPage() {
       }
 
       setAnalysisRequests((prev) => prev.filter((req) => req.id !== id));
-      alert("تم حذف طلب التحليل");
+      showAdminNotice("تم حذف طلب التحليل");
     } catch (error) {
-      alert(error?.message || "تعذر حذف طلب التحليل");
+      showAdminNotice(error?.message || "تعذر حذف طلب التحليل", "error");
     }
   };
 
@@ -723,14 +769,14 @@ export default function AdminPage() {
         )
       );
 
-      alert("تم تحديث حالة طلب إدارة الحساب");
+      showAdminNotice("تم تحديث حالة طلب إدارة الحساب");
     } catch (error) {
-      alert(error?.message || "تعذر تحديث حالة الطلب");
+      showAdminNotice(error?.message || "تعذر تحديث حالة الطلب", "error");
     }
   };
 
   const deleteAccountRequest = async (id) => {
-    if (!confirm("هل تريد حذف طلب إدارة الحساب؟")) return;
+    if (!(await confirmAdminAction("هل تريد حذف طلب إدارة الحساب؟"))) return;
 
     try {
       const response = await fetch("/api/admin/dashboard", {
@@ -752,7 +798,7 @@ export default function AdminPage() {
 
       setAccountRequests((prev) => prev.filter((req) => req.id !== id));
     } catch (error) {
-      alert(error?.message || "تعذر حذف الطلب");
+      showAdminNotice(error?.message || "تعذر حذف الطلب", "error");
     }
   };
 
@@ -773,6 +819,49 @@ export default function AdminPage() {
 
   return (
     <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+      {adminNotice.open && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-4 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
+            <div className={`mx-auto mb-5 grid h-24 w-24 place-items-center rounded-full border-4 ${adminNotice.type === "error" ? "border-red-400 text-red-500 shadow-[0_0_55px_rgba(239,68,68,0.25)]" : "border-emerald-400 text-emerald-500 shadow-[0_0_55px_rgba(52,211,153,0.35)]"}`}>
+              <span className="text-5xl font-black">{adminNotice.type === "error" ? "!" : "✓"}</span>
+            </div>
+            <h3 className="text-3xl font-black leading-tight">{adminNotice.title}</h3>
+            <p className="mt-4 leading-8 text-slate-600">{adminNotice.message}</p>
+            <button
+              onClick={() => setAdminNotice((current) => ({ ...current, open: false }))}
+              className="mt-7 rounded-2xl px-8 py-3 text-lg font-black text-blue-600 transition hover:bg-blue-50"
+            >
+              حسناً
+            </button>
+          </div>
+        </div>
+      )}
+
+      {adminConfirm.open && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-4 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
+            <div className="mx-auto mb-5 grid h-24 w-24 place-items-center rounded-full border-4 border-amber-400 text-amber-500 shadow-[0_0_55px_rgba(245,158,11,0.25)]">
+              <span className="text-5xl font-black">؟</span>
+            </div>
+            <h3 className="text-3xl font-black leading-tight">تأكيد العملية</h3>
+            <p className="mt-4 leading-8 text-slate-600">{adminConfirm.message}</p>
+            <div className="mt-7 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => closeAdminConfirm(false)}
+                className="rounded-2xl border border-slate-200 bg-slate-100 px-6 py-3 font-black text-slate-700 transition hover:bg-slate-200"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={() => closeAdminConfirm(true)}
+                className="rounded-2xl bg-gradient-to-l from-red-700 via-red-500 to-rose-400 px-6 py-3 font-black text-white shadow-[0_14px_38px_rgba(239,68,68,0.32)] transition hover:brightness-110"
+              >
+                تأكيد
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
 
