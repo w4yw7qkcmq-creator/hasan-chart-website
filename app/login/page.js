@@ -35,53 +35,7 @@ const FALLBACK_ADMIN_EMAILS = [
   "ahmaagahmaadd@gmail.com",
 ];
 
-const SUPABASE_AUTH_URL = "https://lzgsxdsumnteuwtjfqlm.supabase.co/auth/v1/token?grant_type=password";
-const SUPABASE_PUBLIC_KEY = "sb_publishable_XCZkQPsJymbmnNuBR9fMpw_SVEFwZm0";
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-
-const loginDirectlyWithSupabase = async (email, password) => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
-
-  try {
-    const response = await fetch(SUPABASE_AUTH_URL, {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_PUBLIC_KEY,
-        Authorization: `Bearer ${SUPABASE_PUBLIC_KEY}`,
-      },
-      body: JSON.stringify({ email, password }),
-      signal: controller.signal,
-    });
-
-    const result = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      return {
-        user: null,
-        error: result?.error_description || result?.msg || result?.error || "بيانات الدخول غير صحيحة",
-      };
-    }
-
-    return {
-      user: result?.user || null,
-      session: result || null,
-      error: null,
-    };
-  } catch (err) {
-    return {
-      user: null,
-      error:
-        err?.name === "AbortError"
-          ? "الاتصال أخذ وقت طويل. جرّب مرة ثانية أو افتح الموقع من نافذة خاصة."
-          : "تعذر الاتصال بخدمة تسجيل الدخول",
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-};
 
 const verifyTurnstileToken = async (token) => {
   if (!TURNSTILE_SITE_KEY) return { ok: true };
@@ -229,7 +183,21 @@ export default function LoginPage() {
     sessionStorage.removeItem("currentUser");
 
     try {
-      const { user, session, error } = await loginDirectlyWithSupabase(cleanEmail, password);
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      const error = !response.ok ? result?.error : null;
+      const user = result?.user || null;
 
       if (error || !user) {
         alert(error || "بيانات الدخول غير صحيحة");
