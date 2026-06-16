@@ -104,7 +104,13 @@ export async function GET() {
     }
 
     const [analysis, accounts, subscriptions, profiles] = await Promise.all([
-      supabase.from("analysis_requests").select("*").order("created_at", { ascending: false }).limit(200),
+      supabase
+        .from("analysis_requests")
+        .select(
+          "id,user_email,username,coin,frame,status,reply,created_at,job_status,processing_started_at,completed_at,failed_at,error_message,attempts"
+        )
+        .order("created_at", { ascending: false })
+        .limit(200),
       supabase.from("account_management_requests").select("*").order("created_at", { ascending: false }).limit(200),
       supabase.from("subscription_requests").select("*").order("created_at", { ascending: false }).limit(200),
       supabase.from("profiles").select("*").limit(500),
