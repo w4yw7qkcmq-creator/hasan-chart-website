@@ -665,8 +665,8 @@ function Price({ title, symbol, price, source = "Binance Live" }) {
 function TradingViewPrice({ title, symbol, tvSymbol }) {
   return (
     <div className="rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
-      <p className="text-sm font-black !text-white drop-shadow-[0_1px_6px_rgba(255,255,255,0.18)]">{title}</p>
-      <h3 className="mt-2 mb-3 text-2xl font-black !text-white drop-shadow-[0_1px_8px_rgba(255,255,255,0.20)]">{symbol}</h3>
+      <p className="text-sm font-black tracking-wide !text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000]">{title}</p>
+      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white drop-shadow-[0_3px_4px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000,_0_0_12px_rgba(255,255,255,0.18)]">{symbol}</h3>
       <TradingViewWidget symbol={tvSymbol} height="120" />
       <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
     </div>
@@ -701,8 +701,8 @@ function Service({ title, text, onRequireLogin }) {
 function MarketWindow({ title, label, symbol }) {
   return (
     <div className="min-h-[230px] overflow-hidden rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
-      <p className="text-sm font-black !text-white drop-shadow-[0_1px_6px_rgba(255,255,255,0.18)]">{label}</p>
-      <h3 className="mt-2 mb-3 text-2xl font-black !text-white drop-shadow-[0_1px_8px_rgba(255,255,255,0.20)]">{title}</h3>
+      <p className="text-sm font-black tracking-wide !text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000]">{label}</p>
+      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white drop-shadow-[0_3px_4px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000,_0_0_12px_rgba(255,255,255,0.18)]">{title}</h3>
       <TradingViewWidget symbol={symbol} height="120" />
       <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
     </div>
