@@ -427,7 +427,7 @@ export default function Home() {
             <div className="lg:col-span-7 space-y-6">
               <span className="badgeGreen">LIVE TRADING INTELLIGENCE</span>
 
-              <h1 className="text-4xl md:text-6xl font-black leading-tight !text-white drop-shadow-[0_3px_18px_rgba(255,255,255,0.30)]">
+              <h1 className="text-4xl md:text-6xl font-black leading-tight">
                 منصة احترافية لمتابعة السوق وطلب التحليلات والتنبيهات السعرية
               </h1>
 
@@ -452,11 +452,11 @@ export default function Home() {
             </div>
 
             <div className="lg:col-span-5">
-              <div className="rounded-[32px] bg-blue-950/35 border border-blue-400/50 p-6 shadow-[0_0_38px_rgba(59,130,246,0.28)] backdrop-blur-xl">
+              <div className="rounded-[32px] bg-black/30 border border-white/10 p-6">
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <p className="text-white/85 text-sm">Market Pulse</p>
-                    <h3 className="text-2xl font-black !text-white">BTC / ETH / SOL</h3>
+                    <p className="text-slate-400 text-sm">Market Pulse</p>
+                    <h3 className="text-2xl font-black">BTC / ETH / SOL</h3>
                   </div>
                   <span className="badgeBlue">WebSocket</span>
                 </div>
@@ -576,7 +576,7 @@ export default function Home() {
         </section>
 
         <section className="grid lg:grid-cols-2 gap-6">
-          <div id="analysis" className="box bg-gradient-to-br from-sky-100 to-blue-50 border border-sky-200 shadow-[0_14px_40px_rgba(59,130,246,0.14)]">
+          <div id="analysis" className="box">
             <h2 className="text-3xl font-black mb-5">🧠 طلب تحليل عملة</h2>
 
             <input
@@ -616,7 +616,7 @@ export default function Home() {
             </a>
           </div>
 
-          <div id="alerts" className="box bg-gradient-to-br from-sky-100 to-blue-50 border border-sky-200 shadow-[0_14px_40px_rgba(59,130,246,0.14)]">
+          <div id="alerts" className="box">
             <h2 className="text-3xl font-black mb-5">🔔 تنبيه سعر</h2>
 
             <input
@@ -675,9 +675,9 @@ function TradingViewPrice({ title, symbol, tvSymbol }) {
 
 function MiniTicker({ symbol, price }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-blue-900/35 border border-blue-300/30 p-4">
-      <span className="font-black !text-white">{symbol}</span>
-      <span className="!text-emerald-400 font-black">${price}</span>
+    <div className="flex items-center justify-between rounded-2xl bg-white/5 border border-white/10 p-4">
+      <span className="font-black">{symbol}</span>
+      <span className="text-emerald-400 font-black">${price}</span>
     </div>
   );
 }
@@ -687,10 +687,10 @@ function Service({ title, text, onRequireLogin }) {
     <button
       type="button"
       onClick={onRequireLogin}
-      className="box w-full bg-gradient-to-br from-sky-100 to-blue-50 border border-sky-200 text-right shadow-[0_10px_30px_rgba(59,130,246,0.12)] transition hover:scale-[1.02] hover:border-blue-400/50"
+      className="box w-full text-right transition hover:scale-[1.02] hover:border-blue-400/40"
     >
-      <h3 className="text-xl font-black mb-3 !text-slate-950">{title}</h3>
-      <p className="!text-slate-600 leading-7">{text}</p>
+      <h3 className="text-xl font-black mb-3">{title}</h3>
+      <p className="text-slate-400 leading-7">{text}</p>
       <span className="mt-5 inline-block rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white">
         اطلب الخدمة
       </span>
