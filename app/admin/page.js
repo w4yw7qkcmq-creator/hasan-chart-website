@@ -148,9 +148,14 @@ const formatAccountManagementRequest = (item) => ({
   notes: item.notes || "",
   status: item.status || "pending",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
-  apiKey: item.api_key || item.api_key_encrypted || "",
-  secretKey: item.secret_key || item.secret_key_encrypted || "",
-  password: item.trading_password || item.trading_password_encrypted || "",
+  apiKey: item.api_key_encrypted ? "محفوظ بشكل مشفر" : "",
+secretKey: item.secret_key_encrypted ? "محفوظ بشكل مشفر" : "",
+password: item.trading_password_encrypted ? "محفوظ بشكل مشفر" : "",
+hasSensitiveKeys: Boolean(
+  item.api_key_encrypted ||
+    item.secret_key_encrypted ||
+    item.trading_password_encrypted
+),
 });
 
 const upsertById = (list, item, limit) => {
@@ -180,6 +185,48 @@ export default function AdminPage() {
     stop_loss: "",
     notes: "",
   });
+  const [accountKeys, setAccountKeys] = useState({});
+  const [accountKeysLoading, setAccountKeysLoading] = useState({});
+  const loadAccountKeys = async (requestId) => {
+    if (accountKeys[requestId]) {
+      setAccountKeys((prev) => {
+        const next = { ...prev };
+        delete next[requestId];
+        return next;
+      });
+      return;
+    }
+
+    if (accountKeysLoading[requestId]) return;
+
+    setAccountKeysLoading((prev) => ({ ...prev, [requestId]: true }));
+
+    try {
+      const response = await fetch("/api/admin/account-keys", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requestId }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر عرض المفاتيح");
+      }
+
+      setAccountKeys((prev) => ({
+        ...prev,
+        [requestId]: result.keys || {},
+      }));
+    } catch (error) {
+      alert(error?.message || "تعذر عرض المفاتيح الحساسة");
+    } finally {
+      setAccountKeysLoading((prev) => ({ ...prev, [requestId]: false }));
+    }
+  };
+
 
   useEffect(() => {
     const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
@@ -1051,7 +1098,10 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="grid gap-5">
-              {accountRequests.map((req) => (
+              {accountRequests.map((req) => {
+                const revealedKeys = accountKeys[req.id];
+
+                return (
                 <article key={req.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
                   <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
                     <div>
@@ -1062,7 +1112,21 @@ export default function AdminPage() {
                       <p className="mt-2 text-sm text-slate-700 dark:text-slate-500">{req.createdAt}</p>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
+                      {req.hasSensitiveKeys ? (
+                        <button
+                          onClick={() => loadAccountKeys(req.id)}
+                          disabled={accountKeysLoading[req.id]}
+                          className="rounded-2xl bg-gradient-to-l from-sky-800 via-cyan-600 to-blue-400 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(14,165,233,0.32)] transition hover:scale-[1.01] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {accountKeysLoading[req.id]
+                            ? "جاري العرض..."
+                            : revealedKeys
+                            ? "إخفاء المفاتيح"
+                            : "عرض المفاتيح الحساسة"}
+                        </button>
+                      ) : null}
+
                       <button
                         onClick={() => approveAccountRequest(req.id)}
                         className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(16,185,129,0.32)] transition hover:scale-[1.01] hover:brightness-110"
@@ -1093,17 +1157,17 @@ export default function AdminPage() {
                       label: "رأس المال",
                       value: req.capital ? `$${req.capital}` : "",
                     }, {
-                      label: "API Key (Encrypted)",
-                      value: req.apiKey,
+                      label: "API Key",
+                      value: revealedKeys?.apiKey || req.apiKey,
                     }, {
-                      label: "Secret Key (Encrypted)",
-                      value: req.secretKey,
+                      label: "Secret Key",
+                      value: revealedKeys?.secretKey || req.secretKey,
                     }, {
                       label: "رقم الحساب",
                       value: req.account,
                     }, {
-                      label: "كلمة المرور (Encrypted)",
-                      value: req.password,
+                      label: "كلمة المرور",
+                      value: revealedKeys?.tradingPassword || req.password,
                     }, {
                       label: "الخادم",
                       value: req.server,
@@ -1120,7 +1184,8 @@ export default function AdminPage() {
                       ))}
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

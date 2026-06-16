@@ -122,7 +122,7 @@ export async function GET() {
     return Response.json({
       success: true,
       analysis_requests: analysis.data || [],
-      account_management_requests: (accounts.data || []).map(formatAccountForAdmin),
+      account_management_requests: accounts.data || [],
       subscription_requests: subscriptions.data || [],
       profiles: profiles.data || [],
     });
