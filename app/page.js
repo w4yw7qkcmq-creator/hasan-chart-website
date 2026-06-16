@@ -664,11 +664,11 @@ function Price({ title, symbol, price, source = "Binance Live" }) {
 
 function TradingViewPrice({ title, symbol, tvSymbol }) {
   return (
-    <div className="box overflow-hidden">
-      <p className="text-slate-400">{title}</p>
-      <h3 className="text-2xl font-black mb-3">{symbol}</h3>
+    <div className="rounded-[28px] border border-slate-700/70 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.28)] transition hover:scale-[1.02]">
+      <p className="text-sm font-bold text-slate-300">{title}</p>
+      <h3 className="mt-2 mb-3 text-2xl font-black text-white">{symbol}</h3>
       <TradingViewWidget symbol={tvSymbol} height="120" />
-      <p className="text-xs text-blue-300 mt-3">● TradingView Live</p>
+      <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
     </div>
   );
 }
@@ -700,11 +700,11 @@ function Service({ title, text, onRequireLogin }) {
 
 function MarketWindow({ title, label, symbol }) {
   return (
-    <div className="box bg-gradient-to-br from-blue-600/20 to-white/5 border-blue-400/20 hover:scale-[1.02] min-h-[230px] overflow-hidden">
-      <p className="text-slate-400 text-sm">{label}</p>
-      <h3 className="text-2xl font-black mt-2 mb-3">{title}</h3>
+    <div className="min-h-[230px] overflow-hidden rounded-[28px] border border-slate-700/70 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.28)] transition hover:scale-[1.02]">
+      <p className="text-sm font-bold text-slate-300">{label}</p>
+      <h3 className="mt-2 mb-3 text-2xl font-black text-white">{title}</h3>
       <TradingViewWidget symbol={symbol} height="120" />
-      <p className="text-xs text-blue-300 mt-3">● TradingView Live</p>
+      <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
     </div>
   );
 }
@@ -738,7 +738,7 @@ function TradingViewWidget({ symbol, height = "120" }) {
   return (
     <div
       ref={containerRef}
-      className="tradingview-widget-container rounded-2xl overflow-hidden bg-black/20 border border-white/10"
+      className="tradingview-widget-container overflow-hidden rounded-2xl border border-slate-700/70 bg-black/35"
       style={{ height }}
     />
   );
