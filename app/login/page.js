@@ -229,13 +229,7 @@ export default function LoginPage() {
     sessionStorage.removeItem("currentUser");
 
     try {
-      const {
-        data: { user, session },
-        error,
-      } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      });
+      const { user, session, error } = await loginDirectlyWithSupabase(cleanEmail, password);
 
       if (error || !user) {
         alert(error || "بيانات الدخول غير صحيحة");
