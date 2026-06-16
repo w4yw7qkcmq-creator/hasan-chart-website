@@ -64,7 +64,18 @@ export async function POST(request) {
     });
 
     const isProduction = process.env.NODE_ENV === "production";
-    const cookieOptions = {
+
+    const accessTokenMaxAge = Number(data.session.expires_in || 3600);
+
+    const accessCookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+      maxAge: accessTokenMaxAge,
+    };
+
+    const refreshCookieOptions = {
       httpOnly: true,
       secure: isProduction,
       sameSite: "lax",
@@ -72,8 +83,17 @@ export async function POST(request) {
       maxAge: 60 * 60 * 24 * 7,
     };
 
-    response.cookies.set("hc_access_token", data.session.access_token, cookieOptions);
-    response.cookies.set("hc_refresh_token", data.session.refresh_token, cookieOptions);
+    response.cookies.set(
+      "hc_access_token",
+      data.session.access_token,
+      accessCookieOptions
+    );
+
+    response.cookies.set(
+      "hc_refresh_token",
+      data.session.refresh_token,
+      refreshCookieOptions
+    );
 
     return response;
   } catch (error) {
