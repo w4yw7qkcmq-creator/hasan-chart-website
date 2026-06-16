@@ -727,7 +727,7 @@ export default function AdminPage() {
           <AdminStat title="بانتظار الرد" value={stats.pendingAnalysis} icon="⏳" subtitle="طلبات تحتاج متابعة" tone="orange" />
           <AdminStat title="تم إنجازها" value={stats.completedAnalysis} icon="✅" subtitle="طلبات مكتملة" tone="green" />
           <AdminStat title="إدارة الحسابات" value={accountRequests.length} icon="📂" subtitle="طلبات العملاء" tone="red" />
-          <AdminStat title="المستخدمون" value={stats.usersCount} icon="👥" subtitle={dataMode === "supabase" ? "من Supabase" : "محلياً للتجربة"} tone="green" />
+          <AdminStat title="المستخدمون" value={stats.usersCount} icon="👥" subtitle={dataMode === "secure-api" ? "من Secure API" : dataMode === "supabase" ? "من Supabase" : "محلياً للتجربة"} tone="green" />
           <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
 
@@ -778,14 +778,14 @@ export default function AdminPage() {
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <button
                 onClick={() => publishVipSignal("spot")}
-                className="rounded-2xl border border-yellow-300/20 bg-yellow-400/10 px-6 py-4 font-black text-yellow-100 transition hover:bg-yellow-400/20"
+                className="rounded-2xl bg-gradient-to-l from-amber-600 via-yellow-500 to-amber-300 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(245,158,11,0.35)] transition hover:scale-[1.01] hover:brightness-110"
               >
                 نشر توصية VIP Spot ⭐
               </button>
 
               <button
                 onClick={() => publishVipSignal("futures")}
-                className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-400/10 px-6 py-4 font-black text-fuchsia-100 transition hover:bg-fuchsia-400/20"
+                className="rounded-2xl bg-gradient-to-l from-fuchsia-700 via-purple-600 to-pink-400 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(192,38,211,0.35)] transition hover:scale-[1.01] hover:brightness-110"
               >
                 نشر توصية VIP Futures 🔥
               </button>
@@ -1065,14 +1065,14 @@ export default function AdminPage() {
                     <div className="flex gap-3">
                       <button
                         onClick={() => approveAccountRequest(req.id)}
-                        className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-5 py-3 font-black text-emerald-100 hover:bg-emerald-400/20"
+                        className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(16,185,129,0.32)] transition hover:scale-[1.01] hover:brightness-110"
                       >
                         تمت المراجعة
                       </button>
 
                       <button
                         onClick={() => deleteAccountRequest(req.id)}
-                        className="rounded-2xl border border-red-400/20 bg-red-500/15 px-5 py-3 font-black text-red-100 hover:bg-red-500/25"
+                        className="rounded-2xl bg-gradient-to-l from-red-800 via-red-600 to-rose-400 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(239,68,68,0.32)] transition hover:scale-[1.01] hover:brightness-110"
                       >
                         حذف
                       </button>
@@ -1164,19 +1164,19 @@ export default function AdminPage() {
                     <div className="flex flex-col gap-3 sm:flex-row">
                       <button
                         onClick={() => updateSubscriptionRequest(req, "مفعل")}
-                        className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-5 py-3 font-black text-emerald-100 transition hover:bg-emerald-400/20"
+                        className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(16,185,129,0.32)] transition hover:scale-[1.01] hover:brightness-110"
                       >
                         تفعيل الاشتراك
                       </button>
                       <button
                         onClick={() => updateSubscriptionRequest(req, "بانتظار الدفع")}
-                        className="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-5 py-3 font-black text-amber-100 transition hover:bg-amber-400/20"
+                        className="rounded-2xl bg-gradient-to-l from-amber-700 via-yellow-500 to-orange-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(245,158,11,0.32)] transition hover:scale-[1.01] hover:brightness-110"
                       >
                         بانتظار الدفع
                       </button>
                       <button
                         onClick={() => updateSubscriptionRequest(req, "مرفوض")}
-                        className="rounded-2xl border border-red-400/20 bg-red-500/15 px-5 py-3 font-black text-red-100 transition hover:bg-red-500/25"
+                        className="rounded-2xl bg-gradient-to-l from-red-800 via-red-600 to-rose-400 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(239,68,68,0.32)] transition hover:scale-[1.01] hover:brightness-110"
                       >
                         رفض
                       </button>
