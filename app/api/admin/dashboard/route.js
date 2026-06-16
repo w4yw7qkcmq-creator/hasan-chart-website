@@ -110,14 +110,32 @@ export async function GET() {
       supabase.from("profiles").select("*").limit(500),
     ]);
 
+    const tableErrors = {
+      analysis: analysis.error?.message || null,
+      accounts: accounts.error?.message || null,
+      subscriptions: subscriptions.error?.message || null,
+      profiles: profiles.error?.message || null,
+    };
+
     if (analysis.error || accounts.error || subscriptions.error || profiles.error) {
-      console.error("Admin dashboard data load error:", {
-        analysis: analysis.error?.message,
-        accounts: accounts.error?.message,
-        subscriptions: subscriptions.error?.message,
-        profiles: profiles.error?.message,
-      });
+      console.error("Admin dashboard data load error:", tableErrors);
+
+      return Response.json(
+        {
+          success: false,
+          error: "فشل تحميل بعض بيانات لوحة الإدارة",
+          tableErrors,
+        },
+        { status: 500 }
+      );
     }
+
+    console.log("Admin dashboard counts:", {
+      analysis: analysis.data?.length || 0,
+      accounts: accounts.data?.length || 0,
+      subscriptions: subscriptions.data?.length || 0,
+      profiles: profiles.data?.length || 0,
+    });
 
     return Response.json({
       success: true,
