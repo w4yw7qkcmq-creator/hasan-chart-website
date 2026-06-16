@@ -126,6 +126,7 @@ const formatAnalysisRequest = (item) => ({
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
 });
 
+
 const formatSubscriptionRequest = (item) => ({
   id: item.id,
   userEmail: item.user_email,
@@ -135,6 +136,21 @@ const formatSubscriptionRequest = (item) => ({
   price: item.price,
   status: item.status || "بانتظار الدفع",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
+});
+
+const formatAccountManagementRequest = (item) => ({
+  id: item.id,
+  type: item.account_type || item.platform || "طلب إدارة حساب",
+  platform: item.platform || "",
+  email: item.email || "",
+  telegram: item.contact_method || "",
+  capital: item.capital || "",
+  notes: item.notes || "",
+  status: item.status || "pending",
+  createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
+  apiKey: item.api_key_encrypted ? "محفوظ بشكل مشفر" : "",
+  secretKey: item.secret_key_encrypted ? "محفوظ بشكل مشفر" : "",
+  password: item.trading_password_encrypted ? "محفوظ بشكل مشفر" : "",
 });
 
 const upsertById = (list, item, limit) => {
@@ -258,13 +274,9 @@ export default function AdminPage() {
   }, [router]);
 
   const loadAdminData = async (currentUser, options = {}) => {
-    const localUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
-
     if (!options.silent) {
       setIsRefreshing(true);
     }
-
-    setAccountRequests([]);
 
     const fallbackUsers = [
       {
@@ -276,50 +288,52 @@ export default function AdminPage() {
         subscription_plan: currentUser?.subscription_plan || "إدارة",
         subscription_status: currentUser?.subscription_status || "نشط",
       },
-      ...localUsers,
     ];
 
     try {
-      const [profiles, analysisData, subscriptionData] = await Promise.all([
-        adminSelect(
-          "profiles",
-          `select=id,email,username,telegram,role,subscription_plan,subscription_status,created_at&order=created_at.desc&limit=${ADMIN_USERS_LIMIT}`
-        ),
-        adminSelect(
-          "analysis_requests",
-          `select=*&order=created_at.desc&limit=${ADMIN_ANALYSIS_LIMIT}`
-        ),
-        adminSelect(
-          "subscription_requests",
-          `select=*&order=created_at.desc&limit=${ADMIN_SUBSCRIPTIONS_LIMIT}`
-        ),
-      ]);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
-      setUsers(profiles?.length ? profiles : fallbackUsers);
+      const response = await fetch("/api/admin/dashboard", {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
 
-      if (!analysisData) {
-        setAnalysisRequests([]);
-      } else {
-        const formattedAnalysis = analysisData.map(formatAnalysisRequest);
-        setAnalysisRequests(formattedAnalysis);
-        setDataMode("supabase");
+      clearTimeout(timeout);
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "فشل تحميل بيانات لوحة الإدارة");
       }
 
-      if (!subscriptionData) {
-        setSubscriptionRequests([]);
-      } else {
-        const formattedSubscriptions = subscriptionData.map(formatSubscriptionRequest);
-        setSubscriptionRequests(formattedSubscriptions);
-      }
+      const formattedAnalysis = (result.analysis_requests || []).map(formatAnalysisRequest);
+      const formattedSubscriptions = (result.subscription_requests || []).map(formatSubscriptionRequest);
+      const formattedAccounts = (result.account_management_requests || []).map(formatAccountManagementRequest);
+
+      setUsers(result.profiles?.length ? result.profiles : fallbackUsers);
+      setAnalysisRequests(formattedAnalysis);
+      setSubscriptionRequests(formattedSubscriptions);
+      setAccountRequests(formattedAccounts);
+      setDataMode("secure-api");
       setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
     } catch (err) {
       console.error("Admin load error:", err);
       setUsers(fallbackUsers);
-      if (!options.silent) {
-        alert("فشل تحميل بيانات لوحة الإدارة من Supabase: " + (err?.message || err));
-      }
       setAnalysisRequests([]);
       setSubscriptionRequests([]);
+      setAccountRequests([]);
+      setDataMode("secure-api");
+      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+
+      if (!options.silent) {
+        alert(
+          err?.name === "AbortError"
+            ? "انتهت مهلة تحميل لوحة الإدارة. جرّب تحديث الصفحة."
+            : err?.message || "فشل تحميل بيانات لوحة الإدارة"
+        );
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -788,7 +802,7 @@ export default function AdminPage() {
               </p>
             </div>
             <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-200">
-              الوضع الحالي: {dataMode === "supabase" ? "Supabase" : "LocalStorage"}
+              الوضع الحالي: {dataMode === "secure-api" ? "Secure API" : dataMode === "supabase" ? "Supabase" : "LocalStorage"}
             </span>
           </div>
 
@@ -1069,6 +1083,12 @@ export default function AdminPage() {
                     {[{
                       label: "تيليجرام",
                       value: req.telegram,
+                    }, {
+                      label: "البريد الإلكتروني",
+                      value: req.email,
+                    }, {
+                      label: "المنصة",
+                      value: req.platform,
                     }, {
                       label: "رأس المال",
                       value: req.capital ? `$${req.capital}` : "",
