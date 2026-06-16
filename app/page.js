@@ -427,11 +427,11 @@ export default function Home() {
             <div className="lg:col-span-7 space-y-6">
               <span className="badgeGreen">LIVE TRADING INTELLIGENCE</span>
 
-              <h1 className="text-4xl md:text-6xl font-black leading-tight">
+              <h1 className="text-4xl md:text-6xl font-black leading-tight tracking-wide !text-white drop-shadow-[0_4px_5px_rgba(0,0,0,0.95)] [text-shadow:_0_2px_0_#000,_0_-2px_0_#000,_2px_0_0_#000,_-2px_0_0_#000,_0_0_18px_rgba(255,255,255,0.18)]">
                 منصة احترافية لمتابعة السوق وطلب التحليلات والتنبيهات السعرية
               </h1>
 
-              <p className="text-slate-300 text-lg leading-8">
+              <p className="text-lg font-bold leading-8 tracking-wide !text-white drop-shadow-[0_3px_4px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000,_0_0_12px_rgba(255,255,255,0.14)]">
                 HasaN CharT World تجمع الأسعار المباشرة، الشارت الحي، طلبات التحليل، التنبيهات، الاشتراكات، ولوحة مستخدم منظمة في تجربة واحدة.
               </p>
 
