@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -101,18 +102,26 @@ export async function GET(req) {
   }
 }
 
+const getAuthenticatedUser = async (supabase, token) => {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    throw new Error("يجب تسجيل الدخول أولاً");
+  }
+
+  return user;
+};
+
 export async function POST(req) {
   try {
     const body = await req.json();
 
-    const {
-      user_email,
-      username,
-      coin,
-      frame,
-    } = body;
+    const { coin, frame } = body;
 
-    if (!user_email || !coin || !frame) {
+    if (!coin || !frame) {
       return Response.json(
         {
           success: false,
@@ -123,7 +132,30 @@ export async function POST(req) {
     }
     const supabase = getSupabaseAdmin();
 
-    const normalizedEmail = String(user_email || "").trim().toLowerCase();
+    const cookieStore = await cookies();
+    const token = cookieStore.get("hc_access_token")?.value;
+
+    if (!token) {
+      return Response.json(
+        {
+          success: false,
+          error: "يجب تسجيل الدخول أولاً",
+        },
+        { status: 401 }
+      );
+    }
+
+    const user = await getAuthenticatedUser(supabase, token);
+
+    const normalizedEmail = String(user.email || "")
+      .trim()
+      .toLowerCase();
+
+    const username =
+      user.user_metadata?.username ||
+      user.user_metadata?.full_name ||
+      user.email?.split("@")[0] ||
+      "مستخدم";
 
     const { data: latestRequest, error: latestRequestError } = await supabase
       .from("analysis_requests")
