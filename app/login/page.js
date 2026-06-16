@@ -263,7 +263,16 @@ export default function LoginPage() {
       localStorage.setItem("currentUser", JSON.stringify(userData));
       sessionStorage.setItem("currentUser", JSON.stringify(userData));
 
-      if (session) {
+      if (session?.access_token && session?.refresh_token) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+
+        if (setSessionError) {
+          console.error("Supabase setSession error:", setSessionError.message);
+        }
+
         localStorage.setItem("hasan-chart-auth-session", JSON.stringify(session));
         localStorage.setItem(
           "sb-lzgsxdsumnteuwtjfqlm-auth-token",
