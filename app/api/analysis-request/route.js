@@ -31,20 +31,33 @@ const getCooldownText = (remainingMs) => {
 
 export async function GET(req) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userEmail = String(searchParams.get("email") || "").trim().toLowerCase();
+    const supabase = getSupabaseAdmin();
+
+    const cookieStore = await cookies();
+    const token = cookieStore.get("hc_access_token")?.value;
+
+    if (!token) {
+      return Response.json(
+        {
+          success: false,
+          error: "يجب تسجيل الدخول أولاً",
+        },
+        { status: 401 }
+      );
+    }
+
+    const user = await getAuthenticatedUser(supabase, token);
+    const userEmail = String(user.email || "").trim().toLowerCase();
 
     if (!userEmail) {
       return Response.json(
         {
           success: false,
-          error: "البريد الإلكتروني مطلوب",
+          error: "تعذر تحديد حساب المستخدم",
         },
         { status: 400 }
       );
     }
-
-    const supabase = getSupabaseAdmin();
 
     const { data: latestRequest, error } = await supabase
       .from("analysis_requests")
