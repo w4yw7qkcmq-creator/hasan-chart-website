@@ -211,6 +211,53 @@ export async function POST(request) {
       );
     }
 
+    if (action === "publish-vip-signal") {
+      const signalType = String(payload.signalType || "").trim();
+      const coin = String(payload.coin || "").trim().toUpperCase();
+      const entry = String(payload.entry || "").trim();
+      const targets = String(payload.targets || "").trim();
+      const stopLoss = String(payload.stopLoss || "").trim();
+      const notes = String(payload.notes || "").trim();
+
+      if (!signalType || !coin) {
+        return Response.json(
+          { success: false, error: "نوع التوصية واسم العملة مطلوبان" },
+          { status: 400 }
+        );
+      }
+
+      const { data, error } = await supabase
+        .from("vip_signals")
+        .insert({
+          signal_type: signalType,
+          coin,
+          entry,
+          targets,
+          stop_loss: stopLoss,
+          notes,
+          status: "نشطة",
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        throw new Error(error.message || "فشل نشر توصية VIP");
+      }
+
+      await writeAdminLog({
+        admin: adminUser,
+        action: "publish-vip-signal",
+        targetTable: "vip_signals",
+        targetId: data?.id || requestId,
+        details: {
+          signalType,
+          coin,
+        },
+      });
+
+      return Response.json({ success: true, id: data?.id || null });
+    }
+
     if (action === "send-analysis-reply") {
       const reply = String(payload.reply || "").trim();
       const replyImage = String(payload.replyImage || "").trim();

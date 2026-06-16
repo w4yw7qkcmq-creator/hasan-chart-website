@@ -581,32 +581,55 @@ export default function AdminPage() {
       return;
     }
 
-    const payload = {
-      signal_type: signalType,
-      coin: vipSignalForm.coin.trim().toUpperCase(),
-      entry: vipSignalForm.entry.trim(),
-      targets: vipSignalForm.targets.trim(),
-      stop_loss: vipSignalForm.stop_loss.trim(),
-      notes: vipSignalForm.notes.trim(),
-      status: "نشطة",
-    };
+    const confirmed = await confirmAdminAction(
+      signalType === "spot"
+        ? "هل تريد نشر توصية VIP Spot؟"
+        : "هل تريد نشر توصية VIP Futures؟"
+    );
 
-    const { error } = await supabase.from("vip_signals").insert(payload);
+    if (!confirmed) return;
 
-    if (error) {
-      showAdminNotice("فشل نشر توصية VIP: " + error.message, "error");
-      return;
+    try {
+      const response = await fetch("/api/admin/dashboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "publish-vip-signal",
+          requestId: `vip-${Date.now()}`,
+          signalType,
+          coin: vipSignalForm.coin.trim().toUpperCase(),
+          entry: vipSignalForm.entry.trim(),
+          targets: vipSignalForm.targets.trim(),
+          stopLoss: vipSignalForm.stop_loss.trim(),
+          notes: vipSignalForm.notes.trim(),
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "فشل نشر توصية VIP");
+      }
+
+      showAdminNotice(
+        signalType === "spot"
+          ? "تم نشر توصية VIP Spot"
+          : "تم نشر توصية VIP Futures"
+      );
+
+      setVipSignalForm({
+        signal_type: signalType,
+        coin: "",
+        entry: "",
+        targets: "",
+        stop_loss: "",
+        notes: "",
+      });
+    } catch (error) {
+      showAdminNotice(error?.message || "فشل نشر توصية VIP", "error");
     }
-
-    showAdminNotice(signalType === "spot" ? "تم نشر توصية VIP Spot" : "تم نشر توصية VIP Futures");
-    setVipSignalForm({
-      signal_type: signalType,
-      coin: "",
-      entry: "",
-      targets: "",
-      stop_loss: "",
-      notes: "",
-    });
   };
 
   const sendAnalysisReply = async (id) => {
