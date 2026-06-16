@@ -96,7 +96,7 @@ export async function GET() {
     const isAdminByProfile = adminProfile?.role === "admin";
     const isAdminByFallback = fallbackAdminEmails.includes(normalizedEmail);
 
-    if (profileError || (!isAdminByProfile && !isAdminByFallback)) {
+    if (!isAdminByFallback && (profileError || !isAdminByProfile)) {
       return Response.json(
         { success: false, error: "غير مصرح لك بالدخول" },
         { status: 403 }
@@ -169,7 +169,7 @@ async function verifyAdminUserForAction() {
   const isAdminByProfile = adminProfile?.role === "admin";
   const isAdminByFallback = fallbackAdminEmails.includes(normalizedEmail);
 
-  if (profileError || (!isAdminByProfile && !isAdminByFallback)) {
+  if (!isAdminByFallback && (profileError || !isAdminByProfile)) {
     throw new Error("غير مصرح لك بالدخول");
   }
 
