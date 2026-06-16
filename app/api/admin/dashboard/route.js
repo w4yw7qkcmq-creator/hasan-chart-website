@@ -138,3 +138,93 @@ export async function GET() {
     );
   }
 }
+
+// --- Secure POST actions for account-management requests ---
+async function verifyAdminUserForAction() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("hc_access_token")?.value;
+
+  if (!token) {
+    throw new Error("يجب تسجيل الدخول أولاً");
+  }
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token);
+
+  if (authError || !user) {
+    throw new Error("جلسة غير صالحة");
+  }
+
+  const normalizedEmail = (user.email || "").toLowerCase();
+  const fallbackAdminEmails = ["ahmaagahmaadd@gmail.com"];
+
+  const { data: adminProfile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id,email,role")
+    .or(`id.eq.${user.id},email.eq.${normalizedEmail}`)
+    .maybeSingle();
+
+  const isAdminByProfile = adminProfile?.role === "admin";
+  const isAdminByFallback = fallbackAdminEmails.includes(normalizedEmail);
+
+  if (profileError || (!isAdminByProfile && !isAdminByFallback)) {
+    throw new Error("غير مصرح لك بالدخول");
+  }
+
+  return user;
+}
+
+export async function POST(request) {
+  try {
+    await verifyAdminUserForAction();
+
+    const { action, requestId } = await request.json();
+
+    if (!action || !requestId) {
+      return Response.json(
+        { success: false, error: "بيانات الطلب غير مكتملة" },
+        { status: 400 }
+      );
+    }
+
+    if (action === "approve-account-request") {
+      const { error } = await supabase
+        .from("account_management_requests")
+        .update({ status: "تمت المراجعة" })
+        .eq("id", requestId);
+
+      if (error) {
+        throw new Error(error.message || "تعذر تحديث الطلب");
+      }
+
+      return Response.json({ success: true });
+    }
+
+    if (action === "delete-account-request") {
+      const { error } = await supabase
+        .from("account_management_requests")
+        .delete()
+        .eq("id", requestId);
+
+      if (error) {
+        throw new Error(error.message || "تعذر حذف الطلب");
+      }
+
+      return Response.json({ success: true });
+    }
+
+    return Response.json(
+      { success: false, error: "إجراء غير معروف" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Admin dashboard action error:", error.message);
+
+    return Response.json(
+      { success: false, error: error.message || "تعذر تنفيذ الإجراء" },
+      { status: 500 }
+    );
+  }
+}

@@ -689,22 +689,64 @@ export default function AdminPage() {
   }
   };
 
-  const approveAccountRequest = (id) => {
-    const updated = accountRequests.map((req) =>
-      req.id === id ? { ...req, status: "تمت المراجعة", reviewedAt: new Date().toLocaleString("ar") } : req
-    );
+  const approveAccountRequest = async (id) => {
+    try {
+      const response = await fetch("/api/admin/dashboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "approve-account-request",
+          requestId: id,
+        }),
+      });
 
-    localStorage.setItem("accountRequests", JSON.stringify(updated));
-    setAccountRequests(updated);
-    alert("تم تحديث حالة طلب إدارة الحساب");
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر تحديث حالة الطلب");
+      }
+
+      setAccountRequests((prev) =>
+        prev.map((req) =>
+          req.id === id
+            ? { ...req, status: "تمت المراجعة", reviewedAt: new Date().toLocaleString("ar") }
+            : req
+        )
+      );
+
+      alert("تم تحديث حالة طلب إدارة الحساب");
+    } catch (error) {
+      alert(error?.message || "تعذر تحديث حالة الطلب");
+    }
   };
 
-  const deleteAccountRequest = (id) => {
+  const deleteAccountRequest = async (id) => {
     if (!confirm("هل تريد حذف طلب إدارة الحساب؟")) return;
 
-    const updated = accountRequests.filter((req) => req.id !== id);
-    localStorage.setItem("accountRequests", JSON.stringify(updated));
-    setAccountRequests(updated);
+    try {
+      const response = await fetch("/api/admin/dashboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete-account-request",
+          requestId: id,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر حذف الطلب");
+      }
+
+      setAccountRequests((prev) => prev.filter((req) => req.id !== id));
+    } catch (error) {
+      alert(error?.message || "تعذر حذف الطلب");
+    }
   };
 
   if (!isAdmin) {
