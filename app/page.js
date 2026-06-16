@@ -469,10 +469,37 @@ export default function Home() {
               <div className="rounded-[32px] bg-black/30 border border-white/10 p-6">
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <p className="text-sm font-bold tracking-wide !text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.75)]">Market Pulse</p>
-                    <h3 className="text-2xl font-black tracking-wide !text-white [text-shadow:0_3px_6px_rgba(0,0,0,0.80)]">BTC / ETH / SOL</h3>
+                    <p
+                      className="text-sm font-bold tracking-wide"
+                      style={{
+                        color: "#ffffff",
+                        WebkitTextFillColor: "#ffffff",
+                        textShadow: "0 2px 4px rgba(0,0,0,0.75)",
+                      }}
+                    >
+                      Market Pulse
+                    </p>
+                    <h3
+                      className="text-2xl font-black tracking-wide"
+                      style={{
+                        color: "#ffffff",
+                        WebkitTextFillColor: "#ffffff",
+                        textShadow: "0 3px 6px rgba(0,0,0,0.80)",
+                      }}
+                    >
+                      BTC / ETH / SOL
+                    </h3>
                   </div>
-                  <span className="badgeBlue !text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.75)]">WebSocket</span>
+                  <span
+                    className="badgeBlue"
+                    style={{
+                      color: "#ffffff",
+                      WebkitTextFillColor: "#ffffff",
+                      textShadow: "0 2px 4px rgba(0,0,0,0.75)",
+                    }}
+                  >
+                    WebSocket
+                  </span>
                 </div>
 
                 <div className="space-y-3">
@@ -690,8 +717,26 @@ function TradingViewPrice({ title, symbol, tvSymbol }) {
 function MiniTicker({ symbol, price }) {
   return (
     <div className="flex items-center justify-between rounded-2xl bg-white/5 border border-white/10 p-4">
-      <span className="font-black tracking-wide !text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.75)]">{symbol}</span>
-      <span className="font-black tracking-wide !text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.75)]">${price}</span>
+      <span
+        className="font-black tracking-wide"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 2px 4px rgba(0,0,0,0.75)",
+        }}
+      >
+        {symbol}
+      </span>
+      <span
+        className="font-black tracking-wide"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 2px 4px rgba(0,0,0,0.75)",
+        }}
+      >
+        ${price}
+      </span>
     </div>
   );
 }
