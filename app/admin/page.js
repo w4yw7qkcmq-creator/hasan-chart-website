@@ -672,21 +672,29 @@ export default function AdminPage() {
   const deleteAnalysisRequest = async (id) => {
     if (!confirm("هل تريد حذف طلب التحليل؟")) return;
 
-    const updated = analysisRequests.filter((req) => req.id !== id);
+    try {
+      const response = await fetch("/api/admin/dashboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete-analysis-request",
+          requestId: id,
+        }),
+      });
 
-    if (dataMode === "supabase") {
-      const { error } = await supabase
-        .from("analysis_requests")
-        .delete()
-        .eq("id", id);
+      const result = await response.json().catch(() => ({}));
 
-      if (error) {
-        alert("لم يتم حذف الطلب من Supabase: " + error.message);
-        return;
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر حذف طلب التحليل");
       }
 
-    setAnalysisRequests(updated);
-  }
+      setAnalysisRequests((prev) => prev.filter((req) => req.id !== id));
+      alert("تم حذف طلب التحليل");
+    } catch (error) {
+      alert(error?.message || "تعذر حذف طلب التحليل");
+    }
   };
 
   const approveAccountRequest = async (id) => {

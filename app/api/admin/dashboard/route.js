@@ -189,6 +189,19 @@ export async function POST(request) {
       );
     }
 
+    if (action === "delete-analysis-request") {
+      const { error } = await supabase
+        .from("analysis_requests")
+        .delete()
+        .eq("id", requestId);
+
+      if (error) {
+        throw new Error(error.message || "تعذر حذف طلب التحليل");
+      }
+
+      return Response.json({ success: true });
+    }
+
     if (action === "approve-account-request") {
       const { error } = await supabase
         .from("account_management_requests")
