@@ -19,9 +19,9 @@ function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
       <div className={`absolute inset-0 bg-gradient-to-br ${glow}`} />
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-slate-700 dark:text-slate-400">{title}</p>
-          <h3 className="mt-3 text-4xl font-black text-white">{value}</h3>
-          <p className="mt-2 text-sm text-slate-700 dark:text-slate-400">{subtitle}</p>
+          <p className="text-sm font-bold text-slate-300">{title}</p>
+          <h3 className="mt-3 text-4xl font-black text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.18)]">{value}</h3>
+          <p className="mt-2 text-sm text-slate-300">{subtitle}</p>
         </div>
         <div className="grid h-14 w-14 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)]">
           {icon}
@@ -40,10 +40,10 @@ function StatusBadge({ status }) {
     <span
       className={`rounded-full border px-3 py-1 text-xs font-black ${
         isDone
-          ? "border-emerald-500/40 bg-emerald-500/25 text-emerald-900 dark:text-emerald-50"
+          ? "border-emerald-500/40 bg-emerald-500/25 text-emerald-50"
           : isPending
-          ? "border-amber-500/40 bg-amber-400/25 text-amber-900 dark:text-amber-50"
-          : "border-cyan-500/40 bg-cyan-400/25 text-cyan-900 dark:text-cyan-50"
+          ? "border-amber-500/40 bg-amber-400/25 text-amber-50"
+          : "border-cyan-500/40 bg-cyan-400/25 text-cyan-50"
       }`}
     >
       {status || "قيد المراجعة"}
@@ -939,25 +939,25 @@ export default function AdminPage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
 
-      <div className="relative z-10 space-y-8 p-4 md:p-6">
+      <div className="relative z-10 space-y-8 p-4 text-slate-100 md:p-6">
         <section className="relative overflow-hidden rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
           <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
           <div className="absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
           <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div>
-              <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-900 dark:text-cyan-200">
+              <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-100">
                 ADMIN CONTROL CENTER
               </span>
               <h1 className="mt-5 text-4xl font-black leading-tight md:text-5xl">لوحة الإدارة</h1>
-              <p className="mt-4 max-w-3xl leading-8 text-slate-900 dark:text-slate-300">
+              <p className="mt-4 max-w-3xl leading-8 text-slate-200">
                 إدارة طلبات التحليل، إرسال الردود مع الصور، ومراجعة طلبات إدارة الحسابات من مكان واحد. يتم تحديث الطلبات لحظيًا بدون إعادة تحميل اللوحة كاملة.
               </p>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 text-sm text-slate-900 shadow-2xl backdrop-blur-2xl dark:text-slate-300">
-          <span className="font-bold text-cyan-900 dark:text-cyan-100">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 text-sm text-slate-200 shadow-2xl backdrop-blur-2xl">
+          <span className="font-bold text-cyan-100">
             {isRefreshing ? "جاري تحديث بيانات اللوحة..." : "التحديث اللحظي مفعل"}
           </span>
-          <span className="text-slate-700 dark:text-slate-400">
+          <span className="text-slate-300">
             {lastUpdatedAt ? `آخر تحديث: ${lastUpdatedAt}` : "بانتظار أول تحديث"}
           </span>
           <button
@@ -965,7 +965,7 @@ export default function AdminPage() {
               const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
               loadAdminData(currentUser);
             }}
-            className="rounded-2xl border border-cyan-500/30 bg-cyan-400/20 px-4 py-2 font-black text-cyan-900 transition hover:bg-cyan-400/30 dark:text-cyan-100"
+            className="rounded-2xl border border-cyan-500/30 bg-cyan-400/20 px-4 py-2 font-black text-cyan-100 transition hover:bg-cyan-400/30"
           >
             تحديث الآن
           </button>
@@ -1060,7 +1060,7 @@ export default function AdminPage() {
                 عرض المستخدمين، تغيير الصلاحية، وتفعيل باقات Spot & Futures.
               </p>
             </div>
-            <span className="rounded-full border border-cyan-500/30 bg-cyan-400/20 px-4 py-2 text-sm font-black text-cyan-900 dark:text-cyan-200">
+            <span className="rounded-full border border-cyan-500/30 bg-cyan-400/20 px-4 py-2 text-sm font-black text-cyan-100">
               الوضع الحالي: {dataMode === "secure-api" ? "Secure API" : dataMode === "supabase" ? "Supabase" : "LocalStorage"}
             </span>
           </div>
@@ -1081,7 +1081,7 @@ export default function AdminPage() {
                       </div>
                       <div className="min-w-0">
                         <h3 className="truncate text-xl font-black text-white">{user.username || "مستخدم"}</h3>
-                        <p className="truncate text-sm text-slate-700 dark:text-slate-400">{user.email}</p>
+                        <p className="truncate text-sm text-slate-300">{user.email}</p>
                         <p className="mt-1 text-xs text-cyan-100/60">{user.telegram || "لا يوجد تليجرام"}</p>
                       </div>
                     </div>
@@ -1126,15 +1126,15 @@ export default function AdminPage() {
                   <div className="mt-5 grid gap-3 md:grid-cols-3">
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                       <p className="text-xs font-bold text-slate-500">الصلاحية</p>
-                      <p className="mt-2 font-black text-cyan-900 dark:text-cyan-200">{user.role || "user"}</p>
+                      <p className="mt-2 font-black text-cyan-100">{user.role || "user"}</p>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                       <p className="text-xs font-bold text-slate-500">الباقة</p>
-                      <p className="mt-2 font-black text-cyan-900 dark:text-cyan-200">{user.subscription_plan || "بدون اشتراك"}</p>
+                      <p className="mt-2 font-black text-cyan-100">{user.subscription_plan || "بدون اشتراك"}</p>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                       <p className="text-xs font-bold text-slate-500">حالة الاشتراك</p>
-                      <p className="mt-2 font-black text-cyan-900 dark:text-cyan-200">{user.subscription_status || "غير نشط"}</p>
+                      <p className="mt-2 font-black text-cyan-100">{user.subscription_status || "غير نشط"}</p>
                     </div>
                   </div>
                 </article>
@@ -1156,7 +1156,7 @@ export default function AdminPage() {
                 className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
                   filter === key
                     ? "border-cyan-300/40 bg-cyan-400/20 text-cyan-100 shadow-[0_0_25px_rgba(0,163,255,0.18)]"
-                    : "border-white/10 bg-black/20 text-slate-900 hover:border-cyan-300/30 hover:bg-cyan-400/10 dark:text-slate-300"
+                    : "border-white/10 bg-black/20 text-slate-300 hover:border-cyan-300/30 hover:bg-cyan-400/10"
                 }`}
               >
                 {label}
@@ -1169,7 +1169,7 @@ export default function AdminPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-3xl font-black">طلبات تحليل العملات</h2>
-              <p className="mt-2 text-slate-700 dark:text-slate-400">اكتب الرد وارفق صورة الشارت ثم أرسلها للمستخدم.</p>
+              <p className="mt-2 text-slate-300">اكتب الرد وارفق صورة الشارت ثم أرسلها للمستخدم.</p>
             </div>
           </div>
 
@@ -1191,13 +1191,13 @@ export default function AdminPage() {
                           <StatusBadge status={req.status} />
                         </div>
                         <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-900 dark:text-slate-300">
-                            المستخدم: <b className="text-cyan-900 dark:text-cyan-200">{req.username || req.userEmail}</b>
+                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                            المستخدم: <b className="text-cyan-100">{req.username || req.userEmail}</b>
                           </span>
-                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-900 dark:text-slate-300">
-                            الفريم: <b className="text-cyan-900 dark:text-cyan-200">{req.frame}</b>
+                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                            الفريم: <b className="text-cyan-100">{req.frame}</b>
                           </span>
-                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-900 dark:text-slate-300">
+                          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
                             التاريخ: {req.createdAt}
                           </span>
                         </div>
@@ -1217,7 +1217,7 @@ export default function AdminPage() {
                     </div>
 
                     {!expandedAnalysis[req.id] && req.reply && (
-                      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/20 p-3 text-sm font-black text-emerald-900 shadow-[0_10px_28px_rgba(16,185,129,0.16)] dark:text-emerald-50">
+                      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/20 p-3 text-sm font-black text-emerald-50 shadow-[0_10px_28px_rgba(16,185,129,0.16)]">
                         تم الرد على هذا الطلب ✅
                       </div>
                     )}
@@ -1227,8 +1227,8 @@ export default function AdminPage() {
 
                     {req.reply && (
                       <div className="rounded-[26px] border border-cyan-300/15 bg-cyan-400/5 p-5">
-                        <p className="text-sm font-bold text-cyan-900 dark:text-cyan-200">الرد الحالي</p>
-                        <p className="mt-2 leading-8 text-slate-900 dark:text-slate-200">{req.reply}</p>
+                        <p className="text-sm font-bold text-cyan-100">الرد الحالي</p>
+                        <p className="mt-2 leading-8 text-slate-100">{req.reply}</p>
                         {req.replyImage && (
                           <img
                             src={req.replyImage}
@@ -1255,7 +1255,7 @@ export default function AdminPage() {
                     />
 
                     <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-                      <label className="block text-sm font-bold text-slate-900 dark:text-slate-300">أرفق صورة التحليل / الشارت</label>
+                      <label className="block text-sm font-bold text-slate-300">أرفق صورة التحليل / الشارت</label>
                       <input
                         type="file"
                         accept="image/*"
@@ -1300,7 +1300,7 @@ export default function AdminPage() {
         <section className="space-y-5">
           <div>
             <h2 className="text-3xl font-black">طلبات إدارة الحسابات</h2>
-            <p className="mt-2 text-slate-700 dark:text-slate-400">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
+            <p className="mt-2 text-slate-300">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
           </div>
 
           {accountRequests.length === 0 ? (
@@ -1321,7 +1321,7 @@ export default function AdminPage() {
                         <h3 className="text-2xl font-black">{req.type}</h3>
                         <StatusBadge status={req.status} />
                       </div>
-                      <p className="mt-2 text-sm text-slate-700 dark:text-slate-500">{req.createdAt}</p>
+                      <p className="mt-2 text-sm text-slate-400">{req.createdAt}</p>
                     </div>
 
                     <div className="flex flex-wrap gap-3">
@@ -1391,7 +1391,7 @@ export default function AdminPage() {
                       .map((item) => (
                         <div key={item.label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                           <p className="text-xs font-bold text-slate-500">{item.label}</p>
-                          <p className="mt-2 break-all font-bold text-slate-900 dark:text-slate-200">{item.value}</p>
+                          <p className="mt-2 break-all font-bold text-slate-100">{item.value}</p>
                         </div>
                       ))}
                   </div>
@@ -1404,7 +1404,7 @@ export default function AdminPage() {
         <section className="space-y-5">
           <div>
             <h2 className="text-3xl font-black">طلبات الاشتراكات والدفع</h2>
-            <p className="mt-2 text-slate-700 dark:text-slate-400">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
+            <p className="mt-2 text-slate-300">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
           </div>
 
           {subscriptionRequests.length === 0 ? (
@@ -1423,16 +1423,16 @@ export default function AdminPage() {
                         <StatusBadge status={req.status} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-900 dark:text-slate-300">
-                          المستخدم: <b className="text-cyan-900 dark:text-cyan-200">{req.username || req.userEmail}</b>
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                          المستخدم: <b className="text-cyan-100">{req.username || req.userEmail}</b>
                         </span>
-                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-900 dark:text-slate-300">
-                          النوع: <b className="text-cyan-900 dark:text-cyan-200">{req.category}</b>
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                          النوع: <b className="text-cyan-100">{req.category}</b>
                         </span>
-                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-900 dark:text-slate-300">
-                          السعر: <b className="text-cyan-900 dark:text-cyan-200">{req.price}</b>
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
+                          السعر: <b className="text-cyan-100">{req.price}</b>
                         </span>
-                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-900 dark:text-slate-300">
+                        <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
                           التاريخ: {req.createdAt}
                         </span>
                       </div>
