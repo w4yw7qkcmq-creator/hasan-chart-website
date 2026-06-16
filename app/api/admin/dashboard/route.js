@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -7,6 +8,55 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
+
+function getEncryptionKey() {
+  if (!encryptionSecret || encryptionSecret.length < 24) {
+    throw new Error("Missing or weak ACCOUNT_DATA_ENCRYPTION_KEY");
+  }
+
+  return crypto.createHash("sha256").update(encryptionSecret).digest();
+}
+
+function decryptValue(value) {
+  if (!value) return null;
+
+  try {
+    const [ivText, authTagText, encryptedText] = String(value).split(":");
+
+    if (!ivText || !authTagText || !encryptedText) {
+      return null;
+    }
+
+    const key = getEncryptionKey();
+    const iv = Buffer.from(ivText, "base64");
+    const authTag = Buffer.from(authTagText, "base64");
+    const encrypted = Buffer.from(encryptedText, "base64");
+
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]);
+
+    return decrypted.toString("utf8");
+  } catch (error) {
+    console.error("Account key decrypt error:", error.message);
+    return null;
+  }
+}
+
+function formatAccountForAdmin(item) {
+  return {
+    ...item,
+    api_key: decryptValue(item.api_key_encrypted),
+    secret_key: decryptValue(item.secret_key_encrypted),
+    trading_password: decryptValue(item.trading_password_encrypted),
+  };
+}
 
 export async function GET() {
   try {
@@ -72,7 +122,7 @@ export async function GET() {
     return Response.json({
       success: true,
       analysis_requests: analysis.data || [],
-      account_management_requests: accounts.data || [],
+      account_management_requests: (accounts.data || []).map(formatAccountForAdmin),
       subscription_requests: subscriptions.data || [],
       profiles: profiles.data || [],
     });

@@ -148,9 +148,9 @@ const formatAccountManagementRequest = (item) => ({
   notes: item.notes || "",
   status: item.status || "pending",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
-  apiKey: item.api_key_encrypted ? "محفوظ بشكل مشفر" : "",
-  secretKey: item.secret_key_encrypted ? "محفوظ بشكل مشفر" : "",
-  password: item.trading_password_encrypted ? "محفوظ بشكل مشفر" : "",
+  apiKey: item.api_key || item.api_key_encrypted || "",
+  secretKey: item.secret_key || item.secret_key_encrypted || "",
+  password: item.trading_password || item.trading_password_encrypted || "",
 });
 
 const upsertById = (list, item, limit) => {
@@ -1093,16 +1093,16 @@ export default function AdminPage() {
                       label: "رأس المال",
                       value: req.capital ? `$${req.capital}` : "",
                     }, {
-                      label: "API Key",
+                      label: "API Key (Encrypted)",
                       value: req.apiKey,
                     }, {
-                      label: "Secret Key",
+                      label: "Secret Key (Encrypted)",
                       value: req.secretKey,
                     }, {
                       label: "رقم الحساب",
                       value: req.account,
                     }, {
-                      label: "كلمة المرور",
+                      label: "كلمة المرور (Encrypted)",
                       value: req.password,
                     }, {
                       label: "الخادم",
