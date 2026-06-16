@@ -427,11 +427,11 @@ export default function Home() {
             <div className="lg:col-span-7 space-y-6">
               <span className="badgeGreen">LIVE TRADING INTELLIGENCE</span>
 
-              <h1 className="text-4xl md:text-6xl font-black leading-tight tracking-wide !text-white drop-shadow-[0_4px_5px_rgba(0,0,0,0.95)] [text-shadow:_0_2px_0_#000,_0_-2px_0_#000,_2px_0_0_#000,_-2px_0_0_#000,_0_0_18px_rgba(255,255,255,0.18)]">
+              <h1 className="text-4xl md:text-6xl font-black leading-tight tracking-wide !text-white [-webkit-text-stroke:1px_rgba(0,0,0,0.75)] [text-shadow:0_3px_6px_rgba(0,0,0,0.45)]">
                 منصة احترافية لمتابعة السوق وطلب التحليلات والتنبيهات السعرية
               </h1>
 
-              <p className="text-lg font-bold leading-8 tracking-wide !text-white drop-shadow-[0_3px_4px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000,_0_0_12px_rgba(255,255,255,0.14)]">
+              <p className="text-lg font-bold leading-8 tracking-wide !text-white [-webkit-text-stroke:0.45px_rgba(0,0,0,0.70)] [text-shadow:0_2px_4px_rgba(0,0,0,0.42)]">
                 HasaN CharT World تجمع الأسعار المباشرة، الشارت الحي، طلبات التحليل، التنبيهات، الاشتراكات، ولوحة مستخدم منظمة في تجربة واحدة.
               </p>
 
@@ -665,8 +665,8 @@ function Price({ title, symbol, price, source = "Binance Live" }) {
 function TradingViewPrice({ title, symbol, tvSymbol }) {
   return (
     <div className="rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
-      <p className="text-sm font-black tracking-wide !text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000]">{title}</p>
-      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white drop-shadow-[0_3px_4px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000,_0_0_12px_rgba(255,255,255,0.18)]">{symbol}</h3>
+      <p className="text-sm font-black tracking-wide !text-white [-webkit-text-stroke:0.35px_rgba(0,0,0,0.75)] [text-shadow:0_2px_3px_rgba(0,0,0,0.45)]">{title}</p>
+      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white [-webkit-text-stroke:0.7px_rgba(0,0,0,0.75)] [text-shadow:0_3px_5px_rgba(0,0,0,0.50)]">{symbol}</h3>
       <TradingViewWidget symbol={tvSymbol} height="120" />
       <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
     </div>
@@ -701,8 +701,8 @@ function Service({ title, text, onRequireLogin }) {
 function MarketWindow({ title, label, symbol }) {
   return (
     <div className="min-h-[230px] overflow-hidden rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
-      <p className="text-sm font-black tracking-wide !text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000]">{label}</p>
-      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white drop-shadow-[0_3px_4px_rgba(0,0,0,0.95)] [text-shadow:_0_1px_0_#000,_0_-1px_0_#000,_1px_0_0_#000,_-1px_0_0_#000,_0_0_12px_rgba(255,255,255,0.18)]">{title}</h3>
+      <p className="text-sm font-black tracking-wide !text-white [-webkit-text-stroke:0.35px_rgba(0,0,0,0.75)] [text-shadow:0_2px_3px_rgba(0,0,0,0.45)]">{label}</p>
+      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white [-webkit-text-stroke:0.7px_rgba(0,0,0,0.75)] [text-shadow:0_3px_5px_rgba(0,0,0,0.50)]">{title}</h3>
       <TradingViewWidget symbol={symbol} height="120" />
       <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
     </div>
