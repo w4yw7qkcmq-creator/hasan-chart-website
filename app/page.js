@@ -453,12 +453,22 @@ export default function Home() {
                 <a
                   href="#analysis"
                   className="px-6 py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 font-bold transition"
+                  style={{
+                    color: "#ffffff",
+                    WebkitTextFillColor: "#ffffff",
+                    textShadow: "0 2px 4px rgba(0,0,0,0.75)",
+                  }}
                 >
                   🧠 طلب تحليل الآن
                 </a>
                 <a
                   href="#alerts"
-                  className="px-6 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-black font-bold transition"
+                  className="px-6 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 font-bold transition"
+                  style={{
+                    color: "#ffffff",
+                    WebkitTextFillColor: "#ffffff",
+                    textShadow: "0 2px 4px rgba(0,0,0,0.75)",
+                  }}
                 >
                   🔔 إنشاء تنبيه سعر
                 </a>
