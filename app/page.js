@@ -617,12 +617,12 @@ export default function Home() {
           <h2 className="sectionTitle text-center lg:text-right">الخدمات</h2>
 
           <div className="grid md:grid-cols-3 gap-5">
-            <Service title="توصيات Spot" text="باقات سبوت شهرية وربع سنوية وسنوية." onRequireLogin={requireLogin} />
-            <Service title="توصيات Futures" text="فرص فيوتشر مع متابعة وإدارة مخاطر." onRequireLogin={requireLogin} />
-            <Service title="HasaN CharT Academy" text="محتوى تعليمي صور وفيديوهات للمشتركين." onRequireLogin={requireLogin} />
-            <Service title="إدارة حسابات Spot" text="إدارة محافظ سبوت باحتراف." onRequireLogin={requireLogin} />
-            <Service title="إدارة حسابات Futures" text="إدارة حسابات فيوتشر." onRequireLogin={requireLogin} />
-            <Service title="أخبار وتحليلات" text="أهم الأخبار والتحليلات اليومية." onRequireLogin={requireLogin} />
+            <Service title="توصيات Spot" text="باقات سبوت شهرية وربع سنوية وسنوية." href="/subscriptions" onRequireLogin={requireLogin} />
+            <Service title="توصيات Futures" text="فرص فيوتشر مع متابعة وإدارة مخاطر." href="/subscriptions" onRequireLogin={requireLogin} />
+            <Service title="HasaN CharT Academy" text="محتوى تعليمي صور وفيديوهات للمشتركين." href="/daily-analysis" onRequireLogin={requireLogin} />
+            <Service title="إدارة حسابات Spot" text="إدارة محافظ سبوت باحتراف." href="/account-management" onRequireLogin={requireLogin} />
+            <Service title="إدارة حسابات Futures" text="إدارة حسابات فيوتشر." href="/account-management" onRequireLogin={requireLogin} />
+            <Service title="أخبار وتحليلات" text="أهم الأخبار والتحليلات اليومية." href="/news" publicLink />
           </div>
         </section>
 
@@ -791,11 +791,20 @@ function MiniTicker({ symbol, price }) {
   );
 }
 
-function Service({ title, text, onRequireLogin }) {
+function Service({ title, text, href, publicLink = false, onRequireLogin }) {
   return (
     <button
       type="button"
-      onClick={onRequireLogin}
+      onClick={() => {
+        if (!href) return;
+
+        if (!publicLink && onRequireLogin) {
+          const user = onRequireLogin();
+          if (!user) return;
+        }
+
+        window.location.href = href;
+      }}
       className="w-full rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)] transition hover:scale-[1.02] hover:border-blue-200/90"
     >
       <h3
