@@ -37,6 +37,50 @@ export default function AccountManagement() {
     message: "تم إرسال طلب إدارة الحساب إلى فريق الإدارة وسيتم التواصل معك قريباً.",
   });
 
+  const allowedImageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  const maxImageSize = 15 * 1024 * 1024;
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return "0MB";
+    return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
+  };
+
+  const validateImageFile = (file) => {
+    if (!file) return { valid: true };
+
+    if (!allowedImageTypes.includes(file.type)) {
+      return {
+        valid: false,
+        message: "يسمح فقط برفع صور JPG أو PNG أو WEBP.",
+      };
+    }
+
+    if (file.size > maxImageSize) {
+      return {
+        valid: false,
+        message: "الحد الأقصى لحجم الصورة هو 15MB.",
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const handleFileChange = (section, setSection, file) => {
+    const validation = validateImageFile(file);
+
+    if (!validation.valid) {
+      setSuccessModal({
+        open: true,
+        title: "ملف غير مسموح",
+        message: validation.message,
+      });
+      setSection({ ...section, file: null });
+      return;
+    }
+
+    setSection({ ...section, file });
+  };
+
   useEffect(() => {
     if (!nextAllowedAt) return;
 
@@ -62,6 +106,17 @@ export default function AccountManagement() {
   }, [nextAllowedAt]);
 
   const saveRequest = async (type, data) => {
+    const fileValidation = validateImageFile(data.file);
+
+    if (!fileValidation.valid) {
+      setSuccessModal({
+        open: true,
+        title: "ملف غير مسموح",
+        message: fileValidation.message,
+      });
+      return false;
+    }
+
     setSubmitting(true);
 
     try {
@@ -79,6 +134,9 @@ export default function AccountManagement() {
           apiKey: data.apiKey,
           secretKey: data.secretKey,
           tradingPassword: data.password,
+          screenshotFileName: data.file?.name || null,
+          screenshotMimeType: data.file?.type || null,
+          screenshotSize: data.file?.size || 0,
         }),
       });
 
@@ -194,10 +252,15 @@ export default function AccountManagement() {
               <label className="mb-2 text-slate-300">أرفق صورة لرأس مالك</label>
               <input
                 type="file"
-                accept="image/*"
-                onChange={(e) => setSpot({ ...spot, file: e.target.files[0] })}
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={(e) => handleFileChange(spot, setSpot, e.target.files[0])}
                 className="p-4 rounded-2xl bg-[#111827] border border-white/10 text-white"
               />
+              {spot.file && (
+                <p className="mt-2 text-sm font-bold text-emerald-300">
+                  تم اختيار: {spot.file.name} ({formatFileSize(spot.file.size)})
+                </p>
+              )}
             </div>
           </div>
 
@@ -247,10 +310,15 @@ export default function AccountManagement() {
               <label className="mb-2 text-slate-300">أرفق صورة لرأس مالك</label>
               <input
                 type="file"
-                accept="image/*"
-                onChange={(e) => setFutures({ ...futures, file: e.target.files[0] })}
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={(e) => handleFileChange(futures, setFutures, e.target.files[0])}
                 className="p-4 rounded-2xl bg-[#111827] border border-white/10 text-white"
               />
+              {futures.file && (
+                <p className="mt-2 text-sm font-bold text-emerald-300">
+                  تم اختيار: {futures.file.name} ({formatFileSize(futures.file.size)})
+                </p>
+              )}
             </div>
           </div>
 
@@ -300,10 +368,15 @@ export default function AccountManagement() {
               <label className="mb-2 text-slate-300">أرفق صورة توضح قيمة الحساب</label>
               <input
                 type="file"
-                accept="image/*"
-                onChange={(e) => setForex({ ...forex, file: e.target.files[0] })}
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={(e) => handleFileChange(forex, setForex, e.target.files[0])}
                 className="p-4 rounded-2xl bg-[#111827] border border-white/10 text-white"
               />
+              {forex.file && (
+                <p className="mt-2 text-sm font-bold text-emerald-300">
+                  تم اختيار: {forex.file.name} ({formatFileSize(forex.file.size)})
+                </p>
+              )}
             </div>
           </div>
 

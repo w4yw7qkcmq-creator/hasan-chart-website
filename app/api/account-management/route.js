@@ -129,6 +129,37 @@ export async function POST(request) {
     const secretKey = sanitizeText(body.secretKey, 2000);
     const tradingPassword = sanitizeText(body.tradingPassword || body.password, 2000);
 
+    const screenshotFileName = sanitizeText(body.screenshotFileName, 255);
+    const screenshotMimeType = sanitizeText(body.screenshotMimeType, 120);
+    const screenshotSize = Number(body.screenshotSize || 0);
+
+    if (screenshotFileName || screenshotMimeType || screenshotSize) {
+      const allowedMimeTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
+
+      if (!allowedMimeTypes.includes(screenshotMimeType)) {
+        return NextResponse.json(
+          {
+            error: "يسمح فقط برفع صور JPG أو PNG أو WEBP.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (screenshotSize > 15 * 1024 * 1024) {
+        return NextResponse.json(
+          {
+            error: "الحد الأقصى لحجم الصورة هو 15MB.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     if (!platform || !capital) {
       return NextResponse.json(
         { error: "يرجى إدخال المنصة ورأس المال" },
