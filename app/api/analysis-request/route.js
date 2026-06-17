@@ -90,13 +90,13 @@ export async function GET(req) {
     const token = cookieStore.get("hc_access_token")?.value;
 
     if (!token) {
-      return Response.json(
-        {
-          success: false,
-          error: "يجب تسجيل الدخول أولاً",
-        },
-        { status: 401 }
-      );
+      return Response.json({
+        success: true,
+        blocked: false,
+        text: "",
+        remainingMs: 0,
+        lastRequestAt: null,
+      });
     }
 
     const user = await getAuthenticatedUser(supabase, token);
@@ -121,16 +121,16 @@ export async function GET(req) {
       .maybeSingle();
 
     if (error) {
-      console.error("ANALYSIS COOLDOWN GET ERROR:", error);
+      console.error("ANALYSIS COOLDOWN GET ERROR:", error?.message || error);
 
-      return Response.json(
-        {
-          success: false,
-          error: "تعذر التحقق من مدة الانتظار. جرّب مرة ثانية.",
-          details: error,
-        },
-        { status: 500 }
-      );
+      return Response.json({
+        success: true,
+        blocked: false,
+        text: "",
+        remainingMs: 0,
+        lastRequestAt: null,
+        warning: "تعذر التحقق من مدة الانتظار حالياً.",
+      });
     }
 
     if (!latestRequest?.created_at) {
@@ -155,16 +155,16 @@ export async function GET(req) {
       lastRequestAt: latestRequest.created_at,
     });
   } catch (err) {
-    console.error("API GET ERROR:", err);
+    console.error("API GET ERROR:", err?.message || err);
 
-    return Response.json(
-      {
-        success: false,
-        error: err.message || "Server Error",
-        details: err,
-      },
-      { status: 500 }
-    );
+    return Response.json({
+      success: true,
+      blocked: false,
+      text: "",
+      remainingMs: 0,
+      lastRequestAt: null,
+      warning: "تعذر التحقق من مدة الانتظار حالياً.",
+    });
   }
 }
 
