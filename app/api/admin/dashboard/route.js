@@ -4,10 +4,21 @@ import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function getAdminSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase admin configuration");
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
 
@@ -60,6 +71,8 @@ function formatAccountForAdmin(item) {
 
 export async function GET() {
   try {
+    const supabase = getAdminSupabase();
+
     const cookieStore = await cookies();
     const token = cookieStore.get("hc_access_token")?.value;
 
@@ -164,7 +177,7 @@ export async function GET() {
 }
 
 // --- Secure POST actions for account-management requests ---
-async function verifyAdminUserForAction() {
+async function verifyAdminUserForAction(supabase) {
   const cookieStore = await cookies();
   const token = cookieStore.get("hc_access_token")?.value;
 
@@ -200,7 +213,7 @@ async function verifyAdminUserForAction() {
   return user;
 }
 
-async function writeAdminLog({
+async function writeAdminLog(supabase, {
   admin,
   action,
   targetTable,
@@ -223,7 +236,9 @@ async function writeAdminLog({
 
 export async function POST(request) {
   try {
-    const adminUser = await verifyAdminUserForAction();
+    const supabase = getAdminSupabase();
+
+    const adminUser = await verifyAdminUserForAction(supabase);
 
     const payload = await request.json();
     const { action, requestId } = payload;
@@ -268,7 +283,7 @@ export async function POST(request) {
         throw new Error(error.message || "فشل نشر توصية VIP");
       }
 
-      await writeAdminLog({
+      await writeAdminLog(supabase, {
         admin: adminUser,
         action: "publish-vip-signal",
         targetTable: "vip_signals",
@@ -306,7 +321,7 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر إرسال الرد");
       }
 
-      await writeAdminLog({
+      await writeAdminLog(supabase, {
         admin: adminUser,
         action: "send-analysis-reply",
         targetTable: "analysis_requests",
@@ -356,7 +371,7 @@ export async function POST(request) {
         }
       }
 
-      await writeAdminLog({
+      await writeAdminLog(supabase, {
         admin: adminUser,
         action: "update-subscription-request",
         targetTable: "subscription_requests",
@@ -381,7 +396,7 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر تحديث الطلب");
       }
 
-      await writeAdminLog({
+      await writeAdminLog(supabase, {
         admin: adminUser,
         action: "approve-account-request",
         targetTable: "account_management_requests",
@@ -401,7 +416,7 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر حذف طلب التحليل");
       }
 
-      await writeAdminLog({
+      await writeAdminLog(supabase, {
         admin: adminUser,
         action: "delete-analysis-request",
         targetTable: "analysis_requests",
@@ -421,7 +436,7 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر حذف الطلب");
       }
 
-      await writeAdminLog({
+      await writeAdminLog(supabase, {
         admin: adminUser,
         action: "delete-account-request",
         targetTable: "account_management_requests",

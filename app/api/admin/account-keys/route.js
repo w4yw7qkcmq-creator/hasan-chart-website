@@ -1,15 +1,24 @@
-
-
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function getAdminSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase admin configuration");
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
 
@@ -46,7 +55,7 @@ function decryptValue(value) {
   return decrypted.toString("utf8");
 }
 
-async function getAdminUser() {
+async function getAdminUser(supabase) {
   const cookieStore = await cookies();
   const token = cookieStore.get("hc_access_token")?.value;
 
@@ -84,7 +93,8 @@ async function getAdminUser() {
 
 export async function POST(request) {
   try {
-    await getAdminUser();
+    const supabase = getAdminSupabase();
+    await getAdminUser(supabase);
 
     const { requestId } = await request.json();
 

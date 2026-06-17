@@ -2,13 +2,21 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+
 const SITE_URL = "https://www.hasanchartworld.com";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return new Response("<urlset></urlset>", {
+      headers: { "Content-Type": "application/xml" },
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   const { data: news } = await supabase
     .from("news_posts")

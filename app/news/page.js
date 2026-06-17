@@ -4,10 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 const POPULAR_TAGS = [
   { label: "بيتكوين", href: "/news/tag/bitcoin" },
@@ -39,6 +35,16 @@ export default function News() {
   async function fetchNews() {
     try {
       setErrorMessage("");
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        setErrorMessage("إعدادات الأخبار غير مكتملة حالياً.");
+        setNews([]);
+        return;
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
       const { data, error } = await supabase
         .from("news_posts")
         .select("*")
