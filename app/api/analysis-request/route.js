@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { analysisRequestLimiter } from "../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,32 @@ const getSupabaseAdmin = () => {
 };
 
 const ANALYSIS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+const ALLOWED_FRAMES = new Set([
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "4h",
+  "1d",
+  "أربع ساعات",
+  "يومي",
+  "ساعة",
+  "نصف ساعة",
+  "ربع ساعة",
+]);
+
+const normalizeCoin = (value) => {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9._:-]/g, "")
+    .slice(0, 30);
+};
+
+const normalizeFrame = (value) => {
+  return String(value || "").trim().slice(0, 30);
+};
 
 const getCooldownText = (remainingMs) => {
   const safeRemaining = Math.max(0, Number(remainingMs) || 0);
@@ -132,13 +159,34 @@ export async function POST(req) {
   try {
     const body = await req.json();
 
-    const { coin, frame } = body;
+    const coin = normalizeCoin(body.coin);
+    const frame = normalizeFrame(body.frame);
 
     if (!coin || !frame) {
       return Response.json(
         {
           success: false,
           error: "البيانات ناقصة",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (coin.length < 2 || coin.length > 30) {
+      return Response.json(
+        {
+          success: false,
+          error: "رمز العملة غير صالح",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_FRAMES.has(frame)) {
+      return Response.json(
+        {
+          success: false,
+          error: "الفريم الزمني غير مدعوم",
         },
         { status: 400 }
       );
@@ -159,6 +207,18 @@ export async function POST(req) {
     }
 
     const user = await getAuthenticatedUser(supabase, token);
+
+    const rateLimitResult = analysisRequestLimiter(user.id);
+
+    if (!rateLimitResult.success) {
+      return Response.json(
+        {
+          success: false,
+          error: "تم إرسال عدة طلبات خلال وقت قصير. يرجى المحاولة لاحقاً.",
+        },
+        { status: 429 }
+      );
+    }
 
     const normalizedEmail = String(user.email || "")
       .trim()
