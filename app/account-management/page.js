@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SuccessModal from "../components/SuccessModal";
 
 export default function AccountManagement() {
@@ -28,11 +28,38 @@ export default function AccountManagement() {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [nextAllowedAt, setNextAllowedAt] = useState(null);
+  const [remainingTime, setRemainingTime] = useState("");
+
   const [successModal, setSuccessModal] = useState({
     open: false,
     title: "تم إرسال الطلب بنجاح",
     message: "تم إرسال طلب إدارة الحساب إلى فريق الإدارة وسيتم التواصل معك قريباً.",
   });
+
+  useEffect(() => {
+    if (!nextAllowedAt) return;
+
+    const updateTimer = () => {
+      const diff = new Date(nextAllowedAt).getTime() - Date.now();
+
+      if (diff <= 0) {
+        setRemainingTime("");
+        setNextAllowedAt(null);
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      setRemainingTime(`${hours} ساعة و ${minutes} دقيقة`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 60000);
+
+    return () => clearInterval(interval);
+  }, [nextAllowedAt]);
 
   const saveRequest = async (type, data) => {
     setSubmitting(true);
@@ -56,6 +83,10 @@ export default function AccountManagement() {
       });
 
       const result = await response.json().catch(() => ({}));
+
+      if (result?.nextAllowedAt) {
+        setNextAllowedAt(result.nextAllowedAt);
+      }
 
       if (!response.ok) {
         setSuccessModal({
@@ -112,7 +143,15 @@ export default function AccountManagement() {
         onClose={() => setSuccessModal((current) => ({ ...current, open: false }))}
       />
       <div className="max-w-5xl mx-auto space-y-10">
-        <h1 className="text-3xl font-bold">إدارة الحسابات</h1>
+        <div className="space-y-3">
+          <h1 className="text-3xl font-bold">إدارة الحسابات</h1>
+
+          {remainingTime && (
+            <div className="rounded-2xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-center text-sm font-bold text-white">
+              يمكنك تقديم طلب إدارة حساب جديد بعد: {remainingTime}
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleSpotSubmit} className="box space-y-6">
           <h2 className="text-2xl font-bold">إدارة حساب سبوت</h2>

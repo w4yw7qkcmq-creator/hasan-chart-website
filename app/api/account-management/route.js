@@ -78,6 +78,34 @@ export async function POST(request) {
       );
     }
 
+    const twentyFourHoursAgo = new Date(
+      Date.now() - 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { data: recentRequest } = await supabase
+      .from("account_management_requests")
+      .select("created_at")
+      .eq("user_id", user.id)
+      .gte("created_at", twentyFourHoursAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentRequest) {
+      const nextAllowedAt = new Date(
+        new Date(recentRequest.created_at).getTime() +
+          24 * 60 * 60 * 1000
+      );
+
+      return NextResponse.json(
+        {
+          error: "يمكنك إرسال طلب إدارة حساب واحد فقط كل 24 ساعة.",
+          nextAllowedAt: nextAllowedAt.toISOString(),
+        },
+        { status: 429 }
+      );
+    }
+
     const rateLimitResult = accountManagementLimiter(user.id);
 
     if (!rateLimitResult.success) {
