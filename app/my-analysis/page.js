@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 function StatusBadge({ status }) {
@@ -49,7 +49,8 @@ export default function MyAnalysisPage() {
   const [replyNotice, setReplyNotice] = useState("");
   const [loadError, setLoadError] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
-  const [openImage, setOpenImage] = useState(null);
+  const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const selectedAnalysisRef = useRef(null);
   const normalizeRequest = (item) => ({
     id: item.id,
     userEmail: item.user_email || item.userEmail,
@@ -63,6 +64,10 @@ export default function MyAnalysisPage() {
       ? new Date(item.created_at).toLocaleString("ar")
       : item.createdAt || "",
   });
+
+  useEffect(() => {
+    selectedAnalysisRef.current = selectedAnalysis;
+  }, [selectedAnalysis]);
 
   const loadRequests = async (user) => {
     setLoading(true);
@@ -105,7 +110,7 @@ export default function MyAnalysisPage() {
       setRequests(formattedRequests);
       setDataMode("api");
       setLastUpdated(new Date().toLocaleTimeString("ar"));
-      console.log("طلبات التحليل المحملة من API:", formattedRequests);
+      console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
 
       const latestReply = formattedRequests.find((item) => item.reply && item.status === "مكتمل");
       if (latestReply) {
@@ -162,18 +167,21 @@ export default function MyAnalysisPage() {
             table: "analysis_requests",
             filter: `user_email=eq.${String(user.email || "").trim().toLowerCase()}`,
           },
-          () => loadRequests(user)
+          () => {
+  if (selectedAnalysisRef.current) {
+    setReplyNotice("📩 وصل تحديث جديد على طلبات التحليل. أغلق التحليل لتحديث القائمة.");
+    return;
+  }
+
+  loadRequests(user);
+}
         )
         .subscribe((status) => {
-          console.log("My analysis realtime status:", status);
+          if (status === "SUBSCRIBED") console.log("My analysis realtime connected");
         });
 
-      refreshInterval = setInterval(() => {
-        if (!document.hidden) {
-          console.log("تحديث تلقائي للطلبات...");
-          loadRequests(user);
-        }
-      }, 10000);
+      // تم إيقاف التحديث التلقائي هنا حتى لا تتحدث الصفحة أثناء مشاهدة التحليل.
+      // التحديث اللحظي ما زال يعمل عبر Supabase Realtime عند وصول رد جديد.
     };
 
     start();
@@ -239,22 +247,53 @@ export default function MyAnalysisPage() {
             </div>
           </div>
         )}
-        {openImage && (
+        {selectedAnalysis && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-3 backdrop-blur-md">
-            <button
-              onClick={() => setOpenImage(null)}
-              className="absolute left-4 top-4 z-10 grid h-12 w-12 place-items-center rounded-2xl border border-white/15 bg-white/10 text-2xl font-black text-white"
-              aria-label="إغلاق الصورة"
-            >
-              ✕
-            </button>
+            <div className="relative max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[30px] border border-cyan-300/20 bg-[#020617] shadow-[0_0_80px_rgba(0,163,255,0.25)]">
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-cyan-300/15 bg-[#020617]/95 p-4 backdrop-blur-xl">
+                <div>
+                  <h2 className="text-2xl font-black text-white">{selectedAnalysis.coin}</h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    الفريم: {selectedAnalysis.frame} • {selectedAnalysis.createdAt}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedAnalysis(null)}
+                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+                >
+                  إغلاق التحليل ✕
+                </button>
+              </div>
 
-            <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-[26px] border border-cyan-300/20 bg-[#020617] p-3 shadow-[0_0_80px_rgba(0,163,255,0.25)]">
-              <img
-                src={openImage}
-                alt="صورة التحليل المكبرة"
-                className="mx-auto h-auto max-h-none w-full max-w-none rounded-2xl object-contain"
-              />
+              <div className="max-h-[calc(92vh-82px)] space-y-5 overflow-auto p-4 md:p-6">
+                <div className="rounded-[24px] border border-emerald-300/20 bg-emerald-400/10 p-4">
+                  <h3 className="mb-3 font-black text-emerald-100">✅ رد الإدارة</h3>
+                  <div className="whitespace-pre-wrap break-words rounded-[20px] border border-white/10 bg-black/25 p-4 text-right text-base leading-8 text-slate-100 [overflow-wrap:anywhere]">
+                    {selectedAnalysis.reply || "لم يتم إرسال الرد بعد."}
+                  </div>
+                </div>
+
+                {selectedAnalysis.replyImage && (
+                  <div className="rounded-[24px] border border-cyan-300/20 bg-cyan-400/10 p-4">
+                    <p className="mb-3 text-sm font-bold text-cyan-100">صورة التحليل</p>
+                    <img
+                      src={selectedAnalysis.replyImage}
+                      alt="صورة التحليل"
+                      loading="lazy"
+                      decoding="async"
+                      className="mx-auto max-h-[74vh] w-full rounded-2xl object-contain"
+                    />
+                    <a
+                      href={selectedAnalysis.replyImage}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-block rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                    >
+                      فتح الصورة بالحجم الكامل
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -353,21 +392,21 @@ export default function MyAnalysisPage() {
             </Link>
           </section>
         ) : !loading ? (
-          <section className="grid gap-5">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredRequests.map((req) => (
               <article
                 key={req.id}
-                className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition hover:border-cyan-300/35 hover:shadow-[0_24px_70px_rgba(0,102,255,0.20)]"
+                className="relative overflow-hidden rounded-[26px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-[0_14px_42px_rgba(0,102,255,0.12)] backdrop-blur-2xl transition hover:border-cyan-300/35 hover:shadow-[0_20px_55px_rgba(0,102,255,0.18)]"
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,0.12),transparent_30%)]" />
                 <div className="relative z-10">
-                  <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <h2 className="text-3xl font-black text-white">{req.coin}</h2>
+                        <h2 className="text-2xl font-black text-white">{req.coin}</h2>
                         <StatusBadge status={req.status} />
                       </div>
-                      <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
                           الفريم: <b className="text-cyan-200">{req.frame}</b>
                         </span>
@@ -376,55 +415,40 @@ export default function MyAnalysisPage() {
                         </span>
                       </div>
                     </div>
-
-                    <Link
-                      href="/#analysis"
-                      className="rounded-2xl border border-cyan-300/15 bg-cyan-400/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
-                    >
-                      طلب جديد
-                    </Link>
                   </div>
 
                   {req.reply ? (
-                    <div className="mt-6 rounded-[26px] border border-emerald-300/25 bg-emerald-400/10 p-5 shadow-[0_0_45px_rgba(16,185,129,0.10)]">
-                      <div className="mb-4 flex items-center gap-3">
-                        <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-xl">📩</div>
+                    <div className="mt-4 rounded-[22px] border border-emerald-300/20 bg-emerald-400/10 p-3">
+                      <div className="mb-3 flex items-center gap-3">
+                        <div className="grid h-10 w-10 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-lg">📩</div>
                         <div>
                           <h3 className="font-black text-emerald-100">✅ وصل رد الإدارة</h3>
                           <p className="text-xs text-slate-500">تم إرسال الرد من فريق HasaN CharT</p>
                         </div>
                       </div>
-                      <div className="max-w-full whitespace-pre-wrap break-words rounded-[22px] border border-white/10 bg-black/20 p-4 text-right text-base leading-8 text-slate-100 [overflow-wrap:anywhere]">
+
+                      <p className="line-clamp-3 rounded-[18px] border border-white/10 bg-black/20 p-3 text-right text-sm leading-7 text-slate-100 [overflow-wrap:anywhere]">
                         {req.reply}
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAnalysis(req)}
+                          className="rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                        >
+                          عرض التحليل
+                        </button>
+                        <Link
+                          href="/#analysis"
+                          className="rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm font-black text-slate-200 transition hover:border-cyan-300/30 hover:bg-cyan-400/10"
+                        >
+                          طلب جديد
+                        </Link>
                       </div>
-
-                      {req.replyImage && (
-                        <div className="mt-5">
-                          <div className="mb-3 flex items-center justify-between gap-3">
-                            <p className="text-sm font-bold text-slate-400">صورة التحليل</p>
-                            <button
-                              onClick={() => setOpenImage(req.replyImage)}
-                              className="rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-100 transition hover:bg-cyan-400/20"
-                            >
-                              تكبير الصورة 🔍
-                            </button>
-                          </div>
-
-                          <button
-                            onClick={() => setOpenImage(req.replyImage)}
-                            className="block w-full overflow-hidden rounded-3xl border border-white/10 bg-black/25 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
-                          >
-                            <img
-                              src={req.replyImage}
-                              alt="صورة التحليل"
-                              className="mx-auto max-h-[560px] w-full rounded-2xl object-contain"
-                            />
-                          </button>
-                        </div>
-                      )}
                     </div>
                   ) : (
-                    <div className="mt-6 rounded-[26px] border border-amber-300/15 bg-amber-400/5 p-5">
+                    <div className="mt-4 rounded-[22px] border border-amber-300/15 bg-amber-400/5 p-3">
                       <div className="flex items-center gap-3">
                         <div className="grid h-11 w-11 place-items-center rounded-2xl border border-amber-300/20 bg-amber-400/10 text-xl">⏳</div>
                         <div>

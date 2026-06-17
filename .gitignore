@@ -6,3 +6,4 @@ node_modules
 worker/last-news.json
 worker/news-card.png
 worker/.env
+.env.local

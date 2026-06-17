@@ -3,7 +3,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
 const menuItems = [
@@ -35,10 +35,12 @@ const socialLinks = [
 
 export default function RootLayout({ children }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState(null);
   const [globalNotice, setGlobalNotice] = useState("");
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadAnalysisReplies, setUnreadAnalysisReplies] = useState(0);
   const [theme, setTheme] = useState("dark");
   const fallbackAdminEmails = [
     "alerts@hasanchartworld.com",
@@ -101,14 +103,19 @@ export default function RootLayout({ children }) {
       if (!row?.id || !row?.reply || row.status !== "مكتمل") return;
       if (row.user_email !== currentUser.email) return;
 
-      const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
       const replyKey = String(row.id);
+      const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
+      const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
 
-      if (seenReplies.includes(replyKey)) return;
+      if (!seenReplies.includes(replyKey) && pathname !== "/my-analysis") {
+        setUnreadAnalysisReplies((count) => Math.max(1, count + 1));
+      }
+
+      if (notifiedReplies.includes(replyKey)) return;
 
       localStorage.setItem(
-        "seenAnalysisReplies",
-        JSON.stringify([replyKey, ...seenReplies].slice(0, 100))
+        "notifiedAnalysisReplies",
+        JSON.stringify([replyKey, ...notifiedReplies].slice(0, 100))
       );
 
       triggerReplyNotification(row.coin);
@@ -131,7 +138,47 @@ export default function RootLayout({ children }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser]);
+  }, [currentUser, pathname]);
+
+  useEffect(() => {
+    if (!currentUser?.email) {
+      setUnreadAnalysisReplies(0);
+      return;
+    }
+
+    const refreshUnreadReplies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("analysis_requests")
+          .select("id, reply, status")
+          .eq("user_email", currentUser.email)
+          .eq("status", "مكتمل")
+          .not("reply", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (error) return;
+
+        const replyIds = (data || [])
+          .filter((item) => item?.reply)
+          .map((item) => String(item.id));
+
+        if (pathname === "/my-analysis") {
+          localStorage.setItem("seenAnalysisReplies", JSON.stringify(replyIds.slice(0, 100)));
+          setUnreadAnalysisReplies(0);
+          return;
+        }
+
+        const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
+        const unseenCount = replyIds.filter((id) => !seenReplies.includes(id)).length;
+        setUnreadAnalysisReplies(unseenCount);
+      } catch (err) {
+        console.warn("Unread analysis replies skipped:", err?.message || err);
+      }
+    };
+
+    refreshUnreadReplies();
+  }, [currentUser, pathname]);
 
   const logout = async () => {
     localStorage.removeItem("currentUser");
@@ -548,6 +595,11 @@ export default function RootLayout({ children }) {
                       >
                         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">{item.icon}</span>
                         <span className="font-bold leading-none">{item.label}</span>
+                        {item.href === "/my-analysis" && unreadAnalysisReplies > 0 && (
+                          <span className="mr-auto grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
+                            {unreadAnalysisReplies > 9 ? "9+" : unreadAnalysisReplies}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
@@ -632,6 +684,11 @@ export default function RootLayout({ children }) {
                   >
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">{item.icon}</span>
                     <span className="font-bold leading-none">{item.label}</span>
+                    {item.href === "/my-analysis" && unreadAnalysisReplies > 0 && (
+                      <span className="mr-auto grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
+                        {unreadAnalysisReplies > 9 ? "9+" : unreadAnalysisReplies}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
