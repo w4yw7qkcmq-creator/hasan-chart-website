@@ -796,11 +796,36 @@ function Service({ title, text, onRequireLogin }) {
     <button
       type="button"
       onClick={onRequireLogin}
-      className="box w-full text-right transition hover:scale-[1.02] hover:border-blue-400/40"
+      className="w-full rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)] transition hover:scale-[1.02] hover:border-blue-200/90"
     >
-      <h3 className="text-xl font-black mb-3">{title}</h3>
-      <p className="text-slate-400 leading-7">{text}</p>
-      <span className="mt-5 inline-block rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white">
+      <h3
+        className="mb-3 text-xl font-black tracking-wide"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 2px 0 #000, 0 0 6px rgba(0,0,0,0.55)",
+        }}
+      >
+        {title}
+      </h3>
+      <p
+        className="leading-7 font-bold"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)",
+        }}
+      >
+        {text}
+      </p>
+      <span
+        className="mt-5 inline-block rounded-2xl border border-white/20 bg-white/15 px-4 py-2 text-sm font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)",
+        }}
+      >
         اطلب الخدمة
       </span>
     </button>
