@@ -191,7 +191,10 @@ export default function Home() {
     const cleanFrame = analysisFrame.trim();
 
     if (!cleanCoin || !cleanFrame) {
-      alert("اكتب اسم العملة والفريم المطلوب");
+      setSuccessModal({
+        title: "بيانات ناقصة",
+        message: "اكتب اسم العملة والفريم المطلوب.",
+      });
       return;
     }
 
@@ -228,6 +231,10 @@ export default function Home() {
         if (response.status === 429 && result?.error) {
           setCanRequestAnalysis(false);
           setAnalysisCooldownText(result.error);
+          setSuccessModal({
+            title: "طلب التحليل غير متاح حالياً",
+            message: result.error,
+          });
           return;
         }
 
@@ -245,12 +252,13 @@ export default function Home() {
       });
     } catch (err) {
       console.error("Submit analysis error:", err);
-
-      if (err?.name === "AbortError") {
-        alert("السيرفر لم يرد خلال 9 ثواني. تأكد أن SUPABASE_SERVICE_ROLE_KEY مضاف في Vercel Production ثم أعد النشر.");
-      } else {
-        alert(err?.message || "حدث خطأ أثناء إرسال طلب التحليل");
-      }
+      setSuccessModal({
+        title: "تعذر إرسال طلب التحليل",
+        message:
+          err?.name === "AbortError"
+            ? "السيرفر لم يرد خلال 9 ثواني. جرّب مرة ثانية بعد قليل."
+            : err?.message || "حدث خطأ أثناء إرسال طلب التحليل.",
+      });
     } finally {
       clearTimeout(timeoutId);
       setAnalysisSubmitting(false);
