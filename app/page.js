@@ -618,7 +618,16 @@ export default function Home() {
 
         <section className="grid lg:grid-cols-2 gap-6">
           <div id="analysis" className="rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)]">
-            <h2 className="mb-5 text-3xl font-black tracking-wide text-white [text-shadow:0_3px_6px_rgba(0,0,0,0.65)]">🧠 طلب تحليل عملة</h2>
+            <h2
+              className="mb-5 text-3xl font-black tracking-wide"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 2px 0 #000, 0 0 6px rgba(0,0,0,0.55)',
+              }}
+            >
+              🧠 طلب تحليل عملة
+            </h2>
 
             <input
               value={analysisCoin}
@@ -647,18 +656,42 @@ export default function Home() {
             </button>
 
             {analysisCooldownText && (
-              <div className="mt-4 rounded-2xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-center text-sm font-bold leading-7 text-blue-100 shadow-[0_0_18px_rgba(59,130,246,0.18)]">
+              <div
+                className="mt-4 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center text-sm font-bold leading-7"
+                style={{
+                  color: '#ffffff',
+                  WebkitTextFillColor: '#ffffff',
+                  textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)',
+                }}
+              >
                 ⏳ {analysisCooldownText}
               </div>
             )}
 
-            <a href="/my-analysis" className="block text-center mt-3 text-blue-400 underline">
+            <a
+              href="/my-analysis"
+              className="block text-center mt-3 underline"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)',
+              }}
+            >
               عرض طلباتي وردود الإدارة
             </a>
           </div>
 
           <div id="alerts" className="rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)]">
-            <h2 className="mb-5 text-3xl font-black tracking-wide text-white [text-shadow:0_3px_6px_rgba(0,0,0,0.65)]">🔔 تنبيه سعر</h2>
+            <h2
+              className="mb-5 text-3xl font-black tracking-wide"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 2px 0 #000, 0 0 6px rgba(0,0,0,0.55)',
+              }}
+            >
+              🔔 تنبيه سعر
+            </h2>
 
             <input
               value={alertCoin}
@@ -674,7 +707,14 @@ export default function Home() {
               className="input"
             />
 
-            <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-center text-sm font-bold leading-7 text-blue-100">
+            <div
+              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center text-sm font-bold leading-7"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)',
+              }}
+            >
               اكتب السعر فقط، وسيتم تفعيل التنبيه تلقائيًا عند ملامسة السعر المحدد.
             </div>
 
