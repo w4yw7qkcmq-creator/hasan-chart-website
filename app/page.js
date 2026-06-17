@@ -617,8 +617,8 @@ export default function Home() {
         </section>
 
         <section className="grid lg:grid-cols-2 gap-6">
-          <div id="analysis" className="box">
-            <h2 className="text-3xl font-black mb-5">🧠 طلب تحليل عملة</h2>
+          <div id="analysis" className="rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)]">
+            <h2 className="mb-5 text-3xl font-black tracking-wide text-white [text-shadow:0_3px_6px_rgba(0,0,0,0.65)]">🧠 طلب تحليل عملة</h2>
 
             <input
               value={analysisCoin}
@@ -657,8 +657,8 @@ export default function Home() {
             </a>
           </div>
 
-          <div id="alerts" className="box">
-            <h2 className="text-3xl font-black mb-5">🔔 تنبيه سعر</h2>
+          <div id="alerts" className="rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)]">
+            <h2 className="mb-5 text-3xl font-black tracking-wide text-white [text-shadow:0_3px_6px_rgba(0,0,0,0.65)]">🔔 تنبيه سعر</h2>
 
             <input
               value={alertCoin}
