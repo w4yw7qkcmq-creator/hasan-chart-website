@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { accountManagementLimiter } from "@/lib/rate-limit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,6 +75,17 @@ export async function POST(request) {
       return NextResponse.json(
         { error: "جلسة تسجيل الدخول غير صالحة" },
         { status: 401 }
+      );
+    }
+
+    const rateLimitResult = accountManagementLimiter(user.id);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: "يمكنك إرسال طلب إدارة حساب واحد فقط كل 24 ساعة.",
+        },
+        { status: 429 }
       );
     }
 

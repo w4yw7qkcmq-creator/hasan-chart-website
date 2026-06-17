@@ -1,0 +1,2203 @@
+{
+  "generatedAt": "2026-06-17T00:38:27.685Z",
+  "counts": {
+    "CRITICAL": 1,
+    "HIGH": 42,
+    "MEDIUM": 226,
+    "LOW": 5
+  },
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "file": "worker/news-worker.js",
+      "line": 30,
+      "title": "Hardcoded private token or secret",
+      "details": "Possible private key/token is hardcoded in source code.",
+      "recommendation": "Move secrets to Railway/Supabase environment variables. Never commit real secrets to GitHub."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/account-management/page.js",
+      "line": 1,
+      "title": "Sensitive key wording found in page component",
+      "details": "A page component may render or handle sensitive key material.",
+      "recommendation": "Only show masked values by default and reveal secrets only to verified admins through protected APIs."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/admin/page.js",
+      "line": 1,
+      "title": "Sensitive key wording found in page component",
+      "details": "A page component may render or handle sensitive key material.",
+      "recommendation": "Only show masked values by default and reveal secrets only to verified admins through protected APIs."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/account-management/route.js",
+      "line": 7,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/admin/account-keys/route.js",
+      "line": 11,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 9,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 114,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 115,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 116,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/admin-reply/route.js",
+      "line": 8,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/admin-reply/route.js",
+      "line": 11,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/alerts/route.js",
+      "line": 8,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/alerts/route.js",
+      "line": 12,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/alerts/route.js",
+      "line": 1,
+      "title": "API route may be missing authentication",
+      "details": "This API route does not show an obvious auth/cookie/JWT check.",
+      "recommendation": "Add authentication before reading or writing user data."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/analysis-request/route.js",
+      "line": 8,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/analysis-request/route.js",
+      "line": 11,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/auth/refresh/route.js",
+      "line": 7,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/my-analysis/route.js",
+      "line": 8,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/my-analysis/route.js",
+      "line": 11,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/my-analysis/route.js",
+      "line": 47,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/my-analysis/route.js",
+      "line": 1,
+      "title": "API route may be missing authentication",
+      "details": "This API route does not show an obvious auth/cookie/JWT check.",
+      "recommendation": "Add authentication before reading or writing user data."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/api/send-news/route.ts",
+      "line": 1,
+      "title": "API route may be missing authentication",
+      "details": "This API route does not show an obvious auth/cookie/JWT check.",
+      "recommendation": "Add authentication before reading or writing user data."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/layout.js",
+      "line": 373,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/news/[id]/page.js",
+      "line": 174,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/news/[id]/page.js",
+      "line": 182,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/news/category/[category]/page.js",
+      "line": 209,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/news/page.js",
+      "line": 44,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/page.js",
+      "line": 250,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/vip-futures/page.js",
+      "line": 56,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "app/vip-spot/page.js",
+      "line": 56,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "worker/index.js",
+      "line": 8,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "worker/index.js",
+      "line": 13,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "worker/index.js",
+      "line": 755,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "worker/news-worker.js",
+      "line": 30,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "worker/news-worker.js",
+      "line": 30,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "worker/news-worker.js",
+      "line": 41,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "worker/news-worker.js",
+      "line": 2022,
+      "title": "Sensitive data selected with select('*')",
+      "details": "select('*') may expose sensitive columns like api_key, secret_key, tokens, email, or internal fields.",
+      "recommendation": "Select only the exact columns needed for this page/API response."
+    },
+    {
+      "severity": "HIGH",
+      "file": "scripts/security-audit.js",
+      "line": 65,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "scripts/security-audit.js",
+      "line": 65,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "scripts/security-audit.js",
+      "line": 72,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "scripts/security-audit.js",
+      "line": 72,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "scripts/security-audit.js",
+      "line": 72,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "HIGH",
+      "file": "scripts/security-audit.js",
+      "line": 72,
+      "title": "Service role usage",
+      "details": "Supabase service role can bypass RLS and must only be used server-side in protected admin routes.",
+      "recommendation": "Verify this file never runs in the browser and the route checks admin permission before any database action."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 68,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 78,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 97,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 440,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 716,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 780,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 303,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 479,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 508,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 595,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 596,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/admin/page.js",
+      "line": 965,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/alerts/page.js",
+      "line": 84,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/alerts/page.js",
+      "line": 15,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/account-management/route.js",
+      "line": 120,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/account-management/route.js",
+      "line": 129,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/account-management/route.js",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/account-keys/route.js",
+      "line": 120,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/account-keys/route.js",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 47,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 127,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 139,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 154,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 220,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 439,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin-reply/route.js",
+      "line": 179,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin-reply/route.js",
+      "line": 208,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/admin-reply/route.js",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/alerts/route.js",
+      "line": 121,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/alerts/route.js",
+      "line": 138,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/alerts/route.js",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/analysis-request/route.js",
+      "line": 71,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/analysis-request/route.js",
+      "line": 105,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/analysis-request/route.js",
+      "line": 182,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/analysis-request/route.js",
+      "line": 230,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/analysis-request/route.js",
+      "line": 248,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/auth/login/route.js",
+      "line": 100,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/auth/login/route.js",
+      "line": 86,
+      "title": "Cookie set without obvious security flags",
+      "details": "Cookies should be HttpOnly, Secure, SameSite, and have a reasonable path/maxAge.",
+      "recommendation": "Ensure auth cookies use httpOnly: true, secure: true in production, sameSite: 'lax' or 'strict'."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/auth/login/route.js",
+      "line": 92,
+      "title": "Cookie set without obvious security flags",
+      "details": "Cookies should be HttpOnly, Secure, SameSite, and have a reasonable path/maxAge.",
+      "recommendation": "Ensure auth cookies use httpOnly: true, secure: true in production, sameSite: 'lax' or 'strict'."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/auth/login/route.js",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/auth/refresh/route.js",
+      "line": 37,
+      "title": "Cookie set without obvious security flags",
+      "details": "Cookies should be HttpOnly, Secure, SameSite, and have a reasonable path/maxAge.",
+      "recommendation": "Ensure auth cookies use httpOnly: true, secure: true in production, sameSite: 'lax' or 'strict'."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/auth/refresh/route.js",
+      "line": 45,
+      "title": "Cookie set without obvious security flags",
+      "details": "Cookies should be HttpOnly, Secure, SameSite, and have a reasonable path/maxAge.",
+      "recommendation": "Ensure auth cookies use httpOnly: true, secure: true in production, sameSite: 'lax' or 'strict'."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/auth/refresh/route.js",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/my-analysis/route.js",
+      "line": 53,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/my-analysis/route.js",
+      "line": 70,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/my-analysis/route.js",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/send-news/route.ts",
+      "line": 1,
+      "title": "API route may be missing rate limiting",
+      "details": "Public or user-facing API routes can be abused without rate limiting.",
+      "recommendation": "Add IP/user based rate limiting, especially for login, analysis requests, alerts, and account management."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/verify-turnstile/route.js",
+      "line": 89,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/verify-turnstile/route.js",
+      "line": 130,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/verify-turnstile/route.js",
+      "line": 143,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/api/verify-turnstile/route.js",
+      "line": 160,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 151,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 211,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 226,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 60,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 71,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 104,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 109,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 137,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 138,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 139,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 140,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 141,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 142,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 143,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 144,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 268,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 287,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 288,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 295,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 300,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 313,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 314,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 349,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 354,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 364,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 367,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/layout.js",
+      "line": 378,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 67,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 232,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 87,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 96,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 97,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 182,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 183,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 225,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/login/page.js",
+      "line": 226,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-analysis/page.js",
+      "line": 108,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-analysis/page.js",
+      "line": 115,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-analysis/page.js",
+      "line": 150,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-analysis/page.js",
+      "line": 168,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-analysis/page.js",
+      "line": 173,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-analysis/page.js",
+      "line": 134,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-analysis/page.js",
+      "line": 137,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-dashboard/page.js",
+      "line": 232,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-dashboard/page.js",
+      "line": 237,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-dashboard/page.js",
+      "line": 238,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-dashboard/page.js",
+      "line": 255,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/my-dashboard/page.js",
+      "line": 258,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/news/[id]/page.js",
+      "line": 202,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/news/page.js",
+      "line": 49,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/news/page.js",
+      "line": 55,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/news/page.js",
+      "line": 58,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/page.js",
+      "line": 92,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/page.js",
+      "line": 247,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/page.js",
+      "line": 298,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/page.js",
+      "line": 352,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/page.js",
+      "line": 156,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/page.js",
+      "line": 161,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/page.js",
+      "line": 173,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/register/page.js",
+      "line": 36,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/subscriptions/page.js",
+      "line": 117,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/vip-futures/page.js",
+      "line": 61,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "app/vip-spot/page.js",
+      "line": 61,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "lib/supabase.js",
+      "line": 14,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "lib/supabase.js",
+      "line": 18,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "lib/supabase.js",
+      "line": 22,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 13,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 567,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 577,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 751,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 760,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 765,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 777,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 789,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 801,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 812,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 824,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 826,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 829,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 926,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/index.js",
+      "line": 931,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 16,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 18,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 21,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 393,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 396,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 806,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 820,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 824,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1287,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1289,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1294,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1393,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1405,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1850,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1855,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1863,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1868,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1873,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 1910,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2008,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2027,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2039,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2053,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2066,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2089,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2092,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2103,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2105,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2109,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2129,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2132,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2157,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2195,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2209,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2211,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2332,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2335,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2391,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2435,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2566,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2596,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2622,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2660,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2787,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2820,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2837,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 2839,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3082,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3168,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3179,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3185,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3217,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3241,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3245,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3255,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3260,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3285,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3289,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3293,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3315,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3352,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3366,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3422,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3444,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3449,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3461,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3467,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3471,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3479,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3488,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3499,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3521,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3598,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3619,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3645,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "worker/news-worker.js",
+      "line": 3651,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 193,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 194,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 195,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 197,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 198,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 199,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 200,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 201,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 202,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 205,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 210,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 211,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 212,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 213,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 214,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 223,
+      "title": "Console logging may expose data",
+      "details": "Logs can accidentally expose user data, request bodies, API keys, or tokens in Railway logs.",
+      "recommendation": "Log only safe summaries, IDs, counts, and sanitized errors. Never log keys/secrets/full request bodies."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 95,
+      "title": "localStorage/sessionStorage usage",
+      "details": "Browser storage is readable by JavaScript and unsafe for sensitive tokens.",
+      "recommendation": "Use HttpOnly cookies for auth tokens. Do not store access/refresh tokens in localStorage."
+    },
+    {
+      "severity": "MEDIUM",
+      "file": "scripts/security-audit.js",
+      "line": 100,
+      "title": "Cookie set without obvious security flags",
+      "details": "Cookies should be HttpOnly, Secure, SameSite, and have a reasonable path/maxAge.",
+      "recommendation": "Ensure auth cookies use httpOnly: true, secure: true in production, sameSite: 'lax' or 'strict'."
+    },
+    {
+      "severity": "LOW",
+      "file": "app/api/account-management/route.js",
+      "line": 80,
+      "title": "Potential user input used directly",
+      "details": "User input should be validated and length-limited before database/API usage.",
+      "recommendation": "Validate type, length, allowed values, and reject unknown fields."
+    },
+    {
+      "severity": "LOW",
+      "file": "app/api/admin/account-keys/route.js",
+      "line": 89,
+      "title": "Potential user input used directly",
+      "details": "User input should be validated and length-limited before database/API usage.",
+      "recommendation": "Validate type, length, allowed values, and reject unknown fields."
+    },
+    {
+      "severity": "LOW",
+      "file": "app/api/admin/dashboard/route.js",
+      "line": 228,
+      "title": "Potential user input used directly",
+      "details": "User input should be validated and length-limited before database/API usage.",
+      "recommendation": "Validate type, length, allowed values, and reject unknown fields."
+    },
+    {
+      "severity": "LOW",
+      "file": "app/api/auth/login/route.js",
+      "line": 38,
+      "title": "Potential user input used directly",
+      "details": "User input should be validated and length-limited before database/API usage.",
+      "recommendation": "Validate type, length, allowed values, and reject unknown fields."
+    },
+    {
+      "severity": "LOW",
+      "file": "worker/index.js",
+      "line": 846,
+      "title": "Potential user input used directly",
+      "details": "User input should be validated and length-limited before database/API usage.",
+      "recommendation": "Validate type, length, allowed values, and reject unknown fields."
+    }
+  ]
+}
