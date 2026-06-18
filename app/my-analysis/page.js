@@ -40,6 +40,23 @@ function StatCard({ title, value, icon, subtitle }) {
     </div>
   );
 }
+
+function formatArabicDateTime(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  return new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Damascus",
+  }).format(date);
+}
 export default function MyAnalysisPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -50,6 +67,7 @@ export default function MyAnalysisPage() {
   const [loadError, setLoadError] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const [fullImageOpen, setFullImageOpen] = useState(false);
   const selectedAnalysisRef = useRef(null);
   const normalizeRequest = (item) => ({
     id: item.id,
@@ -61,8 +79,8 @@ export default function MyAnalysisPage() {
     reply: item.reply || "",
     replyImage: item.reply_image || item.replyImage || "",
     createdAt: item.created_at
-      ? new Date(item.created_at).toLocaleString("ar")
-      : item.createdAt || "",
+      ? formatArabicDateTime(item.created_at)
+      : formatArabicDateTime(item.createdAt) || "",
   });
 
   useEffect(() => {
@@ -109,7 +127,13 @@ export default function MyAnalysisPage() {
 
       setRequests(formattedRequests);
       setDataMode("api");
-      setLastUpdated(new Date().toLocaleTimeString("ar"));
+      setLastUpdated(new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+        timeZone: "Asia/Damascus",
+      }).format(new Date()));
       console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
 
       const latestReply = formattedRequests.find((item) => item.reply && item.status === "مكتمل");
@@ -250,16 +274,23 @@ export default function MyAnalysisPage() {
         {selectedAnalysis && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-3 backdrop-blur-md">
             <div className="relative max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[30px] border border-cyan-300/20 bg-[#020617] shadow-[0_0_80px_rgba(0,163,255,0.25)]">
-              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-cyan-300/15 bg-[#020617]/95 p-4 backdrop-blur-xl">
-                <div>
-                  <h2 className="text-2xl font-black text-white">{selectedAnalysis.coin}</h2>
-                  <p className="mt-1 text-sm text-slate-400">
-                    الفريم: {selectedAnalysis.frame} • {selectedAnalysis.createdAt}
-                  </p>
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-cyan-300/25 bg-gradient-to-l from-[#1263c7] via-[#0b3b78] to-[#06162f] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+                <div className="text-right">
+                  <h2 className="text-2xl font-black !text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">{selectedAnalysis.coin}</h2>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-black !text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">
+                    <span>الفريم:</span>
+                    <span dir="ltr" className="rounded-full bg-white/10 px-2 py-1">{selectedAnalysis.frame}</span>
+                    <span>•</span>
+                    <span>التاريخ:</span>
+                    <span dir="ltr" className="rounded-full bg-white/10 px-2 py-1">{selectedAnalysis.createdAt}</span>
+                  </div>
                 </div>
                 <button
-                  onClick={() => setSelectedAnalysis(null)}
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+                  onClick={() => {
+                    setFullImageOpen(false);
+                    setSelectedAnalysis(null);
+                  }}
+                  className="rounded-2xl border border-white/25 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-4 py-2 text-sm font-black text-white shadow-[0_0_22px_rgba(0,163,255,0.35)] transition hover:scale-[1.02]"
                 >
                   إغلاق التحليل ✕
                 </button>
@@ -283,14 +314,32 @@ export default function MyAnalysisPage() {
                       decoding="async"
                       className="mx-auto max-h-[74vh] w-full rounded-2xl object-contain"
                     />
-                    <a
-                      href={selectedAnalysis.replyImage}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => setFullImageOpen(true)}
                       className="mt-3 inline-block rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
                     >
-                      فتح الصورة بالحجم الكامل
-                    </a>
+                      تكبير الصورة داخل الموقع
+                    </button>
+                    {fullImageOpen && (
+                      <div className="fixed inset-y-0 left-0 right-0 z-[10000] flex items-center justify-center bg-black/95 p-3 backdrop-blur-lg md:right-[305px]">
+                        <button
+                          type="button"
+                          onClick={() => setFullImageOpen(false)}
+                          className="absolute left-4 top-4 z-10 rounded-2xl border border-white/25 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-black !text-white shadow-[0_0_25px_rgba(0,163,255,0.35)]"
+                        >
+                          إغلاق الصورة ✕
+                        </button>
+
+                        <img
+                          src={selectedAnalysis.replyImage}
+                          alt="صورة التحليل بالحجم الكامل"
+                          loading="lazy"
+                          decoding="async"
+                          className="max-h-[92vh] w-auto max-w-[calc(100vw-340px)] rounded-2xl object-contain shadow-[0_0_80px_rgba(0,0,0,0.65)] max-md:max-w-[94vw]"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -411,7 +460,7 @@ export default function MyAnalysisPage() {
                           الفريم: <b className="text-cyan-200">{req.frame}</b>
                         </span>
                         <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">
-                          التاريخ: {req.createdAt}
+                          التاريخ: <b dir="ltr" className="text-cyan-200">{req.createdAt}</b>
                         </span>
                       </div>
                     </div>
