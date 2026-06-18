@@ -1,10 +1,12 @@
-
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+const loginAttempts = new Map();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000;
 
 function createAuthClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -33,9 +35,39 @@ function getSafeUser(user) {
   };
 }
 
+function isRateLimited(identifier) {
+  const now = Date.now();
+  const attempts = loginAttempts.get(identifier) || [];
+
+  const recentAttempts = attempts.filter(
+    (timestamp) => now - timestamp < WINDOW_MS
+  );
+
+  if (recentAttempts.length >= MAX_ATTEMPTS) {
+    return true;
+  }
+
+  recentAttempts.push(now);
+  loginAttempts.set(identifier, recentAttempts);
+  return false;
+}
+
 export async function POST(request) {
   try {
     const { email, password } = await request.json();
+
+    const normalizedEmail = String(email || "")
+      .trim()
+      .toLowerCase();
+
+    if (isRateLimited(normalizedEmail)) {
+      return NextResponse.json(
+        {
+          error: "تم تجاوز عدد محاولات تسجيل الدخول. حاول مرة أخرى بعد 15 دقيقة.",
+        },
+        { status: 429 }
+      );
+    }
 
     if (!email || !password) {
       return NextResponse.json(
@@ -47,7 +79,7 @@ export async function POST(request) {
     const supabase = createAuthClient();
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: String(email).trim().toLowerCase(),
+      email: normalizedEmail,
       password: String(password),
     });
 
@@ -97,7 +129,7 @@ export async function POST(request) {
 
     return response;
   } catch (error) {
-    console.error("Secure login API error:", error.message);
+    console.error("Login API error");
     return NextResponse.json(
       { error: "حدث خطأ أثناء تسجيل الدخول" },
       { status: 500 }
