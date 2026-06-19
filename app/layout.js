@@ -42,6 +42,7 @@ export default function RootLayout({ children }) {
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadAnalysisReplies, setUnreadAnalysisReplies] = useState(0);
+  const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [theme, setTheme] = useState("dark");
   const fallbackAdminEmails = [
     "alerts@hasanchartworld.com",
@@ -218,6 +219,7 @@ export default function RootLayout({ children }) {
     const message = `📩 وصل رد الإدارة على طلب تحليل ${coin || "العملة"}`;
     setGlobalNotice(message);
     setGlobalNoticeHref("/my-analysis");
+    setNotificationMenuOpen(true);
 
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "granted") {
@@ -234,6 +236,7 @@ export default function RootLayout({ children }) {
     const message = `🚨 تم نشر توصية VIP ${typeLabel} جديدة على ${signal?.coin || "عملة جديدة"}`;
     setGlobalNotice(message);
     setGlobalNoticeHref(signal?.signal_type === "futures" ? "/vip-futures" : "/vip-spot");
+    setNotificationMenuOpen(true);
 
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "granted") {
@@ -813,6 +816,59 @@ export default function RootLayout({ children }) {
                     ? "🔔 الإشعارات مفعلة"
                     : "🔔 تفعيل إشعارات الموقع"}
                 </button>
+
+                {currentUser && (
+                  <div className="relative hidden sm:block">
+                    <button
+                      type="button"
+                      onClick={() => setNotificationMenuOpen((open) => !open)}
+                      className="relative grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-xl text-cyan-100 shadow-[0_0_24px_rgba(0,163,255,0.18)] transition hover:bg-cyan-400/20"
+                      aria-label="الإشعارات"
+                    >
+                      🔔
+                      {unreadAnalysisReplies > 0 && (
+                        <span className="absolute -right-2 -top-2 grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
+                          {unreadAnalysisReplies > 9 ? "9+" : unreadAnalysisReplies}
+                        </span>
+                      )}
+                    </button>
+
+                    {notificationMenuOpen && (
+                      <div className="absolute left-0 top-14 z-[9999] w-[320px] rounded-[26px] border border-cyan-300/20 bg-[#020817] p-4 text-white shadow-[0_24px_80px_rgba(0,102,255,0.28)] backdrop-blur-2xl">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h3 className="font-black text-white">الإشعارات</h3>
+                          <button
+                            type="button"
+                            onClick={() => setNotificationMenuOpen(false)}
+                            className="grid h-8 w-8 place-items-center rounded-full bg-white/10 font-black text-white"
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {unreadAnalysisReplies > 0 ? (
+                          <Link
+                            href="/my-analysis"
+                            onClick={() => {
+                              setNotificationMenuOpen(false);
+                              setUnreadAnalysisReplies(0);
+                            }}
+                            className="block rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 transition hover:bg-emerald-400/20"
+                          >
+                            <p className="font-black text-emerald-100">📩 لديك ردود إدارة جديدة</p>
+                            <p className="mt-1 text-sm text-slate-400">
+                              عدد الردود غير المقروءة: {unreadAnalysisReplies}
+                            </p>
+                          </Link>
+                        ) : (
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+                            لا توجد إشعارات جديدة حالياً.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button
                   onClick={toggleTheme}
