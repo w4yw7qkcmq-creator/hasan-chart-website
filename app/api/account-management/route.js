@@ -53,6 +53,14 @@ function sanitizeText(value, maxLength = 2000) {
   return String(value).trim().slice(0, maxLength);
 }
 
+async function safeJson(request) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request) {
   try {
     const supabase = getAdminSupabase();
@@ -74,6 +82,13 @@ export async function POST(request) {
     if (userError || !user) {
       return NextResponse.json(
         { error: "جلسة تسجيل الدخول غير صالحة" },
+        { status: 401 }
+      );
+    }
+
+    if (!user?.id || !user?.email) {
+      return NextResponse.json(
+        { error: "تعذر تحديد حساب المستخدم" },
         { status: 401 }
       );
     }
@@ -117,7 +132,14 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
+    const body = await safeJson(request);
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "صيغة الطلب غير صالحة" },
+        { status: 400 }
+      );
+    }
 
     const platform = sanitizeText(body.platform, 80);
     const accountType = sanitizeText(body.accountType, 80);
@@ -132,6 +154,13 @@ export async function POST(request) {
     const screenshotFileName = sanitizeText(body.screenshotFileName, 255);
     const screenshotMimeType = sanitizeText(body.screenshotMimeType, 120);
     const screenshotSize = Number(body.screenshotSize || 0);
+
+    if (Number.isNaN(screenshotSize) || screenshotSize < 0) {
+      return NextResponse.json(
+        { error: "حجم الصورة غير صالح" },
+        { status: 400 }
+      );
+    }
 
     if (screenshotFileName || screenshotMimeType || screenshotSize) {
       const allowedMimeTypes = [
@@ -188,7 +217,7 @@ export async function POST(request) {
       });
 
     if (insertError) {
-      console.error("Account management insert error:", insertError.message);
+      console.error("Account management insert error:", insertError?.message || insertError);
       return NextResponse.json(
         { error: "تعذر إرسال الطلب حالياً" },
         { status: 500 }
@@ -197,7 +226,7 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Account management API error:", error.message);
+    console.error("Account management API error:", error?.message || error);
     return NextResponse.json(
       { error: "حدث خطأ غير متوقع" },
       { status: 500 }
