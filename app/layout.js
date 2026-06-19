@@ -789,7 +789,7 @@ export default function RootLayout({ children }) {
           </aside>
 
           <div className="min-w-0 flex-1 overflow-x-hidden">
-            <header className="sticky top-0 z-40 overflow-hidden bg-[#020817]/90 border-b border-cyan-300/15 backdrop-blur-2xl px-4 md:px-6 py-4 shadow-[0_14px_50px_rgba(0,102,255,0.16)]">
+            <header className="sticky top-0 z-40 overflow-visible bg-[#020817]/90 border-b border-cyan-300/15 backdrop-blur-2xl px-4 md:px-6 py-4 shadow-[0_14px_50px_rgba(0,102,255,0.16)]">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.20),transparent_28%),linear-gradient(90deg,rgba(2,6,23,0.92),rgba(7,20,47,0.88),rgba(2,6,23,0.92))]" />
               <div className="relative z-10 flex items-center justify-between gap-3">
                 <button
@@ -834,13 +834,13 @@ export default function RootLayout({ children }) {
                     </button>
 
                     {notificationMenuOpen && (
-                      <div className="absolute left-0 top-14 z-[9999] w-[320px] rounded-[26px] border border-cyan-300/20 bg-[#020817] p-4 text-white shadow-[0_24px_80px_rgba(0,102,255,0.28)] backdrop-blur-2xl">
+                      <div className="fixed left-5 top-20 z-[99999] min-h-[130px] w-[340px] max-w-[calc(100vw-40px)] rounded-[26px] border border-cyan-300/40 bg-gradient-to-br from-sky-400 to-blue-500 p-4 text-white shadow-[0_24px_80px_rgba(0,102,255,0.35)] backdrop-blur-2xl">
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <h3 className="font-black text-white">الإشعارات</h3>
+                          <h3 className="font-black text-xl text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]">الإشعارات</h3>
                           <button
                             type="button"
                             onClick={() => setNotificationMenuOpen(false)}
-                            className="grid h-8 w-8 place-items-center rounded-full bg-white/10 font-black text-white"
+                            className="grid h-8 w-8 place-items-center rounded-full bg-white/10 font-black !text-white"
                           >
                             ✕
                           </button>
@@ -861,7 +861,7 @@ export default function RootLayout({ children }) {
                             </p>
                           </Link>
                         ) : (
-                          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+                          <div className="rounded-2xl border border-white/30 bg-white/20 p-4 text-sm text-white font-bold">
                             لا توجد إشعارات جديدة حالياً.
                           </div>
                         )}
