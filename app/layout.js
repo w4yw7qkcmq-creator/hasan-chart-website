@@ -836,7 +836,12 @@ export default function RootLayout({ children }) {
                     {notificationMenuOpen && (
                       <div className="fixed left-5 top-20 z-[99999] min-h-[130px] w-[340px] max-w-[calc(100vw-40px)] rounded-[26px] border border-cyan-300/40 bg-gradient-to-br from-sky-400 to-blue-500 p-4 text-white shadow-[0_24px_80px_rgba(0,102,255,0.35)] backdrop-blur-2xl">
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <h3 className="font-black text-xl text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]">الإشعارات</h3>
+                          <h3
+                            className="font-black text-xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+                            style={{ color: "#ffffff" }}
+                          >
+                            الإشعارات
+                          </h3>
                           <button
                             type="button"
                             onClick={() => setNotificationMenuOpen(false)}
