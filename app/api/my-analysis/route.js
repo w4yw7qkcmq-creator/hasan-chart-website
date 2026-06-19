@@ -40,16 +40,17 @@ const getAuthenticatedUser = async (supabase, token) => {
   return user;
 };
 
-export async function GET() {
-  return POST();
+export async function GET(req) {
+  return POST(req);
 }
 
 export async function POST(req) {
   try {
     const supabase = getSupabaseAdmin();
     const body = req ? await req.json().catch(() => ({})) : {};
+    const urlEmail = req?.url ? new URL(req.url).searchParams.get("email") : "";
 
-    let userEmail = normalizeEmail(body?.email || body?.user_email);
+    let userEmail = normalizeEmail(body?.email || body?.user_email || urlEmail);
 
     if (!userEmail) {
       const cookieStore = await cookies();
