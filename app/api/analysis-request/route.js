@@ -62,6 +62,14 @@ const ALLOWED_FRAMES = new Set([
   "ربع ساعة",
 ]);
 
+const safeJson = async (req) => {
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
+};
+
 const normalizeCoin = (value) => {
   return String(value || "")
     .trim()
@@ -183,7 +191,17 @@ const getAuthenticatedUser = async (supabase, token) => {
 
 export async function POST(req) {
   try {
-    const body = await req.json();
+    const body = await safeJson(req);
+
+    if (!body || typeof body !== "object") {
+      return Response.json(
+        {
+          success: false,
+          error: "صيغة الطلب غير صالحة",
+        },
+        { status: 400 }
+      );
+    }
 
     const coin = normalizeCoin(body.coin);
     const frame = normalizeFrame(body.frame);
@@ -234,6 +252,16 @@ export async function POST(req) {
 
     const user = await getAuthenticatedUser(supabase, token);
 
+    if (!user?.id || !user?.email) {
+      return Response.json(
+        {
+          success: false,
+          error: "تعذر تحديد حساب المستخدم",
+        },
+        { status: 401 }
+      );
+    }
+
     const rateLimitResult = analysisRequestLimiter(user.id);
 
     if (!rateLimitResult.success) {
@@ -265,13 +293,13 @@ export async function POST(req) {
       .maybeSingle();
 
     if (latestRequestError) {
-      console.error("ANALYSIS COOLDOWN CHECK ERROR:", latestRequestError);
+      console.error("ANALYSIS COOLDOWN CHECK ERROR:", latestRequestError?.message || latestRequestError);
 
       return Response.json(
         {
           success: false,
           error: "تعذر التحقق من مدة الانتظار. جرّب مرة ثانية.",
-          details: latestRequestError,
+          details: undefined,
         },
         { status: 500 }
       );
@@ -294,6 +322,32 @@ export async function POST(req) {
       }
     }
 
+    const duplicateWindow = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+    const { data: duplicateRequest, error: duplicateError } = await supabase
+      .from("analysis_requests")
+      .select("id")
+      .eq("user_email", normalizedEmail)
+      .eq("coin", coin)
+      .eq("frame", frame)
+      .gte("created_at", duplicateWindow)
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateError) {
+      console.error("ANALYSIS DUPLICATE CHECK ERROR:", duplicateError?.message || duplicateError);
+    }
+
+    if (duplicateRequest?.id) {
+      return Response.json(
+        {
+          success: false,
+          error: "تم إرسال نفس طلب التحليل قبل قليل. يرجى الانتظار.",
+        },
+        { status: 429 }
+      );
+    }
+
     const { data: insertedRequest, error } = await supabase
       .from("analysis_requests")
       .insert([
@@ -313,13 +367,13 @@ export async function POST(req) {
       .single();
 
     if (error) {
-      console.error("ANALYSIS INSERT ERROR:", error);
+      console.error("ANALYSIS INSERT ERROR:", error?.message || error);
 
       return Response.json(
         {
           success: false,
-          error: error.message,
-          details: error,
+          error: "تعذر إرسال طلب التحليل حالياً.",
+          details: undefined,
         },
         { status: 500 }
       );
@@ -331,13 +385,13 @@ export async function POST(req) {
       data: insertedRequest,
     });
   } catch (err) {
-    console.error("API ERROR:", err);
+    console.error("API ERROR:", err?.message || err);
 
     return Response.json(
       {
         success: false,
-        error: err.message || "Server Error",
-        details: err,
+        error: err?.message || "حدث خطأ أثناء إرسال طلب التحليل.",
+        details: undefined,
       },
       { status: 500 }
     );
