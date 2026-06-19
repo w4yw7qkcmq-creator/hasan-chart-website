@@ -114,8 +114,8 @@ export default function RootLayout({ children }) {
     if (!currentUser?.email) return;
 
     const notifyIfNewReply = (row) => {
-      if (!row?.id || !row?.reply || row.status !== "مكتمل") return;
-      if (row.user_email !== currentUser.email) return;
+      if (!row?.id || !row?.reply) return;
+      if (String(row.user_email || "").toLowerCase() !== String(currentUser.email || "").toLowerCase()) return;
 
       const replyKey = String(row.id);
       const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
@@ -139,9 +139,8 @@ export default function RootLayout({ children }) {
       try {
         const { data, error } = await supabase
           .from("analysis_requests")
-          .select("id, coin, reply, status, user_email")
-          .eq("user_email", currentUser.email)
-          .eq("status", "مكتمل")
+          .select("id, coin, reply, status, user_email, created_at")
+          .ilike("user_email", currentUser.email)
           .not("reply", "is", null)
           .order("created_at", { ascending: false })
           .limit(20);
@@ -206,9 +205,8 @@ export default function RootLayout({ children }) {
       try {
         const { data, error } = await supabase
           .from("analysis_requests")
-          .select("id, reply, status")
-          .eq("user_email", currentUser.email)
-          .eq("status", "مكتمل")
+          .select("id, reply, status, created_at")
+          .ilike("user_email", currentUser.email)
           .not("reply", "is", null)
           .order("created_at", { ascending: false })
           .limit(50);
