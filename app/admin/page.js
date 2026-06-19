@@ -721,72 +721,66 @@ export default function AdminPage() {
   };
 
   const handleReplyImage = (id, file) => {
-  if (!file) return;
+    if (!file) return;
 
-  const img = new Image();
-  const reader = new FileReader();
+    const img = new Image();
+    const reader = new FileReader();
 
-  reader.onload = (event) => {
-    img.onload = async () => {
-      try {
-        const canvas = document.createElement("canvas");
+    reader.onload = (event) => {
+      img.onload = async () => {
+        try {
+          const canvas = document.createElement("canvas");
 
-        const maxWidth = 900;
-        const scale = Math.min(maxWidth / img.width, 1);
+          const maxWidth = 900;
+          const scale = Math.min(maxWidth / img.width, 1);
 
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
 
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        canvas.toBlob(
-          async (blob) => {
-            if (!blob) {
-              showAdminNotice("تعذر ضغط الصورة", "error");
-              return;
-            }
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                showAdminNotice("تعذر ضغط الصورة", "error");
+                return;
+              }
 
-            const fileName = `analysis-${id}-${Date.now()}.jpg`;
+              const compressedReader = new FileReader();
 
-            const { error: uploadError } = await supabase.storage
-              .from("analysis-images")
-              .upload(fileName, blob, {
-                contentType: "image/jpeg",
-                upsert: true,
-              });
+              compressedReader.onloadend = () => {
+                setReplies((prev) => ({
+                  ...prev,
+                  [id]: {
+                    ...prev[id],
+                    image: compressedReader.result,
+                  },
+                }));
 
-            if (uploadError) {
-              showAdminNotice("فشل رفع الصورة: " + uploadError.message, "error");
-              return;
-            }
+                showAdminNotice("تم تجهيز الصورة بنجاح ✅");
+              };
 
-            const { data } = supabase.storage
-              .from("analysis-images")
-              .getPublicUrl(fileName);
+              compressedReader.onerror = () => {
+                showAdminNotice("تعذر تجهيز الصورة", "error");
+              };
 
-            setReplies((prev) => ({
-              ...prev,
-              [id]: {
-                ...prev[id],
-                image: data.publicUrl,
-              },
-            }));
-          },
-          "image/jpeg",
-          0.65
-        );
-      } catch (err) {
-        console.error("Image upload error:", err);
-        showAdminNotice("حدث خطأ أثناء تجهيز الصورة", "error");
-      }
+              compressedReader.readAsDataURL(blob);
+            },
+            "image/jpeg",
+            0.65
+          );
+        } catch (err) {
+          console.error("Image upload error:", err);
+          showAdminNotice("حدث خطأ أثناء تجهيز الصورة", "error");
+        }
+      };
+
+      img.src = event.target.result;
     };
 
-    img.src = event.target.result;
+    reader.readAsDataURL(file);
   };
-
-  reader.readAsDataURL(file);
-};
 
   const deleteAnalysisRequest = async (id) => {
     if (!(await confirmAdminAction("هل تريد حذف طلب التحليل؟"))) return;
