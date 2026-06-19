@@ -38,6 +38,7 @@ export default function RootLayout({ children }) {
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState(null);
   const [globalNotice, setGlobalNotice] = useState("");
+  const [globalNoticeHref, setGlobalNoticeHref] = useState("");
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadAnalysisReplies, setUnreadAnalysisReplies] = useState(0);
@@ -55,6 +56,17 @@ export default function RootLayout({ children }) {
 
     setNotificationPermission(Notification.permission);
   }, []);
+
+  useEffect(() => {
+    if (!globalNotice) return;
+
+    const timer = setTimeout(() => {
+      setGlobalNotice("");
+      setGlobalNoticeHref("");
+    }, 9000);
+
+    return () => clearTimeout(timer);
+  }, [globalNotice]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -91,6 +103,7 @@ export default function RootLayout({ children }) {
       });
 
       setGlobalNotice("🔔 تم تفعيل إشعارات الموقع بنجاح");
+      setGlobalNoticeHref("");
     } else {
       alert("تم رفض الإشعارات من المتصفح");
     }
@@ -204,6 +217,7 @@ export default function RootLayout({ children }) {
   const triggerReplyNotification = (coin) => {
     const message = `📩 وصل رد الإدارة على طلب تحليل ${coin || "العملة"}`;
     setGlobalNotice(message);
+    setGlobalNoticeHref("/my-analysis");
 
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "granted") {
@@ -219,6 +233,7 @@ export default function RootLayout({ children }) {
     const typeLabel = signal?.signal_type === "futures" ? "Futures" : "Spot";
     const message = `🚨 تم نشر توصية VIP ${typeLabel} جديدة على ${signal?.coin || "عملة جديدة"}`;
     setGlobalNotice(message);
+    setGlobalNoticeHref(signal?.signal_type === "futures" ? "/vip-futures" : "/vip-spot");
 
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "granted") {
@@ -529,11 +544,27 @@ export default function RootLayout({ children }) {
               <div>
                 <p className="font-black">{globalNotice}</p>
                 <p className="mt-1 text-sm font-bold text-black/70">
-                  افتح صفحة التوصيات أو طلباتي حسب نوع الإشعار. إذا لم يظهر إشعار المتصفح، فعّل الإشعارات من الزر بالأعلى.
+                  إذا لم يظهر إشعار المتصفح، فعّل الإشعارات من الزر بالأعلى.
                 </p>
+
+                {globalNoticeHref && (
+                  <Link
+                    href={globalNoticeHref}
+                    onClick={() => {
+                      setGlobalNotice("");
+                      setGlobalNoticeHref("");
+                    }}
+                    className="mt-3 inline-flex rounded-2xl bg-black/15 px-4 py-2 text-sm font-black text-black transition hover:bg-black/25"
+                  >
+                    فتح الآن
+                  </Link>
+                )}
               </div>
               <button
-                onClick={() => setGlobalNotice("")}
+                onClick={() => {
+                  setGlobalNotice("");
+                  setGlobalNoticeHref("");
+                }}
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10 font-black"
               >
                 ✕
