@@ -135,6 +135,47 @@ export default function RootLayout({ children }) {
       triggerReplyNotification(row.coin);
     };
 
+    const checkLatestAnalysisReplies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("analysis_requests")
+          .select("id, coin, reply, status, user_email")
+          .eq("user_email", currentUser.email)
+          .eq("status", "مكتمل")
+          .not("reply", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (error || !data?.length) return;
+
+        const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
+        const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
+
+        const newReply = data.find((row) => {
+          const key = String(row.id);
+          return row?.reply && !seenReplies.includes(key) && !notifiedReplies.includes(key);
+        });
+
+        if (!newReply) return;
+
+        const replyKey = String(newReply.id);
+        localStorage.setItem(
+          "notifiedAnalysisReplies",
+          JSON.stringify([replyKey, ...notifiedReplies].slice(0, 100))
+        );
+
+        if (pathname !== "/my-analysis") {
+          setUnreadAnalysisReplies((count) => Math.max(1, count + 1));
+          triggerReplyNotification(newReply.coin);
+        }
+      } catch (err) {
+        console.warn("Analysis reply notification check skipped:", err?.message || err);
+      }
+    };
+
+    checkLatestAnalysisReplies();
+    const analysisReplyTimer = setInterval(checkLatestAnalysisReplies, 10000);
+
     const channel = supabase
       .channel(`global-analysis-replies-${currentUser.email}`)
       .on(
@@ -150,6 +191,7 @@ export default function RootLayout({ children }) {
       .subscribe();
 
     return () => {
+      clearInterval(analysisReplyTimer);
       supabase.removeChannel(channel);
     };
   }, [currentUser, pathname]);
