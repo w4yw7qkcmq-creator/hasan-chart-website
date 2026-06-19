@@ -26,12 +26,21 @@ const menuItems = [
   { href: "/affiliate", icon: "🤝", label: "التسويق بالعمولة" },
 ];
 
+
 const socialLinks = [
   { label: "الدعم الفني", badge: "Telegram", icon: "🛟", href: "https://t.me/HasaNCharTSupport" },
   { label: "القناة الرسمية", badge: "Telegram", icon: "📢", href: "https://t.me/HsaNCharT" },
   { label: "د. حسن", badge: "Telegram", icon: "👨‍🏫", href: "https://t.me/CEOHasaNCharT" },
   { label: "منصة X", badge: "X", icon: "𝕏", href: "https://x.com/HasanChart" },
 ];
+
+const getAnalysisReplyKey = (row) => {
+  const id = String(row?.id || "");
+  const reply = String(row?.reply || "");
+  const image = String(row?.reply_image || row?.replyImage || "");
+  const signature = `${reply.length}:${reply.slice(0, 80)}:${image.length}`;
+  return `${id}:${signature}`;
+};
 
 export default function RootLayout({ children }) {
   const router = useRouter();
@@ -117,7 +126,7 @@ export default function RootLayout({ children }) {
       if (!row?.id || !row?.reply) return;
       if (String(row.user_email || "").toLowerCase() !== String(currentUser.email || "").toLowerCase()) return;
 
-      const replyKey = String(row.id);
+      const replyKey = getAnalysisReplyKey(row);
       const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
       const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
 
@@ -139,7 +148,7 @@ export default function RootLayout({ children }) {
       try {
         const { data, error } = await supabase
           .from("analysis_requests")
-          .select("id, coin, reply, status, user_email, created_at")
+          .select("id, coin, reply, reply_image, status, user_email, created_at")
           .ilike("user_email", currentUser.email)
           .not("reply", "is", null)
           .order("created_at", { ascending: false })
@@ -151,13 +160,13 @@ export default function RootLayout({ children }) {
         const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
 
         const newReply = data.find((row) => {
-          const key = String(row.id);
+          const key = getAnalysisReplyKey(row);
           return row?.reply && !seenReplies.includes(key) && !notifiedReplies.includes(key);
         });
 
         if (!newReply) return;
 
-        const replyKey = String(newReply.id);
+        const replyKey = getAnalysisReplyKey(newReply);
         localStorage.setItem(
           "notifiedAnalysisReplies",
           JSON.stringify([replyKey, ...notifiedReplies].slice(0, 100))
@@ -205,7 +214,7 @@ export default function RootLayout({ children }) {
       try {
         const { data, error } = await supabase
           .from("analysis_requests")
-          .select("id, reply, status, created_at")
+          .select("id, reply, reply_image, status, created_at")
           .ilike("user_email", currentUser.email)
           .not("reply", "is", null)
           .order("created_at", { ascending: false })
@@ -215,7 +224,7 @@ export default function RootLayout({ children }) {
 
         const replyIds = (data || [])
           .filter((item) => item?.reply)
-          .map((item) => String(item.id));
+          .map((item) => getAnalysisReplyKey(item));
 
         if (pathname === "/my-analysis") {
           localStorage.setItem("seenAnalysisReplies", JSON.stringify(replyIds.slice(0, 100)));
