@@ -79,9 +79,9 @@ export async function POST(req) {
     const { data, error } = await supabase
       .from("analysis_requests")
       .select(
-        "id,user_email,username,coin,frame,status,reply,reply_image,created_at,job_status,attempts"
+        "id,user_email,username,coin,frame,status,reply,reply_image,created_at"
       )
-      .ilike("user_email", userEmail)
+      .eq("user_email", userEmail)
       .order("created_at", { ascending: false })
       .limit(30);
 
