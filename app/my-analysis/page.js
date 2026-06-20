@@ -102,16 +102,13 @@ export default function MyAnalysisPage() {
     const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     try {
-      const response = await fetch("/api/my-analysis", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          email: user.email,
-        }),
-      });
+      const response = await fetch(
+        `/api/my-analysis?email=${encodeURIComponent(user.email)}`,
+        {
+          method: "GET",
+          signal: controller.signal,
+        }
+      );
 
       const result = await response.json().catch(() => null);
 
