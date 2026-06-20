@@ -130,7 +130,7 @@ export default function RootLayout({ children }) {
       const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
       const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
 
-      if (!seenReplies.includes(replyKey) && pathname !== "/my-analysis") {
+      if (!seenReplies.includes(replyKey)) {
         setUnreadAnalysisReplies((count) => Math.max(1, count + 1));
       }
 
@@ -172,10 +172,8 @@ export default function RootLayout({ children }) {
           JSON.stringify([replyKey, ...notifiedReplies].slice(0, 100))
         );
 
-        if (pathname !== "/my-analysis") {
-          setUnreadAnalysisReplies((count) => Math.max(1, count + 1));
-          triggerReplyNotification(newReply.coin);
-        }
+        setUnreadAnalysisReplies((count) => Math.max(1, count + 1));
+        triggerReplyNotification(newReply.coin);
       } catch (err) {
         console.warn("Analysis reply notification check skipped:", err?.message || err);
       }
@@ -226,11 +224,6 @@ export default function RootLayout({ children }) {
           .filter((item) => item?.reply)
           .map((item) => getAnalysisReplyKey(item));
 
-        if (pathname === "/my-analysis") {
-          localStorage.setItem("seenAnalysisReplies", JSON.stringify(replyIds.slice(0, 100)));
-          setUnreadAnalysisReplies(0);
-          return;
-        }
 
         const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
         const unseenCount = replyIds.filter((id) => !seenReplies.includes(id)).length;
