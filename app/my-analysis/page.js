@@ -68,6 +68,7 @@ export default function MyAnalysisPage() {
   const [lastUpdated, setLastUpdated] = useState("");
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [fullImageOpen, setFullImageOpen] = useState(false);
+  const [imageLoadingId, setImageLoadingId] = useState(null);
   const selectedAnalysisRef = useRef(null);
   const normalizeRequest = (item) => ({
     id: item.id,
@@ -82,6 +83,46 @@ export default function MyAnalysisPage() {
       ? formatArabicDateTime(item.created_at)
       : formatArabicDateTime(item.createdAt) || "",
   });
+
+  const openAnalysis = async (request) => {
+    if (!request) return;
+
+    setFullImageOpen(false);
+    setImageLoadingId(request.id);
+    setSelectedAnalysis(request);
+
+    try {
+      if (!request?.id || !currentUser?.email || request.replyImage) return;
+
+      const response = await fetch(
+        `/api/my-analysis-image?id=${encodeURIComponent(request.id)}&email=${encodeURIComponent(currentUser.email)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const result = await response.json().catch(() => null);
+
+      if (response.ok && result?.success && result?.reply_image) {
+        const updatedRequest = {
+          ...request,
+          replyImage: result.reply_image,
+        };
+
+        setSelectedAnalysis(updatedRequest);
+        setRequests((prev) =>
+          prev.map((item) =>
+            item.id === request.id ? { ...item, replyImage: result.reply_image } : item
+          )
+        );
+      }
+    } catch (err) {
+      console.warn("Analysis image loading skipped:", err?.message || err);
+    } finally {
+      setImageLoadingId(null);
+    }
+  };
 
   useEffect(() => {
     selectedAnalysisRef.current = selectedAnalysis;
@@ -326,6 +367,11 @@ export default function MyAnalysisPage() {
                   </div>
                 </div>
 
+                {imageLoadingId === selectedAnalysis.id && (
+                  <div className="rounded-[24px] border border-cyan-300/20 bg-cyan-400/10 p-4 text-center text-sm font-bold text-cyan-100">
+                    جاري تحميل صورة التحليل...
+                  </div>
+                )}
                 {selectedAnalysis.replyImage && (
                   <div className="rounded-[24px] border border-cyan-300/20 bg-cyan-400/10 p-4">
                     <p className="mb-3 text-sm font-bold text-cyan-100">صورة التحليل</p>
@@ -505,7 +551,7 @@ export default function MyAnalysisPage() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => setSelectedAnalysis(req)}
+                          onClick={() => openAnalysis(req)}
                           className="rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
                         >
                           عرض التحليل

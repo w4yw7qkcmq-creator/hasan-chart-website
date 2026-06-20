@@ -80,7 +80,7 @@ export async function POST(req) {
     const { data, error } = await supabase
       .from("analysis_requests")
       .select(
-        "id,user_email,username,coin,frame,status,reply,reply_image,created_at"
+        "id,user_email,username,coin,frame,status,reply,created_at"
       )
       .eq("user_email", userEmail)
       .order("created_at", { ascending: false })
@@ -101,7 +101,14 @@ export async function POST(req) {
 
     return Response.json({
       success: true,
-      requests: Array.isArray(data) ? data : [],
+      requests: Array.isArray(data)
+        ? data.map((item) => ({
+            ...item,
+            reply_image: null,
+            replyImage: null,
+            hasReplyImage: Boolean(item?.reply),
+          }))
+        : [],
     });
   } catch (err) {
     console.error("MY ANALYSIS API CATCH ERROR:", err?.message || err);
