@@ -99,13 +99,14 @@ export default function MyAnalysisPage() {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
       const response = await fetch(
         `/api/my-analysis?email=${encodeURIComponent(user.email)}`,
         {
           method: "GET",
+          cache: "no-store",
           signal: controller.signal,
         }
       );
@@ -113,7 +114,7 @@ export default function MyAnalysisPage() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.success) {
-        setRequests([]);
+        if (requests.length === 0) setRequests([]);
         setLoadError(result?.error || "تعذر تحميل طلبات التحليل.");
         return;
       }
@@ -139,10 +140,10 @@ export default function MyAnalysisPage() {
       }
     } catch (err) {
       console.error("Load requests API error:", err);
-      setRequests([]);
+      if (requests.length === 0) setRequests([]);
       setLoadError(
         err?.name === "AbortError"
-          ? "تحميل الطلبات أخذ وقت طويل. اضغط إعادة التحميل أو افتح الصفحة من جديد."
+          ? "تحميل الطلبات أخذ وقت طويل بسبب حجم صور التحليل. اضغط تحديث الطلبات مرة أخرى."
           : "حدث خطأ أثناء تحميل طلبات التحليل."
       );
     } finally {
