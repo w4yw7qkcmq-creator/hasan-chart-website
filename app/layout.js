@@ -146,15 +146,15 @@ export default function RootLayout({ children }) {
 
     const checkLatestAnalysisReplies = async () => {
       try {
-        const { data, error } = await supabase
-          .from("analysis_requests")
-          .select("id, coin, reply, reply_image, status, user_email, created_at")
-          .ilike("user_email", currentUser.email)
-          .not("reply", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(20);
+        const response = await fetch(
+          `/api/my-analysis?email=${encodeURIComponent(currentUser.email)}`,
+          { method: "GET", cache: "no-store" }
+        );
 
-        if (error || !data?.length) return;
+        const result = await response.json().catch(() => null);
+        const data = result?.requests || [];
+
+        if (!response.ok || !result?.success || !data.length) return;
 
         const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
         const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
@@ -192,7 +192,10 @@ export default function RootLayout({ children }) {
           table: "analysis_requests",
           filter: `user_email=eq.${currentUser.email}`,
         },
-        (payload) => notifyIfNewReply(payload.new)
+        (payload) => {
+          notifyIfNewReply(payload.new);
+          checkLatestAnalysisReplies();
+        }
       )
       .subscribe();
 
@@ -210,20 +213,19 @@ export default function RootLayout({ children }) {
 
     const refreshUnreadReplies = async () => {
       try {
-        const { data, error } = await supabase
-          .from("analysis_requests")
-          .select("id, reply, reply_image, status, created_at")
-          .ilike("user_email", currentUser.email)
-          .not("reply", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(50);
+        const response = await fetch(
+          `/api/my-analysis?email=${encodeURIComponent(currentUser.email)}`,
+          { method: "GET", cache: "no-store" }
+        );
 
-        if (error) return;
+        const result = await response.json().catch(() => null);
+        const data = result?.requests || [];
+
+        if (!response.ok || !result?.success) return;
 
         const replyIds = (data || [])
           .filter((item) => item?.reply)
           .map((item) => getAnalysisReplyKey(item));
-
 
         const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
         const unseenCount = replyIds.filter((id) => !seenReplies.includes(id)).length;
