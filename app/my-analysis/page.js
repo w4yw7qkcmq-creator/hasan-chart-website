@@ -87,6 +87,16 @@ export default function MyAnalysisPage() {
     selectedAnalysisRef.current = selectedAnalysis;
   }, [selectedAnalysis]);
 
+  useEffect(() => {
+    if (!replyNotice) return;
+
+    const timer = setTimeout(() => {
+      setReplyNotice("");
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [replyNotice]);
+
   const loadRequests = async (user) => {
     setLoading(true);
     setLoadError("");
@@ -254,18 +264,21 @@ export default function MyAnalysisPage() {
 
       <div className="relative z-10 space-y-7 p-4 md:p-6">
         {replyNotice && (
-          <div className="fixed left-5 top-5 z-[999] max-w-md rounded-[26px] border border-emerald-300/25 bg-emerald-400/95 p-5 text-black shadow-[0_22px_70px_rgba(16,185,129,0.35)]">
+          <div className="fixed left-5 top-5 z-[999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-black">{replyNotice}</p>
-                <p className="mt-1 text-sm font-bold text-black/70">افتح الطلب في الأسفل لمشاهدة الرد والصورة.</p>
+                <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">{replyNotice}</p>
+                <p className="mt-1 text-sm font-bold text-white/90">افتح الطلب في الأسفل لمشاهدة الرد والصورة.</p>
               </div>
               <button
                 onClick={() => setReplyNotice("")}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10 font-black"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
               >
                 ✕
               </button>
+            </div>
+            <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
+              <div className="h-full animate-pulse bg-white" />
             </div>
           </div>
         )}
