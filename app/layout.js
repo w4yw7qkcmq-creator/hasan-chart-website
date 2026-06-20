@@ -865,7 +865,19 @@ export default function RootLayout({ children }) {
                   <div className="relative hidden sm:block">
                     <button
                       type="button"
-                      onClick={() => setNotificationMenuOpen((open) => !open)}
+                      onClick={() => {
+                        setNotificationMenuOpen((open) => {
+                          const nextOpen = !open;
+
+                          if (nextOpen) {
+                            const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
+                            localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
+                            setUnreadAnalysisReplies(0);
+                          }
+
+                          return nextOpen;
+                        });
+                      }}
                       className="relative grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-xl text-cyan-100 shadow-[0_0_24px_rgba(0,163,255,0.18)] transition hover:bg-cyan-400/20"
                       aria-label="الإشعارات"
                     >
@@ -899,6 +911,8 @@ export default function RootLayout({ children }) {
                           <Link
                             href="/my-analysis"
                             onClick={() => {
+                              const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
+                              localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
                               setNotificationMenuOpen(false);
                               setUnreadAnalysisReplies(0);
                             }}

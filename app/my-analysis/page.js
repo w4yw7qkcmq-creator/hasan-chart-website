@@ -212,8 +212,18 @@ export default function MyAnalysisPage() {
           if (status === "SUBSCRIBED") console.log("My analysis realtime connected");
         });
 
-      // تم إيقاف التحديث التلقائي هنا حتى لا تتحدث الصفحة أثناء مشاهدة التحليل.
-      // التحديث اللحظي ما زال يعمل عبر Supabase Realtime عند وصول رد جديد.
+      const refreshIfIdle = () => {
+        if (!selectedAnalysisRef.current) {
+          loadRequests(user);
+        }
+      };
+
+      refreshInterval = setInterval(refreshIfIdle, 15000);
+
+      window.addEventListener("focus", refreshIfIdle);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") refreshIfIdle();
+      });
     };
 
     start();
@@ -221,6 +231,7 @@ export default function MyAnalysisPage() {
     return () => {
       isMounted = false;
       if (refreshInterval) clearInterval(refreshInterval);
+      window.removeEventListener("focus", loadRequests);
       if (channel) supabase.removeChannel(channel);
     };
   }, []);
