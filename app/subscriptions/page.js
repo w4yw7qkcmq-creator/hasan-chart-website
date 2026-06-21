@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { supabase } from "../../lib/supabase";
 
 const plans = [
   {
@@ -125,17 +124,24 @@ export default function SubscriptionsPage() {
     setLoadingPlan(plan.name);
 
     try {
-      const { error } = await supabase.from("subscription_requests").insert({
-        user_email: currentUser.email,
-        username: currentUser.username || currentUser.email,
-        plan_name: plan.name,
-        category: plan.category,
-        price: plan.price,
-        status: "بانتظار الدفع",
+      const response = await fetch("/api/subscription-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_email: currentUser.email,
+          username: currentUser.username || currentUser.email,
+          plan_name: plan.name,
+          category: plan.category,
+          price: plan.price,
+        }),
       });
 
-      if (error) {
-        alert("فشل إرسال طلب الاشتراك: " + error.message);
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        alert("فشل إرسال طلب الاشتراك: " + (result?.error || "حدث خطأ غير معروف"));
         return;
       }
 
