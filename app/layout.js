@@ -215,17 +215,21 @@ export default function RootLayout({ children }) {
 
     const loadSiteNotifications = async () => {
       try {
-        const { data, error } = await supabase
-          .from("notifications")
-          .select("id,title,message,type,is_read,created_at,user_email")
-          .eq("user_email", currentUser.email)
-          .eq("is_read", false)
-          .order("created_at", { ascending: false })
-          .limit(10);
+        const response = await fetch(
+          `/api/my-notifications?email=${encodeURIComponent(currentUser.email)}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
 
-        if (error) return;
-        setSiteNotifications(data || []);
-        if ((data || []).length > 0 && !notificationMenuOpen) {
+        const result = await response.json().catch(() => null);
+        const notifications = result?.notifications || [];
+
+        if (!response.ok || !result?.success) return;
+
+        setSiteNotifications(notifications);
+        if (notifications.length > 0 && !notificationMenuOpen) {
           setSiteNotificationBadgeCleared(false);
         }
       } catch (err) {
@@ -409,11 +413,16 @@ export default function RootLayout({ children }) {
     setSiteNotificationBadgeCleared(false);
 
     try {
-      await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .in("id", ids)
-        .eq("user_email", currentUser.email);
+      await fetch("/api/mark-notifications-read", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: currentUser.email,
+          ids,
+        }),
+      });
     } catch (err) {
       console.warn("Mark notifications read skipped:", err?.message || err);
     }
