@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -16,11 +16,35 @@ const POPULAR_TAGS = [
   { label: "الأسهم", href: "/news/tag/stocks" },
 ];
 
+function formatNewsDate(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Damascus",
+  }).format(date);
+}
+
+function makeExcerpt(text, maxLength = 180) {
+  const value = String(text || "").trim();
+  if (!value) return "تفاصيل الخبر غير متاحة حالياً.";
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength).trim()}...`;
+}
+
 export default function News() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [lastUpdated, setLastUpdated] = useState("");
 
   useEffect(() => {
     fetchNews();
@@ -60,6 +84,7 @@ export default function News() {
 
       console.log("Fetched news_posts count:", data?.length || 0);
       setNews(data || []);
+      setLastUpdated(formatNewsDate(new Date()));
     } catch (error) {
       console.error("Unexpected news error:", error);
       setErrorMessage(error.message || "حدث خطأ غير متوقع أثناء تحميل الأخبار.");
@@ -239,10 +264,12 @@ export default function News() {
     { key: "commodities", label: "النفط والطاقة" },
   ];
 
-  const filteredNews = news.filter((item) => {
-    if (selectedCategory === "all") return true;
-    return getNewsCategory(item) === selectedCategory;
-  });
+  const filteredNews = useMemo(() => {
+    return news.filter((item) => {
+      if (selectedCategory === "all") return true;
+      return getNewsCategory(item) === selectedCategory;
+    });
+  }, [news, selectedCategory]);
 
   return (
     <main className="min-h-screen px-4 py-10 text-slate-950">
@@ -257,6 +284,20 @@ export default function News() {
           <p className="mx-auto max-w-2xl text-lg leading-8 text-slate-600">
             تغطية مباشرة لأهم أخبار الاقتصاد، الأسواق العالمية، الأسهم، العملات الرقمية، والبيانات المؤثرة على حركة السوق.
           </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={fetchNews}
+              className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black !text-white shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-700"
+            >
+              تحديث الأخبار الآن
+            </button>
+            {lastUpdated && (
+              <span className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-sm font-bold text-slate-600">
+                آخر تحديث: {lastUpdated}
+              </span>
+            )}
+          </div>
         </section>
 
         <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
@@ -299,8 +340,13 @@ export default function News() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="w-14 h-14 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-[420px] animate-pulse rounded-[1.75rem] border border-white/50 bg-white/70 shadow-[0_18px_60px_rgba(15,23,42,0.08)]"
+              />
+            ))}
           </div>
         ) : errorMessage ? (
           <div className="bg-red-500/10 border border-red-400/20 rounded-3xl p-10 text-center text-red-200 leading-8">
@@ -323,8 +369,9 @@ export default function News() {
 
               const sourceLink = item.source_link || item.link || null;
               const newsTitle = extractArabicTitle(item);
-              const newsContent = fullText(
-                item.content || item.summary || item.description || item.ai_summary || item.normalized_title
+              const newsContent = makeExcerpt(
+                fullText(item.summary || item.description || item.ai_summary || item.content || item.normalized_title),
+                index === 0 ? 260 : 170
               );
               const newsImage = getNewsImage(item);
               const sourceName = getSourceName(sourceLink);
@@ -355,6 +402,8 @@ export default function News() {
                       <img
                         src={newsImage}
                         alt={newsTitle}
+                        loading={index < 3 ? "eager" : "lazy"}
+                        decoding="async"
                         onError={(event) => {
                           event.currentTarget.style.display = "none";
                           const fallback = event.currentTarget.parentElement?.querySelector(".fallback-news-image");
@@ -377,19 +426,14 @@ export default function News() {
 
                   <div className="p-6">
                     <div className="mb-4 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
-                      {new Date(item.created_at).toLocaleString("ar-SA", {
-                        month: "long",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "numeric",
-                      })}
+                      {formatNewsDate(item.created_at)}
                     </div>
 
                     <h2 className={`${index === 0 ? "text-2xl md:text-3xl" : "text-xl"} mb-4 font-black leading-relaxed text-slate-950`}>
                       {newsTitle}
                     </h2>
 
-                    <p className="text-[15px] leading-7 text-slate-600">
+                    <p className="line-clamp-4 text-[15px] leading-7 text-slate-600">
                       {newsContent}
                     </p>
 
