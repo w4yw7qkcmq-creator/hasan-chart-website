@@ -228,6 +228,35 @@ export default function RootLayout({ children }) {
 
         if (!response.ok || !result?.success) return;
 
+        const notifiedSiteItems = JSON.parse(localStorage.getItem("notifiedSiteNotifications") || "[]");
+
+        notifications.forEach((notification) => {
+          const notificationKey = String(notification.id || "");
+
+          if (!notificationKey || notifiedSiteItems.includes(notificationKey)) {
+            return;
+          }
+
+          if (
+            (notification.type === "vip-spot" || notification.type === "vip-futures") &&
+            typeof window !== "undefined" &&
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
+            new Notification(notification.title || "HasaN CharT World", {
+              body: notification.message || "تم نشر توصية جديدة",
+              icon: "/logo.png",
+            });
+          }
+
+          notifiedSiteItems.unshift(notificationKey);
+        });
+
+        localStorage.setItem(
+          "notifiedSiteNotifications",
+          JSON.stringify(notifiedSiteItems.slice(0, 100))
+        );
+
         setSiteNotifications(notifications);
         if (notifications.length > 0 && !notificationMenuOpen) {
           setSiteNotificationBadgeCleared(false);
