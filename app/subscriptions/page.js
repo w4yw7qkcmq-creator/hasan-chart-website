@@ -186,26 +186,33 @@ export default function SubscriptionsPage() {
   return (
     <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
       {notification && (
-        <div className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
-                {notification.title}
-              </p>
-              <p className="mt-1 text-sm font-bold text-white/90">
-                {notification.message}
-              </p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/55 px-5 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
+            <div
+              className={`mx-auto mb-6 grid h-24 w-24 place-items-center rounded-full border-[6px] text-5xl shadow-[0_0_50px_rgba(16,185,129,0.22)] ${
+                notification.type === "success"
+                  ? "border-emerald-400 text-emerald-500"
+                  : "border-red-400 text-red-500"
+              }`}
+            >
+              {notification.type === "success" ? "✓" : "!"}
             </div>
+
+            <h3 className="text-3xl font-black leading-relaxed text-slate-950">
+              {notification.title}
+            </h3>
+
+            <p className="mx-auto mt-4 max-w-sm text-lg font-bold leading-9 text-slate-600">
+              {notification.message}
+            </p>
+
             <button
               type="button"
               onClick={() => setNotification(null)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
+              className="mt-8 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-8 py-3 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.28)] transition hover:scale-[1.02]"
             >
-              ✕
+              حسناً
             </button>
-          </div>
-          <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
-            <div className="h-full animate-pulse bg-white" />
           </div>
         </div>
       )}
