@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 function getSignalStatus(signal) {
   const createdAt = signal.created_at || signal.createdAt;
@@ -29,7 +30,11 @@ const FILTERS = [
 
 function SignalCard({ signal }) {
   return (
-    <article className="rounded-[28px] border border-cyan-200 bg-white p-6 shadow-[0_20px_70px_rgba(14,116,144,0.15)]">
+    <article
+      className="rounded-[28px] border border-cyan-200 bg-white p-6 shadow-[0_20px_70px_rgba(14,116,144,0.15)]"
+      onCopy={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <span className="inline-flex rounded-full border border-amber-300/50 bg-amber-100 px-4 py-2 text-xs font-black text-amber-700">
@@ -78,17 +83,30 @@ export default function VipFuturesPage() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
   const loadSignals = async () => {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/vip-signals?type=futures", {
-        method: "GET",
-        cache: "no-store",
-      });
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+      const userEmail = currentUser?.email || "";
+
+      const response = await fetch(
+        `/api/vip-signals?type=futures&email=${encodeURIComponent(userEmail)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
 
       const result = await response.json().catch(() => null);
+
+      if (result?.subscriptionExpired) {
+        setSubscriptionExpired(true);
+        setSignals([]);
+        return;
+      }
 
       if (!response.ok || !result?.success) {
         console.error("VIP Futures signals error:", result?.error || "Unknown error");
@@ -106,6 +124,18 @@ export default function VipFuturesPage() {
   };
 
   useEffect(() => {
+    const checkSubscriptionExpiry = async () => {
+      try {
+        await fetch("/api/check-subscription-expiry", {
+          method: "GET",
+          cache: "no-store",
+        });
+      } catch (error) {
+        console.error("Subscription expiry check error:", error);
+      }
+    };
+
+    checkSubscriptionExpiry();
     loadSignals();
 
     const timer = setInterval(() => {
@@ -115,6 +145,26 @@ export default function VipFuturesPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  if (subscriptionExpired) {
+    return (
+      <main className="min-h-screen bg-[#020617] px-4 py-20 text-white">
+        <div className="mx-auto max-w-2xl rounded-[36px] border border-red-200/30 bg-white p-10 text-center text-slate-950 shadow-2xl">
+          <div className="text-6xl">⚠️</div>
+          <h1 className="mt-6 text-4xl font-black">انتهت صلاحية اشتراكك</h1>
+          <p className="mt-4 text-lg font-bold text-slate-600">
+            انتهت صلاحية الباقة الخاصة بك. قم بتجديد الاشتراك للعودة إلى توصيات VIP Futures.
+          </p>
+          <Link
+            href="/subscriptions"
+            className="mt-8 inline-flex rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-8 py-4 font-black text-white"
+          >
+            تجديد الاشتراك
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const activeSignals = signals.filter((signal) => getSignalStatus(signal) !== "منتهية");
   const expiredSignals = signals.filter((signal) => getSignalStatus(signal) === "منتهية");
@@ -127,7 +177,13 @@ export default function VipFuturesPage() {
         : signals;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-950">
+    <main
+      className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-950 select-none"
+      onContextMenu={(e) => e.preventDefault()}
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+    >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_45%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.18),transparent_35%)]" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 md:px-6">

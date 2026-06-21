@@ -328,6 +328,62 @@ async function sendEmailViaResend({ to, subject, html }) {
   return response.json().catch(() => ({ success: true }));
 }
 
+function getSubscriptionDurationDays(planName) {
+  const text = String(planName || "").toLowerCase();
+
+  if (
+    text.includes("year") ||
+    text.includes("annual") ||
+    text.includes("سنة") ||
+    text.includes("سنوي")
+  ) {
+    return 365;
+  }
+
+  if (
+    text.includes("6 month") ||
+    text.includes("6 months") ||
+    text.includes("ستة أشهر") ||
+    text.includes("٦ أشهر") ||
+    text.includes("6 اشهر") ||
+    text.includes("6 أشهر")
+  ) {
+    return 180;
+  }
+
+  if (
+    text.includes("3 month") ||
+    text.includes("3 months") ||
+    text.includes("ثلاثة أشهر") ||
+    text.includes("٣ أشهر") ||
+    text.includes("3 اشهر") ||
+    text.includes("3 أشهر")
+  ) {
+    return 90;
+  }
+
+  if (
+    text.includes("week") ||
+    text.includes("أسبوع") ||
+    text.includes("اسبوع")
+  ) {
+    return 7;
+  }
+
+  return 30;
+}
+
+function getSubscriptionExpiryDate(planName) {
+  const startedAt = new Date();
+  const expiresAt = new Date(startedAt);
+  expiresAt.setDate(expiresAt.getDate() + getSubscriptionDurationDays(planName));
+
+  return {
+    startedAt: startedAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  };
+}
+
 async function notifyVipSubscribers(supabase, signal) {
   try {
     const { signalType, coin, entry, targets, stopLoss, notes } = signal;
@@ -501,9 +557,24 @@ export async function POST(request) {
         );
       }
 
+      const activationDates =
+        newStatus === "مفعل"
+          ? getSubscriptionExpiryDate(planName)
+          : null;
+
+      const subscriptionUpdate =
+        newStatus === "مفعل"
+          ? {
+              status: newStatus,
+              started_at: activationDates.startedAt,
+              expires_at: activationDates.expiresAt,
+              expired_notice_sent: false,
+            }
+          : { status: newStatus };
+
       const { error } = await supabase
         .from("subscription_requests")
-        .update({ status: newStatus })
+        .update(subscriptionUpdate)
         .eq("id", requestId);
 
       if (error) {
@@ -528,7 +599,7 @@ export async function POST(request) {
         await supabase.from("notifications").insert({
           user_email: userEmail,
           title: "تم تفعيل اشتراكك بنجاح 🎉",
-          message: `تم تفعيل اشتراك ${planName || "الخاص بك"} ويمكنك الآن استخدام جميع المزايا المتاحة.`,
+          message: `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`,
           type: "subscription",
           is_read: false,
         });
@@ -543,6 +614,7 @@ export async function POST(request) {
           status: newStatus,
           userEmail,
           planName,
+          expiresAt: activationDates?.expiresAt || null,
         },
       });
 

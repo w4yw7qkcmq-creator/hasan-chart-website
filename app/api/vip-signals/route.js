@@ -29,6 +29,33 @@ export async function GET(request) {
     const url = new URL(request.url);
     const signalType = normalizeSignalType(url.searchParams.get("type"));
 
+    const email = String(url.searchParams.get("email") || "")
+      .trim()
+      .toLowerCase();
+
+    if (email) {
+      const { data: subscription } = await supabase
+        .from("subscription_requests")
+        .select("status,expires_at")
+        .eq("user_email", email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const expired =
+        !subscription ||
+        subscription.status === "منتهي" ||
+        (subscription.expires_at && new Date(subscription.expires_at).getTime() <= Date.now());
+
+      if (expired) {
+        return NextResponse.json({
+          success: false,
+          subscriptionExpired: true,
+          signals: [],
+        });
+      }
+    }
+
     const { data, error } = await supabase
       .from("vip_signals")
       .select("*")

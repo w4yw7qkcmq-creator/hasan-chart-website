@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 function getSignalStatus(signal) {
   const createdAt = signal.created_at || signal.createdAt;
@@ -84,17 +85,29 @@ export default function VipSpotPage() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
   const loadSignals = async () => {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/vip-signals?type=spot", {
-        method: "GET",
-        cache: "no-store",
-      });
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+      const userEmail = currentUser?.email || "";
+      const response = await fetch(
+        `/api/vip-signals?type=spot&email=${encodeURIComponent(userEmail)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
 
       const result = await response.json().catch(() => null);
+
+      if (result?.subscriptionExpired) {
+        setSubscriptionExpired(true);
+        setSignals([]);
+        return;
+      }
 
       if (!response.ok || !result?.success) {
         console.error("VIP Spot signals error:", result?.error || "Unknown error");
@@ -112,6 +125,18 @@ export default function VipSpotPage() {
   };
 
   useEffect(() => {
+    const checkSubscriptionExpiry = async () => {
+      try {
+        await fetch("/api/check-subscription-expiry", {
+          method: "GET",
+          cache: "no-store",
+        });
+      } catch (error) {
+        console.error("Subscription expiry check error:", error);
+      }
+    };
+
+    checkSubscriptionExpiry();
     loadSignals();
     const timer = setInterval(() => {
       loadSignals();
@@ -120,6 +145,26 @@ export default function VipSpotPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  if (subscriptionExpired) {
+    return (
+      <main className="min-h-screen bg-[#020617] px-4 py-20 text-white">
+        <div className="mx-auto max-w-2xl rounded-[36px] border border-red-200/30 bg-white p-10 text-center text-slate-950 shadow-2xl">
+          <div className="text-6xl">⚠️</div>
+          <h1 className="mt-6 text-4xl font-black">انتهت صلاحية اشتراكك</h1>
+          <p className="mt-4 text-lg font-bold text-slate-600">
+            انتهت صلاحية الباقة الخاصة بك. قم بتجديد الاشتراك للعودة إلى توصيات VIP Spot.
+          </p>
+          <Link
+            href="/subscriptions"
+            className="mt-8 inline-flex rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-8 py-4 font-black text-white"
+          >
+            تجديد الاشتراك
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const activeSignals = signals.filter((signal) => getSignalStatus(signal) !== "منتهية");
   const expiredSignals = signals.filter((signal) => getSignalStatus(signal) === "منتهية");
