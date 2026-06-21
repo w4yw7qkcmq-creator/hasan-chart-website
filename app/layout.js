@@ -305,6 +305,77 @@ export default function RootLayout({ children }) {
     refreshUnreadReplies();
   }, [currentUser, pathname]);
 
+  // Automatic user subscription refresh so VIP menu items appear after admin activation without logging out.
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    refreshCurrentUserSubscription();
+    const timer = setInterval(refreshCurrentUserSubscription, 10000);
+
+    const channel = supabase
+      .channel(`global-subscription-refresh-${currentUser.email}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "subscription_requests",
+          filter: `user_email=eq.${currentUser.email}`,
+        },
+        (payload) => {
+          if (payload?.new?.status === "مفعل") {
+            refreshCurrentUserSubscription();
+            setGlobalNotice("🎉 تم تفعيل اشتراكك بنجاح");
+            setGlobalNoticeHref("/subscriptions");
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.email]);
+
+  // Refresh user subscription info (VIP menu items appear after admin activation)
+  const refreshCurrentUserSubscription = async () => {
+    if (!currentUser?.email) return;
+
+    try {
+      const { data } = await supabase
+        .from("subscription_requests")
+        .select("plan_name,status")
+        .eq("user_email", currentUser.email)
+        .eq("status", "مفعل")
+        .order("created_at", { ascending: false });
+
+      const activePlanNames = (data || [])
+        .map((item) => item.plan_name)
+        .filter(Boolean)
+        .join(" | ");
+
+      if (!activePlanNames) return;
+
+      setCurrentUser((prev) => {
+        if (!prev) return prev;
+
+        const updatedUser = {
+          ...prev,
+          subscription_plan: activePlanNames,
+          subscription_status: "مفعل",
+        };
+
+        localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+        sessionStorage.setItem("currentUser", JSON.stringify(updatedUser));
+
+        return updatedUser;
+      });
+    } catch (err) {
+      console.warn("Subscription refresh skipped:", err?.message || err);
+    }
+  };
+
   const markSiteNotificationsRead = async () => {
     if (!currentUser?.email || siteNotifications.length === 0) return;
 
