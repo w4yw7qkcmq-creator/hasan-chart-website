@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const plans = [
   {
@@ -111,13 +111,31 @@ function Feature({ text }) {
 
 export default function SubscriptionsPage() {
   const [loadingPlan, setLoadingPlan] = useState(null);
+  const [notification, setNotification] = useState(null);
+
+  useEffect(() => {
+    if (!notification) return;
+
+    const timer = setTimeout(() => {
+      setNotification(null);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [notification]);
 
   const requestSubscription = async (plan) => {
     const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
 
     if (!currentUser?.email) {
-      alert("يجب تسجيل الدخول أولاً");
-      window.location.href = "/login";
+      setNotification({
+        type: "error",
+        title: "يجب تسجيل الدخول أولاً",
+        message: "سجّل دخولك حتى تتمكن من إرسال طلب الاشتراك.",
+      });
+
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 1200);
       return;
     }
 
@@ -141,13 +159,25 @@ export default function SubscriptionsPage() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.success) {
-        alert("فشل إرسال طلب الاشتراك: " + (result?.error || "حدث خطأ غير معروف"));
+        setNotification({
+          type: "error",
+          title: "فشل إرسال الطلب",
+          message: result?.error || "حدث خطأ غير معروف",
+        });
         return;
       }
 
-      alert("تم إرسال طلب الاشتراك بنجاح ✅ سيتم التواصل معك لإتمام الدفع وتفعيل الباقة.");
+      setNotification({
+        type: "success",
+        title: "تم إرسال طلب الاشتراك ✅",
+        message: "سيتم التواصل معك لإتمام الدفع وتفعيل الباقة.",
+      });
     } catch (err) {
-      alert("حدث خطأ أثناء إرسال طلب الاشتراك");
+      setNotification({
+        type: "error",
+        title: "حدث خطأ أثناء إرسال الطلب",
+        message: "حاول مرة ثانية بعد قليل.",
+      });
     } finally {
       setLoadingPlan(null);
     }
@@ -155,6 +185,30 @@ export default function SubscriptionsPage() {
 
   return (
     <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+      {notification && (
+        <div className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+                {notification.title}
+              </p>
+              <p className="mt-1 text-sm font-bold text-white/90">
+                {notification.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNotification(null)}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
+            <div className="h-full animate-pulse bg-white" />
+          </div>
+        </div>
+      )}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
 
