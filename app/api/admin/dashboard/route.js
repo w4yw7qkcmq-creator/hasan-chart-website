@@ -234,6 +234,135 @@ async function writeAdminLog(supabase, {
   }
 }
 
+function signalTypeLabel(signalType) {
+  return signalType === "futures" ? "Futures" : "Spot";
+}
+
+function matchesSignalSubscription(planText, signalType) {
+  const text = String(planText || "").toLowerCase();
+
+  if (signalType === "futures") {
+    return (
+      text.includes("future") ||
+      text.includes("futures") ||
+      text.includes("فيوتشر") ||
+      text.includes("vip futures")
+    );
+  }
+
+  return (
+    text.includes("spot") ||
+    text.includes("سبوت") ||
+    text.includes("vip spot")
+  );
+}
+
+function buildVipSignalEmailHtml({ signalType, coin, entry, targets, stopLoss, notes }) {
+  const label = signalTypeLabel(signalType);
+
+  return `
+    <div dir="rtl" style="font-family: Arial, sans-serif; background:#f8fafc; padding:24px; color:#0f172a;">
+      <div style="max-width:620px; margin:0 auto; background:white; border-radius:24px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 18px 60px rgba(15,23,42,.08);">
+        <div style="background:linear-gradient(135deg,#06b6d4,#2563eb); color:white; padding:28px; text-align:center;">
+          <div style="font-size:14px; font-weight:800; opacity:.95;">HasaN CharT World</div>
+          <h1 style="margin:10px 0 0; font-size:26px;">🚨 توصية VIP ${label} جديدة</h1>
+        </div>
+        <div style="padding:26px;">
+          <h2 style="margin:0 0 18px; font-size:24px;">${coin}</h2>
+          <div style="display:grid; gap:12px;">
+            <div style="background:#ecfeff; border:1px solid #bae6fd; border-radius:16px; padding:14px;"><b>منطقة الدخول:</b><br/>${entry || "غير محدد"}</div>
+            <div style="background:#ecfdf5; border:1px solid #bbf7d0; border-radius:16px; padding:14px;"><b>الأهداف:</b><br/>${String(targets || "غير محدد").replace(/\n/g, "<br/>")}</div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:16px; padding:14px;"><b>وقف الخسارة:</b><br/>${stopLoss || "غير محدد"}</div>
+            ${notes ? `<div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:16px; padding:14px;"><b>ملاحظات:</b><br/>${String(notes).replace(/\n/g, "<br/>")}</div>` : ""}
+          </div>
+          <p style="margin-top:22px; color:#64748b; font-size:13px; line-height:1.8;">هذه الرسالة مخصصة للمشتركين في توصيات VIP. يرجى الالتزام بإدارة رأس المال.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function sendEmailViaResend({ to, subject, html }) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || "HasaN CharT World <onboarding@resend.dev>";
+
+  if (!resendApiKey || !to) {
+    return { skipped: true };
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to,
+      subject,
+      html,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text || "Email provider error");
+  }
+
+  return response.json().catch(() => ({ success: true }));
+}
+
+async function notifyVipSubscribers(supabase, signal) {
+  try {
+    const { signalType, coin, entry, targets, stopLoss, notes } = signal;
+    const label = signalTypeLabel(signalType);
+
+    const { data: subscriptions, error } = await supabase
+      .from("subscription_requests")
+      .select("user_email,plan_name,category,status")
+      .eq("status", "مفعل");
+
+    if (error) {
+      console.error("VIP subscribers load error:", error.message || error);
+      return;
+    }
+
+    const recipientEmails = [
+      ...new Set(
+        (subscriptions || [])
+          .filter((item) =>
+            matchesSignalSubscription(`${item.plan_name || ""} ${item.category || ""}`, signalType)
+          )
+          .map((item) => String(item.user_email || "").trim().toLowerCase())
+          .filter(Boolean)
+      ),
+    ];
+
+    if (recipientEmails.length === 0) return;
+
+    await supabase.from("notifications").insert(
+      recipientEmails.map((email) => ({
+        user_email: email,
+        title: `🚨 توصية VIP ${label} جديدة`,
+        message: `تم نشر توصية جديدة على ${coin}. افتح صفحة توصيات VIP ${label} للاطلاع على التفاصيل.`,
+        type: signalType === "futures" ? "vip-futures" : "vip-spot",
+        is_read: false,
+      }))
+    );
+
+    const subject = `🚨 توصية VIP ${label} جديدة - ${coin}`;
+    const html = buildVipSignalEmailHtml({ signalType, coin, entry, targets, stopLoss, notes });
+
+    await Promise.allSettled(
+      recipientEmails.map((email) =>
+        sendEmailViaResend({ to: email, subject, html })
+      )
+    );
+  } catch (error) {
+    console.error("VIP subscriber notification error:", error.message || error);
+  }
+}
+
 export async function POST(request) {
   try {
     const supabase = getAdminSupabase();
@@ -292,6 +421,15 @@ export async function POST(request) {
           signalType,
           coin,
         },
+      });
+
+      await notifyVipSubscribers(supabase, {
+        signalType,
+        coin,
+        entry,
+        targets,
+        stopLoss,
+        notes,
       });
 
       return Response.json({ success: true, id: data?.id || null });
