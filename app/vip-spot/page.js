@@ -21,9 +21,19 @@ function getSignalStatus(signal) {
   return expired ? "منتهية" : "نشطة";
 }
 
+const FILTERS = [
+  { key: "all", label: "كل التوصيات" },
+  { key: "active", label: "النشطة" },
+  { key: "expired", label: "المنتهية" },
+];
+
 function SignalCard({ signal }) {
   return (
-    <article className="overflow-hidden rounded-[30px] border border-cyan-200/70 bg-white text-slate-950 shadow-[0_22px_80px_rgba(14,165,233,0.18)]">
+    <article
+      className="overflow-hidden rounded-[30px] border border-cyan-200/70 bg-white text-slate-950 shadow-[0_22px_80px_rgba(14,165,233,0.18)]"
+      onCopy={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div className="border-b border-slate-100 bg-gradient-to-l from-cyan-50 via-sky-50 to-white p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
@@ -73,6 +83,7 @@ function SignalCard({ signal }) {
 export default function VipSpotPage() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFilter, setSelectedFilter] = useState("all");
 
   const loadSignals = async () => {
     setLoading(true);
@@ -110,8 +121,24 @@ export default function VipSpotPage() {
     return () => clearInterval(timer);
   }, []);
 
+  const activeSignals = signals.filter((signal) => getSignalStatus(signal) !== "منتهية");
+  const expiredSignals = signals.filter((signal) => getSignalStatus(signal) === "منتهية");
+
+  const filteredSignals =
+    selectedFilter === "active"
+      ? activeSignals
+      : selectedFilter === "expired"
+        ? expiredSignals
+        : signals;
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020617] text-white">
+    <main
+      className="relative min-h-screen overflow-hidden bg-[#020617] text-white select-none"
+      onContextMenu={(e) => e.preventDefault()}
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+    >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_45%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.18),transparent_35%)]" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 md:px-6">
@@ -134,20 +161,58 @@ export default function VipSpotPage() {
             </div>
           </div>
 
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl border border-cyan-100 bg-cyan-50 p-5 text-center">
+              <p className="text-xs font-black text-cyan-700">كل التوصيات</p>
+              <p className="mt-2 text-3xl font-black text-slate-950">{signals.length}</p>
+            </div>
+            <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 text-center">
+              <p className="text-xs font-black text-emerald-700">التوصيات النشطة</p>
+              <p className="mt-2 text-3xl font-black text-slate-950">{activeSignals.length}</p>
+            </div>
+            <div className="rounded-3xl border border-red-100 bg-red-50 p-5 text-center">
+              <p className="text-xs font-black text-red-700">التوصيات المنتهية</p>
+              <p className="mt-2 text-3xl font-black text-slate-950">{expiredSignals.length}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            {FILTERS.map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setSelectedFilter(filter.key)}
+                className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
+                  selectedFilter === filter.key
+                    ? "bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 text-white shadow-[0_12px_32px_rgba(37,99,235,0.25)]"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
           <div className="mt-12">
             {loading ? (
               <div className="rounded-[28px] border border-cyan-200 bg-cyan-50 p-8 text-center font-black text-cyan-700">
                 جاري تحميل توصيات Spot...
               </div>
-            ) : signals.length === 0 ? (
+            ) : filteredSignals.length === 0 ? (
               <div className="rounded-[28px] border border-dashed border-cyan-200 bg-white p-10 text-center text-slate-950">
                 <div className="mb-4 text-5xl">📭</div>
-                <h2 className="text-2xl font-black">لا توجد توصيات Spot حالياً</h2>
+                <h2 className="text-2xl font-black">
+                  {selectedFilter === "active"
+                    ? "لا توجد توصيات نشطة حالياً"
+                    : selectedFilter === "expired"
+                      ? "لا توجد توصيات منتهية حالياً"
+                      : "لا توجد توصيات Spot حالياً"}
+                </h2>
                 <p className="mt-3 font-bold text-slate-500">عند نشر توصية من لوحة الإدارة ستظهر هنا مباشرة.</p>
               </div>
             ) : (
               <div className="grid gap-6">
-                {signals.map((signal) => (
+                {filteredSignals.map((signal) => (
                   <SignalCard key={signal.id} signal={signal} />
                 ))}
               </div>
