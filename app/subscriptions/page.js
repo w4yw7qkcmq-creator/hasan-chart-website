@@ -112,6 +112,9 @@ function Feature({ text }) {
 export default function SubscriptionsPage() {
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [telegramUsername, setTelegramUsername] = useState("");
+  const [paymentProof, setPaymentProof] = useState("");
 
   useEffect(() => {
     if (!notification) return;
@@ -122,6 +125,36 @@ export default function SubscriptionsPage() {
 
     return () => clearTimeout(timer);
   }, [notification]);
+
+  const handlePaymentProof = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setNotification({
+        type: "error",
+        title: "ملف غير مدعوم",
+        message: "يرجى رفع صورة إشعار الدفع فقط.",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      setPaymentProof(reader.result || "");
+    };
+
+    reader.onerror = () => {
+      setNotification({
+        type: "error",
+        title: "تعذر رفع الصورة",
+        message: "حاول رفع صورة أوضح لإشعار الدفع.",
+      });
+    };
+
+    reader.readAsDataURL(file);
+  };
 
   const requestSubscription = async (plan) => {
     const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
@@ -139,7 +172,37 @@ export default function SubscriptionsPage() {
       return;
     }
 
-    setLoadingPlan(plan.name);
+    setSelectedPlan(plan);
+    setTelegramUsername("");
+    setPaymentProof("");
+  };
+
+  const submitSubscriptionRequest = async () => {
+    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+
+    if (!selectedPlan || !currentUser?.email) return;
+
+    const cleanTelegramUsername = telegramUsername.trim();
+
+    if (!cleanTelegramUsername) {
+      setNotification({
+        type: "error",
+        title: "أدخل يوزر التليجرام",
+        message: "يرجى كتابة يوزر التليجرام حتى يستطيع الدعم التواصل معك.",
+      });
+      return;
+    }
+
+    if (!paymentProof) {
+      setNotification({
+        type: "error",
+        title: "أرفق إشعار الدفع",
+        message: "يرجى رفع صورة إثبات الدفع قبل إرسال الطلب.",
+      });
+      return;
+    }
+
+    setLoadingPlan(selectedPlan.name);
 
     try {
       const response = await fetch("/api/subscription-request", {
@@ -150,9 +213,11 @@ export default function SubscriptionsPage() {
         body: JSON.stringify({
           user_email: currentUser.email,
           username: currentUser.username || currentUser.email,
-          plan_name: plan.name,
-          category: plan.category,
-          price: plan.price,
+          plan_name: selectedPlan.name,
+          category: selectedPlan.category,
+          price: selectedPlan.price,
+          telegram_username: cleanTelegramUsername,
+          payment_proof: paymentProof,
         }),
       });
 
@@ -167,10 +232,14 @@ export default function SubscriptionsPage() {
         return;
       }
 
+      setSelectedPlan(null);
+      setTelegramUsername("");
+      setPaymentProof("");
+
       setNotification({
         type: "success",
-        title: "تم إرسال طلب الاشتراك ✅",
-        message: "سيتم التواصل معك لإتمام الدفع وتفعيل الباقة.",
+        title: "طلبك قيد المعالجة ✅",
+        message: "تم استلام طلب الاشتراك وإثبات الدفع، وسيقوم الدعم بمراجعته وتفعيل الباقة.",
       });
     } catch (err) {
       setNotification({
@@ -213,6 +282,93 @@ export default function SubscriptionsPage() {
             >
               حسناً
             </button>
+          </div>
+        </div>
+      )}
+      {selectedPlan && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-950/60 px-5 backdrop-blur-md">
+          <div className="w-full max-w-xl rounded-[34px] border border-white/70 bg-white p-7 text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-cyan-600">طلب اشتراك جديد</p>
+                <h3 className="mt-2 text-3xl font-black">إتمام طلب الاشتراك</h3>
+                <p className="mt-2 text-sm font-bold leading-7 text-slate-500">
+                  أرسل بيانات الدفع ليتمكن الدعم من مراجعة الطلب وتفعيل الباقة.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPlan(null);
+                  setTelegramUsername("");
+                  setPaymentProof("");
+                }}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-xl font-black text-slate-600 transition hover:bg-slate-200"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4">
+              <div className="rounded-3xl border border-cyan-100 bg-cyan-50/80 p-4">
+                <p className="text-xs font-black text-cyan-700">الباقة المختارة</p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="text-xl font-black text-slate-950">{selectedPlan.name}</span>
+                  <span className="rounded-2xl bg-white px-4 py-2 text-lg font-black text-blue-700 shadow-sm">
+                    {selectedPlan.price}
+                  </span>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-slate-700">يوزر التليجرام</span>
+                <input
+                  value={telegramUsername}
+                  onChange={(event) => setTelegramUsername(event.target.value)}
+                  placeholder="مثال: @username"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-right font-bold text-slate-950 outline-none transition focus:border-cyan-400 focus:bg-white"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-slate-700">صورة إشعار الدفع</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePaymentProof}
+                  className="w-full rounded-2xl border border-dashed border-cyan-300 bg-cyan-50/70 px-4 py-4 text-sm font-bold text-slate-700 file:ml-4 file:rounded-xl file:border-0 file:bg-cyan-600 file:px-4 file:py-2 file:font-black file:text-white"
+                />
+                {paymentProof && (
+                  <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
+                    تم إرفاق صورة إثبات الدفع ✅
+                  </div>
+                )}
+              </label>
+            </div>
+
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={submitSubscriptionRequest}
+                disabled={loadingPlan === selectedPlan.name}
+                className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.28)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loadingPlan === selectedPlan.name ? "جاري إرسال الطلب..." : "إرسال الطلب للمراجعة"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPlan(null);
+                  setTelegramUsername("");
+                  setPaymentProof("");
+                }}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-4 font-black text-slate-700 transition hover:bg-slate-100"
+              >
+                إلغاء
+              </button>
+            </div>
           </div>
         </div>
       )}

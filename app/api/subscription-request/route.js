@@ -21,8 +21,10 @@ export async function POST(request) {
     const planName = String(body.plan_name || "").trim();
     const category = String(body.category || "").trim();
     const price = String(body.price || "").trim();
+    const telegramUsername = String(body.telegram_username || "").trim();
+    const paymentProof = String(body.payment_proof || "").trim();
 
-    if (!userEmail || !planName || !category || !price) {
+    if (!userEmail || !planName || !category || !price || !telegramUsername || !paymentProof) {
       return NextResponse.json(
         {
           success: false,
@@ -39,7 +41,9 @@ export async function POST(request) {
         plan_name: planName,
         category,
         price,
-        status: "pending",
+        telegram_username: telegramUsername,
+        payment_proof: paymentProof,
+        status: "قيد المعالجة",
       },
     ]);
 
