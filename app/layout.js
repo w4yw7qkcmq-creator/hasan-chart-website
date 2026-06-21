@@ -343,27 +343,27 @@ export default function RootLayout({ children }) {
     if (!currentUser?.email) return;
 
     try {
-      const { data } = await supabase
-        .from("subscription_requests")
-        .select("plan_name,status")
-        .eq("user_email", currentUser.email)
-        .eq("status", "مفعل")
-        .order("created_at", { ascending: false });
+      const response = await fetch(
+        `/api/my-subscription-status?email=${encodeURIComponent(currentUser.email)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
 
-      const activePlanNames = (data || [])
-        .map((item) => item.plan_name)
-        .filter(Boolean)
-        .join(" | ");
+      const result = await response.json().catch(() => null);
 
-      if (!activePlanNames) return;
+      if (!response.ok || !result?.success || !result?.active) {
+        return;
+      }
 
       setCurrentUser((prev) => {
         if (!prev) return prev;
 
         const updatedUser = {
           ...prev,
-          subscription_plan: activePlanNames,
-          subscription_status: "مفعل",
+          subscription_plan: result.subscription_plan || "",
+          subscription_status: result.subscription_status || "مفعل",
         };
 
         localStorage.setItem("currentUser", JSON.stringify(updatedUser));
