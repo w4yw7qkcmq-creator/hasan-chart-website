@@ -2,6 +2,25 @@
 
 import { useEffect, useState } from "react";
 
+function getSignalStatus(signal) {
+  const createdAt = signal.created_at || signal.createdAt;
+
+  if (!createdAt) {
+    return signal.status || "نشطة";
+  }
+
+  const createdTime = new Date(createdAt).getTime();
+
+  if (!Number.isFinite(createdTime)) {
+    return signal.status || "نشطة";
+  }
+
+  const tenMinutes = 10 * 60 * 1000;
+  const expired = Date.now() - createdTime >= tenMinutes;
+
+  return expired ? "منتهية" : "نشطة";
+}
+
 function SignalCard({ signal }) {
   return (
     <article className="rounded-[28px] border border-cyan-200 bg-white p-6 shadow-[0_20px_70px_rgba(14,116,144,0.15)]">
@@ -13,9 +32,15 @@ function SignalCard({ signal }) {
           <h3 className="mt-4 text-3xl font-black text-slate-950">{signal.coin}</h3>
           <p className="mt-2 text-sm text-slate-400">{signal.createdAt}</p>
         </div>
-        <span className="rounded-full border border-emerald-300/50 bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700">
-          {signal.status || "نشطة"}
-        </span>
+        {getSignalStatus(signal) === "منتهية" ? (
+          <span className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700">
+            منتهية
+          </span>
+        ) : (
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700">
+            نشطة
+          </span>
+        )}
       </div>
 
       <div className="mt-6 grid gap-3 md:grid-cols-3">
@@ -76,7 +101,10 @@ export default function VipFuturesPage() {
   useEffect(() => {
     loadSignals();
 
-    const timer = setInterval(loadSignals, 10000);
+    const timer = setInterval(() => {
+      loadSignals();
+      setSignals((prev) => [...prev]);
+    }, 10000);
 
     return () => clearInterval(timer);
   }, []);
