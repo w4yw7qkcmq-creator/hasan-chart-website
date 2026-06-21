@@ -390,11 +390,11 @@ export default function MyAnalysisPage() {
                       تكبير الصورة داخل الموقع
                     </button>
                     {fullImageOpen && (
-                      <div className="fixed inset-y-0 left-0 right-0 z-[10000] flex items-center justify-center bg-black/95 p-3 backdrop-blur-lg md:right-[305px]">
+                      <div className="fixed inset-y-0 left-0 right-0 z-[10000] flex items-center justify-center bg-[#020817] p-0 backdrop-blur-lg md:right-[305px]">
                         <button
                           type="button"
                           onClick={() => setFullImageOpen(false)}
-                          className="absolute left-4 top-4 z-10 rounded-2xl border border-white/25 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-black !text-white shadow-[0_0_25px_rgba(0,163,255,0.35)]"
+                          className="absolute left-5 top-5 z-10 rounded-2xl border border-white/25 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-black !text-white shadow-[0_0_25px_rgba(0,163,255,0.35)]"
                         >
                           إغلاق الصورة ✕
                         </button>
@@ -404,7 +404,7 @@ export default function MyAnalysisPage() {
                           alt="صورة التحليل بالحجم الكامل"
                           loading="lazy"
                           decoding="async"
-                          className="max-h-[92vh] w-auto max-w-[calc(100vw-340px)] rounded-2xl object-contain shadow-[0_0_80px_rgba(0,0,0,0.65)] max-md:max-w-[94vw]"
+                          className="h-screen w-full rounded-none object-contain shadow-[0_0_80px_rgba(0,0,0,0.65)] md:h-screen md:w-full"
                         />
                       </div>
                     )}
