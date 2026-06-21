@@ -134,7 +134,9 @@ const formatSubscriptionRequest = (item) => ({
   planName: item.plan_name,
   category: item.category,
   price: item.price,
-  status: item.status || "بانتظار الدفع",
+  telegramUsername: item.telegram_username || "",
+  paymentProof: item.payment_proof || "",
+  status: item.status || "قيد المعالجة",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
 });
 
@@ -1425,6 +1427,11 @@ export default function AdminPage() {
                         <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
                           السعر: <b className="text-cyan-100">{req.price}</b>
                         </span>
+                        {req.telegramUsername && (
+                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
+                            تليجرام: <b className="text-cyan-100">{req.telegramUsername}</b>
+                          </span>
+                        )}
                         <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
                           التاريخ: {req.createdAt}
                         </span>
@@ -1452,6 +1459,40 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </div>
+                  {(req.telegramUsername || req.paymentProof) && (
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      {req.telegramUsername && (
+                        <div className="rounded-2xl border border-cyan-300/15 bg-black/20 p-4">
+                          <p className="text-xs font-bold text-slate-500">يوزر التليجرام</p>
+                          <p className="mt-2 break-all font-black text-cyan-100">{req.telegramUsername}</p>
+                        </div>
+                      )}
+
+                      {req.paymentProof && (
+                        <div className="rounded-2xl border border-cyan-300/15 bg-black/20 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-bold text-slate-500">إثبات الدفع</p>
+                              <p className="mt-2 font-black text-cyan-100">صورة إشعار الدفع مرفقة</p>
+                            </div>
+                            <a
+                              href={req.paymentProof}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-xl bg-cyan-500/20 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-500/30"
+                            >
+                              فتح الصورة
+                            </a>
+                          </div>
+                          <img
+                            src={req.paymentProof}
+                            alt="إثبات الدفع"
+                            className="mt-4 max-h-[260px] w-full rounded-2xl border border-cyan-300/15 object-contain bg-black/30"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
