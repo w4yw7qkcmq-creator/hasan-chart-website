@@ -731,7 +731,7 @@ export default function AdminPage() {
         try {
           const canvas = document.createElement("canvas");
 
-          const maxWidth = 1800;
+          const maxWidth = 2560;
           const scale = Math.min(maxWidth / img.width, 1);
 
           canvas.width = img.width * scale;
@@ -768,7 +768,7 @@ export default function AdminPage() {
               compressedReader.readAsDataURL(blob);
             },
             "image/jpeg",
-            0.9
+            0.95
           );
         } catch (err) {
           console.error("Image upload error:", err);
