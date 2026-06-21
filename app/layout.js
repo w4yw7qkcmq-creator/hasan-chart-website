@@ -51,6 +51,7 @@ export default function RootLayout({ children }) {
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadAnalysisReplies, setUnreadAnalysisReplies] = useState(0);
+  const [siteNotifications, setSiteNotifications] = useState([]);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [theme, setTheme] = useState("dark");
   const fallbackAdminEmails = [
@@ -207,6 +208,67 @@ export default function RootLayout({ children }) {
 
   useEffect(() => {
     if (!currentUser?.email) {
+      setSiteNotifications([]);
+      return;
+    }
+
+    const loadSiteNotifications = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("notifications")
+          .select("id,title,message,type,is_read,created_at,user_email")
+          .eq("user_email", currentUser.email)
+          .eq("is_read", false)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (error) return;
+        setSiteNotifications(data || []);
+      } catch (err) {
+        console.warn("Site notifications skipped:", err?.message || err);
+      }
+    };
+
+    loadSiteNotifications();
+    const timer = setInterval(loadSiteNotifications, 10000);
+
+    const channel = supabase
+      .channel(`global-site-notifications-${currentUser.email}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_email=eq.${currentUser.email}`,
+        },
+        (payload) => {
+          const notification = payload.new;
+          setSiteNotifications((prev) => [notification, ...prev].slice(0, 10));
+
+          const message = notification?.title || "وصلك إشعار جديد";
+          setGlobalNotice(message);
+          setGlobalNoticeHref(notification?.type === "subscription" ? "/subscriptions" : "");
+          setNotificationMenuOpen(true);
+
+          if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+            new Notification("HasaN CharT", {
+              body: notification?.message || message,
+              icon: "/logo.png",
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser?.email) {
       setUnreadAnalysisReplies(0);
       return;
     }
@@ -237,6 +299,23 @@ export default function RootLayout({ children }) {
 
     refreshUnreadReplies();
   }, [currentUser, pathname]);
+
+  const markSiteNotificationsRead = async () => {
+    if (!currentUser?.email || siteNotifications.length === 0) return;
+
+    const ids = siteNotifications.map((item) => item.id).filter(Boolean);
+    setSiteNotifications([]);
+
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .in("id", ids)
+        .eq("user_email", currentUser.email);
+    } catch (err) {
+      console.warn("Mark notifications read skipped:", err?.message || err);
+    }
+  };
 
   const logout = async () => {
     localStorage.removeItem("currentUser");
@@ -873,6 +952,7 @@ export default function RootLayout({ children }) {
                             const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
                             localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
                             setUnreadAnalysisReplies(0);
+                            markSiteNotificationsRead();
                           }
 
                           return nextOpen;
@@ -882,9 +962,9 @@ export default function RootLayout({ children }) {
                       aria-label="الإشعارات"
                     >
                       🔔
-                      {unreadAnalysisReplies > 0 && (
+                      {unreadAnalysisReplies + siteNotifications.length > 0 && (
                         <span className="absolute -right-2 -top-2 grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
-                          {unreadAnalysisReplies > 9 ? "9+" : unreadAnalysisReplies}
+                          {unreadAnalysisReplies + siteNotifications.length > 9 ? "9+" : unreadAnalysisReplies + siteNotifications.length}
                         </span>
                       )}
                     </button>
@@ -907,22 +987,41 @@ export default function RootLayout({ children }) {
                           </button>
                         </div>
 
-                        {unreadAnalysisReplies > 0 ? (
-                          <Link
-                            href="/my-analysis"
-                            onClick={() => {
-                              const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
-                              localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
-                              setNotificationMenuOpen(false);
-                              setUnreadAnalysisReplies(0);
-                            }}
-                            className="block rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 transition hover:bg-emerald-400/20"
-                          >
-                            <p className="font-black text-emerald-100">📩 لديك ردود إدارة جديدة</p>
-                            <p className="mt-1 text-sm text-slate-400">
-                              عدد الردود غير المقروءة: {unreadAnalysisReplies}
-                            </p>
-                          </Link>
+                        {unreadAnalysisReplies > 0 || siteNotifications.length > 0 ? (
+                          <div className="space-y-3">
+                            {siteNotifications.map((notification) => (
+                              <Link
+                                key={notification.id}
+                                href={notification.type === "subscription" ? "/subscriptions" : "/my-dashboard"}
+                                onClick={() => {
+                                  markSiteNotificationsRead();
+                                  setNotificationMenuOpen(false);
+                                }}
+                                className="block rounded-2xl border border-white/25 bg-white/20 p-4 transition hover:bg-white/30"
+                              >
+                                <p className="font-black !text-white">{notification.title}</p>
+                                <p className="mt-1 text-sm font-bold !text-white/85">{notification.message}</p>
+                              </Link>
+                            ))}
+
+                            {unreadAnalysisReplies > 0 && (
+                              <Link
+                                href="/my-analysis"
+                                onClick={() => {
+                                  const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
+                                  localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
+                                  setNotificationMenuOpen(false);
+                                  setUnreadAnalysisReplies(0);
+                                }}
+                                className="block rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 transition hover:bg-emerald-400/20"
+                              >
+                                <p className="font-black text-emerald-100">📩 لديك ردود إدارة جديدة</p>
+                                <p className="mt-1 text-sm text-white/80">
+                                  عدد الردود غير المقروءة: {unreadAnalysisReplies}
+                                </p>
+                              </Link>
+                            )}
+                          </div>
                         ) : (
                           <div className="rounded-2xl border border-white/30 bg-white/20 p-4 text-sm text-white font-bold">
                             لا توجد إشعارات جديدة حالياً.
