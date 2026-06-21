@@ -369,6 +369,14 @@ export async function POST(request) {
             profileError.message || "تم تحديث الطلب لكن تعذر تفعيل اشتراك المستخدم"
           );
         }
+
+        await supabase.from("notifications").insert({
+          user_email: userEmail,
+          title: "تم تفعيل اشتراكك بنجاح 🎉",
+          message: `تم تفعيل اشتراك ${planName || "الخاص بك"} ويمكنك الآن استخدام جميع المزايا المتاحة.`,
+          type: "subscription",
+          is_read: false,
+        });
       }
 
       await writeAdminLog(supabase, {
