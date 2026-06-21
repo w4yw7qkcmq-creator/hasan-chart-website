@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -30,7 +28,7 @@ async function sendEmailViaResend({ to, subject, html }) {
 
   if (!resendApiKey || !to) return;
 
-  await fetch("https://api.resend.com/emails", {
+  const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${resendApiKey}`,
@@ -43,6 +41,11 @@ async function sendEmailViaResend({ to, subject, html }) {
       html,
     }),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    console.error("Resend expiry email error:", errorText || response.statusText);
+  }
 }
 
 export async function GET(request) {
@@ -57,7 +60,7 @@ export async function GET(request) {
     if (email) {
       const { data: subscription } = await supabase
         .from("subscription_requests")
-        .select("status,expires_at")
+        .select("id,status,expires_at,expired_notice_sent,plan_name")
         .eq("user_email", email)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -72,20 +75,22 @@ export async function GET(request) {
         subscription &&
         subscription.expires_at &&
         new Date(subscription.expires_at).getTime() <= Date.now() &&
-        subscription.status !== "منتهي"
+        !subscription.expired_notice_sent
       ) {
+        const planName = subscription.plan_name || "اشتراك VIP";
+
         await supabase
           .from("subscription_requests")
           .update({
             status: "منتهي",
             expired_notice_sent: true,
           })
-          .eq("user_email", email);
+          .eq("id", subscription.id);
 
         await supabase.from("notifications").insert({
           user_email: email,
           title: "انتهى اشتراكك ⚠️",
-          message: "انتهت صلاحية اشتراكك. يمكنك التجديد من صفحة الباقات.",
+          message: `انتهت صلاحية ${planName}. يمكنك التجديد من صفحة الباقات.`,
           type: "subscription-expired",
           is_read: false,
         });
@@ -94,10 +99,22 @@ export async function GET(request) {
           to: email,
           subject: "انتهاء الاشتراك - HasaN CharT World",
           html: `
-            <div dir="rtl" style="font-family:Arial,sans-serif;padding:24px">
-              <h2>انتهت صلاحية اشتراكك</h2>
-              <p>تم إيقاف الوصول إلى خدمات VIP بسبب انتهاء مدة الاشتراك.</p>
-              <p><a href="https://www.hasanchartworld.com/subscriptions">تجديد الاشتراك</a></p>
+            <div dir="rtl" style="background:#f8fafc;padding:24px;color:#0f172a">
+              <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden">
+                <div style="background:linear-gradient(135deg,#06b6d4,#2563eb);color:white;padding:26px;text-align:center">
+                  <h2 style="margin:0;font-size:24px">انتهت صلاحية اشتراكك ⚠️</h2>
+                </div>
+                <div style="padding:26px;line-height:1.9">
+                  <p>انتهت صلاحية الباقة التالية:</p>
+                  <p style="font-size:20px"><strong>${planName}</strong></p>
+                  <p>تم إيقاف الوصول إلى خدمات VIP بسبب انتهاء مدة الاشتراك.</p>
+                  <p style="margin-top:24px">
+                    <a href="https://www.hasanchartworld.com/subscriptions" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:14px;padding:12px 22px;font-weight:800">
+                      تجديد الاشتراك
+                    </a>
+                  </p>
+                </div>
+              </div>
             </div>
           `,
         });
