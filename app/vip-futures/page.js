@@ -1,43 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
 
 function SignalCard({ signal }) {
   return (
-    <article className="rounded-[28px] border border-fuchsia-300/15 bg-black/25 p-6 shadow-[0_20px_70px_rgba(168,85,247,0.14)] backdrop-blur-2xl">
+    <article className="rounded-[28px] border border-cyan-200 bg-white p-6 shadow-[0_20px_70px_rgba(14,116,144,0.15)]">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <span className="inline-flex rounded-full border border-fuchsia-300/20 bg-fuchsia-400/10 px-4 py-2 text-xs font-black text-fuchsia-100">
-            VIP FUTURES
+          <span className="inline-flex rounded-full border border-amber-300/50 bg-amber-100 px-4 py-2 text-xs font-black text-amber-700">
+            VIP FUTURES 🔥
           </span>
-          <h3 className="mt-4 text-3xl font-black text-white">{signal.coin}</h3>
-          <p className="mt-2 text-sm text-slate-500">{signal.createdAt}</p>
+          <h3 className="mt-4 text-3xl font-black text-slate-950">{signal.coin}</h3>
+          <p className="mt-2 text-sm text-slate-400">{signal.createdAt}</p>
         </div>
-        <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-4 py-2 text-sm font-black text-emerald-100">
+        <span className="rounded-full border border-emerald-300/50 bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700">
           {signal.status || "نشطة"}
         </span>
       </div>
 
       <div className="mt-6 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="rounded-2xl border border-white/10 bg-cyan-50 p-4">
           <p className="text-xs font-bold text-slate-500">منطقة الدخول</p>
-          <p className="mt-2 font-black text-fuchsia-100">{signal.entry || "غير محدد"}</p>
+          <p className="mt-2 font-black text-cyan-700">{signal.entry || "غير محدد"}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="rounded-2xl border border-white/10 bg-emerald-50 p-4">
           <p className="text-xs font-bold text-slate-500">الأهداف</p>
-          <p className="mt-2 whitespace-pre-line font-black text-emerald-100">{signal.targets || "غير محدد"}</p>
+          <p className="mt-2 whitespace-pre-line font-black text-emerald-700">{signal.targets || "غير محدد"}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="rounded-2xl border border-white/10 bg-red-50 p-4">
           <p className="text-xs font-bold text-slate-500">وقف الخسارة</p>
-          <p className="mt-2 font-black text-red-100">{signal.stop_loss || "غير محدد"}</p>
+          <p className="mt-2 font-black text-red-700">{signal.stop_loss || "غير محدد"}</p>
         </div>
       </div>
 
       {signal.notes && (
-        <div className="mt-5 rounded-2xl border border-fuchsia-300/15 bg-fuchsia-400/5 p-5">
-          <p className="text-sm font-bold text-fuchsia-200">ملاحظات التوصية</p>
-          <p className="mt-2 whitespace-pre-line leading-8 text-slate-200">{signal.notes}</p>
+        <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+          <p className="text-sm font-bold text-blue-700">ملاحظات التوصية</p>
+          <p className="mt-2 whitespace-pre-line leading-8 text-slate-700">{signal.notes}</p>
         </div>
       )}
     </article>
@@ -51,79 +50,71 @@ export default function VipFuturesPage() {
   const loadSignals = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("vip_signals")
-      .select("*")
-      .eq("signal_type", "futures")
-      .order("created_at", { ascending: false });
+    try {
+      const response = await fetch("/api/vip-signals?type=futures", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-    if (error) {
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        console.error("VIP Futures signals error:", result?.error || "Unknown error");
+        setSignals([]);
+        return;
+      }
+
+      setSignals(result.signals || []);
+    } catch (error) {
       console.error("VIP Futures signals error:", error);
       setSignals([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setSignals(
-      (data || []).map((item) => ({
-        ...item,
-        createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
-      }))
-    );
-    setLoading(false);
   };
 
   useEffect(() => {
     loadSignals();
 
-    const channel = supabase
-      .channel("vip-futures-signals")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "vip_signals", filter: "signal_type=eq.futures" },
-        () => loadSignals()
-      )
-      .subscribe();
+    const timer = setInterval(loadSignals, 10000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020617] text-white">
+    <main className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-950">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_45%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.18),transparent_35%)]" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 md:px-6">
-        <div className="rounded-[36px] border border-fuchsia-300/15 bg-white/[0.05] p-8 shadow-[0_30px_120px_rgba(15,23,42,0.8)] backdrop-blur-3xl md:p-12">
+        <div className="rounded-[36px] border border-cyan-200/70 bg-white/90 p-8 shadow-[0_30px_120px_rgba(15,23,42,0.1)] backdrop-blur-3xl md:p-12 text-slate-950">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-fuchsia-400/10 px-4 py-2 text-sm font-black text-fuchsia-100">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-amber-200 px-4 py-2 text-sm font-black text-amber-700">
                 🔥 قسم توصيات VIP Futures
               </div>
 
               <h1 className="text-4xl font-black md:text-6xl">توصيات Futures الاحترافية</h1>
 
-              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
+              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-600 font-bold">
                 هنا تظهر توصيات الفيوتشر الخاصة بالمشتركين فقط، ويتم تحديثها مباشرة عند نشر توصية جديدة من لوحة الإدارة.
               </p>
             </div>
 
-            <div className="grid h-32 w-32 place-items-center rounded-[32px] border border-fuchsia-300/20 bg-fuchsia-400/10 text-6xl shadow-[0_0_50px_rgba(217,70,239,0.18)]">
+            <div className="grid h-32 w-32 place-items-center rounded-[32px] border border-cyan-200 bg-cyan-50 text-6xl shadow-[0_0_50px_rgba(14,116,144,0.18)]">
               🔥
             </div>
           </div>
 
           <div className="mt-12">
             {loading ? (
-              <div className="rounded-[28px] border border-fuchsia-300/15 bg-black/20 p-8 text-center text-fuchsia-100">
+              <div className="rounded-[28px] border border-cyan-200 bg-cyan-50 p-8 text-center text-cyan-700">
                 جاري تحميل توصيات Futures...
               </div>
             ) : signals.length === 0 ? (
-              <div className="rounded-[28px] border border-dashed border-fuchsia-300/20 bg-black/20 p-10 text-center">
+              <div className="rounded-[28px] border border-cyan-200 bg-white p-10 text-center text-slate-950">
                 <div className="mb-4 text-5xl">📭</div>
                 <h2 className="text-2xl font-black">لا توجد توصيات Futures حالياً</h2>
-                <p className="mt-3 text-slate-400">عند نشر توصية من لوحة الإدارة ستظهر هنا مباشرة.</p>
+                <p className="mt-3 font-bold text-slate-500">عند نشر توصية من لوحة الإدارة ستظهر هنا مباشرة.</p>
               </div>
             ) : (
               <div className="grid gap-6">
