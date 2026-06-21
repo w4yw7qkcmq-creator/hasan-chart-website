@@ -1,47 +1,69 @@
-
-
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
 );
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
 
-    const { user_email, username, plan_name, category, price } = body;
+    const userEmail = String(body.user_email || body.email || "").trim().toLowerCase();
+    const username = String(body.username || userEmail || "").trim();
+    const planName = String(body.plan_name || "").trim();
+    const category = String(body.category || "").trim();
+    const price = String(body.price || "").trim();
 
-    const { error } = await supabase
-      .from('subscription_requests')
-      .insert([
+    if (!userEmail || !planName || !category || !price) {
+      return NextResponse.json(
         {
-          user_email,
-          username,
-          plan_name,
-          category,
-          price,
-          status: 'pending'
-        }
-      ]);
+          success: false,
+          error: "بيانات طلب الاشتراك غير مكتملة",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase.from("subscription_requests").insert([
+      {
+        user_email: userEmail,
+        username,
+        plan_name: planName,
+        category,
+        price,
+        status: "pending",
+      },
+    ]);
 
     if (error) {
-      return NextResponse.json({
-        success: false,
-        error: error.message
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'تم إرسال طلب الاشتراك بنجاح'
+      message: "تم إرسال طلب الاشتراك بنجاح",
     });
   } catch (err) {
-    return NextResponse.json({
-      success: false,
-      error: err.message
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: err?.message || "Server Error",
+      },
+      { status: 500 }
+    );
   }
 }
