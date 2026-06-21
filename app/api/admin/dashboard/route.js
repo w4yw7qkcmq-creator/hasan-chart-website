@@ -234,8 +234,24 @@ async function writeAdminLog(supabase, {
   }
 }
 
+
 function signalTypeLabel(signalType) {
   return signalType === "futures" ? "Futures" : "Spot";
+}
+
+function normalizeVipSignalType(value) {
+  const text = String(value || "").trim().toLowerCase();
+
+  if (
+    text.includes("future") ||
+    text.includes("futures") ||
+    text.includes("فيوتشر") ||
+    text.includes("عقود")
+  ) {
+    return "futures";
+  }
+
+  return "spot";
 }
 
 function matchesSignalSubscription(planText, signalType) {
@@ -315,7 +331,8 @@ async function sendEmailViaResend({ to, subject, html }) {
 async function notifyVipSubscribers(supabase, signal) {
   try {
     const { signalType, coin, entry, targets, stopLoss, notes } = signal;
-    const label = signalTypeLabel(signalType);
+    const normalizedSignalType = normalizeVipSignalType(signalType);
+    const label = signalTypeLabel(normalizedSignalType);
 
     const { data: subscriptions, error } = await supabase
       .from("subscription_requests")
@@ -331,7 +348,7 @@ async function notifyVipSubscribers(supabase, signal) {
       ...new Set(
         (subscriptions || [])
           .filter((item) =>
-            matchesSignalSubscription(`${item.plan_name || ""} ${item.category || ""}`, signalType)
+            matchesSignalSubscription(`${item.plan_name || ""} ${item.category || ""}`, normalizedSignalType)
           )
           .map((item) => String(item.user_email || "").trim().toLowerCase())
           .filter(Boolean)
@@ -345,13 +362,13 @@ async function notifyVipSubscribers(supabase, signal) {
         user_email: email,
         title: `🚨 توصية VIP ${label} جديدة`,
         message: `تم نشر توصية جديدة على ${coin}. افتح صفحة توصيات VIP ${label} للاطلاع على التفاصيل.`,
-        type: signalType === "futures" ? "vip-futures" : "vip-spot",
+        type: normalizedSignalType === "futures" ? "vip-futures" : "vip-spot",
         is_read: false,
       }))
     );
 
     const subject = `🚨 توصية VIP ${label} جديدة - ${coin}`;
-    const html = buildVipSignalEmailHtml({ signalType, coin, entry, targets, stopLoss, notes });
+    const html = buildVipSignalEmailHtml({ signalType: normalizedSignalType, coin, entry, targets, stopLoss, notes });
 
     await Promise.allSettled(
       recipientEmails.map((email) =>
@@ -380,14 +397,14 @@ export async function POST(request) {
     }
 
     if (action === "publish-vip-signal") {
-      const signalType = String(payload.signalType || "").trim();
+      const signalType = normalizeVipSignalType(payload.signalType);
       const coin = String(payload.coin || "").trim().toUpperCase();
       const entry = String(payload.entry || "").trim();
       const targets = String(payload.targets || "").trim();
       const stopLoss = String(payload.stopLoss || "").trim();
       const notes = String(payload.notes || "").trim();
 
-      if (!signalType || !coin) {
+      if (!coin) {
         return Response.json(
           { success: false, error: "نوع التوصية واسم العملة مطلوبان" },
           { status: 400 }
