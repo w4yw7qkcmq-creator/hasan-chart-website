@@ -1058,19 +1058,34 @@ export default function RootLayout({ children }) {
                   <div className="relative hidden sm:block">
                     <button
                       type="button"
-                      onClick={() => {
-                        setNotificationMenuOpen((open) => {
-                          const nextOpen = !open;
+                      onClick={async () => {
+                        const nextOpen = !notificationMenuOpen;
 
-                          if (nextOpen) {
-                            const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
-                            localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
-                            setUnreadAnalysisReplies(0);
-                            setSiteNotificationBadgeCleared(true);
+                        if (nextOpen) {
+                          const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
+                          localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
+                          setUnreadAnalysisReplies(0);
+
+                          try {
+                            const response = await fetch(
+                              `/api/my-notifications?email=${encodeURIComponent(currentUser.email)}`,
+                              {
+                                method: "GET",
+                                cache: "no-store",
+                              }
+                            );
+
+                            const result = await response.json().catch(() => null);
+
+                            if (response.ok && result?.success) {
+                              setSiteNotifications(result.notifications || []);
+                            }
+                          } catch (err) {
+                            console.warn("Open notifications refresh skipped:", err?.message || err);
                           }
+                        }
 
-                          return nextOpen;
-                        });
+                        setNotificationMenuOpen(nextOpen);
                       }}
                       className="relative grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-xl text-cyan-100 shadow-[0_0_24px_rgba(0,163,255,0.18)] transition hover:bg-cyan-400/20"
                       aria-label="الإشعارات"
@@ -1103,7 +1118,15 @@ export default function RootLayout({ children }) {
                             {siteNotifications.map((notification) => (
                               <Link
                                 key={notification.id}
-                                href={notification.type === "subscription" ? "/subscriptions" : "/my-dashboard"}
+                                href={
+                                  notification.type === "subscription"
+                                    ? "/subscriptions"
+                                    : notification.type === "vip-futures"
+                                      ? "/vip-futures"
+                                      : notification.type === "vip-spot"
+                                        ? "/vip-spot"
+                                        : "/my-dashboard"
+                                }
                                 onClick={() => {
                                   markSiteNotificationsRead();
                                   setNotificationMenuOpen(false);
@@ -1124,10 +1147,10 @@ export default function RootLayout({ children }) {
                                   setNotificationMenuOpen(false);
                                   setUnreadAnalysisReplies(0);
                                 }}
-                                className="block rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 transition hover:bg-emerald-400/20"
+                                className="block rounded-2xl border border-emerald-100 bg-emerald-50 p-4 transition hover:bg-emerald-100"
                               >
-                                <p className="font-black text-emerald-100">📩 لديك ردود إدارة جديدة</p>
-                                <p className="mt-1 text-sm text-white/80">
+                                <p className="font-black text-slate-950">📩 لديك ردود إدارة جديدة</p>
+                                <p className="mt-1 text-sm font-bold text-slate-600">
                                   عدد الردود غير المقروءة: {unreadAnalysisReplies}
                                 </p>
                               </Link>
