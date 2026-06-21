@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
 
 function SignalCard({ signal }) {
   return (
@@ -51,43 +50,34 @@ export default function VipSpotPage() {
   const loadSignals = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("vip_signals")
-      .select("*")
-      .eq("signal_type", "spot")
-      .order("created_at", { ascending: false });
+    try {
+      const response = await fetch("/api/vip-signals?type=spot", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-    if (error) {
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        console.error("VIP Spot signals error:", result?.error || "Unknown error");
+        setSignals([]);
+        return;
+      }
+
+      setSignals(result.signals || []);
+    } catch (error) {
       console.error("VIP Spot signals error:", error);
       setSignals([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setSignals(
-      (data || []).map((item) => ({
-        ...item,
-        createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
-      }))
-    );
-    setLoading(false);
   };
 
   useEffect(() => {
     loadSignals();
+    const timer = setInterval(loadSignals, 10000);
 
-    const channel = supabase
-      .channel("vip-spot-signals")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "vip_signals", filter: "signal_type=eq.spot" },
-        () => loadSignals()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   return (
