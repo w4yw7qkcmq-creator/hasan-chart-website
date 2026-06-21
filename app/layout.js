@@ -357,17 +357,42 @@ export default function RootLayout({ children }) {
         return;
       }
 
+      const activePlanText = result.subscription_plan || "اشتراكك";
+      const activationNoticeKey = `subscriptionActivationNotice-${currentUser.email}-${activePlanText}`;
+      const alreadyNotified = localStorage.getItem(activationNoticeKey) === "yes";
+
       setCurrentUser((prev) => {
         if (!prev) return prev;
 
+        const wasInactive = !["نشط", "active", "مفعل"].includes(
+          String(prev.subscription_status || "").toLowerCase()
+        );
+
         const updatedUser = {
           ...prev,
-          subscription_plan: result.subscription_plan || "",
+          subscription_plan: activePlanText,
           subscription_status: result.subscription_status || "مفعل",
         };
 
         localStorage.setItem("currentUser", JSON.stringify(updatedUser));
         sessionStorage.setItem("currentUser", JSON.stringify(updatedUser));
+
+        if ((wasInactive || !alreadyNotified) && !alreadyNotified) {
+          const notice = {
+            id: `local-subscription-${Date.now()}`,
+            title: "تم تفعيل اشتراكك بنجاح 🎉",
+            message: `تم تفعيل ${activePlanText} ويمكنك الآن استخدام صفحات التوصيات الخاصة بك.`,
+            type: "subscription",
+            is_read: false,
+          };
+
+          localStorage.setItem(activationNoticeKey, "yes");
+          setSiteNotifications((prevNotifications) => [notice, ...prevNotifications].slice(0, 10));
+          setSiteNotificationBadgeCleared(false);
+          setGlobalNotice(notice.title);
+          setGlobalNoticeHref("/subscriptions");
+          setNotificationMenuOpen(true);
+        }
 
         return updatedUser;
       });
