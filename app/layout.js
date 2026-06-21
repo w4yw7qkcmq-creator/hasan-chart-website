@@ -52,6 +52,7 @@ export default function RootLayout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadAnalysisReplies, setUnreadAnalysisReplies] = useState(0);
   const [siteNotifications, setSiteNotifications] = useState([]);
+  const [siteNotificationBadgeCleared, setSiteNotificationBadgeCleared] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [theme, setTheme] = useState("dark");
   const fallbackAdminEmails = [
@@ -224,6 +225,9 @@ export default function RootLayout({ children }) {
 
         if (error) return;
         setSiteNotifications(data || []);
+        if ((data || []).length > 0 && !notificationMenuOpen) {
+          setSiteNotificationBadgeCleared(false);
+        }
       } catch (err) {
         console.warn("Site notifications skipped:", err?.message || err);
       }
@@ -245,6 +249,7 @@ export default function RootLayout({ children }) {
         (payload) => {
           const notification = payload.new;
           setSiteNotifications((prev) => [notification, ...prev].slice(0, 10));
+          setSiteNotificationBadgeCleared(false);
 
           const message = notification?.title || "وصلك إشعار جديد";
           setGlobalNotice(message);
@@ -305,6 +310,7 @@ export default function RootLayout({ children }) {
 
     const ids = siteNotifications.map((item) => item.id).filter(Boolean);
     setSiteNotifications([]);
+    setSiteNotificationBadgeCleared(false);
 
     try {
       await supabase
@@ -952,7 +958,7 @@ export default function RootLayout({ children }) {
                             const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
                             localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
                             setUnreadAnalysisReplies(0);
-                            markSiteNotificationsRead();
+                            setSiteNotificationBadgeCleared(true);
                           }
 
                           return nextOpen;
@@ -962,9 +968,9 @@ export default function RootLayout({ children }) {
                       aria-label="الإشعارات"
                     >
                       🔔
-                      {unreadAnalysisReplies + siteNotifications.length > 0 && (
+                      {unreadAnalysisReplies + (siteNotificationBadgeCleared ? 0 : siteNotifications.length) > 0 && (
                         <span className="absolute -right-2 -top-2 grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
-                          {unreadAnalysisReplies + siteNotifications.length > 9 ? "9+" : unreadAnalysisReplies + siteNotifications.length}
+                          {unreadAnalysisReplies + (siteNotificationBadgeCleared ? 0 : siteNotifications.length) > 9 ? "9+" : unreadAnalysisReplies + (siteNotificationBadgeCleared ? 0 : siteNotifications.length)}
                         </span>
                       )}
                     </button>
