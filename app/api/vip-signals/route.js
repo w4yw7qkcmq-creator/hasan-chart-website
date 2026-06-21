@@ -24,6 +24,27 @@ const normalizeSignalType = (value) => {
   return "spot";
 };
 
+async function sendEmailViaResend({ to, subject, html }) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || "HasaN CharT World <onboarding@resend.dev>";
+
+  if (!resendApiKey || !to) return;
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to,
+      subject,
+      html,
+    }),
+  });
+}
+
 export async function GET(request) {
   try {
     const url = new URL(request.url);
@@ -46,6 +67,41 @@ export async function GET(request) {
         !subscription ||
         subscription.status === "منتهي" ||
         (subscription.expires_at && new Date(subscription.expires_at).getTime() <= Date.now());
+
+      if (
+        subscription &&
+        subscription.expires_at &&
+        new Date(subscription.expires_at).getTime() <= Date.now() &&
+        subscription.status !== "منتهي"
+      ) {
+        await supabase
+          .from("subscription_requests")
+          .update({
+            status: "منتهي",
+            expired_notice_sent: true,
+          })
+          .eq("user_email", email);
+
+        await supabase.from("notifications").insert({
+          user_email: email,
+          title: "انتهى اشتراكك ⚠️",
+          message: "انتهت صلاحية اشتراكك. يمكنك التجديد من صفحة الباقات.",
+          type: "subscription-expired",
+          is_read: false,
+        });
+
+        await sendEmailViaResend({
+          to: email,
+          subject: "انتهاء الاشتراك - HasaN CharT World",
+          html: `
+            <div dir="rtl" style="font-family:Arial,sans-serif;padding:24px">
+              <h2>انتهت صلاحية اشتراكك</h2>
+              <p>تم إيقاف الوصول إلى خدمات VIP بسبب انتهاء مدة الاشتراك.</p>
+              <p><a href="https://www.hasanchartworld.com/subscriptions">تجديد الاشتراك</a></p>
+            </div>
+          `,
+        });
+      }
 
       if (expired) {
         return NextResponse.json({
