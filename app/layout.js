@@ -767,11 +767,11 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen bg-[#020617] text-white antialiased overflow-x-hidden">
         {globalNotice && (
-          <div className="fixed left-5 top-5 z-[9999] max-w-md rounded-[26px] border border-emerald-300/25 bg-emerald-400/95 p-5 text-black shadow-[0_22px_70px_rgba(16,185,129,0.35)]">
+          <div className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-black">{globalNotice}</p>
-                <p className="mt-1 text-sm font-bold text-black/70">
+                <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">{globalNotice}</p>
+                <p className="mt-1 text-sm font-bold text-white/90">
                   إذا لم يظهر إشعار المتصفح، فعّل الإشعارات من الزر بالأعلى.
                 </p>
 
@@ -782,7 +782,7 @@ export default function RootLayout({ children }) {
                       setGlobalNotice("");
                       setGlobalNoticeHref("");
                     }}
-                    className="mt-3 inline-flex rounded-2xl bg-black/15 px-4 py-2 text-sm font-black text-black transition hover:bg-black/25"
+                    className="mt-3 inline-flex rounded-2xl bg-white/20 px-4 py-2 text-sm font-black text-white transition hover:bg-white/30"
                   >
                     فتح الآن
                   </Link>
@@ -793,10 +793,13 @@ export default function RootLayout({ children }) {
                   setGlobalNotice("");
                   setGlobalNoticeHref("");
                 }}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10 font-black"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
               >
                 ✕
               </button>
+            </div>
+            <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
+              <div className="h-full animate-pulse bg-white" />
             </div>
           </div>
         )}
@@ -1033,7 +1036,7 @@ export default function RootLayout({ children }) {
                   onClick={enableBrowserNotifications}
                   className={`hidden rounded-2xl px-4 py-2 text-sm font-black transition sm:inline-flex ${
                     notificationPermission === "granted"
-                      ? "border border-emerald-300/30 bg-emerald-400/15 text-emerald-100"
+                      ? "border border-cyan-200/60 bg-gradient-to-l from-cyan-500/90 to-blue-600/90 text-white shadow-[0_0_24px_rgba(34,211,238,0.22)] hover:brightness-110"
                       : "border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
                   }`}
                 >
@@ -1072,18 +1075,15 @@ export default function RootLayout({ children }) {
                     </button>
 
                     {notificationMenuOpen && (
-                      <div className="fixed left-5 top-20 z-[99999] min-h-[130px] w-[340px] max-w-[calc(100vw-40px)] rounded-[26px] border border-cyan-300/40 bg-gradient-to-br from-sky-400 to-blue-500 p-4 text-white shadow-[0_24px_80px_rgba(0,102,255,0.35)] backdrop-blur-2xl">
+                      <div className="fixed left-5 top-20 z-[99999] min-h-[130px] w-[360px] max-w-[calc(100vw-40px)] rounded-[28px] border border-cyan-200/40 bg-white p-4 text-slate-950 shadow-[0_24px_80px_rgba(0,102,255,0.22)] backdrop-blur-2xl">
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <h3
-                            className="font-black text-xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
-                            style={{ color: "#ffffff" }}
-                          >
+                          <h3 className="font-black text-xl text-slate-950">
                             الإشعارات
                           </h3>
                           <button
                             type="button"
                             onClick={() => setNotificationMenuOpen(false)}
-                            className="grid h-8 w-8 place-items-center rounded-full bg-white/10 font-black !text-white"
+                            className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 font-black text-slate-700 transition hover:bg-slate-200"
                           >
                             ✕
                           </button>
@@ -1099,10 +1099,10 @@ export default function RootLayout({ children }) {
                                   markSiteNotificationsRead();
                                   setNotificationMenuOpen(false);
                                 }}
-                                className="block rounded-2xl border border-white/25 bg-white/20 p-4 transition hover:bg-white/30"
+                                className="block rounded-2xl border border-cyan-100 bg-cyan-50 p-4 transition hover:bg-cyan-100"
                               >
-                                <p className="font-black !text-white">{notification.title}</p>
-                                <p className="mt-1 text-sm font-bold !text-white/85">{notification.message}</p>
+                                <p className="font-black text-slate-950">{notification.title}</p>
+                                <p className="mt-1 text-sm font-bold text-slate-600">{notification.message}</p>
                               </Link>
                             ))}
 
@@ -1125,7 +1125,7 @@ export default function RootLayout({ children }) {
                             )}
                           </div>
                         ) : (
-                          <div className="rounded-2xl border border-white/30 bg-white/20 p-4 text-sm text-white font-bold">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-600">
                             لا توجد إشعارات جديدة حالياً.
                           </div>
                         )}
