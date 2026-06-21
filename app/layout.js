@@ -685,6 +685,20 @@ export default function RootLayout({ children }) {
       );
 
       triggerVipSignalNotification(signal);
+
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        const typeLabel = signal?.signal_type === "futures" ? "VIP Futures" : "VIP Spot";
+
+        new Notification(`🚨 ${typeLabel}`, {
+          body: `${signal?.coin || "عملة جديدة"} - تم نشر توصية جديدة`,
+          icon: "/logo.png",
+          requireInteraction: true,
+        });
+      }
     };
 
     const checkLatestVipSignals = async () => {
@@ -724,7 +738,10 @@ export default function RootLayout({ children }) {
           schema: "public",
           table: "vip_signals",
         },
-        (payload) => notifyIfAllowedVipSignal(payload.new)
+        (payload) => {
+          console.log("New VIP Signal:", payload.new);
+          notifyIfAllowedVipSignal(payload.new);
+        }
       )
       .subscribe();
 
