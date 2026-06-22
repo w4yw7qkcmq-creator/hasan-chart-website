@@ -1826,29 +1826,29 @@ export default function AdminPage() {
           ) : (
             <div className="grid gap-5">
               {filteredSubscriptions.map((req) => (
-                <article key={req.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
+                <article key={req.id} className="rounded-[30px] border border-cyan-200 bg-white/95 p-6 text-slate-950 shadow-[0_22px_70px_rgba(14,165,233,0.16)] backdrop-blur-2xl">
                   <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-2xl font-black">{req.planName}</h3>
+                        <h3 className="text-2xl font-black text-slate-950">{req.planName}</h3>
                         <StatusBadge status={req.status} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
-                          المستخدم: <b className="text-cyan-100">{req.username || req.userEmail}</b>
+                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                          المستخدم: <b className="text-slate-950">{req.username || req.userEmail}</b>
                         </span>
-                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
-                          النوع: <b className="text-cyan-100">{req.category}</b>
+                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                          النوع: <b className="text-slate-950">{req.category}</b>
                         </span>
-                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
-                          السعر: <b className="text-cyan-100">{req.price}</b>
+                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                          السعر: <b className="text-slate-950">{req.price}</b>
                         </span>
                         {req.telegramUsername && (
-                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
-                            تليجرام: <b className="text-cyan-100">{req.telegramUsername}</b>
+                          <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                            تليجرام: <b className="text-slate-950">{req.telegramUsername}</b>
                           </span>
                         )}
-                        <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
+                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
                           التاريخ: {req.createdAt}
                         </span>
                       </div>
@@ -1864,7 +1864,7 @@ export default function AdminPage() {
                             updateRequestStatus("subscription_requests", req.id, e.target.value);
                           }
                         }}
-                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
+                        className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none shadow-sm"
                       >
                         {SUBSCRIPTION_STATUS_OPTIONS.map((status) => (
                           <option key={status} value={status}>{status}</option>
@@ -1893,33 +1893,42 @@ export default function AdminPage() {
                   {(req.telegramUsername || req.paymentProof) && (
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                       {req.telegramUsername && (
-                        <div className="rounded-2xl border border-cyan-300/15 bg-black/20 p-4">
-                          <p className="text-xs font-bold text-slate-500">يوزر التليجرام</p>
-                          <p className="mt-2 break-all font-black text-cyan-100">{req.telegramUsername}</p>
+                        <div className="rounded-3xl border border-cyan-200 bg-white p-4 shadow-[0_16px_50px_rgba(14,165,233,0.12)]">
+                          <p className="text-xs font-black text-cyan-700">يوزر التليجرام</p>
+                          <p className="mt-2 break-all font-black text-slate-950">{req.telegramUsername}</p>
                         </div>
                       )}
 
                       {req.paymentProof && (
-                        <div className="rounded-2xl border border-cyan-300/15 bg-black/20 p-4">
+                        <div className="rounded-3xl border border-cyan-200 bg-white p-4 shadow-[0_16px_50px_rgba(14,165,233,0.12)]">
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-xs font-bold text-slate-500">إثبات الدفع</p>
-                              <p className="mt-2 font-black text-cyan-100">صورة إشعار الدفع مرفقة</p>
+                              <p className="text-xs font-black text-cyan-700">إثبات الدفع</p>
+                              <p className="mt-2 font-black text-slate-950">صورة إشعار الدفع مرفقة</p>
+                              <p className="mt-1 text-xs font-bold text-slate-500">اضغط على الصورة أو زر فتح الصورة لعرضها بدقة كاملة.</p>
                             </div>
                             <a
                               href={req.paymentProof}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-xl bg-cyan-500/20 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-500/30"
+                              className="rounded-xl bg-gradient-to-l from-blue-700 to-cyan-500 px-4 py-2 text-sm font-black text-white shadow-[0_10px_24px_rgba(37,99,235,0.25)] transition hover:brightness-110"
                             >
                               فتح الصورة
                             </a>
                           </div>
-                          <img
-                            src={req.paymentProof}
-                            alt="إثبات الدفع"
-                            className="mt-4 max-h-[260px] w-full rounded-2xl border border-cyan-300/15 object-contain bg-black/30"
-                          />
+                          <a
+                            href={req.paymentProof}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 block overflow-hidden rounded-2xl border border-cyan-100 bg-slate-100 p-2 transition hover:border-cyan-300 hover:shadow-[0_16px_45px_rgba(14,165,233,0.18)]"
+                            title="فتح إثبات الدفع بدقة كاملة"
+                          >
+                            <img
+                              src={req.paymentProof}
+                              alt="إثبات الدفع"
+                              className="max-h-[340px] w-full rounded-xl object-contain"
+                            />
+                          </a>
                         </div>
                       )}
                     </div>
