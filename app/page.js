@@ -48,12 +48,12 @@ export default function Home() {
   ];
 
   const analysisFrameSuggestions = [
-    { value: "1h", label: "1 ساعة", hint: "1h / 1 hour / ساعة" },
-    { value: "2h", label: "2 ساعة", hint: "2h / 2 hours / ساعتين" },
     { value: "4h", label: "4 ساعات", hint: "4h / 4 hours / أربع ساعات" },
     { value: "12h", label: "12 ساعة", hint: "12h / 12 hours / 12 ساعة" },
     { value: "1d", label: "يومي", hint: "1d / daily / يوم" },
+    { value: "3d", label: "3 أيام", hint: "3d / 3 days / 3 أيام" },
     { value: "1w", label: "أسبوعي", hint: "1w / weekly / أسبوع" },
+    { value: "2w", label: "أسبوعين", hint: "2w / 2 weeks / أسبوعين" },
     { value: "1M", label: "شهري", hint: "1M / monthly / شهر" },
     { value: "2M", label: "شهرين", hint: "2M / 2 months / شهرين" },
     { value: "1y", label: "سنة", hint: "1y / 1 year / سنة" },
