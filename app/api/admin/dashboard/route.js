@@ -214,6 +214,7 @@ async function verifyAdminUserForAction(supabase) {
   return user;
 }
 
+
 async function writeAdminLog(supabase, {
   admin,
   action,
@@ -233,6 +234,46 @@ async function writeAdminLog(supabase, {
   } catch (error) {
     console.error("Admin log error:", error.message);
   }
+}
+
+const ADMIN_STATUS_TABLES = {
+  subscription_requests: {
+    table: "subscription_requests",
+    allowedStatuses: [
+      "بانتظار المراجعة",
+      "تم التواصل",
+      "قيد التفعيل",
+      "مفعل",
+      "مرفوض",
+      "مؤرشف",
+    ],
+  },
+  analysis_requests: {
+    table: "analysis_requests",
+    allowedStatuses: [
+      "قيد المراجعة",
+      "قيد التحليل",
+      "مكتمل",
+      "تم الرد",
+      "مرفوض",
+      "مؤرشف",
+    ],
+  },
+  account_management_requests: {
+    table: "account_management_requests",
+    allowedStatuses: [
+      "جديد",
+      "قيد المراجعة",
+      "نشط",
+      "مغلق",
+      "مرفوض",
+      "مؤرشف",
+    ],
+  },
+};
+
+function getAdminStatusTable(tableName) {
+  return ADMIN_STATUS_TABLES[String(tableName || "").trim()] || null;
 }
 
 
@@ -519,6 +560,46 @@ export async function POST(request) {
       );
     }
 
+    if (action === "update-request-status") {
+      const targetTableConfig = getAdminStatusTable(payload.table);
+      const newStatus = String(payload.status || "").trim();
+
+      if (!targetTableConfig) {
+        return Response.json(
+          { success: false, error: "نوع الطلب غير مدعوم" },
+          { status: 400 }
+        );
+      }
+
+      if (!targetTableConfig.allowedStatuses.includes(newStatus)) {
+        return Response.json(
+          { success: false, error: "الحالة غير مدعومة لهذا النوع من الطلبات" },
+          { status: 400 }
+        );
+      }
+
+      const { error } = await supabase
+        .from(targetTableConfig.table)
+        .update({ status: newStatus })
+        .eq("id", requestId);
+
+      if (error) {
+        throw new Error(error.message || "تعذر تحديث حالة الطلب");
+      }
+
+      await writeAdminLog(supabase, {
+        admin: adminUser,
+        action: "update-request-status",
+        targetTable: targetTableConfig.table,
+        targetId: requestId,
+        details: {
+          status: newStatus,
+        },
+      });
+
+      return Response.json({ success: true });
+    }
+
     if (action === "publish-vip-signal") {
       const signalType = normalizeVipSignalType(payload.signalType);
       const coin = String(payload.coin || "").trim().toUpperCase();
@@ -591,7 +672,7 @@ export async function POST(request) {
         .update({
           reply,
           reply_image: replyImage || null,
-          status: "مكتمل",
+          status: "تم الرد",
         })
         .eq("id", requestId);
 
@@ -691,7 +772,7 @@ export async function POST(request) {
     if (action === "approve-account-request") {
       const { error } = await supabase
         .from("account_management_requests")
-        .update({ status: "تمت المراجعة" })
+        .update({ status: "قيد المراجعة" })
         .eq("id", requestId);
 
       if (error) {
