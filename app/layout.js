@@ -238,7 +238,9 @@ export default function RootLayout({ children }) {
           }
 
           if (
-            (notification.type === "vip-spot" || notification.type === "vip-futures") &&
+            (notification.type === "vip-spot" ||
+              notification.type === "vip-futures" ||
+              notification.type === "subscription-expired") &&
             typeof window !== "undefined" &&
             "Notification" in window &&
             Notification.permission === "granted"
@@ -286,7 +288,15 @@ export default function RootLayout({ children }) {
 
           const message = notification?.title || "وصلك إشعار جديد";
           setGlobalNotice(message);
-          setGlobalNoticeHref(notification?.type === "subscription" ? "/subscriptions" : "");
+          setGlobalNoticeHref(
+            notification?.type === "subscription" || notification?.type === "subscription-expired"
+              ? "/subscriptions"
+              : notification?.type === "vip-futures"
+                ? "/vip-futures"
+                : notification?.type === "vip-spot"
+                  ? "/vip-spot"
+                  : ""
+          );
           setNotificationMenuOpen(true);
 
           if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
@@ -1165,7 +1175,7 @@ export default function RootLayout({ children }) {
                               <Link
                                 key={notification.id}
                                 href={
-                                  notification.type === "subscription"
+                                  notification.type === "subscription" || notification.type === "subscription-expired"
                                     ? "/subscriptions"
                                     : notification.type === "vip-futures"
                                       ? "/vip-futures"
@@ -1176,6 +1186,10 @@ export default function RootLayout({ children }) {
                                 onClick={() => {
                                   markSiteNotificationsRead();
                                   setNotificationMenuOpen(false);
+                                  if (notification.type === "subscription-expired") {
+                                    setGlobalNotice("انتهت صلاحية اشتراكك ⚠️");
+                                    setGlobalNoticeHref("/subscriptions");
+                                  }
                                 }}
                                 className="block rounded-2xl border border-cyan-100 bg-cyan-50 p-4 transition hover:bg-cyan-100"
                               >
