@@ -252,6 +252,7 @@ export default function AdminPage() {
   const [accountSearch, setAccountSearch] = useState("");
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
   const [lastNotificationIds, setLastNotificationIds] = useState([]);
+  const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
   const updateRequestStatus = async (table, requestId, newStatus) => {
     const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${newStatus}؟`);
     if (!confirmed) return;
@@ -787,6 +788,32 @@ export default function AdminPage() {
     return { pendingAnalysis, completedAnalysis, pendingAccounts, pendingSubscriptions, usersCount: users.length };
   }, [analysisRequests, accountRequests, subscriptionRequests, users]);
 
+  const adminNotifications = useMemo(() => {
+    const subscriptionItems = subscriptionRequests
+      .filter((item) => item.status === "بانتظار المراجعة" || item.status === "قيد المعالجة")
+      .map((item) => ({
+        id: `subscription-${item.id}`,
+        type: "subscription",
+        icon: "💳",
+        title: "طلب اشتراك جديد",
+        message: `${item.planName || "اشتراك جديد"} - ${item.userEmail || item.username || "مستخدم"}`,
+        createdAt: item.createdAt,
+      }));
+
+    const accountItems = accountRequests
+      .filter((item) => item.status === "جديد" || item.status === "بانتظار المراجعة")
+      .map((item) => ({
+        id: `account-${item.id}`,
+        type: "account",
+        icon: "📂",
+        title: "طلب إدارة حساب جديد",
+        message: item.email || item.telegram || "طلب جديد",
+        createdAt: item.createdAt,
+      }));
+
+    return [...subscriptionItems, ...accountItems].slice(0, 20);
+  }, [subscriptionRequests, accountRequests]);
+
   const filteredAnalysis = useMemo(() => {
     let list = analysisRequests;
 
@@ -1222,12 +1249,78 @@ export default function AdminPage() {
         </div>
             </div>
 
-            <button
-              onClick={logout}
-              className="rounded-2xl border border-red-400/20 bg-red-500/15 px-6 py-4 font-black text-red-100 transition hover:bg-red-500/25"
-            >
-              تسجيل خروج الأدمن
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAdminNotificationsOpen((prev) => !prev)}
+                  className="relative rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-6 py-4 font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                >
+                  🔔 إشعارات الأدمن
+                  {adminNotifications.length > 0 && (
+                    <span className="absolute -right-2 -top-2 grid h-7 min-w-7 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_22px_rgba(239,68,68,0.55)]">
+                      {adminNotifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {adminNotificationsOpen && (
+                  <div className="absolute left-0 top-[calc(100%+12px)] z-50 w-[min(92vw,420px)] overflow-hidden rounded-[28px] border border-cyan-300/15 bg-[#07142f] p-4 text-right shadow-[0_24px_90px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+                    <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
+                      <h3 className="text-lg font-black text-white">مركز إشعارات الأدمن</h3>
+                      <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-black text-cyan-100">
+                        {adminNotifications.length} جديد
+                      </span>
+                    </div>
+
+                    {adminNotifications.length === 0 ? (
+                      <div className="py-8 text-center">
+                        <p className="text-3xl">✅</p>
+                        <p className="mt-3 font-black text-white">لا توجد طلبات جديدة</p>
+                        <p className="mt-1 text-sm text-slate-400">طلبات الاشتراك وإدارة الحسابات الجديدة ستظهر هنا.</p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                        {adminNotifications.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setAdminNotificationsOpen(false);
+                              if (item.type === "subscription") {
+                                setSubscriptionFilter("pending");
+                              }
+                              if (item.type === "account") {
+                                setAccountFilter("new");
+                              }
+                            }}
+                            className="w-full rounded-2xl border border-cyan-300/15 bg-black/25 p-4 text-right transition hover:border-cyan-300/30 hover:bg-cyan-400/10"
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/15 bg-cyan-400/10 text-2xl">
+                                {item.icon}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-black text-white">{item.title}</p>
+                                <p className="mt-1 break-words text-sm font-bold text-slate-300">{item.message}</p>
+                                {item.createdAt && <p className="mt-2 text-xs text-slate-500">{item.createdAt}</p>}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={logout}
+                className="rounded-2xl border border-red-400/20 bg-red-500/15 px-6 py-4 font-black text-red-100 transition hover:bg-red-500/25"
+              >
+                تسجيل خروج الأدمن
+              </button>
+            </div>
           </div>
         </section>
 
