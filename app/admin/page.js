@@ -105,6 +105,7 @@ const SUBSCRIPTION_FILTERS = [
   ["archived", "مؤرشف"],
 ];
 
+
 const ACCOUNT_FILTERS = [
   ["all", "كل طلبات إدارة الحسابات"],
   ["new", "جديد"],
@@ -113,6 +114,18 @@ const ACCOUNT_FILTERS = [
   ["closed", "مغلق"],
   ["archived", "مؤرشف"],
 ];
+
+// --- Admin search helpers ---
+const normalizeAdminSearch = (value) => String(value || "").trim().toLowerCase();
+
+const matchesAdminSearch = (item, searchValue, fields) => {
+  const query = normalizeAdminSearch(searchValue);
+  if (!query) return true;
+
+  return fields.some((field) =>
+    normalizeAdminSearch(item?.[field]).includes(query)
+  );
+};
 
 const getStoredAccessToken = async () => {
   try {
@@ -234,6 +247,9 @@ export default function AdminPage() {
   const [filter, setFilter] = useState("all");
   const [subscriptionFilter, setSubscriptionFilter] = useState("all");
   const [accountFilter, setAccountFilter] = useState("all");
+  const [analysisSearch, setAnalysisSearch] = useState("");
+  const [subscriptionSearch, setSubscriptionSearch] = useState("");
+  const [accountSearch, setAccountSearch] = useState("");
   const updateRequestStatus = async (table, requestId, newStatus) => {
     const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${newStatus}؟`);
     if (!confirmed) return;
@@ -694,31 +710,65 @@ export default function AdminPage() {
   }, [analysisRequests, accountRequests, subscriptionRequests, users]);
 
   const filteredAnalysis = useMemo(() => {
-    if (filter === "pending") return analysisRequests.filter((req) => req.status === "قيد المراجعة" || !req.status);
-    if (filter === "processing") return analysisRequests.filter((req) => req.status === "قيد التحليل");
-    if (filter === "answered") return analysisRequests.filter((req) => req.status === "تم الرد" || req.status === "مكتمل");
-    if (filter === "rejected") return analysisRequests.filter((req) => req.status === "مرفوض");
-    if (filter === "archived") return analysisRequests.filter((req) => req.status === "مؤرشف");
-    return analysisRequests.filter((req) => req.status !== "مؤرشف");
-  }, [analysisRequests, filter]);
+    let list = analysisRequests;
+
+    if (filter === "pending") list = list.filter((req) => req.status === "قيد المراجعة" || !req.status);
+    else if (filter === "processing") list = list.filter((req) => req.status === "قيد التحليل");
+    else if (filter === "answered") list = list.filter((req) => req.status === "تم الرد" || req.status === "مكتمل");
+    else if (filter === "rejected") list = list.filter((req) => req.status === "مرفوض");
+    else if (filter === "archived") list = list.filter((req) => req.status === "مؤرشف");
+    else list = list.filter((req) => req.status !== "مؤرشف");
+
+    return list.filter((req) =>
+      matchesAdminSearch(req, analysisSearch, ["coin", "frame", "userEmail", "username", "status"])
+    );
+  }, [analysisRequests, filter, analysisSearch]);
 
   const filteredSubscriptions = useMemo(() => {
-    if (subscriptionFilter === "pending") return subscriptionRequests.filter((req) => req.status === "بانتظار المراجعة" || req.status === "قيد المعالجة" || !req.status);
-    if (subscriptionFilter === "contacted") return subscriptionRequests.filter((req) => req.status === "تم التواصل");
-    if (subscriptionFilter === "active") return subscriptionRequests.filter((req) => req.status === "مفعل");
-    if (subscriptionFilter === "rejected") return subscriptionRequests.filter((req) => req.status === "مرفوض");
-    if (subscriptionFilter === "archived") return subscriptionRequests.filter((req) => req.status === "مؤرشف");
-    return subscriptionRequests.filter((req) => req.status !== "مؤرشف");
-  }, [subscriptionRequests, subscriptionFilter]);
+    let list = subscriptionRequests;
+
+    if (subscriptionFilter === "pending") list = list.filter((req) => req.status === "بانتظار المراجعة" || req.status === "قيد المعالجة" || !req.status);
+    else if (subscriptionFilter === "contacted") list = list.filter((req) => req.status === "تم التواصل");
+    else if (subscriptionFilter === "active") list = list.filter((req) => req.status === "مفعل");
+    else if (subscriptionFilter === "rejected") list = list.filter((req) => req.status === "مرفوض");
+    else if (subscriptionFilter === "archived") list = list.filter((req) => req.status === "مؤرشف");
+    else list = list.filter((req) => req.status !== "مؤرشف");
+
+    return list.filter((req) =>
+      matchesAdminSearch(req, subscriptionSearch, [
+        "planName",
+        "category",
+        "price",
+        "telegramUsername",
+        "userEmail",
+        "username",
+        "status",
+      ])
+    );
+  }, [subscriptionRequests, subscriptionFilter, subscriptionSearch]);
 
   const filteredAccounts = useMemo(() => {
-    if (accountFilter === "new") return accountRequests.filter((req) => req.status === "جديد" || !req.status);
-    if (accountFilter === "reviewing") return accountRequests.filter((req) => req.status === "قيد المراجعة");
-    if (accountFilter === "active") return accountRequests.filter((req) => req.status === "نشط");
-    if (accountFilter === "closed") return accountRequests.filter((req) => req.status === "مغلق");
-    if (accountFilter === "archived") return accountRequests.filter((req) => req.status === "مؤرشف");
-    return accountRequests.filter((req) => req.status !== "مؤرشف");
-  }, [accountRequests, accountFilter]);
+    let list = accountRequests;
+
+    if (accountFilter === "new") list = list.filter((req) => req.status === "جديد" || !req.status);
+    else if (accountFilter === "reviewing") list = list.filter((req) => req.status === "قيد المراجعة");
+    else if (accountFilter === "active") list = list.filter((req) => req.status === "نشط");
+    else if (accountFilter === "closed") list = list.filter((req) => req.status === "مغلق");
+    else if (accountFilter === "archived") list = list.filter((req) => req.status === "مؤرشف");
+    else list = list.filter((req) => req.status !== "مؤرشف");
+
+    return list.filter((req) =>
+      matchesAdminSearch(req, accountSearch, [
+        "type",
+        "platform",
+        "email",
+        "telegram",
+        "capital",
+        "notes",
+        "status",
+      ])
+    );
+  }, [accountRequests, accountFilter, accountSearch]);
 
   const logout = () => {
     localStorage.removeItem("currentUser");
@@ -1281,6 +1331,14 @@ export default function AdminPage() {
               </button>
             ))}
           </div>
+          <div className="mt-4">
+            <input
+              value={analysisSearch}
+              onChange={(e) => setAnalysisSearch(e.target.value)}
+              placeholder="بحث في طلبات التحليل: العملة، الفريم، البريد، المستخدم، الحالة..."
+              className="w-full rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 font-bold text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+            />
+          </div>
         </section>
 
         <section className="space-y-5">
@@ -1443,6 +1501,14 @@ export default function AdminPage() {
                 </button>
               ))}
             </div>
+            <div className="mt-4">
+              <input
+                value={accountSearch}
+                onChange={(e) => setAccountSearch(e.target.value)}
+                placeholder="بحث في إدارة الحسابات: البريد، التليجرام، المنصة، رأس المال، الحالة..."
+                className="w-full rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 font-bold text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+              />
+            </div>
           </div>
 
           {filteredAccounts.length === 0 ? (
@@ -1570,6 +1636,14 @@ export default function AdminPage() {
                   {label}
                 </button>
               ))}
+            </div>
+            <div className="mt-4">
+              <input
+                value={subscriptionSearch}
+                onChange={(e) => setSubscriptionSearch(e.target.value)}
+                placeholder="بحث في الاشتراكات: الباقة، البريد، المستخدم، التليجرام، السعر، الحالة..."
+                className="w-full rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 font-bold text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+              />
             </div>
           </div>
 
