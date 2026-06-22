@@ -250,6 +250,8 @@ export default function AdminPage() {
   const [analysisSearch, setAnalysisSearch] = useState("");
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
+  const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
+  const [lastNotificationIds, setLastNotificationIds] = useState([]);
   const updateRequestStatus = async (table, requestId, newStatus) => {
     const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${newStatus}؟`);
     if (!confirmed) return;
@@ -439,6 +441,17 @@ export default function AdminPage() {
     }
 
     setIsAdmin(true);
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "granted") {
+        setBrowserNotificationsEnabled(true);
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            setBrowserNotificationsEnabled(true);
+          }
+        });
+      }
+    }
     loadAdminData(currentUser);
 
     const touchUpdatedAt = () => {
@@ -581,6 +594,51 @@ export default function AdminPage() {
       setIsRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    if (!browserNotificationsEnabled) return;
+
+    const pendingSubscriptions = subscriptionRequests.filter(
+      (item) => item.status === "بانتظار المراجعة" || item.status === "قيد المعالجة"
+    );
+
+    const pendingAccounts = accountRequests.filter(
+      (item) => item.status === "جديد" || item.status === "بانتظار المراجعة"
+    );
+
+    const notifications = [
+      ...pendingSubscriptions.map((item) => ({
+        id: `subscription-${item.id}`,
+        title: "طلب اشتراك جديد 💳",
+        body: `${item.planName || "اشتراك جديد"} - ${item.userEmail || item.username || "مستخدم"}`,
+      })),
+      ...pendingAccounts.map((item) => ({
+        id: `account-${item.id}`,
+        title: "طلب إدارة حساب جديد 📂",
+        body: item.email || item.telegram || "طلب جديد",
+      })),
+    ];
+
+    notifications.forEach((item) => {
+      if (lastNotificationIds.includes(item.id)) return;
+
+      try {
+        new Notification(item.title, {
+          body: item.body,
+          icon: "/favicon.png",
+        });
+      } catch (_) {}
+    });
+
+    setLastNotificationIds((prev) => [
+      ...new Set([...prev, ...notifications.map((item) => item.id)]),
+    ]);
+  }, [
+    browserNotificationsEnabled,
+    subscriptionRequests,
+    accountRequests,
+    lastNotificationIds,
+  ]);
 
   const updateUserRole = async (userId, newRole) => {
     const updated = users.map((user) =>
