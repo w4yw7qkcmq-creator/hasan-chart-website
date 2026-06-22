@@ -242,7 +242,7 @@ export async function POST(request) {
         api_key_encrypted: encryptedApiKey,
         secret_key_encrypted: encryptedSecretKey,
         trading_password_encrypted: encryptedTradingPassword,
-        status: "pending",
+        status: "جديد",
       });
 
     if (insertError) {
@@ -253,18 +253,24 @@ export async function POST(request) {
       );
     }
 
-    sendAdminAccountRequestEmail({
-      email: user.email,
-      platform,
-      capital,
-      accountType,
-      contactMethod,
-    }).catch((emailError) => {
+    try {
+      const emailResult = await sendAdminAccountRequestEmail({
+        email: user.email,
+        platform,
+        capital,
+        accountType,
+        contactMethod,
+      });
+
+      if (emailResult?.success === false) {
+        console.error("Admin account-management email failed:", emailResult);
+      }
+    } catch (emailError) {
       console.error(
         "Admin account-management email error:",
         emailError?.message || emailError
       );
-    });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

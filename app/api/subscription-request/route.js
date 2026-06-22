@@ -68,7 +68,7 @@ export async function POST(request) {
         price,
         telegram_username: telegramUsername,
         payment_proof: paymentProof,
-        status: "قيد المعالجة",
+        status: "بانتظار المراجعة",
       },
     ]);
 
@@ -82,17 +82,23 @@ export async function POST(request) {
       );
     }
 
-    sendAdminSubscriptionRequestEmail({
-      userEmail,
-      username,
-      planName,
-      category,
-      price,
-      telegramUsername,
-      paymentProof,
-    }).catch((emailError) => {
+    try {
+      const emailResult = await sendAdminSubscriptionRequestEmail({
+        userEmail,
+        username,
+        planName,
+        category,
+        price,
+        telegramUsername,
+        paymentProof,
+      });
+
+      if (emailResult?.success === false) {
+        console.error("Admin subscription email failed:", emailResult);
+      }
+    } catch (emailError) {
       console.error("Admin subscription email error:", emailError?.message || emailError);
-    });
+    }
 
     return NextResponse.json({
       success: true,
