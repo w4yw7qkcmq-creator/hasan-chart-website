@@ -486,6 +486,21 @@ export default function AdminPage() {
       touchUpdatedAt();
     };
 
+    // Realtime monitoring for account_management_requests
+    const handleAccountManagementChange = (payload) => {
+      if (payload.eventType === "DELETE") {
+        setAccountRequests((prev) => prev.filter((item) => item.id !== payload.old.id));
+        touchUpdatedAt();
+        return;
+      }
+
+      if (!payload.new?.id) return;
+
+      const formatted = formatAccountManagementRequest(payload.new);
+      setAccountRequests((prev) => upsertById(prev, formatted, ADMIN_SUBSCRIPTIONS_LIMIT));
+      touchUpdatedAt();
+    };
+
     const handleProfileChange = (payload) => {
       if (payload.eventType === "DELETE") {
         setUsers((prev) => prev.filter((item) => item.id !== payload.old.id));
@@ -510,6 +525,11 @@ export default function AdminPage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "subscription_requests" },
         handleSubscriptionChange
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "account_management_requests" },
+        handleAccountManagementChange
       )
       .on(
         "postgres_changes",
