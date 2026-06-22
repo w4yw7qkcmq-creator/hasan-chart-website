@@ -156,9 +156,7 @@ export async function GET() {
     const [analysis, accounts, subscriptions, profiles] = await Promise.all([
       supabase
         .from("analysis_requests")
-        .select(
-          "id,user_email,username,coin,frame,status,reply,created_at,job_status,processing_started_at,completed_at,failed_at,error_message,attempts"
-        )
+        .select("*")
         .order("created_at", { ascending: false })
         .limit(200),
       supabase.from("account_management_requests").select("*").order("created_at", { ascending: false }).limit(200),
@@ -174,16 +172,7 @@ export async function GET() {
     };
 
     if (analysis.error || accounts.error || subscriptions.error || profiles.error) {
-      console.error("Admin dashboard data load error:", tableErrors);
-
-      return Response.json(
-        {
-          success: false,
-          error: "فشل تحميل بعض بيانات لوحة الإدارة",
-          tableErrors,
-        },
-        { status: 500 }
-      );
+      console.error("Admin dashboard data load warning:", tableErrors);
     }
 
     console.log("Admin dashboard counts:", {
@@ -194,16 +183,17 @@ export async function GET() {
     });
 
     const adminNotifications = buildAdminDashboardNotifications({
-      subscriptions: subscriptions.data || [],
-      accounts: accounts.data || [],
+      subscriptions: subscriptions.error ? [] : subscriptions.data || [],
+      accounts: accounts.error ? [] : accounts.data || [],
     });
 
     return Response.json({
       success: true,
-      analysis_requests: analysis.data || [],
-      account_management_requests: accounts.data || [],
-      subscription_requests: subscriptions.data || [],
-      profiles: profiles.data || [],
+      analysis_requests: analysis.error ? [] : analysis.data || [],
+      account_management_requests: accounts.error ? [] : accounts.data || [],
+      subscription_requests: subscriptions.error ? [] : subscriptions.data || [],
+      profiles: profiles.error ? [] : profiles.data || [],
+      table_errors: tableErrors,
       admin_notifications: adminNotifications,
       admin_notifications_count: adminNotifications.length,
     });
