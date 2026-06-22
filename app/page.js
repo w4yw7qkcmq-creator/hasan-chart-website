@@ -47,6 +47,18 @@ export default function Home() {
     { title: "SILVER", label: "سعر أونصة الفضة", symbol: "OANDA:XAGUSD" },
   ];
 
+  const analysisFrameSuggestions = [
+    { value: "1h", label: "1 ساعة", hint: "1h / 1 hour / ساعة" },
+    { value: "2h", label: "2 ساعة", hint: "2h / 2 hours / ساعتين" },
+    { value: "4h", label: "4 ساعات", hint: "4h / 4 hours / أربع ساعات" },
+    { value: "12h", label: "12 ساعة", hint: "12h / 12 hours / 12 ساعة" },
+    { value: "1d", label: "يومي", hint: "1d / daily / يوم" },
+    { value: "1w", label: "أسبوعي", hint: "1w / weekly / أسبوع" },
+    { value: "1M", label: "شهري", hint: "1M / monthly / شهر" },
+    { value: "2M", label: "شهرين", hint: "2M / 2 months / شهرين" },
+    { value: "1y", label: "سنة", hint: "1y / 1 year / سنة" },
+  ];
+
   const getCooldownMessage = (createdAt) => {
     if (!createdAt) return { blocked: false, text: "" };
 
@@ -654,12 +666,52 @@ export default function Home() {
               className="input"
             />
 
-            <input
-              value={analysisFrame}
-              onChange={(e) => setAnalysisFrame(e.target.value)}
-              placeholder="الفريم المطلوب مثل 15m / 1h / 4h"
-              className="input"
-            />
+            <div className="space-y-3">
+              <input
+                value={analysisFrame}
+                onChange={(e) => setAnalysisFrame(e.target.value)}
+                placeholder="اكتب الفريم بالعربي أو الإنجليزي: 12 hours / 12 ساعة / شهرين / سنة"
+                className="input"
+                list="analysis-frame-suggestions"
+              />
+
+              <datalist id="analysis-frame-suggestions">
+                {analysisFrameSuggestions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.hint}
+                  </option>
+                ))}
+              </datalist>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {analysisFrameSuggestions.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setAnalysisFrame(item.value)}
+                    className={`rounded-2xl border px-3 py-2 text-sm font-black transition ${
+                      analysisFrame === item.value
+                        ? "border-white bg-white text-blue-700"
+                        : "border-white/25 bg-white/15 text-white hover:bg-white/25"
+                    }`}
+                    title={item.hint}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <p
+                className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold leading-7"
+                style={{
+                  color: "#ffffff",
+                  WebkitTextFillColor: "#ffffff",
+                  textShadow: "0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)",
+                }}
+              >
+                يمكنك كتابة الفريم بأي صيغة: 12h أو 12 hours أو 12 ساعة أو شهرين أو سنة.
+              </p>
+            </div>
 
             <button
               onClick={submitAnalysis}
