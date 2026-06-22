@@ -16,6 +16,13 @@ const supabase = createClient(
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_REPLY_TO || "support@hasanchartworld.com";
 
 async function sendAdminSubscriptionRequestEmail({ userEmail, username, planName, category, price, telegramUsername, paymentProof }) {
+  const isInlinePaymentProof = String(paymentProof || "").startsWith("data:image");
+  const paymentProofHtml = isInlinePaymentProof
+    ? "صورة إثبات الدفع محفوظة داخل الطلب ويمكن عرضها من لوحة الإدارة."
+    : paymentProof
+    ? `<a href="${paymentProof}" style="color:#2563eb;font-weight:800;text-decoration:none">فتح صورة إثبات الدفع</a>`
+    : "غير مرفق";
+
   await sendTemplateEmail({
     to: ADMIN_EMAIL,
     subject: "طلب اشتراك جديد - HasaN CharT World",
@@ -29,7 +36,7 @@ async function sendAdminSubscriptionRequestEmail({ userEmail, username, planName
         <p><strong>البريد:</strong> ${userEmail}</p>
         <p><strong>اسم المستخدم:</strong> ${username || "غير متوفر"}</p>
         <p><strong>تليجرام:</strong> ${telegramUsername}</p>
-        <p><strong>إثبات الدفع:</strong> <a href="${paymentProof}">فتح الصورة</a></p>
+        <p><strong>إثبات الدفع:</strong> ${paymentProofHtml}</p>
       </div>
     `,
     actionText: "فتح لوحة الإدارة",
