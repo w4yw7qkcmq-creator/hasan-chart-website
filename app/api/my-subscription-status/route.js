@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -45,7 +43,7 @@ export async function GET(request) {
 
     const { data, error } = await supabase
       .from("subscription_requests")
-      .select("id,plan_name,category,price,status,created_at")
+      .select("id,plan_name,category,price,status,started_at,expires_at,created_at")
       .eq("user_email", email)
       .eq("status", "مفعل")
       .order("created_at", { ascending: false });
@@ -76,6 +74,7 @@ export async function GET(request) {
       hasSpot: flags.hasSpot,
       hasFutures: flags.hasFutures,
       plans: activePlans,
+      current_subscription: activePlans[0] || null,
     });
   } catch (err) {
     return NextResponse.json(

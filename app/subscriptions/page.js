@@ -109,12 +109,37 @@ function Feature({ text }) {
   );
 }
 
+function formatDate(value) {
+  if (!value) return "غير محدد";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "غير محدد";
+
+  return date.toLocaleDateString("ar-SY-u-nu-latn", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+function getRemainingDays(expiresAt) {
+  if (!expiresAt) return null;
+
+  const expiresTime = new Date(expiresAt).getTime();
+  if (!Number.isFinite(expiresTime)) return null;
+
+  const diff = expiresTime - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
 export default function SubscriptionsPage() {
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [notification, setNotification] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [telegramUsername, setTelegramUsername] = useState("");
   const [paymentProof, setPaymentProof] = useState("");
+  const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
 
   useEffect(() => {
     if (!notification) return;
@@ -125,6 +150,43 @@ export default function SubscriptionsPage() {
 
     return () => clearTimeout(timer);
   }, [notification]);
+
+  useEffect(() => {
+    const loadCurrentSubscription = async () => {
+      try {
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+
+        if (!currentUser?.email) {
+          setCurrentSubscription(null);
+          return;
+        }
+
+        const response = await fetch(
+          `/api/my-subscription-status?email=${encodeURIComponent(currentUser.email)}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result?.success || !result?.active) {
+          setCurrentSubscription(null);
+          return;
+        }
+
+        setCurrentSubscription(result.current_subscription || result.plans?.[0] || null);
+      } catch (error) {
+        console.error("Current subscription load error:", error);
+        setCurrentSubscription(null);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+
+    loadCurrentSubscription();
+  }, []);
 
   const handlePaymentProof = (event) => {
     const file = event.target.files?.[0];
@@ -395,7 +457,72 @@ export default function SubscriptionsPage() {
           </div>
         </section>
 
-        <section className="space-y-8">
+        <section className="rounded-[34px] border border-cyan-300/15 bg-white/[0.06] p-6 shadow-2xl backdrop-blur-2xl md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200">
+                CURRENT MEMBERSHIP
+              </span>
+              <h2 className="mt-4 text-3xl font-black text-white">اشتراكك الحالي</h2>
+              <p className="mt-3 max-w-2xl leading-8 text-slate-300">
+                تابع حالة باقتك الحالية وتاريخ البداية والانتهاء وعدد الأيام المتبقية قبل التجديد.
+              </p>
+            </div>
+
+            {currentSubscription && (
+              <Link
+                href="#plans"
+                className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-6 py-4 text-center font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.28)] transition hover:scale-[1.02]"
+              >
+                تجديد الاشتراك
+              </Link>
+            )}
+          </div>
+
+          {subscriptionLoading ? (
+            <div className="mt-6 rounded-3xl border border-cyan-300/15 bg-black/20 p-5 text-center font-bold text-cyan-100">
+              جاري تحميل بيانات الاشتراك...
+            </div>
+          ) : currentSubscription ? (
+            <div className="mt-7 grid gap-4 md:grid-cols-4">
+              <div className="rounded-3xl border border-cyan-300/15 bg-black/25 p-5">
+                <p className="text-xs font-black text-slate-500">اسم الباقة</p>
+                <p className="mt-3 text-xl font-black text-cyan-100">
+                  {currentSubscription.plan_name || currentSubscription.category || "اشتراك VIP"}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-emerald-300/15 bg-black/25 p-5">
+                <p className="text-xs font-black text-slate-500">تاريخ البداية</p>
+                <p className="mt-3 text-xl font-black text-emerald-100">
+                  {formatDate(currentSubscription.started_at || currentSubscription.created_at)}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-amber-300/15 bg-black/25 p-5">
+                <p className="text-xs font-black text-slate-500">تاريخ الانتهاء</p>
+                <p className="mt-3 text-xl font-black text-amber-100">
+                  {formatDate(currentSubscription.expires_at)}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-blue-300/15 bg-gradient-to-br from-blue-600/20 to-cyan-400/10 p-5">
+                <p className="text-xs font-black text-slate-400">الأيام المتبقية</p>
+                <p className="mt-3 text-4xl font-black text-white">
+                  {getRemainingDays(currentSubscription.expires_at) ?? "--"}
+                </p>
+                <p className="mt-1 text-sm font-bold text-cyan-100">يوم</p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-3xl border border-dashed border-cyan-300/20 bg-black/20 p-6 text-center">
+              <p className="text-xl font-black text-white">لا يوجد اشتراك مفعل حالياً</p>
+              <p className="mt-2 font-bold text-slate-400">اختر إحدى الباقات بالأسفل وأرسل طلب الاشتراك للمراجعة.</p>
+            </div>
+          )}
+        </section>
+
+        <section id="plans" className="space-y-8">
           {["باقات السبوت", "باقات الفيوتشر"].map((category) => (
             <div key={category} className="space-y-5">
               <div className="flex items-center justify-between gap-4">
