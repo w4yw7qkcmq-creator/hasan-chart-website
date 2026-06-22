@@ -55,6 +55,8 @@ const FRAME_LOOKUP = new Map(
   )
 );
 
+const SUPPORTED_FRAME_CODES = new Set(Object.keys(FRAME_ALIASES));
+
 const safeJson = async (req) => {
   try {
     return await req.json();
@@ -104,7 +106,7 @@ const normalizeFrame = (value) => {
   const yearMatch = lowerFrame.match(/^(\d+)\s*(y|year|years|سنة|سنوات|عام)$/);
   if (yearMatch) return `${yearMatch[1]}y`;
 
-  return rawFrame;
+  return "";
 };
 
 const getCooldownText = (remainingMs) => {
@@ -229,7 +231,6 @@ export async function POST(req) {
     }
 
     const coin = normalizeCoin(body.coin);
-    const rawFrame = normalizeFrameInput(body.frame);
     const frame = normalizeFrame(body.frame);
 
     if (!coin || !frame) {
@@ -252,7 +253,7 @@ export async function POST(req) {
       );
     }
 
-    if (!frame || frame === rawFrame) {
+    if (!frame || !SUPPORTED_FRAME_CODES.has(frame)) {
       return Response.json(
         {
           success: false,
