@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { getSiteUrl, sendTemplateEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -463,11 +464,29 @@ async function notifyVipSubscribers(supabase, signal) {
     );
 
     const subject = `🚨 توصية VIP ${label} جديدة - ${coin}`;
-    const html = buildVipSignalEmailHtml({ signalType: normalizedSignalType, coin, entry, targets, stopLoss, notes });
+    const signalPageUrl = `${getSiteUrl()}${normalizedSignalType === "futures" ? "/vip-futures" : "/vip-spot"}`;
+
+    const emailContent = `
+      <h2 style="margin:0 0 18px;font-size:24px">${coin}</h2>
+      <div style="display:grid;gap:12px">
+        <div style="background:#ecfeff;border:1px solid #bae6fd;border-radius:16px;padding:14px"><b>منطقة الدخول:</b><br/>${entry || "غير محدد"}</div>
+        <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:16px;padding:14px"><b>الأهداف:</b><br/>${String(targets || "غير محدد").replace(/\n/g, "<br/>")}</div>
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:16px;padding:14px"><b>وقف الخسارة:</b><br/>${stopLoss || "غير محدد"}</div>
+        ${notes ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px;padding:14px"><b>ملاحظات:</b><br/>${String(notes).replace(/\n/g, "<br/>")}</div>` : ""}
+      </div>
+      <p style="margin-top:22px;color:#64748b;font-size:13px;line-height:1.8">هذه الرسالة مخصصة للمشتركين في توصيات VIP. يرجى الالتزام بإدارة رأس المال.</p>
+    `;
 
     const emailResults = await Promise.allSettled(
       recipientEmails.map((email) =>
-        sendEmailViaResend({ to: email, subject, html })
+        sendTemplateEmail({
+          to: email,
+          subject,
+          title: `🚨 توصية VIP ${label} جديدة`,
+          content: emailContent,
+          actionText: "فتح صفحة التوصيات",
+          actionUrl: signalPageUrl,
+        })
       )
     );
 
