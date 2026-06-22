@@ -457,14 +457,14 @@ export default function SubscriptionsPage() {
           </div>
         </section>
 
-        <section className="rounded-[34px] border border-cyan-300/15 bg-white/[0.06] p-6 shadow-2xl backdrop-blur-2xl md:p-8">
+        <section className="rounded-[34px] border border-cyan-200 bg-white/95 p-6 text-slate-950 shadow-[0_24px_90px_rgba(14,165,233,0.18)] backdrop-blur-2xl md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200">
+              <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700">
                 CURRENT MEMBERSHIP
               </span>
-              <h2 className="mt-4 text-3xl font-black text-white">اشتراكك الحالي</h2>
-              <p className="mt-3 max-w-2xl leading-8 text-slate-300">
+              <h2 className="mt-4 text-3xl font-black text-slate-950">اشتراكك الحالي</h2>
+              <p className="mt-3 max-w-2xl font-bold leading-8 text-slate-600">
                 تابع حالة باقتك الحالية وتاريخ البداية والانتهاء وعدد الأيام المتبقية قبل التجديد.
               </p>
             </div>
@@ -480,44 +480,44 @@ export default function SubscriptionsPage() {
           </div>
 
           {subscriptionLoading ? (
-            <div className="mt-6 rounded-3xl border border-cyan-300/15 bg-black/20 p-5 text-center font-bold text-cyan-100">
+            <div className="mt-6 rounded-3xl border border-cyan-200 bg-cyan-50 p-5 text-center font-black text-cyan-700">
               جاري تحميل بيانات الاشتراك...
             </div>
           ) : currentSubscription ? (
             <div className="mt-7 grid gap-4 md:grid-cols-4">
-              <div className="rounded-3xl border border-cyan-300/15 bg-black/25 p-5">
-                <p className="text-xs font-black text-slate-500">اسم الباقة</p>
-                <p className="mt-3 text-xl font-black text-cyan-100">
+              <div className="rounded-3xl border border-cyan-200 bg-cyan-50 p-5 shadow-sm">
+                <p className="text-xs font-black text-cyan-700">اسم الباقة</p>
+                <p className="mt-3 text-xl font-black text-slate-950">
                   {currentSubscription.plan_name || currentSubscription.category || "اشتراك VIP"}
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-emerald-300/15 bg-black/25 p-5">
-                <p className="text-xs font-black text-slate-500">تاريخ البداية</p>
-                <p className="mt-3 text-xl font-black text-emerald-100">
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                <p className="text-xs font-black text-emerald-700">تاريخ البداية</p>
+                <p className="mt-3 text-xl font-black text-slate-950">
                   {formatDate(currentSubscription.started_at || currentSubscription.created_at)}
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-amber-300/15 bg-black/25 p-5">
-                <p className="text-xs font-black text-slate-500">تاريخ الانتهاء</p>
-                <p className="mt-3 text-xl font-black text-amber-100">
+              <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                <p className="text-xs font-black text-amber-700">تاريخ الانتهاء</p>
+                <p className="mt-3 text-xl font-black text-slate-950">
                   {formatDate(currentSubscription.expires_at)}
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-blue-300/15 bg-gradient-to-br from-blue-600/20 to-cyan-400/10 p-5">
-                <p className="text-xs font-black text-slate-400">الأيام المتبقية</p>
+              <div className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-600 to-cyan-400 p-5 text-white shadow-[0_18px_50px_rgba(37,99,235,0.25)]">
+                <p className="text-xs font-black text-blue-50">الأيام المتبقية</p>
                 <p className="mt-3 text-4xl font-black text-white">
                   {getRemainingDays(currentSubscription.expires_at) ?? "--"}
                 </p>
-                <p className="mt-1 text-sm font-bold text-cyan-100">يوم</p>
+                <p className="mt-1 text-sm font-black text-blue-50">يوم</p>
               </div>
             </div>
           ) : (
-            <div className="mt-6 rounded-3xl border border-dashed border-cyan-300/20 bg-black/20 p-6 text-center">
-              <p className="text-xl font-black text-white">لا يوجد اشتراك مفعل حالياً</p>
-              <p className="mt-2 font-bold text-slate-400">اختر إحدى الباقات بالأسفل وأرسل طلب الاشتراك للمراجعة.</p>
+            <div className="mt-6 rounded-3xl border border-dashed border-cyan-300 bg-cyan-50 p-6 text-center">
+              <p className="text-xl font-black text-slate-950">لا يوجد اشتراك مفعل حالياً</p>
+              <p className="mt-2 font-bold text-slate-600">اختر إحدى الباقات بالأسفل وأرسل طلب الاشتراك للمراجعة.</p>
             </div>
           )}
         </section>
