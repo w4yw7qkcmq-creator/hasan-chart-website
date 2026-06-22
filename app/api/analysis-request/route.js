@@ -22,45 +22,38 @@ const getSupabaseAdmin = () => {
 
 const ANALYSIS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
-const ALLOWED_FRAMES = new Set([
-  "1m",
-  "3m",
-  "5m",
-  "15m",
-  "30m",
-  "45m",
-  "1h",
-  "2h",
-  "3h",
-  "4h",
-  "6h",
-  "8h",
-  "12h",
-  "1d",
-  "1w",
-  "1M",
-  "أربع ساعات",
-  "يومي",
-  "أسبوعي",
-  "شهري",
-  "يوم",
-  "يومين",
-  "ثلاثة أيام",
-  "أربعة أيام",
-  "3 أيام",
-  "4 أيام",
-  "أسبوع",
-  "2D",
-  "3D",
-  "4D",
-  "ساعة",
-  "ساعتين",
-  "ثلاث ساعات",
-  "ست ساعات",
-  "ثمان ساعات",
-  "نصف ساعة",
-  "ربع ساعة",
-]);
+const FRAME_ALIASES = {
+  "1m": ["1m", "1 min", "1 minute", "دقيقة", "دقيقة واحدة", "١ دقيقة"],
+  "3m": ["3m", "3 min", "3 minutes", "3 دقائق", "٣ دقائق"],
+  "5m": ["5m", "5 min", "5 minutes", "5 دقائق", "٥ دقائق"],
+  "15m": ["15m", "15 min", "15 minutes", "15 دقيقة", "١٥ دقيقة", "ربع ساعة"],
+  "30m": ["30m", "30 min", "30 minutes", "30 دقيقة", "٣٠ دقيقة", "نصف ساعة"],
+  "45m": ["45m", "45 min", "45 minutes", "45 دقيقة", "٤٥ دقيقة"],
+  "1h": ["1h", "1 hour", "hour", "ساعة", "ساعة واحدة", "١ ساعة"],
+  "2h": ["2h", "2 hour", "2 hours", "ساعتين", "2 ساعة", "٢ ساعة"],
+  "3h": ["3h", "3 hour", "3 hours", "ثلاث ساعات", "3 ساعات", "٣ ساعات"],
+  "4h": ["4h", "4 hour", "4 hours", "أربع ساعات", "اربع ساعات", "4 ساعات", "٤ ساعات"],
+  "6h": ["6h", "6 hour", "6 hours", "ست ساعات", "6 ساعات", "٦ ساعات"],
+  "8h": ["8h", "8 hour", "8 hours", "ثمان ساعات", "8 ساعات", "٨ ساعات"],
+  "12h": ["12h", "12 hour", "12 hours", "12 ساعة", "١٢ ساعة", "اثنا عشر ساعة", "إثنا عشر ساعة"],
+  "1d": ["1d", "1 day", "day", "daily", "يوم", "يومي", "يوم واحد", "١ يوم"],
+  "2d": ["2d", "2 day", "2 days", "يومين", "2 يوم", "٢ يوم"],
+  "3d": ["3d", "3 day", "3 days", "ثلاثة أيام", "3 أيام", "٣ أيام"],
+  "4d": ["4d", "4 day", "4 days", "أربعة أيام", "اربعة أيام", "4 أيام", "٤ أيام"],
+  "1w": ["1w", "1 week", "week", "weekly", "أسبوع", "اسبوع", "أسبوعي", "اسبوعي", "١ أسبوع"],
+  "2w": ["2w", "2 week", "2 weeks", "أسبوعين", "اسبوعين", "2 أسبوع", "٢ أسبوع"],
+  "1M": ["1M", "1 month", "month", "monthly", "شهر", "شهري", "شهر واحد", "١ شهر"],
+  "2M": ["2M", "2 month", "2 months", "شهرين", "2 شهر", "٢ شهر"],
+  "3M": ["3M", "3 month", "3 months", "ثلاثة أشهر", "3 أشهر", "٣ أشهر"],
+  "6M": ["6M", "6 month", "6 months", "ستة أشهر", "6 أشهر", "٦ أشهر"],
+  "1y": ["1y", "1 year", "year", "yearly", "سنة", "سنوي", "سنة واحدة", "عام", "١ سنة"],
+};
+
+const FRAME_LOOKUP = new Map(
+  Object.entries(FRAME_ALIASES).flatMap(([canonicalFrame, aliases]) =>
+    aliases.map((alias) => [alias.toLowerCase(), canonicalFrame])
+  )
+);
 
 const safeJson = async (req) => {
   try {
@@ -78,8 +71,40 @@ const normalizeCoin = (value) => {
     .slice(0, 30);
 };
 
+const normalizeFrameInput = (value) => {
+  return String(value || "")
+    .trim()
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/\s+/g, " ")
+    .slice(0, 50);
+};
+
 const normalizeFrame = (value) => {
-  return String(value || "").trim().slice(0, 30);
+  const rawFrame = normalizeFrameInput(value);
+  const lowerFrame = rawFrame.toLowerCase();
+
+  if (FRAME_LOOKUP.has(lowerFrame)) return FRAME_LOOKUP.get(lowerFrame);
+
+  const compactFrame = lowerFrame.replace(/\s+/g, "");
+  if (FRAME_LOOKUP.has(compactFrame)) return FRAME_LOOKUP.get(compactFrame);
+
+  const hourMatch = lowerFrame.match(/^(\d+)\s*(h|hour|hours|ساعة|ساعات)$/);
+  if (hourMatch) return `${hourMatch[1]}h`;
+
+  const dayMatch = lowerFrame.match(/^(\d+)\s*(d|day|days|يوم|أيام|ايام)$/);
+  if (dayMatch) return `${dayMatch[1]}d`;
+
+  const weekMatch = lowerFrame.match(/^(\d+)\s*(w|week|weeks|أسبوع|اسبوع|أسابيع|اسابيع)$/);
+  if (weekMatch) return `${weekMatch[1]}w`;
+
+  const monthMatch = lowerFrame.match(/^(\d+)\s*(mth|month|months|شهر|أشهر|اشهر)$/);
+  if (monthMatch) return `${monthMatch[1]}M`;
+
+  const yearMatch = lowerFrame.match(/^(\d+)\s*(y|year|years|سنة|سنوات|عام)$/);
+  if (yearMatch) return `${yearMatch[1]}y`;
+
+  return rawFrame;
 };
 
 const getCooldownText = (remainingMs) => {
@@ -204,6 +229,7 @@ export async function POST(req) {
     }
 
     const coin = normalizeCoin(body.coin);
+    const rawFrame = normalizeFrameInput(body.frame);
     const frame = normalizeFrame(body.frame);
 
     if (!coin || !frame) {
@@ -226,11 +252,11 @@ export async function POST(req) {
       );
     }
 
-    if (!ALLOWED_FRAMES.has(frame)) {
+    if (!frame || frame === rawFrame) {
       return Response.json(
         {
           success: false,
-          error: "الفريم الزمني غير مدعوم",
+          error: "الفريم الزمني غير مدعوم. يمكنك كتابة الفريم بالعربي أو الإنجليزي مثل: 1h، 12 hours، 12 ساعة، يوم، أسبوع، شهر، شهرين، سنة.",
         },
         { status: 400 }
       );
