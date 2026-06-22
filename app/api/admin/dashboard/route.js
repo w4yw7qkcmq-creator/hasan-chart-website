@@ -70,6 +70,42 @@ function formatAccountForAdmin(item) {
   };
 }
 
+function buildAdminDashboardNotifications({ subscriptions = [], accounts = [] }) {
+  const subscriptionNotifications = (subscriptions || [])
+    .filter((item) => {
+      const status = String(item.status || "بانتظار المراجعة").trim();
+      return status === "بانتظار المراجعة" || status === "قيد المعالجة" || status === "جديد";
+    })
+    .map((item) => ({
+      id: `subscription-${item.id}`,
+      type: "subscription_request",
+      title: "طلب اشتراك جديد 💳",
+      message: `طلب اشتراك جديد في ${item.plan_name || item.category || "باقات التوصيات"} من ${item.user_email || item.username || "مستخدم جديد"}.`,
+      targetSection: "subscriptions",
+      targetId: item.id,
+      created_at: item.created_at || null,
+    }));
+
+  const accountNotifications = (accounts || [])
+    .filter((item) => {
+      const status = String(item.status || "جديد").trim();
+      return status === "جديد" || status === "بانتظار المراجعة";
+    })
+    .map((item) => ({
+      id: `account-${item.id}`,
+      type: "account_management_request",
+      title: "طلب إدارة حساب جديد 📂",
+      message: `طلب إدارة حساب جديد من ${item.email || item.contact_method || "مستخدم جديد"}.`,
+      targetSection: "accounts",
+      targetId: item.id,
+      created_at: item.created_at || null,
+    }));
+
+  return [...subscriptionNotifications, ...accountNotifications]
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, 20);
+}
+
 export async function GET() {
   try {
     const supabase = getAdminSupabase();
@@ -157,12 +193,19 @@ export async function GET() {
       profiles: profiles.data?.length || 0,
     });
 
+    const adminNotifications = buildAdminDashboardNotifications({
+      subscriptions: subscriptions.data || [],
+      accounts: accounts.data || [],
+    });
+
     return Response.json({
       success: true,
       analysis_requests: analysis.data || [],
       account_management_requests: accounts.data || [],
       subscription_requests: subscriptions.data || [],
       profiles: profiles.data || [],
+      admin_notifications: adminNotifications,
+      admin_notifications_count: adminNotifications.length,
     });
   } catch (error) {
     console.error("Admin dashboard API error:", error);

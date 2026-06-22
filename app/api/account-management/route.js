@@ -3,10 +3,39 @@ import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { accountManagementLimiter } from "../../../lib/rate-limit";
+import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_REPLY_TO || "support@hasanchartworld.com";
+
+async function sendAdminAccountRequestEmail({
+  email,
+  platform,
+  capital,
+  accountType,
+  contactMethod,
+}) {
+  await sendTemplateEmail({
+    to: ADMIN_EMAIL,
+    subject: "طلب إدارة حساب جديد - HasaN CharT World",
+    title: "طلب إدارة حساب جديد 📂",
+    content: `
+      <p>وصل طلب إدارة حساب جديد من أحد المستخدمين.</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:16px;line-height:1.9">
+        <p><strong>البريد:</strong> ${email}</p>
+        <p><strong>المنصة:</strong> ${platform}</p>
+        <p><strong>رأس المال:</strong> ${capital}</p>
+        <p><strong>نوع الحساب:</strong> ${accountType || "غير محدد"}</p>
+        <p><strong>طريقة التواصل:</strong> ${contactMethod || "غير محددة"}</p>
+      </div>
+    `,
+    actionText: "فتح لوحة الإدارة",
+    actionUrl: `${getSiteUrl()}/admin`,
+  });
+}
 
 function getAdminSupabase() {
   if (!supabaseUrl || !supabaseServiceKey) {
@@ -223,6 +252,19 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+
+    sendAdminAccountRequestEmail({
+      email: user.email,
+      platform,
+      capital,
+      accountType,
+      contactMethod,
+    }).catch((emailError) => {
+      console.error(
+        "Admin account-management email error:",
+        emailError?.message || emailError
+      );
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
