@@ -1265,10 +1265,10 @@ export default function AdminPage() {
                 </button>
 
                 {adminNotificationsOpen && (
-                  <div className="absolute left-0 top-[calc(100%+12px)] z-50 w-[min(92vw,420px)] overflow-hidden rounded-[28px] border border-cyan-300/15 bg-[#07142f] p-4 text-right shadow-[0_24px_90px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
-                    <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
-                      <h3 className="text-lg font-black text-white">مركز إشعارات الأدمن</h3>
-                      <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-black text-cyan-100">
+                  <div className="fixed left-1/2 top-24 z-[9999] w-[min(92vw,520px)] -translate-x-1/2 overflow-hidden rounded-[28px] border border-cyan-200 bg-white/95 p-4 text-right text-slate-950 shadow-[0_24px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                      <h3 className="text-lg font-black text-slate-950">مركز إشعارات الأدمن</h3>
+                      <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-700">
                         {adminNotifications.length} جديد
                       </span>
                     </div>
@@ -1276,8 +1276,8 @@ export default function AdminPage() {
                     {adminNotifications.length === 0 ? (
                       <div className="py-8 text-center">
                         <p className="text-3xl">✅</p>
-                        <p className="mt-3 font-black text-white">لا توجد طلبات جديدة</p>
-                        <p className="mt-1 text-sm text-slate-400">طلبات الاشتراك وإدارة الحسابات الجديدة ستظهر هنا.</p>
+                        <p className="mt-3 font-black text-slate-950">لا توجد طلبات جديدة</p>
+                        <p className="mt-1 text-sm text-slate-600">طلبات الاشتراك وإدارة الحسابات الجديدة ستظهر هنا.</p>
                       </div>
                     ) : (
                       <div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto pr-1">
@@ -1294,16 +1294,16 @@ export default function AdminPage() {
                                 setAccountFilter("new");
                               }
                             }}
-                            className="w-full rounded-2xl border border-cyan-300/15 bg-black/25 p-4 text-right transition hover:border-cyan-300/30 hover:bg-cyan-400/10"
+                            className="w-full rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 text-right transition hover:border-cyan-300 hover:bg-cyan-100"
                           >
                             <div className="flex items-start gap-3">
-                              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/15 bg-cyan-400/10 text-2xl">
+                              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-200 bg-white text-2xl shadow-sm">
                                 {item.icon}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="font-black text-white">{item.title}</p>
-                                <p className="mt-1 break-words text-sm font-bold text-slate-300">{item.message}</p>
-                                {item.createdAt && <p className="mt-2 text-xs text-slate-500">{item.createdAt}</p>}
+                                <p className="font-black text-slate-950">{item.title}</p>
+                                <p className="mt-1 break-words text-sm font-bold text-slate-700">{item.message}</p>
+                                {item.createdAt && <p className="mt-2 text-xs font-bold text-slate-500">{item.createdAt}</p>}
                               </div>
                             </div>
                           </button>
