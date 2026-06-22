@@ -300,7 +300,7 @@ function buildVipSignalEmailHtml({ signalType, coin, entry, targets, stopLoss, n
 
 async function sendEmailViaResend({ to, subject, html }) {
   const resendApiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || "HasaN CharT World <onboarding@resend.dev>";
+  const fromEmail = process.env.EMAIL_FROM || "HasaN CharT World <support@hasanchartworld.com>";
 
   if (!resendApiKey || !to) {
     return { skipped: true };
@@ -384,32 +384,71 @@ function getSubscriptionExpiryDate(planName) {
   };
 }
 
+function isActiveSubscriptionRow(item) {
+  if (!item) return false;
+
+  const status = String(item.status || item.subscription_status || "").trim().toLowerCase();
+  const isActiveStatus = status === "مفعل" || status === "نشط" || status === "active";
+
+  if (!isActiveStatus) return false;
+
+  if (item.expires_at) {
+    const expiresTime = new Date(item.expires_at).getTime();
+    if (Number.isFinite(expiresTime) && expiresTime <= Date.now()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 async function notifyVipSubscribers(supabase, signal) {
   try {
     const { signalType, coin, entry, targets, stopLoss, notes } = signal;
     const normalizedSignalType = normalizeVipSignalType(signalType);
     const label = signalTypeLabel(normalizedSignalType);
 
-    const { data: subscriptions, error } = await supabase
-      .from("subscription_requests")
-      .select("user_email,plan_name,category,status")
-      .eq("status", "مفعل");
+    const [subscriptionsResult, profilesResult] = await Promise.all([
+      supabase
+        .from("subscription_requests")
+        .select("user_email,plan_name,category,status,expires_at")
+        .eq("status", "مفعل"),
+      supabase
+        .from("profiles")
+        .select("email,subscription_plan,subscription_status"),
+    ]);
 
-    if (error) {
-      console.error("VIP subscribers load error:", error.message || error);
-      return;
+    if (subscriptionsResult.error) {
+      console.error("VIP subscribers load error:", subscriptionsResult.error.message || subscriptionsResult.error);
     }
 
-    const recipientEmails = [
-      ...new Set(
-        (subscriptions || [])
-          .filter((item) =>
-            matchesSignalSubscription(`${item.plan_name || ""} ${item.category || ""}`, normalizedSignalType)
-          )
-          .map((item) => String(item.user_email || "").trim().toLowerCase())
-          .filter(Boolean)
-      ),
-    ];
+    if (profilesResult.error) {
+      console.error("VIP subscriber profiles load error:", profilesResult.error.message || profilesResult.error);
+    }
+
+    const subscribersFromRequests = (subscriptionsResult.data || [])
+      .filter(isActiveSubscriptionRow)
+      .filter((item) =>
+        matchesSignalSubscription(`${item.plan_name || ""} ${item.category || ""}`, normalizedSignalType)
+      )
+      .map((item) => String(item.user_email || "").trim().toLowerCase())
+      .filter(Boolean);
+
+    const subscribersFromProfiles = (profilesResult.data || [])
+      .filter(isActiveSubscriptionRow)
+      .filter((item) =>
+        matchesSignalSubscription(item.subscription_plan || "", normalizedSignalType)
+      )
+      .map((item) => String(item.email || "").trim().toLowerCase())
+      .filter(Boolean);
+
+    const recipientEmails = [...new Set([...subscribersFromRequests, ...subscribersFromProfiles])];
+
+    console.log("VIP signal recipients:", {
+      signalType: normalizedSignalType,
+      count: recipientEmails.length,
+      recipientEmails,
+    });
 
     if (recipientEmails.length === 0) return;
 
@@ -426,11 +465,20 @@ async function notifyVipSubscribers(supabase, signal) {
     const subject = `🚨 توصية VIP ${label} جديدة - ${coin}`;
     const html = buildVipSignalEmailHtml({ signalType: normalizedSignalType, coin, entry, targets, stopLoss, notes });
 
-    await Promise.allSettled(
+    const emailResults = await Promise.allSettled(
       recipientEmails.map((email) =>
         sendEmailViaResend({ to: email, subject, html })
       )
     );
+
+    emailResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error("VIP email failed:", {
+          email: recipientEmails[index],
+          error: result.reason?.message || result.reason,
+        });
+      }
+    });
   } catch (error) {
     console.error("VIP subscriber notification error:", error.message || error);
   }
