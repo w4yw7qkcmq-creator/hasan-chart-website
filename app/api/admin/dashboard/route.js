@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
-import { getSiteUrl, sendTemplateEmail } from "@/lib/email";
+import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
 
 export const dynamic = "force-dynamic";
 
