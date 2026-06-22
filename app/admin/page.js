@@ -699,7 +699,7 @@ export default function AdminPage() {
     if (filter === "answered") return analysisRequests.filter((req) => req.status === "تم الرد" || req.status === "مكتمل");
     if (filter === "rejected") return analysisRequests.filter((req) => req.status === "مرفوض");
     if (filter === "archived") return analysisRequests.filter((req) => req.status === "مؤرشف");
-    return analysisRequests;
+    return analysisRequests.filter((req) => req.status !== "مؤرشف");
   }, [analysisRequests, filter]);
 
   const filteredSubscriptions = useMemo(() => {
@@ -708,7 +708,7 @@ export default function AdminPage() {
     if (subscriptionFilter === "active") return subscriptionRequests.filter((req) => req.status === "مفعل");
     if (subscriptionFilter === "rejected") return subscriptionRequests.filter((req) => req.status === "مرفوض");
     if (subscriptionFilter === "archived") return subscriptionRequests.filter((req) => req.status === "مؤرشف");
-    return subscriptionRequests;
+    return subscriptionRequests.filter((req) => req.status !== "مؤرشف");
   }, [subscriptionRequests, subscriptionFilter]);
 
   const filteredAccounts = useMemo(() => {
@@ -717,7 +717,7 @@ export default function AdminPage() {
     if (accountFilter === "active") return accountRequests.filter((req) => req.status === "نشط");
     if (accountFilter === "closed") return accountRequests.filter((req) => req.status === "مغلق");
     if (accountFilter === "archived") return accountRequests.filter((req) => req.status === "مؤرشف");
-    return accountRequests;
+    return accountRequests.filter((req) => req.status !== "مؤرشف");
   }, [accountRequests, accountFilter]);
 
   const logout = () => {
