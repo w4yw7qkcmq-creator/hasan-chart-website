@@ -312,6 +312,7 @@ export default function AdminPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasLoadedAdminData, setHasLoadedAdminData] = useState(false);
   const hasLoadedAdminDataRef = useRef(false);
+  const [refreshWarning, setRefreshWarning] = useState("");
   const [replySending, setReplySending] = useState({});
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const [vipSignalForm, setVipSignalForm] = useState({
@@ -607,21 +608,21 @@ export default function AdminPage() {
       setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
       hasLoadedAdminDataRef.current = true;
       setHasLoadedAdminData(true);
+      setRefreshWarning("");
     } catch (err) {
       console.error("Admin load error:", err);
 
-      if (options.silent) {
+      if (options.silent || hasLoadedAdminDataRef.current) {
+        setRefreshWarning("بعض البيانات تأخرت في التحديث");
         return;
       }
 
-      if (!hasLoadedAdminDataRef.current) {
-        setUsers(fallbackUsers);
-        setAnalysisRequests([]);
-        setSubscriptionRequests([]);
-        setAccountRequests([]);
-        setDataMode("secure-api");
-        setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
-      }
+      setUsers(fallbackUsers);
+      setAnalysisRequests([]);
+      setSubscriptionRequests([]);
+      setAccountRequests([]);
+      setDataMode("secure-api");
+      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
 
       showAdminNotice(
         err?.name === "AbortError"
@@ -1263,6 +1264,19 @@ export default function AdminPage() {
       <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
 
       <div className="relative z-10 space-y-8 p-4 text-slate-100 md:p-6">
+        {refreshWarning && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-[0_10px_30px_rgba(245,158,11,0.12)]">
+            <span>{refreshWarning}</span>
+            <button
+              type="button"
+              onClick={() => setRefreshWarning("")}
+              className="rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-xs font-black text-amber-800 transition hover:bg-amber-100"
+            >
+              إغلاق
+            </button>
+          </div>
+        )}
+
         <section className="relative overflow-hidden rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
           <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
           <div className="absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
