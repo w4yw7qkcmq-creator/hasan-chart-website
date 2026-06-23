@@ -271,6 +271,14 @@ function RootLayoutContent({ children }) {
             return;
           }
 
+          if (notification.type === "price-alert") {
+            showAppModal({
+              type: "success",
+              title: notification.title || "✅ وصل السعر إلى هدف التنبيه",
+              message: notification.message || "",
+            });
+          }
+
           if (
             (notification.type === "vip-spot" ||
               notification.type === "vip-futures" ||
@@ -320,6 +328,29 @@ function RootLayoutContent({ children }) {
           setSiteNotifications((prev) => [notification, ...prev].slice(0, 10));
           setSiteNotificationBadgeCleared(false);
 
+          const notificationKey = String(notification?.id || "");
+          const notifiedSiteItems = JSON.parse(
+            localStorage.getItem("notifiedSiteNotifications") || "[]"
+          );
+
+          if (
+            notification?.type === "price-alert" &&
+            notificationKey &&
+            !notifiedSiteItems.includes(notificationKey)
+          ) {
+            showAppModal({
+              type: "success",
+              title: notification.title || "✅ وصل السعر إلى هدف التنبيه",
+              message: notification.message || "",
+            });
+
+            notifiedSiteItems.unshift(notificationKey);
+            localStorage.setItem(
+              "notifiedSiteNotifications",
+              JSON.stringify(notifiedSiteItems.slice(0, 100))
+            );
+          }
+
           const message = notification?.title || "وصلك إشعار جديد";
           setGlobalNotice(message);
           setGlobalNoticeHref(
@@ -347,7 +378,7 @@ function RootLayoutContent({ children }) {
       clearInterval(timer);
       supabase.removeChannel(channel);
     };
-  }, [currentUser]);
+  }, [currentUser, showAppModal]);
 
   useEffect(() => {
     if (!currentUser?.email) {

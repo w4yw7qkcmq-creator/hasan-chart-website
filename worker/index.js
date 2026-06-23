@@ -21,7 +21,9 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 });
 
-const CHECK_INTERVAL_MS = 15000;
+const { processEmailQueue } = require("./email-queue");
+
+const CHECK_INTERVAL_MS = 12000;
 const MAX_ALERTS_PER_RUN = 20;
 
 const app = express();
@@ -50,6 +52,44 @@ const escapeHtml = (value) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+
+const formatCoinPair = (coin) => {
+  const symbol = normalizeSymbol(coin);
+
+  if (!symbol) return "";
+
+  if (symbol.endsWith("USDT")) {
+    return `${symbol.slice(0, -4)}-USDT`;
+  }
+
+  return symbol;
+};
+
+const getConditionLabel = (condition) => {
+  return normalizeCondition(condition) === "below"
+    ? "وصول السعر للأسفل"
+    : "وصول السعر للأعلى";
+};
+
+const buildPriceAlertNotificationMessage = ({
+  coin,
+  targetPrice,
+  currentPrice,
+  condition,
+}) => {
+  const coinLabel = formatCoinPair(coin);
+  const conditionLabel = getConditionLabel(condition);
+
+  return [
+    `العملة: ${coinLabel}`,
+    `السعر الذي طلبته: ${formatNumber(targetPrice)}`,
+    `السعر الحالي عند التفعيل: ${formatNumber(currentPrice)}`,
+    "",
+    `نوع التنبيه: ${conditionLabel}`,
+    "",
+    "تم تفعيل التنبيه لأن السعر وصل إلى المستوى المطلوب.",
+  ].join("\n");
+};
 
 const formatNumber = (value) => {
   const numberValue = Number(value);
@@ -623,16 +663,26 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
   };
 };
 
-const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, currentPrice }) => {
+const sendTriggeredAlertEmail = async ({
+  email,
+  coin,
+  condition,
+  targetPrice,
+  currentPrice,
+}) => {
   if (!resendApiKey || !email) {
     return {
+      success: false,
+      skipped: true,
       sent: false,
       reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
     };
   }
 
-  const safeCoin = escapeHtml(coin);
-  const conditionText = normalizeCondition(condition) === "below" ? "هبط السعر إلى" : "صعد السعر إلى";
+  const coinLabel = formatCoinPair(coin);
+  const safeCoin = escapeHtml(coinLabel);
+  const conditionLabel = getConditionLabel(condition);
+  const safeConditionLabel = escapeHtml(conditionLabel);
   const safeTargetPrice = escapeHtml(formatNumber(targetPrice));
   const safeCurrentPrice = escapeHtml(formatNumber(currentPrice));
 
@@ -645,68 +695,31 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
     body: JSON.stringify({
       from: "HasaN CharT World <alerts@hasanchartworld.com>",
       to: email,
-      subject: `🔔 تحقق تنبيه ${safeCoin}`,
+      subject: `✅ وصل السعر إلى هدف التنبيه - ${safeCoin}`,
       html: `
 <div style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;color:#ffffff;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#020617;width:100%;padding:24px 12px;">
     <tr>
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px;background:#07142f;border-radius:24px;overflow:hidden;border:1px solid rgba(34,211,238,0.18);box-shadow:0 0 40px rgba(37,99,235,0.22);">
-
           <tr>
             <td style="background:linear-gradient(135deg,#07142f 0%,#0b63ff 55%,#06b6d4 100%);padding:34px 22px;text-align:center;">
-              <div style="display:inline-block;background:rgba(2,6,23,0.28);border:1px solid rgba(255,255,255,0.25);border-radius:999px;padding:10px 18px;color:#ffffff;font-size:14px;font-weight:900;">
-                🔔 Price Alert Triggered
-              </div>
-
-              <h1 style="margin:24px 0 0;color:#ffffff;font-size:34px;line-height:1.5;font-weight:900;text-align:center;">
-                تم تفعيل تنبيه السعر
+              <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.6;font-weight:900;text-align:center;">
+                ✅ وصل السعر إلى هدف التنبيه
               </h1>
             </td>
           </tr>
-
           <tr>
             <td style="padding:28px 20px 10px;">
-              <div style="background:#020817;border:1px solid rgba(34,211,238,0.16);border-radius:20px;padding:22px;color:#e2e8f0;font-size:20px;line-height:2.1;font-weight:600;text-align:center;">
-                تم تفعيل التنبيه لعملة
-                <strong style="color:#67e8f9;">${safeCoin}</strong>
-                لأن السعر ${conditionText} المستوى المحدد.
+              <div style="background:#020817;border:1px solid rgba(34,211,238,0.16);border-radius:20px;padding:22px;color:#e2e8f0;font-size:18px;line-height:2;font-weight:600;text-align:right;">
+                <p style="margin:0 0 8px;"><strong>العملة:</strong> ${safeCoin}</p>
+                <p style="margin:0 0 8px;"><strong>السعر الذي طلبته:</strong> ${safeTargetPrice}</p>
+                <p style="margin:0 0 8px;"><strong>السعر الحالي عند التفعيل:</strong> ${safeCurrentPrice}</p>
+                <p style="margin:0 0 8px;"><strong>نوع التنبيه:</strong> ${safeConditionLabel}</p>
+                <p style="margin:16px 0 0;color:#94a3b8;font-size:15px;">تم تفعيل التنبيه لأن السعر وصل إلى المستوى المطلوب.</p>
               </div>
             </td>
           </tr>
-
-          <tr>
-            <td style="padding:12px 20px 0;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                <tr>
-                  <td width="50%" style="padding-left:6px;">
-                    <div style="background:#0b1b3a;border:1px solid rgba(34,211,238,0.16);border-radius:18px;padding:22px;text-align:center;">
-                      <div style="color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:10px;">
-                        السعر المستهدف
-                      </div>
-
-                      <div style="color:#67e8f9;font-size:28px;font-weight:900;word-break:break-word;">
-                        ${safeTargetPrice}
-                      </div>
-                    </div>
-                  </td>
-
-                  <td width="50%" style="padding-right:6px;">
-                    <div style="background:#0b1b3a;border:1px solid rgba(34,211,238,0.16);border-radius:18px;padding:22px;text-align:center;">
-                      <div style="color:#93c5fd;font-size:13px;font-weight:800;margin-bottom:10px;">
-                        السعر الحالي
-                      </div>
-
-                      <div style="color:#ffffff;font-size:28px;font-weight:900;word-break:break-word;">
-                        ${safeCurrentPrice}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
           <tr>
             <td align="center" style="padding:32px 20px 34px;">
               <a href="https://www.hasanchartworld.com" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#2563eb);color:#ffffff;text-decoration:none;padding:18px 34px;border-radius:18px;font-size:17px;font-weight:900;box-shadow:0 0 22px rgba(37,99,235,0.35);">
@@ -714,7 +727,6 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
               </a>
             </td>
           </tr>
-
         </table>
       </td>
     </tr>
@@ -726,9 +738,21 @@ const sendTriggeredAlertEmail = async ({ email, coin, condition, targetPrice, cu
 
   const data = await response.json().catch(() => null);
 
+  if (!response.ok) {
+    return {
+      success: false,
+      sent: false,
+      status: response.status,
+      error: data?.message || response.statusText || "Email provider error",
+      result: data,
+    };
+  }
+
   return {
-    sent: response.ok,
+    success: true,
+    sent: true,
     status: response.status,
+    id: data?.id || null,
     data,
   };
 };
@@ -748,7 +772,23 @@ const shouldTriggerAlert = ({ condition, targetPrice, currentPrice }) => {
 };
 
 async function checkPriceAlerts() {
-  console.log("🔍 Checking active price alerts...");
+  const startedAt = new Date().toISOString();
+
+  console.log("ALERT_CHECK_STARTED", {
+    timestamp: startedAt,
+    intervalMs: CHECK_INTERVAL_MS,
+  });
+
+  const summary = {
+    checked: 0,
+    uniqueCoins: 0,
+    triggered: 0,
+    notificationsCreated: 0,
+    emailsQueued: 0,
+    alertsUpdated: 0,
+    skippedInvalid: 0,
+    emailStats: null,
+  };
 
   const { data: alerts, error } = await supabase
     .from("price_alerts")
@@ -757,78 +797,176 @@ async function checkPriceAlerts() {
     .limit(MAX_ALERTS_PER_RUN);
 
   if (error) {
-    console.log("❌ Error fetching price alerts:", error.message);
+    console.log("ALERT_CHECK_FINISHED", {
+      ...summary,
+      error: error.message,
+    });
     return;
   }
 
   if (!alerts || alerts.length === 0) {
-    console.log("📭 No active price alerts.");
+    console.log("ALERT_CHECK_FINISHED", summary);
     return;
   }
 
-  const priceCache = new Map();
+  summary.checked = alerts.length;
+
+  const alertsByCoin = new Map();
 
   for (const alert of alerts) {
     const coin = normalizeSymbol(alert.coin);
-    const targetPrice = Number(alert.target_price);
-    const condition = normalizeCondition(alert.condition);
 
-    if (!alert.user_email || !coin || !Number.isFinite(targetPrice)) {
-      console.log("⚠️ Skipping invalid alert:", alert.id);
+    if (!coin) {
+      summary.skippedInvalid += 1;
       continue;
     }
 
+    if (!alertsByCoin.has(coin)) {
+      alertsByCoin.set(coin, []);
+    }
+
+    alertsByCoin.get(coin).push(alert);
+  }
+
+  summary.uniqueCoins = alertsByCoin.size;
+
+  const triggeredItems = [];
+  const emailJobs = [];
+
+  for (const [coin, coinAlerts] of alertsByCoin.entries()) {
     try {
-      let currentPrice = priceCache.get(coin);
+      const currentPrice = await getMarketPrice(coin);
 
-      if (!currentPrice) {
-        currentPrice = await getMarketPrice(coin);
-        priceCache.set(coin, currentPrice);
-      }
+      for (const alert of coinAlerts) {
+        const targetPrice = Number(alert.target_price);
+        const condition = normalizeCondition(alert.condition);
+        const userEmail = String(alert.user_email || "").trim().toLowerCase();
 
-      console.log(
-        `📊 ${coin}: current=${formatNumber(currentPrice)} target=${formatNumber(targetPrice)} condition=${condition}`
-      );
+        if (!userEmail || !Number.isFinite(targetPrice)) {
+          summary.skippedInvalid += 1;
+          continue;
+        }
 
-      const triggered = shouldTriggerAlert({
-        condition,
-        targetPrice,
-        currentPrice,
-      });
+        const triggered = shouldTriggerAlert({
+          condition,
+          targetPrice,
+          currentPrice,
+        });
 
-      if (!triggered) continue;
+        if (!triggered) {
+          continue;
+        }
 
-      console.log("🚨 Price alert triggered:", coin, alert.user_email);
+        const conditionLabel = getConditionLabel(condition);
 
-      const emailResult = await sendTriggeredAlertEmail({
-        email: alert.user_email,
-        coin,
-        condition,
-        targetPrice,
-        currentPrice,
-      });
+        console.log("ALERT_TRIGGERED", {
+          alertId: alert.id,
+          email: userEmail,
+          coin: formatCoinPair(coin),
+          targetPrice,
+          requestedPrice: targetPrice,
+          currentPrice,
+          condition,
+          conditionLabel,
+        });
 
-      if (!emailResult.sent) {
-        console.log("❌ Alert email failed:", JSON.stringify(emailResult, null, 2));
-        continue;
-      }
+        const notificationMessage = buildPriceAlertNotificationMessage({
+          coin,
+          targetPrice,
+          currentPrice,
+          condition,
+        });
 
-      const { error: updateError } = await supabase
-        .from("price_alerts")
-        .update({
-          status: "triggered",
-        })
-        .eq("id", alert.id);
+        const { error: notificationError } = await supabase
+          .from("notifications")
+          .insert({
+            user_email: userEmail,
+            title: "✅ وصل السعر إلى هدف التنبيه",
+            message: notificationMessage,
+            type: "price-alert",
+            is_read: false,
+          });
 
-      if (updateError) {
-        console.log("❌ Alert status update error:", updateError.message);
-      } else {
-        console.log("✅ Alert email sent and status updated:", coin);
+        if (notificationError) {
+          console.error("ALERT_NOTIFICATION_CREATED", {
+            alertId: alert.id,
+            email: userEmail,
+            success: false,
+            error: notificationError.message,
+          });
+        } else {
+          summary.notificationsCreated += 1;
+          console.log("ALERT_NOTIFICATION_CREATED", {
+            alertId: alert.id,
+            email: userEmail,
+            success: true,
+          });
+        }
+
+        const { error: updateError } = await supabase
+          .from("price_alerts")
+          .update({
+            status: "triggered",
+            triggered_at: new Date().toISOString(),
+            triggered_price: String(currentPrice),
+          })
+          .eq("id", alert.id);
+
+        if (updateError) {
+          console.error("ALERT_STATUS_UPDATE_FAILED", {
+            alertId: alert.id,
+            error: updateError.message,
+          });
+        } else {
+          summary.alertsUpdated += 1;
+        }
+
+        emailJobs.push({
+          to: userEmail,
+          send: () =>
+            sendTriggeredAlertEmail({
+              email: userEmail,
+              coin,
+              condition,
+              targetPrice,
+              currentPrice,
+            }),
+        });
+
+        summary.emailsQueued += 1;
+        summary.triggered += 1;
+
+        console.log("ALERT_EMAIL_QUEUED", {
+          alertId: alert.id,
+          email: userEmail,
+          coin: formatCoinPair(coin),
+        });
+
+        triggeredItems.push({
+          alertId: alert.id,
+          email: userEmail,
+          coin,
+        });
       }
     } catch (error) {
-      console.log("❌ Price alert processing error:", coin, error?.message || error);
+      console.error("ALERT_COIN_CHECK_FAILED", {
+        coin,
+        error: error?.message || error,
+      });
     }
   }
+
+  if (emailJobs.length > 0) {
+    summary.emailStats = await processEmailQueue(emailJobs, {
+      label: "price-alerts",
+    });
+  }
+
+  console.log("ALERT_CHECK_FINISHED", {
+    ...summary,
+    triggeredItems,
+    finishedAt: new Date().toISOString(),
+  });
 }
 
 app.get("/health", async (_req, res) => {
