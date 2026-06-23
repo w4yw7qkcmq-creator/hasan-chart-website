@@ -1268,7 +1268,7 @@ export default function AdminPage() {
                   <div className="fixed left-1/2 top-24 z-[9999] w-[min(92vw,520px)] -translate-x-1/2 overflow-hidden rounded-[28px] border border-cyan-200 bg-white/95 p-4 text-right text-slate-950 shadow-[0_24px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
                     <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
                       <h3 className="text-lg font-black text-slate-950">مركز إشعارات الأدمن</h3>
-                      <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-700">
+                      <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-blacktext-cyan-200">
                         {adminNotifications.length} جديد
                       </span>
                     </div>
@@ -1303,7 +1303,7 @@ export default function AdminPage() {
                               <div className="min-w-0 flex-1">
                                 <p className="font-black text-slate-950">{item.title}</p>
                                 <p className="mt-1 break-words text-sm font-bold text-slate-700">{item.message}</p>
-                                {item.createdAt && <p className="mt-2 text-xs font-bold text-slate-500">{item.createdAt}</p>}
+                                {item.createdAt && <p className="mt-2 text-xs font-bold text-slate-300">{item.createdAt}</p>}
                               </div>
                             </div>
                           </button>
@@ -1826,11 +1826,11 @@ export default function AdminPage() {
           ) : (
             <div className="grid gap-5">
               {filteredSubscriptions.map((req) => (
-                <article key={req.id} className="rounded-[30px] border border-cyan-200 bg-white/95 p-6 text-slate-950 shadow-[0_22px_70px_rgba(14,165,233,0.16)] backdrop-blur-2xl">
+                <article key={req.id} className="rounded-[30px] border border-[#263142] bg-[#111827]/80 p-6 text-white shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
                   <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-2xl font-black text-slate-950">{req.planName}</h3>
+                        <h3 className="text-2xl font-black text-white">{req.planName}</h3>
                         <StatusBadge status={req.status} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3 text-sm">
@@ -1893,8 +1893,8 @@ export default function AdminPage() {
                   {(req.telegramUsername || req.paymentProof) && (
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                       {req.telegramUsername && (
-                        <div className="rounded-3xl border border-cyan-200 bg-white p-4 shadow-[0_16px_50px_rgba(14,165,233,0.12)]">
-                          <p className="text-xs font-black text-cyan-700">يوزر التليجرام</p>
+                        <div className="rounded-3xl border border-white/10 bg-black/20 p-4 shadow-[0_16px_50px_rgba(14,165,233,0.12)]">
+                          <p className="text-xs font-black text-cyan-200">يوزر التليجرام</p>
                           <p className="mt-2 break-all font-black text-slate-950">{req.telegramUsername}</p>
                         </div>
                       )}
@@ -1903,7 +1903,7 @@ export default function AdminPage() {
                         <div className="rounded-3xl border border-cyan-200 bg-white p-4 shadow-[0_16px_50px_rgba(14,165,233,0.12)]">
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-xs font-black text-cyan-700">إثبات الدفع</p>
+                              <p className="text-xs font-black text-cyan-200">إثبات الدفع</p>
                               <p className="mt-2 font-black text-slate-950">صورة إشعار الدفع مرفقة</p>
                               <p className="mt-1 text-xs font-bold text-slate-500">اضغط على الصورة أو زر فتح الصورة لعرضها بدقة كاملة.</p>
                             </div>
