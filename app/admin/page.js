@@ -39,14 +39,14 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-xs font-black ${
+      className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${
         isArchived
-          ? "border-slate-500/40 bg-slate-500/25 text-slate-100"
+          ? "border-slate-300 bg-slate-100 text-slate-800"
           : isDone
-          ? "border-emerald-500/40 bg-emerald-500/25 text-emerald-50"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
           : isPending
-          ? "border-amber-500/40 bg-amber-400/25 text-amber-50"
-          : "border-cyan-500/40 bg-cyan-400/25 text-cyan-50"
+          ? "border-amber-200 bg-amber-50 text-amber-800"
+          : "border-cyan-200 bg-cyan-50 text-cyan-800"
       }`}
     >
       {status || "بانتظار المراجعة"}
@@ -117,6 +117,14 @@ const ACCOUNT_FILTERS = [
 
 // --- Admin search helpers ---
 const normalizeAdminSearch = (value) => String(value || "").trim().toLowerCase();
+
+const isValidPreviewUrl = (value) => {
+  const src = String(value || "").trim();
+  if (!src || src === "null" || src === "undefined" || src.startsWith("about:")) {
+    return false;
+  }
+  return true;
+};
 
 const matchesAdminSearch = (item, searchValue, fields) => {
   const query = normalizeAdminSearch(searchValue);
@@ -314,6 +322,7 @@ export default function AdminPage() {
   });
   const [accountKeys, setAccountKeys] = useState({});
   const [accountKeysLoading, setAccountKeysLoading] = useState({});
+  const [proofPreview, setProofPreview] = useState(null);
 
   // Admin Notice/Confirm modals
   const [adminNotice, setAdminNotice] = useState({
@@ -1188,6 +1197,34 @@ export default function AdminPage() {
         </div>
       )}
 
+      {proofPreview && isValidPreviewUrl(proofPreview) && (
+        <div
+          className="fixed inset-0 z-[9999] flex flex-col bg-slate-950/75 backdrop-blur-md"
+          onClick={() => setProofPreview(null)}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-4 border-b border-cyan-200/70 bg-white/95 px-4 py-4 md:px-6">
+            <p className="text-lg font-black text-slate-950">معاينة الصورة</p>
+            <button
+              type="button"
+              onClick={() => setProofPreview(null)}
+              className="rounded-2xl border border-cyan-200 bg-white px-6 py-3 font-black text-slate-950 shadow-[0_10px_30px_rgba(14,165,233,0.12)] transition hover:bg-cyan-50"
+            >
+              إغلاق
+            </button>
+          </div>
+          <div
+            className="flex flex-1 items-center justify-center overflow-auto p-4 md:p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={proofPreview}
+              alt="معاينة الصورة"
+              className="max-h-[calc(100vh-88px)] max-w-full rounded-2xl border border-cyan-100 bg-white object-contain shadow-[0_20px_70px_rgba(14,165,233,0.2)]"
+            />
+          </div>
+        </div>
+      )}
+
       {adminConfirm.open && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-4 backdrop-blur-md">
           <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
@@ -1486,7 +1523,7 @@ export default function AdminPage() {
           )}
         </section>
 
-        <section className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-2xl backdrop-blur-2xl md:p-5">
+        <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-4 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-5">
           <div className="flex flex-wrap gap-3">
             {ANALYSIS_FILTERS.map(([key, label]) => (
               <button
@@ -1494,8 +1531,8 @@ export default function AdminPage() {
                 onClick={() => setFilter(key)}
                 className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
                   filter === key
-                    ? "border-cyan-300/20 bg-cyan-400/10 text-cyan-100 shadow-[0_0_25px_rgba(0,163,255,0.13)]"
-                    : "border-cyan-300/15 bg-black/20 text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10"
+                    ? "border-cyan-200 bg-cyan-50 text-slate-950 shadow-[0_0_25px_rgba(14,165,233,0.12)]"
+                    : "border-cyan-100 bg-white/80 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
                 }`}
               >
                 {label}
@@ -1507,7 +1544,7 @@ export default function AdminPage() {
               value={analysisSearch}
               onChange={(e) => setAnalysisSearch(e.target.value)}
               placeholder="بحث في طلبات التحليل: العملة، الفريم، البريد، المستخدم، الحالة..."
-              className="w-full rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 font-bold text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+              className="w-full rounded-2xl border border-cyan-100 bg-white/90 px-4 py-4 font-bold text-slate-950 outline-none placeholder:text-slate-500 focus:border-cyan-200 focus:ring-4 focus:ring-cyan-100"
             />
           </div>
         </section>
@@ -1515,56 +1552,60 @@ export default function AdminPage() {
         <section className="space-y-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-black">طلبات تحليل العملات</h2>
-              <p className="mt-2 text-[#b7bdc6]">اكتب الرد وارفق صورة الشارت ثم أرسلها للمستخدم.</p>
+              <h2 className="text-3xl font-black text-slate-950">طلبات تحليل العملات</h2>
+              <p className="mt-2 text-slate-600">اكتب الرد وارفق صورة الشارت ثم أرسلها للمستخدم.</p>
             </div>
           </div>
 
           {filteredAnalysis.length === 0 ? (
-            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
-              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">📭</div>
-              <h3 className="text-2xl font-black">لا توجد طلبات تحليل حالياً</h3>
+            <div className="rounded-[30px] border border-dashed border-cyan-200/70 bg-white/85 p-10 text-center text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-100 bg-cyan-50 text-4xl">📭</div>
+              <h3 className="text-2xl font-black text-slate-950">لا توجد طلبات تحليل حالياً</h3>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredAnalysis.map((req) => (
-                <article key={req.id} className="relative overflow-hidden rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-2xl backdrop-blur-2xl">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,0.12),transparent_30%)]" />
-                  <div className="relative z-10 space-y-5">
-                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-3xl font-black text-slate-100">{req.coin}</h3>
-                          <StatusBadge status={req.status} />
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
-                            المستخدم: <b className="text-cyan-100">{req.username || req.userEmail}</b>
-                          </span>
-                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
-                            الفريم: <b className="text-cyan-100">{req.frame}</b>
-                          </span>
-                          <span className="rounded-full border border-cyan-300/15 bg-black/20 px-4 py-2 text-slate-300">
-                            التاريخ: {req.createdAt}
-                          </span>
-                        </div>
-                      </div>
+                <article
+                  key={req.id}
+                  className="flex min-w-0 flex-col overflow-hidden rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl"
+                >
+                  <div className="flex min-w-0 flex-col gap-4">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h3 className="min-w-0 break-words text-2xl font-black leading-tight text-slate-950 md:text-3xl">
+                        {req.coin}
+                      </h3>
+                      <StatusBadge status={req.status} />
+                    </div>
 
+                    <div className="flex min-w-0 flex-wrap gap-2 text-sm">
+                      <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-3 py-2 text-slate-800">
+                        المستخدم: <b className="text-slate-950">{req.username || req.userEmail}</b>
+                      </span>
+                      <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-3 py-2 text-slate-800">
+                        الفريم: <b className="text-slate-950">{req.frame}</b>
+                      </span>
+                      <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-3 py-2 text-slate-800">
+                        التاريخ: <b className="text-slate-950">{req.createdAt}</b>
+                      </span>
+                    </div>
+
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
                       <button
+                        type="button"
                         onClick={() =>
                           setExpandedAnalysis((prev) => ({
                             ...prev,
                             [req.id]: !prev[req.id],
                           }))
                         }
-                        className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-5 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                        className="w-full shrink-0 rounded-2xl border border-cyan-200 bg-white/90 px-5 py-3 text-center text-sm font-black text-slate-950 shadow-[0_10px_30px_rgba(14,165,233,0.1)] transition hover:bg-cyan-50 sm:w-[168px]"
                       >
                         {expandedAnalysis[req.id] ? "إخفاء التفاصيل" : "عرض التفاصيل"}
                       </button>
                       <select
                         value={req.status || "قيد المراجعة"}
                         onChange={(e) => updateRequestStatus("analysis_requests", req.id, e.target.value)}
-                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
+                        className="min-w-0 flex-1 rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none"
                       >
                         {ANALYSIS_STATUS_OPTIONS.map((status) => (
                           <option key={status} value={status}>{status}</option>
@@ -1573,24 +1614,31 @@ export default function AdminPage() {
                     </div>
 
                     {!expandedAnalysis[req.id] && req.reply && (
-                      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/20 p-3 text-sm font-black text-emerald-50 shadow-[0_10px_28px_rgba(16,185,129,0.16)]">
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-800 shadow-[0_10px_28px_rgba(16,185,129,0.12)]">
                         تم الرد على هذا الطلب ✅
                       </div>
                     )}
 
                     {expandedAnalysis[req.id] && (
-                      <div className="space-y-5 border-t border-white/10 pt-5">
+                      <div className="min-w-0 space-y-5 border-t border-cyan-100 pt-5">
 
                     {req.reply && (
-                      <div className="rounded-[26px] border border-cyan-300/15 bg-white/[0.045] p-5">
-                        <p className="text-sm font-bold text-cyan-100">الرد الحالي</p>
-                        <p className="mt-2 leading-8 text-slate-100">{req.reply}</p>
-                        {req.replyImage && (
-                          <img
-                            src={req.replyImage}
-                            className="mt-4 max-h-[260px] rounded-2xl border border-cyan-300/15 object-contain"
-                            alt="صورة التحليل"
-                          />
+                      <div className="rounded-[26px] border border-cyan-100 bg-white/80 p-5 text-slate-950">
+                        <p className="text-sm font-bold text-slate-800">الرد الحالي</p>
+                        <p className="mt-2 break-words leading-8 text-slate-950">{req.reply}</p>
+                        {isValidPreviewUrl(req.replyImage) && (
+                          <button
+                            type="button"
+                            onClick={() => setProofPreview(req.replyImage)}
+                            className="mt-4 block w-full overflow-hidden rounded-2xl border border-cyan-100 bg-slate-50 p-2 transition hover:border-cyan-200 hover:shadow-[0_12px_40px_rgba(14,165,233,0.14)]"
+                            title="عرض صورة التحليل"
+                          >
+                            <img
+                              src={req.replyImage}
+                              className="max-h-[260px] w-full cursor-pointer rounded-xl object-contain"
+                              alt="صورة التحليل"
+                            />
+                          </button>
                         )}
                       </div>
                     )}
@@ -1607,29 +1655,37 @@ export default function AdminPage() {
                         }))
                       }
                       placeholder="اكتب تحليل العملة هنا..."
-                      className="min-h-32 w-full rounded-[20px] border border-cyan-300/15 bg-black/30 p-4 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+                      className="min-h-32 w-full min-w-0 rounded-[20px] border border-cyan-100 bg-white/80 p-4 text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-cyan-200 focus:ring-4 focus:ring-cyan-100"
                     />
 
-                    <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-                      <label className="block text-sm font-bold text-slate-300">أرفق صورة التحليل / الشارت</label>
+                    <div className="rounded-[24px] border border-cyan-100 bg-white/80 p-4 text-slate-950">
+                      <label className="block text-sm font-bold text-slate-800">أرفق صورة التحليل / الشارت</label>
                       <input
                         type="file"
                         accept="image/*"
                         onChange={(e) => handleReplyImage(req.id, e.target.files[0])}
-                        className="mt-3 w-full rounded-2xl border border-cyan-300/15 bg-black/30 p-3 text-slate-100"
+                        className="mt-3 w-full min-w-0 rounded-2xl border border-cyan-100 bg-white/90 p-3 text-slate-950"
                       />
 
-                      {replies[req.id]?.image && (
-                        <img
-                          src={replies[req.id].image}
-                          className="mt-4 max-h-[220px] rounded-2xl border border-cyan-300/15 object-contain"
-                          alt="معاينة الصورة"
-                        />
+                      {isValidPreviewUrl(replies[req.id]?.image) && (
+                        <button
+                          type="button"
+                          onClick={() => setProofPreview(replies[req.id].image)}
+                          className="mt-4 block w-full overflow-hidden rounded-2xl border border-cyan-100 bg-slate-50 p-2 transition hover:border-cyan-200"
+                          title="معاينة الصورة"
+                        >
+                          <img
+                            src={replies[req.id].image}
+                            className="max-h-[220px] w-full cursor-pointer rounded-xl object-contain"
+                            alt="معاينة الصورة"
+                          />
+                        </button>
                       )}
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                       <button
+                        type="button"
                         onClick={() => sendAnalysisReply(req.id)}
                         disabled={replySending[req.id]}
                         className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.32)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
@@ -1638,8 +1694,9 @@ export default function AdminPage() {
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => deleteAnalysisRequest(req.id)}
-                        className="rounded-2xl border border-red-400/20 bg-red-500/15 px-5 py-3 font-black text-red-100 transition hover:bg-red-500/25"
+                        className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 font-black text-red-800 transition hover:bg-red-100"
                       >
                         حذف الطلب
                       </button>
@@ -1655,8 +1712,8 @@ export default function AdminPage() {
 
         <section className="space-y-5">
           <div>
-            <h2 className="text-3xl font-black">طلبات إدارة الحسابات</h2>
-            <p className="mt-2 text-slate-300">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
+            <h2 className="text-3xl font-black text-slate-950">طلبات إدارة الحسابات</h2>
+            <p className="mt-2 text-slate-600">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
             <div className="mt-4 flex flex-wrap gap-3">
               {ACCOUNT_FILTERS.map(([key, label]) => (
                 <button
@@ -1664,8 +1721,8 @@ export default function AdminPage() {
                   onClick={() => setAccountFilter(key)}
                   className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
                     accountFilter === key
-                      ? "border-cyan-300/20 bg-cyan-400/10 text-cyan-100 shadow-[0_0_25px_rgba(0,163,255,0.13)]"
-                      : "border-cyan-300/15 bg-black/20 text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10"
+                      ? "border-cyan-200 bg-cyan-50 text-slate-950 shadow-[0_0_25px_rgba(14,165,233,0.12)]"
+                      : "border-cyan-100 bg-white/80 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
                   }`}
                 >
                   {label}
@@ -1677,15 +1734,15 @@ export default function AdminPage() {
                 value={accountSearch}
                 onChange={(e) => setAccountSearch(e.target.value)}
                 placeholder="بحث في إدارة الحسابات: البريد، التليجرام، المنصة، رأس المال، الحالة..."
-                className="w-full rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 font-bold text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+                className="w-full rounded-2xl border border-cyan-100 bg-white/90 px-4 py-4 font-bold text-slate-950 outline-none placeholder:text-slate-500 focus:border-cyan-200 focus:ring-4 focus:ring-cyan-100"
               />
             </div>
           </div>
 
           {filteredAccounts.length === 0 ? (
-            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
-              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">📂</div>
-              <h3 className="text-2xl font-black">لا توجد طلبات إدارة حسابات حالياً</h3>
+            <div className="rounded-[30px] border border-dashed border-cyan-200/70 bg-white/85 p-10 text-center text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-100 bg-cyan-50 text-4xl">📂</div>
+              <h3 className="text-2xl font-black text-slate-950">لا توجد طلبات إدارة حسابات حالياً</h3>
             </div>
           ) : (
             <div className="grid gap-5">
@@ -1693,21 +1750,21 @@ export default function AdminPage() {
                 const revealedKeys = accountKeys[req.id];
 
                 return (
-                <article key={req.id} className="rounded-[30px] border border-[#263142] bg-[#111827]/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+                <article key={req.id} className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-6 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl">
                   <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-2xl font-black">{req.type}</h3>
+                        <h3 className="text-2xl font-black text-slate-950">{req.type}</h3>
                         <StatusBadge status={req.status} />
                       </div>
-                      <p className="mt-2 text-sm text-[#848e9c]">{req.createdAt}</p>
+                      <p className="mt-2 text-sm text-slate-600">{req.createdAt}</p>
                     </div>
 
                     <div className="flex flex-wrap gap-3">
                       <select
                         value={req.status || "جديد"}
                         onChange={(e) => updateRequestStatus("account_management_requests", req.id, e.target.value)}
-                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
+                        className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none"
                       >
                         {ACCOUNT_STATUS_OPTIONS.map((status) => (
                           <option key={status} value={status}>{status}</option>
@@ -1777,9 +1834,9 @@ export default function AdminPage() {
                     }]
                       .filter((item) => item.value)
                       .map((item) => (
-                        <div key={item.label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                          <p className="text-xs font-bold text-slate-500">{item.label}</p>
-                          <p className="mt-2 break-all font-bold text-slate-100">{item.value}</p>
+                        <div key={item.label} className="rounded-2xl border border-cyan-100 bg-white/90 p-4">
+                          <p className="text-xs font-bold text-slate-800">{item.label}</p>
+                          <p className="mt-2 break-all font-bold text-slate-950">{item.value}</p>
                         </div>
                       ))}
                   </div>
@@ -1791,8 +1848,8 @@ export default function AdminPage() {
         </section>
         <section className="space-y-5">
           <div>
-            <h2 className="text-3xl font-black">طلبات الاشتراكات والدفع</h2>
-            <p className="mt-2 text-slate-300">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
+            <h2 className="text-3xl font-black text-slate-950">طلبات الاشتراكات والدفع</h2>
+            <p className="mt-2 text-slate-600">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
             <div className="mt-4 flex flex-wrap gap-3">
               {SUBSCRIPTION_FILTERS.map(([key, label]) => (
                 <button
@@ -1800,8 +1857,8 @@ export default function AdminPage() {
                   onClick={() => setSubscriptionFilter(key)}
                   className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
                     subscriptionFilter === key
-                      ? "border-cyan-300/20 bg-cyan-400/10 text-cyan-100 shadow-[0_0_25px_rgba(0,163,255,0.13)]"
-                      : "border-cyan-300/15 bg-black/20 text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10"
+                      ? "border-cyan-200 bg-cyan-50 text-slate-950 shadow-[0_0_25px_rgba(14,165,233,0.12)]"
+                      : "border-cyan-100 bg-white/80 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
                   }`}
                 >
                   {label}
@@ -1813,43 +1870,43 @@ export default function AdminPage() {
                 value={subscriptionSearch}
                 onChange={(e) => setSubscriptionSearch(e.target.value)}
                 placeholder="بحث في الاشتراكات: الباقة، البريد، المستخدم، التليجرام، السعر، الحالة..."
-                className="w-full rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-4 font-bold text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-400/10"
+                className="w-full rounded-2xl border border-cyan-100 bg-white/90 px-4 py-4 font-bold text-slate-950 outline-none placeholder:text-slate-500 focus:border-cyan-200 focus:ring-4 focus:ring-cyan-100"
               />
             </div>
           </div>
 
           {filteredSubscriptions.length === 0 ? (
-            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
-              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">💳</div>
-              <h3 className="text-2xl font-black">لا توجد طلبات اشتراك حالياً</h3>
+            <div className="rounded-[30px] border border-dashed border-cyan-200/70 bg-white/85 p-10 text-center text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl">
+              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-100 bg-cyan-50 text-4xl">💳</div>
+              <h3 className="text-2xl font-black text-slate-950">لا توجد طلبات اشتراك حالياً</h3>
             </div>
           ) : (
             <div className="grid gap-5">
               {filteredSubscriptions.map((req) => (
-                <article key={req.id} className="rounded-[30px] border border-[#263142] bg-[#111827]/80 p-6 text-white shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl">
+                <article key={req.id} className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-6 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl">
                   <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-2xl font-black text-white">{req.planName}</h3>
+                        <h3 className="text-2xl font-black text-slate-950">{req.planName}</h3>
                         <StatusBadge status={req.status} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                        <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-4 py-2 text-slate-800">
                           المستخدم: <b className="text-slate-950">{req.username || req.userEmail}</b>
                         </span>
-                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                        <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-4 py-2 text-slate-800">
                           النوع: <b className="text-slate-950">{req.category}</b>
                         </span>
-                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                        <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-4 py-2 text-slate-800">
                           السعر: <b className="text-slate-950">{req.price}</b>
                         </span>
                         {req.telegramUsername && (
-                          <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
+                          <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-4 py-2 text-slate-800">
                             تليجرام: <b className="text-slate-950">{req.telegramUsername}</b>
                           </span>
                         )}
-                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-slate-600 shadow-sm">
-                          التاريخ: {req.createdAt}
+                        <span className="max-w-full rounded-full border border-cyan-100 bg-white/80 px-4 py-2 text-slate-800">
+                          التاريخ: <b className="text-slate-950">{req.createdAt}</b>
                         </span>
                       </div>
                     </div>
@@ -1864,7 +1921,7 @@ export default function AdminPage() {
                             updateRequestStatus("subscription_requests", req.id, e.target.value);
                           }
                         }}
-                        className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none shadow-sm"
+                        className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none"
                       >
                         {SUBSCRIPTION_STATUS_OPTIONS.map((status) => (
                           <option key={status} value={status}>{status}</option>
@@ -1890,45 +1947,43 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </div>
-                  {(req.telegramUsername || req.paymentProof) && (
+                  {(req.telegramUsername || isValidPreviewUrl(req.paymentProof)) && (
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                       {req.telegramUsername && (
-                        <div className="rounded-3xl border border-white/10 bg-black/20 p-4 shadow-[0_16px_50px_rgba(14,165,233,0.12)]">
-                          <p className="text-xs font-black text-cyan-200">يوزر التليجرام</p>
-                          <p className="mt-2 break-all font-black text-slate-950">{req.telegramUsername}</p>
+                        <div className="rounded-2xl border border-cyan-100 bg-white/90 p-4">
+                          <p className="text-xs font-bold text-slate-800">يوزر التليجرام</p>
+                          <p className="mt-2 break-all font-bold text-slate-950">{req.telegramUsername}</p>
                         </div>
                       )}
 
-                      {req.paymentProof && (
-                        <div className="rounded-3xl border border-cyan-200 bg-white p-4 shadow-[0_16px_50px_rgba(14,165,233,0.12)]">
+                      {isValidPreviewUrl(req.paymentProof) && (
+                        <div className="rounded-2xl border border-cyan-100 bg-white/90 p-4">
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-xs font-black text-cyan-200">إثبات الدفع</p>
-                              <p className="mt-2 font-black text-slate-950">صورة إشعار الدفع مرفقة</p>
-                              <p className="mt-1 text-xs font-bold text-slate-500">اضغط على الصورة أو زر فتح الصورة لعرضها بدقة كاملة.</p>
+                              <p className="text-xs font-bold text-slate-800">إثبات الدفع</p>
+                              <p className="mt-2 font-bold text-slate-950">صورة إشعار الدفع مرفقة</p>
+                              <p className="mt-1 text-xs font-bold text-slate-800">اضغط على الصورة أو زر فتح الصورة لعرضها بدقة كاملة.</p>
                             </div>
-                            <a
-                              href={req.paymentProof}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-xl bg-gradient-to-l from-blue-700 to-cyan-500 px-4 py-2 text-sm font-black text-white shadow-[0_10px_24px_rgba(37,99,235,0.25)] transition hover:brightness-110"
+                            <button
+                              type="button"
+                              onClick={() => setProofPreview(req.paymentProof)}
+                              className="shrink-0 rounded-xl bg-gradient-to-l from-blue-700 to-cyan-500 px-4 py-2 text-sm font-black text-white shadow-[0_10px_24px_rgba(37,99,235,0.25)] transition hover:brightness-110"
                             >
                               فتح الصورة
-                            </a>
+                            </button>
                           </div>
-                          <a
-                            href={req.paymentProof}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-4 block overflow-hidden rounded-2xl border border-cyan-100 bg-slate-100 p-2 transition hover:border-cyan-300 hover:shadow-[0_16px_45px_rgba(14,165,233,0.18)]"
-                            title="فتح إثبات الدفع بدقة كاملة"
+                          <button
+                            type="button"
+                            onClick={() => setProofPreview(req.paymentProof)}
+                            className="mt-4 block w-full overflow-hidden rounded-2xl border border-cyan-100 bg-slate-50 p-2 transition hover:border-cyan-200 hover:shadow-[0_16px_45px_rgba(14,165,233,0.14)]"
+                            title="عرض إثبات الدفع بدقة كاملة"
                           >
                             <img
                               src={req.paymentProof}
                               alt="إثبات الدفع"
-                              className="max-h-[340px] w-full rounded-xl object-contain"
+                              className="max-h-[340px] w-full cursor-pointer rounded-xl object-contain"
                             />
-                          </a>
+                          </button>
                         </div>
                       )}
                     </div>
