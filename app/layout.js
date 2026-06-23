@@ -34,6 +34,32 @@ const socialLinks = [
   { label: "منصة X", badge: "X", icon: "𝕏", href: "https://x.com/HasanChart" },
 ];
 
+function getPlanAccess(subscriptionPlan) {
+  const text = String(subscriptionPlan || "").toLowerCase();
+
+  return {
+    hasSpot: text.includes("spot") || text.includes("سبوت") || text.includes("vip spot"),
+    hasFutures:
+      text.includes("future") ||
+      text.includes("futures") ||
+      text.includes("فيوتشر") ||
+      text.includes("vip futures"),
+  };
+}
+
+function getUserPlanAccess(user) {
+  if (typeof user?.hasSpot === "boolean" && typeof user?.hasFutures === "boolean") {
+    return { hasSpot: user.hasSpot, hasFutures: user.hasFutures };
+  }
+
+  return getPlanAccess(user?.subscription_plan);
+}
+
+function hasActiveSubscriptionStatus(status) {
+  const normalized = String(status || "").toLowerCase();
+  return normalized === "نشط" || normalized === "active" || normalized === "مفعل";
+}
+
 const getAnalysisReplyKey = (row) => {
   const id = String(row?.id || "");
   const reply = String(row?.reply || "");
@@ -149,8 +175,8 @@ export default function RootLayout({ children }) {
     const checkLatestAnalysisReplies = async () => {
       try {
         const response = await fetch(
-          `/api/my-analysis?email=${encodeURIComponent(currentUser.email)}`,
-          { method: "GET", cache: "no-store" }
+          `/api/my-analysis`,
+          { method: "GET", cache: "no-store", credentials: "include" }
         );
 
         const result = await response.json().catch(() => null);
@@ -215,13 +241,11 @@ export default function RootLayout({ children }) {
 
     const loadSiteNotifications = async () => {
       try {
-        const response = await fetch(
-          `/api/my-notifications?email=${encodeURIComponent(currentUser.email)}`,
-          {
-            method: "GET",
-            cache: "no-store",
-          }
-        );
+        const response = await fetch("/api/my-notifications", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+        });
 
         const result = await response.json().catch(() => null);
         const notifications = result?.notifications || [];
@@ -324,8 +348,8 @@ export default function RootLayout({ children }) {
     const refreshUnreadReplies = async () => {
       try {
         const response = await fetch(
-          `/api/my-analysis?email=${encodeURIComponent(currentUser.email)}`,
-          { method: "GET", cache: "no-store" }
+          `/api/my-analysis`,
+          { method: "GET", cache: "no-store", credentials: "include" }
         );
 
         const result = await response.json().catch(() => null);
@@ -386,13 +410,11 @@ export default function RootLayout({ children }) {
     if (!currentUser?.email) return;
 
     try {
-      const response = await fetch(
-        `/api/my-subscription-status?email=${encodeURIComponent(currentUser.email)}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/my-subscription-status", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+      });
 
       const result = await response.json().catch(() => null);
 
@@ -415,6 +437,8 @@ export default function RootLayout({ children }) {
           ...prev,
           subscription_plan: activePlanText,
           subscription_status: result.subscription_status || "مفعل",
+          hasSpot: Boolean(result.hasSpot),
+          hasFutures: Boolean(result.hasFutures),
         };
 
         localStorage.setItem("currentUser", JSON.stringify(updatedUser));
@@ -457,8 +481,8 @@ export default function RootLayout({ children }) {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
-          email: currentUser.email,
           ids,
         }),
       });
@@ -511,13 +535,14 @@ export default function RootLayout({ children }) {
     setGlobalNoticeHref(signal?.signal_type === "futures" ? "/vip-futures" : "/vip-spot");
     setNotificationMenuOpen(true);
 
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "granted") {
-        new Notification("HasaN CharT World", {
-          body: message,
-          icon: "/logo.png",
-        });
-      }
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      const typeLabel = signal?.signal_type === "futures" ? "VIP Futures" : "VIP Spot";
+
+      new Notification(`🚨 ${typeLabel}`, {
+        body: `${signal?.coin || "عملة جديدة"} - ${message}`,
+        icon: "/logo.png",
+        requireInteraction: true,
+      });
     }
   };
 
@@ -554,7 +579,7 @@ export default function RootLayout({ children }) {
       try {
         const { data } = await supabase
           .from("subscription_requests")
-          .select("plan_name, status")
+          .select("plan_name, category, status")
           .eq("user_email", authUser.email)
           .eq("status", "مفعل")
           .order("created_at", { ascending: false });
@@ -565,9 +590,11 @@ export default function RootLayout({ children }) {
       }
 
       const activePlanNames = activeSubscriptions
-        .map((item) => item.plan_name)
+        .map((item) => [item.plan_name, item.category].filter(Boolean).join(" "))
         .filter(Boolean)
         .join(" | ");
+
+      const planAccess = getPlanAccess(activePlanNames);
 
       const cleanEmail = String(authUser.email || "").toLowerCase();
       const isFallbackAdmin = fallbackAdminEmails.includes(cleanEmail);
@@ -598,6 +625,8 @@ export default function RootLayout({ children }) {
           activeSubscriptions.length > 0
             ? "مفعل"
             : profile?.subscription_status || localUser?.subscription_status || "غير نشط",
+        hasSpot: planAccess.hasSpot,
+        hasFutures: planAccess.hasFutures,
         loggedAt: localUser?.loggedAt || new Date().toLocaleString("ar"),
       };
     };
@@ -664,15 +693,9 @@ export default function RootLayout({ children }) {
   useEffect(() => {
     if (!currentUser?.email) return;
 
-    const activePlan = String(currentUser?.subscription_plan || "").toLowerCase();
-    const activeStatus = String(currentUser?.subscription_status || "").toLowerCase();
-    const hasActiveSubscription =
-      activeStatus === "نشط" || activeStatus === "active" || activeStatus === "مفعل";
+    if (!hasActiveSubscriptionStatus(currentUser?.subscription_status)) return;
 
-    if (!hasActiveSubscription) return;
-
-    const hasSpotPlan = activePlan.includes("spot") || activePlan.includes("سبوت");
-    const hasFuturesPlan = activePlan.includes("futures") || activePlan.includes("فيوتشر");
+    const { hasSpot: hasSpotPlan, hasFutures: hasFuturesPlan } = getUserPlanAccess(currentUser);
 
     const isAllowedVipSignal = (signal) => {
       if (!signal?.id || !signal?.signal_type) return false;
@@ -695,20 +718,6 @@ export default function RootLayout({ children }) {
       );
 
       triggerVipSignalNotification(signal);
-
-      if (
-        typeof window !== "undefined" &&
-        "Notification" in window &&
-        Notification.permission === "granted"
-      ) {
-        const typeLabel = signal?.signal_type === "futures" ? "VIP Futures" : "VIP Spot";
-
-        new Notification(`🚨 ${typeLabel}`, {
-          body: `${signal?.coin || "عملة جديدة"} - تم نشر توصية جديدة`,
-          icon: "/logo.png",
-          requireInteraction: true,
-        });
-      }
     };
 
     const checkLatestVipSignals = async () => {
@@ -902,13 +911,8 @@ export default function RootLayout({ children }) {
                   {menuItems.map((item) => {
                     if (item.auth && !currentUser) return null;
 
-                    const activePlan = String(currentUser?.subscription_plan || "").toLowerCase();
-                    const activeStatus = String(currentUser?.subscription_status || "").toLowerCase();
-                    const hasActiveSubscription =
-                      activeStatus === "نشط" || activeStatus === "active" || activeStatus === "مفعل";
-
-                    const hasSpotPlan = activePlan.includes("spot") || activePlan.includes("سبوت");
-                    const hasFuturesPlan = activePlan.includes("futures") || activePlan.includes("فيوتشر");
+                    const hasActiveSubscription = hasActiveSubscriptionStatus(currentUser?.subscription_status);
+                    const { hasSpot: hasSpotPlan, hasFutures: hasFuturesPlan } = getUserPlanAccess(currentUser);
 
                     if (item.plan === "spot" && (!hasActiveSubscription || !hasSpotPlan)) return null;
                     if (item.plan === "futures" && (!hasActiveSubscription || !hasFuturesPlan)) return null;
@@ -1123,13 +1127,11 @@ export default function RootLayout({ children }) {
                           setUnreadAnalysisReplies(0);
 
                           try {
-                            const response = await fetch(
-                              `/api/my-notifications?email=${encodeURIComponent(currentUser.email)}`,
-                              {
-                                method: "GET",
-                                cache: "no-store",
-                              }
-                            );
+                            const response = await fetch("/api/my-notifications", {
+                              method: "GET",
+                              cache: "no-store",
+                              credentials: "include",
+                            });
 
                             const result = await response.json().catch(() => null);
 

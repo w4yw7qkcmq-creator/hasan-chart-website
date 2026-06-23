@@ -3,23 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+const SIGNAL_ACTIVE_MS = 10 * 60 * 1000;
+
 function getSignalStatus(signal) {
   const createdAt = signal.created_at || signal.createdAt;
 
   if (!createdAt) {
-    return signal.status || "نشطة";
+    return signal.status === "منتهية" ? "منتهية" : "نشطة";
   }
 
   const createdTime = new Date(createdAt).getTime();
 
   if (!Number.isFinite(createdTime)) {
-    return signal.status || "نشطة";
+    return signal.status === "منتهية" ? "منتهية" : "نشطة";
   }
 
-  const tenMinutes = 10 * 60 * 1000;
-  const expired = Date.now() - createdTime >= tenMinutes;
-
-  return expired ? "منتهية" : "نشطة";
+  return Date.now() - createdTime >= SIGNAL_ACTIVE_MS ? "منتهية" : "نشطة";
 }
 
 const FILTERS = [
@@ -31,47 +30,49 @@ const FILTERS = [
 function SignalCard({ signal }) {
   return (
     <article
-      className="rounded-[28px] border border-cyan-200 bg-white p-6 shadow-[0_20px_70px_rgba(14,116,144,0.15)]"
+      className="overflow-hidden rounded-[30px] border border-cyan-200/70 bg-white text-slate-950 shadow-[0_22px_80px_rgba(14,165,233,0.18)]"
       onCopy={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-        <div>
-          <span className="inline-flex rounded-full border border-amber-300/50 bg-amber-100 px-4 py-2 text-xs font-black text-amber-700">
-            VIP FUTURES 🔥
-          </span>
-          <h3 className="mt-4 text-3xl font-black text-slate-950">{signal.coin}</h3>
-          <p className="mt-2 text-sm text-slate-400">{signal.createdAt}</p>
+      <div className="border-b border-slate-100 bg-gradient-to-l from-cyan-50 via-sky-50 to-white p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div>
+            <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-black text-amber-700">
+              VIP FUTURES 🔥
+            </span>
+            <h3 className="mt-4 text-3xl font-black text-slate-950">{signal.coin}</h3>
+            <p className="mt-2 text-sm font-bold text-slate-500">{signal.createdAt}</p>
+          </div>
+          {getSignalStatus(signal) === "منتهية" ? (
+            <span className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700">
+              منتهية
+            </span>
+          ) : (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700">
+              نشطة
+            </span>
+          )}
         </div>
-        {getSignalStatus(signal) === "منتهية" ? (
-          <span className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700">
-            منتهية
-          </span>
-        ) : (
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700">
-            نشطة
-          </span>
-        )}
       </div>
 
-      <div className="mt-6 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-cyan-50 p-4">
-          <p className="text-xs font-bold text-slate-500">منطقة الدخول</p>
-          <p className="mt-2 font-black text-cyan-700">{signal.entry || "غير محدد"}</p>
+      <div className="grid gap-4 p-6 md:grid-cols-3">
+        <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-5 shadow-sm">
+          <p className="text-xs font-black text-cyan-700">منطقة الدخول</p>
+          <p className="mt-3 font-black text-slate-950">{signal.entry || "غير محدد"}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-emerald-50 p-4">
-          <p className="text-xs font-bold text-slate-500">الأهداف</p>
-          <p className="mt-2 whitespace-pre-line font-black text-emerald-700">{signal.targets || "غير محدد"}</p>
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+          <p className="text-xs font-black text-emerald-700">الأهداف</p>
+          <p className="mt-3 whitespace-pre-line font-black text-slate-950">{signal.targets || "غير محدد"}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-red-50 p-4">
-          <p className="text-xs font-bold text-slate-500">وقف الخسارة</p>
-          <p className="mt-2 font-black text-red-700">{signal.stop_loss || "غير محدد"}</p>
+        <div className="rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
+          <p className="text-xs font-black text-red-700">وقف الخسارة</p>
+          <p className="mt-3 font-black text-slate-950">{signal.stop_loss || "غير محدد"}</p>
         </div>
       </div>
 
       {signal.notes && (
-        <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
-          <p className="text-sm font-bold text-blue-700">ملاحظات التوصية</p>
+        <div className="mx-6 mb-6 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+          <p className="text-sm font-black text-blue-700">ملاحظات التوصية</p>
           <p className="mt-2 whitespace-pre-line leading-8 text-slate-700">{signal.notes}</p>
         </div>
       )}
@@ -84,25 +85,23 @@ export default function VipFuturesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [statusTick, setStatusTick] = useState(0);
 
-  const loadSignals = async () => {
-    setLoading(true);
+  const loadSignals = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
 
     try {
-      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-      const userEmail = currentUser?.email || "";
-
-      const response = await fetch(
-        `/api/vip-signals?type=futures&email=${encodeURIComponent(userEmail)}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/vip-signals?type=futures", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+      });
 
       const result = await response.json().catch(() => null);
 
-      if (result?.subscriptionExpired) {
+      if (response.status === 403 && result?.subscriptionExpired) {
         setSubscriptionExpired(true);
         setSignals([]);
         return;
@@ -114,36 +113,33 @@ export default function VipFuturesPage() {
         return;
       }
 
+      setSubscriptionExpired(false);
       setSignals(result.signals || []);
     } catch (error) {
       console.error("VIP Futures signals error:", error);
       setSignals([]);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    const checkSubscriptionExpiry = async () => {
-      try {
-        await fetch("/api/check-subscription-expiry", {
-          method: "GET",
-          cache: "no-store",
-        });
-      } catch (error) {
-        console.error("Subscription expiry check error:", error);
-      }
-    };
-
-    checkSubscriptionExpiry();
     loadSignals();
 
-    const timer = setInterval(() => {
-      loadSignals();
-      setSignals((prev) => [...prev]);
+    const refreshTimer = setInterval(() => {
+      loadSignals({ silent: true });
     }, 10000);
 
-    return () => clearInterval(timer);
+    const statusTimer = setInterval(() => {
+      setStatusTick((value) => value + 1);
+    }, 30000);
+
+    return () => {
+      clearInterval(refreshTimer);
+      clearInterval(statusTimer);
+    };
   }, []);
 
   if (subscriptionExpired) {
@@ -166,6 +162,8 @@ export default function VipFuturesPage() {
     );
   }
 
+  void statusTick;
+
   const activeSignals = signals.filter((signal) => getSignalStatus(signal) !== "منتهية");
   const expiredSignals = signals.filter((signal) => getSignalStatus(signal) === "منتهية");
 
@@ -178,30 +176,30 @@ export default function VipFuturesPage() {
 
   return (
     <main
-      className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-950 select-none"
+      className="relative min-h-screen overflow-hidden bg-[#020617] text-white select-none"
       onContextMenu={(e) => e.preventDefault()}
       onCopy={(e) => e.preventDefault()}
       onCut={(e) => e.preventDefault()}
       onDragStart={(e) => e.preventDefault()}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_45%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.18),transparent_35%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_45%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.18),transparent_35%)]" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 md:px-6">
-        <div className="rounded-[36px] border border-cyan-200/70 bg-white/90 p-8 shadow-[0_30px_120px_rgba(15,23,42,0.1)] backdrop-blur-3xl md:p-12 text-slate-950">
+        <div className="rounded-[36px] border border-cyan-200/70 bg-white/90 p-8 text-slate-950 shadow-[0_30px_120px_rgba(14,165,233,0.18)] backdrop-blur-3xl md:p-12">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-amber-200 px-4 py-2 text-sm font-black text-amber-700">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-black text-amber-700">
                 🔥 قسم توصيات VIP Futures
               </div>
 
               <h1 className="text-4xl font-black md:text-6xl">توصيات Futures الاحترافية</h1>
 
-              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-600 font-bold">
+              <p className="mt-6 max-w-3xl text-lg font-bold leading-8 text-slate-600">
                 هنا تظهر توصيات الفيوتشر الخاصة بالمشتركين فقط، ويتم تحديثها مباشرة عند نشر توصية جديدة من لوحة الإدارة.
               </p>
             </div>
 
-            <div className="grid h-32 w-32 place-items-center rounded-[32px] border border-cyan-200 bg-cyan-50 text-6xl shadow-[0_0_50px_rgba(14,116,144,0.18)]">
+            <div className="grid h-32 w-32 place-items-center rounded-[32px] border border-cyan-200 bg-cyan-50 text-6xl shadow-[0_0_50px_rgba(34,211,238,0.18)]">
               🔥
             </div>
           </div>
@@ -240,11 +238,11 @@ export default function VipFuturesPage() {
 
           <div className="mt-12">
             {loading ? (
-              <div className="rounded-[28px] border border-cyan-200 bg-cyan-50 p-8 text-center text-cyan-700">
+              <div className="rounded-[28px] border border-cyan-200 bg-cyan-50 p-8 text-center font-black text-cyan-700">
                 جاري تحميل توصيات Futures...
               </div>
             ) : filteredSignals.length === 0 ? (
-              <div className="rounded-[28px] border border-cyan-200 bg-white p-10 text-center text-slate-950">
+              <div className="rounded-[28px] border border-dashed border-cyan-200 bg-white p-10 text-center text-slate-950">
                 <div className="mb-4 text-5xl">📭</div>
                 <h2 className="text-2xl font-black">
                   {selectedFilter === "active"

@@ -3,23 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+const SIGNAL_ACTIVE_MS = 10 * 60 * 1000;
+
 function getSignalStatus(signal) {
   const createdAt = signal.created_at || signal.createdAt;
 
   if (!createdAt) {
-    return signal.status || "نشطة";
+    return signal.status === "منتهية" ? "منتهية" : "نشطة";
   }
 
   const createdTime = new Date(createdAt).getTime();
 
   if (!Number.isFinite(createdTime)) {
-    return signal.status || "نشطة";
+    return signal.status === "منتهية" ? "منتهية" : "نشطة";
   }
 
-  const tenMinutes = 10 * 60 * 1000;
-  const expired = Date.now() - createdTime >= tenMinutes;
-
-  return expired ? "منتهية" : "نشطة";
+  return Date.now() - createdTime >= SIGNAL_ACTIVE_MS ? "منتهية" : "نشطة";
 }
 
 const FILTERS = [
@@ -86,24 +85,23 @@ export default function VipSpotPage() {
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [statusTick, setStatusTick] = useState(0);
 
-  const loadSignals = async () => {
-    setLoading(true);
+  const loadSignals = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
 
     try {
-      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-      const userEmail = currentUser?.email || "";
-      const response = await fetch(
-        `/api/vip-signals?type=spot&email=${encodeURIComponent(userEmail)}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/vip-signals?type=spot", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+      });
 
       const result = await response.json().catch(() => null);
 
-      if (result?.subscriptionExpired) {
+      if (response.status === 403 && result?.subscriptionExpired) {
         setSubscriptionExpired(true);
         setSignals([]);
         return;
@@ -115,35 +113,33 @@ export default function VipSpotPage() {
         return;
       }
 
+      setSubscriptionExpired(false);
       setSignals(result.signals || []);
     } catch (error) {
       console.error("VIP Spot signals error:", error);
       setSignals([]);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    const checkSubscriptionExpiry = async () => {
-      try {
-        await fetch("/api/check-subscription-expiry", {
-          method: "GET",
-          cache: "no-store",
-        });
-      } catch (error) {
-        console.error("Subscription expiry check error:", error);
-      }
-    };
-
-    checkSubscriptionExpiry();
     loadSignals();
-    const timer = setInterval(() => {
-      loadSignals();
-      setSignals((prev) => [...prev]);
+
+    const refreshTimer = setInterval(() => {
+      loadSignals({ silent: true });
     }, 10000);
 
-    return () => clearInterval(timer);
+    const statusTimer = setInterval(() => {
+      setStatusTick((value) => value + 1);
+    }, 30000);
+
+    return () => {
+      clearInterval(refreshTimer);
+      clearInterval(statusTimer);
+    };
   }, []);
 
   if (subscriptionExpired) {
@@ -165,6 +161,8 @@ export default function VipSpotPage() {
       </main>
     );
   }
+
+  void statusTick;
 
   const activeSignals = signals.filter((signal) => getSignalStatus(signal) !== "منتهية");
   const expiredSignals = signals.filter((signal) => getSignalStatus(signal) === "منتهية");
