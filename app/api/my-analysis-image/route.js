@@ -1,37 +1,26 @@
 
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const normalizeEmail = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase();
-
-const getSupabaseAdmin = () => {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase admin configuration");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-};
+import { requireSessionEmail } from "../../../lib/auth-session";
 
 export async function GET(req) {
   try {
+    const session = await requireSessionEmail();
+
+    if (session.error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "يجب تسجيل الدخول.",
+        },
+        { status: 401 }
+      );
+    }
+
     const url = new URL(req.url);
-
     const id = url.searchParams.get("id");
-    const email = normalizeEmail(url.searchParams.get("email"));
 
-    if (!id || !email) {
+    if (!id) {
       return NextResponse.json(
         {
           success: false,
@@ -41,7 +30,7 @@ export async function GET(req) {
       );
     }
 
-    const supabase = getSupabaseAdmin();
+    const { email, supabase } = session;
 
     const { data, error } = await supabase
       .from("analysis_requests")

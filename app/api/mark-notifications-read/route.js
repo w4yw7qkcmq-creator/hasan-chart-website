@@ -1,34 +1,28 @@
 
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  }
-);
+import { requireSessionEmail } from "../../../lib/auth-session";
 
 export async function POST(request) {
   try {
+    const session = await requireSessionEmail();
+
+    if (session.error) {
+      return NextResponse.json(
+        { success: false, error: "يجب تسجيل الدخول." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
-
-    const email = String(body?.email || "")
-      .trim()
-      .toLowerCase();
-
+    const { email, supabase } = session;
     const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : [];
 
-    if (!email || ids.length === 0) {
+    if (ids.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "Missing email or notification ids",
+          error: "Missing notification ids",
         },
         { status: 400 }
       );

@@ -1,72 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { requireSessionEmail } from "../../../lib/auth-session";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
-
-const getSupabaseAdmin = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error(
-      "إعدادات السيرفر ناقصة: تأكد من إضافة NEXT_PUBLIC_SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY في Vercel Production"
-    );
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-};
-
-const normalizeEmail = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase();
-
-const getAuthenticatedUser = async (supabase, token) => {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    throw new Error("جلسة تسجيل الدخول غير صالحة. سجّل الدخول من جديد.");
-  }
-
-  return user;
-};
 
 export async function GET(req) {
   return POST(req);
 }
 
-export async function POST(req) {
+export async function POST() {
   try {
-    const supabase = getSupabaseAdmin();
-    const body = req ? await req.json().catch(() => ({})) : {};
-    const urlEmail = req?.url ? new URL(req.url).searchParams.get("email") : "";
+    const session = await requireSessionEmail();
 
-    let userEmail = normalizeEmail(body?.email || body?.user_email || urlEmail);
-
-    if (!userEmail) {
-      const cookieStore = await cookies();
-      const token = cookieStore.get("hc_access_token")?.value;
-
-      if (token) {
-        try {
-          const user = await getAuthenticatedUser(supabase, token);
-          userEmail = normalizeEmail(user.email);
-        } catch (authError) {
-          console.warn("MY ANALYSIS AUTH FALLBACK:", authError?.message || authError);
-        }
-      }
-    }
-
-    if (!userEmail || !userEmail.includes("@")) {
+    if (session.error) {
       return Response.json(
         {
           success: false,
@@ -76,6 +21,8 @@ export async function POST(req) {
         { status: 401 }
       );
     }
+
+    const { email: userEmail, supabase } = session;
 
     const { data, error } = await supabase
       .from("analysis_requests")
