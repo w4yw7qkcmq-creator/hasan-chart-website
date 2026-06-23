@@ -103,7 +103,6 @@ function RootLayoutContent({ children }) {
     if (!("Notification" in window)) return;
 
     setNotificationPermission(Notification.permission);
-    setWebPushEnabled(Boolean(localStorage.getItem("hc_push_endpoint")));
   }, []);
 
   useEffect(() => {
@@ -115,7 +114,24 @@ function RootLayoutContent({ children }) {
   }, []);
 
   const savePushSubscription = async () => {
-    const subscription = await subscribeToWebPush();
+    let fetchAttempted = false;
+
+    console.log("PUSH_SAVE_SUBSCRIPTION_START");
+
+    let subscription;
+
+    try {
+      subscription = await subscribeToWebPush();
+    } catch (error) {
+      console.error(
+        "PUSH_SUBSCRIBE_WEB_PUSH_FAILED",
+        error?.message || String(error)
+      );
+      throw new Error(
+        error?.message || "تعذر إنشاء اشتراك Web Push من المتصفح"
+      );
+    }
+
     const payload = serializePushSubscription(subscription);
 
     if (!payload?.endpoint || !payload?.keys?.p256dh || !payload?.keys?.auth) {
@@ -128,18 +144,9 @@ function RootLayoutContent({ children }) {
       anonymousId,
     };
 
-    console.log(
-      "PUSH_SUBSCRIBE_CLIENT_FETCH_START",
-      JSON.stringify({
-        url: "/api/push/subscribe",
-        method: "POST",
-        hasEndpoint: Boolean(payload.endpoint),
-        hasP256dh: Boolean(payload.keys.p256dh),
-        hasAuth: Boolean(payload.keys.auth),
-        hasAnonymousId: Boolean(anonymousId),
-        hasEmailSession: Boolean(currentUser?.email),
-      })
-    );
+    console.log("PUSH_SUBSCRIBE_CLIENT_FETCH_START");
+
+    fetchAttempted = true;
 
     const response = await fetch("/api/push/subscribe", {
       method: "POST",
@@ -155,7 +162,6 @@ function RootLayoutContent({ children }) {
     console.log(
       "PUSH_SUBSCRIBE_CLIENT_FETCH_DONE",
       JSON.stringify({
-        url: "/api/push/subscribe",
         status: response.status,
         ok: response.ok,
         success: Boolean(result?.success),
@@ -176,7 +182,7 @@ function RootLayoutContent({ children }) {
     setWebPushEnabled(true);
 
     return {
-      apiCalled: true,
+      apiCalled: fetchAttempted,
       subscription: result.subscription,
     };
   };
@@ -211,6 +217,8 @@ function RootLayoutContent({ children }) {
   };
 
   const enableBrowserNotifications = async () => {
+    console.log("PUSH_ENABLE_BUTTON_CLICKED");
+
     if (typeof window === "undefined") return;
 
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
@@ -247,19 +255,22 @@ function RootLayoutContent({ children }) {
       const saveResult = await savePushSubscription();
 
       if (!saveResult?.apiCalled || !saveResult?.subscription?.id) {
-        throw new Error("لم يتم استدعاء API حفظ الاشتراك");
+        throw new Error("لم يتم استدعاء /api/push/subscribe بنجاح");
       }
 
       showAppModal({
         type: "success",
         title: "تم تفعيل إشعارات المتصفح",
         message:
-          "تم حفظ اشتراك الإشعارات بنجاح. ستصلك تنبيهات الأسعار على المتصفح حتى لو كان الموقع مغلقاً.",
+          "تم حفظ اشتراك الإشعارات في قاعدة البيانات. ستصلك تنبيهات الأسعار حتى لو كان الموقع مغلقاً.",
       });
 
-      setGlobalNotice("🔔 تم تفعيل إشعارات المتصفح بنجاح");
+      setGlobalNotice("🔔 تم حفظ اشتراك إشعارات المتصفح بنجاح");
       setGlobalNoticeHref("");
     } catch (error) {
+      setWebPushEnabled(false);
+      setStoredPushEndpoint("");
+
       showAppModal({
         type: "warning",
         title: "تعذر تفعيل الإشعارات",
@@ -1059,6 +1070,18 @@ function RootLayoutContent({ children }) {
                     {theme === "light" ? "🌙 تفعيل الوضع الليلي" : "☀️ تفعيل الوضع النهاري"}
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void enableBrowserNotifications();
+                    }}
+                    className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                  >
+                    {notificationPermission === "granted" && webPushEnabled
+                      ? "🔔 إشعارات المتصفح مفعلة"
+                      : "🔔 تفعيل إشعارات المتصفح"}
+                  </button>
+
                   {currentUser ? (
                     <>
                       <Link href="/my-dashboard" onClick={() => setMobileMenuOpen(false)} className="mb-4 flex items-center gap-3">
@@ -1203,7 +1226,10 @@ function RootLayoutContent({ children }) {
                 </Link>
 
                 <button
-                  onClick={enableBrowserNotifications}
+                  type="button"
+                  onClick={() => {
+                    void enableBrowserNotifications();
+                  }}
                   className={`inline-flex rounded-2xl px-4 py-2 text-sm font-black transition ${
                     notificationPermission === "granted" && webPushEnabled
                       ? "border border-cyan-200/60 bg-gradient-to-l from-cyan-500/90 to-blue-600/90 text-white shadow-[0_0_24px_rgba(34,211,238,0.22)] hover:brightness-110"
