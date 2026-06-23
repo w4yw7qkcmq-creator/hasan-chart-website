@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
+import {
+  ensureServiceWorkerRegistration,
+  getAnonymousPushId,
+  serializePushSubscription,
+  setStoredPushEndpoint,
+  subscribeToWebPush,
+} from "../lib/push-client";
 import { AppModalProvider, useAppModal } from "./components/AppModalProvider";
 
 const menuItems = [
@@ -77,6 +84,7 @@ function RootLayoutContent({ children }) {
   const [globalNotice, setGlobalNotice] = useState("");
   const [globalNoticeHref, setGlobalNoticeHref] = useState("");
   const [notificationPermission, setNotificationPermission] = useState("default");
+  const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadAnalysisReplies, setUnreadAnalysisReplies] = useState(0);
   const [siteNotifications, setSiteNotifications] = useState([]);
@@ -95,7 +103,83 @@ function RootLayoutContent({ children }) {
     if (!("Notification" in window)) return;
 
     setNotificationPermission(Notification.permission);
+    setWebPushEnabled(Boolean(localStorage.getItem("hc_push_endpoint")));
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+
+    ensureServiceWorkerRegistration().catch((err) => {
+      console.warn("Service worker registration skipped:", err?.message || err);
+    });
+  }, []);
+
+  const savePushSubscription = async () => {
+    const subscription = await subscribeToWebPush();
+    const payload = serializePushSubscription(subscription);
+
+    if (!payload?.endpoint || !payload?.keys?.p256dh || !payload?.keys?.auth) {
+      throw new Error("تعذر قراءة بيانات اشتراك Push من المتصفح");
+    }
+
+    const anonymousId = getAnonymousPushId();
+    const requestBody = {
+      subscription: payload,
+      anonymousId,
+    };
+
+    console.log(
+      "PUSH_SUBSCRIBE_CLIENT_FETCH_START",
+      JSON.stringify({
+        url: "/api/push/subscribe",
+        method: "POST",
+        hasEndpoint: Boolean(payload.endpoint),
+        hasP256dh: Boolean(payload.keys.p256dh),
+        hasAuth: Boolean(payload.keys.auth),
+        hasAnonymousId: Boolean(anonymousId),
+        hasEmailSession: Boolean(currentUser?.email),
+      })
+    );
+
+    const response = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(requestBody),
+    });
+
+    const result = await response.json().catch(() => null);
+
+    console.log(
+      "PUSH_SUBSCRIBE_CLIENT_FETCH_DONE",
+      JSON.stringify({
+        url: "/api/push/subscribe",
+        status: response.status,
+        ok: response.ok,
+        success: Boolean(result?.success),
+        subscriptionId: result?.subscription?.id || null,
+        error: result?.error || null,
+      })
+    );
+
+    if (!response.ok || !result?.success || !result?.subscription?.id) {
+      const apiError =
+        result?.error ||
+        (response.ok ? "لم يتم حفظ الاشتراك في قاعدة البيانات" : `HTTP ${response.status}`);
+
+      throw new Error(apiError);
+    }
+
+    setStoredPushEndpoint(payload.endpoint);
+    setWebPushEnabled(true);
+
+    return {
+      apiCalled: true,
+      subscription: result.subscription,
+    };
+  };
 
   useEffect(() => {
     if (!globalNotice) return;
@@ -128,34 +212,78 @@ function RootLayoutContent({ children }) {
 
   const enableBrowserNotifications = async () => {
     if (typeof window === "undefined") return;
-    if (!("Notification" in window)) {
+
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
       showAppModal({
         type: "warning",
         title: "الإشعارات غير مدعومة",
-        message: "المتصفح لا يدعم الإشعارات",
+        message: "المتصفح لا يدعم Web Push Notifications",
       });
       return;
     }
 
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-
-    if (permission === "granted") {
-      new Notification("HasaN CharT", {
-        body: "تم تفعيل إشعارات الموقع بنجاح 🔔",
-        icon: "/logo.png",
-      });
-
-      setGlobalNotice("🔔 تم تفعيل إشعارات الموقع بنجاح");
-      setGlobalNoticeHref("");
-    } else {
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
       showAppModal({
         type: "warning",
-        title: "تم رفض الإشعارات",
-        message: "تم رفض الإشعارات من المتصفح. يمكنك تفعيلها لاحقاً من إعدادات المتصفح.",
+        title: "إعدادات الإشعارات ناقصة",
+        message: "مفتاح VAPID العام غير مُعد على السيرفر.",
+      });
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+
+      if (permission !== "granted") {
+        showAppModal({
+          type: "warning",
+          title: "تم رفض الإشعارات",
+          message: "تم رفض إشعارات المتصفح. يمكنك تفعيلها لاحقاً من إعدادات المتصفح.",
+        });
+        return;
+      }
+
+      const saveResult = await savePushSubscription();
+
+      if (!saveResult?.apiCalled || !saveResult?.subscription?.id) {
+        throw new Error("لم يتم استدعاء API حفظ الاشتراك");
+      }
+
+      showAppModal({
+        type: "success",
+        title: "تم تفعيل إشعارات المتصفح",
+        message:
+          "تم حفظ اشتراك الإشعارات بنجاح. ستصلك تنبيهات الأسعار على المتصفح حتى لو كان الموقع مغلقاً.",
+      });
+
+      setGlobalNotice("🔔 تم تفعيل إشعارات المتصفح بنجاح");
+      setGlobalNoticeHref("");
+    } catch (error) {
+      showAppModal({
+        type: "warning",
+        title: "تعذر تفعيل الإشعارات",
+        message: error?.message || "حاول مرة أخرى من إعدادات المتصفح.",
       });
     }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    savePushSubscription()
+      .then((saved) => {
+        if (saved?.apiCalled && saved?.subscription?.id) {
+          setWebPushEnabled(true);
+        }
+      })
+      .catch((err) => {
+        setWebPushEnabled(false);
+        setStoredPushEndpoint("");
+        console.warn("Push subscription sync skipped:", err?.message || err);
+      });
+  }, [currentUser?.email]);
 
   useEffect(() => {
     if (!currentUser?.email) return;
@@ -1076,15 +1204,15 @@ function RootLayoutContent({ children }) {
 
                 <button
                   onClick={enableBrowserNotifications}
-                  className={`hidden rounded-2xl px-4 py-2 text-sm font-black transition sm:inline-flex ${
-                    notificationPermission === "granted"
+                  className={`inline-flex rounded-2xl px-4 py-2 text-sm font-black transition ${
+                    notificationPermission === "granted" && webPushEnabled
                       ? "border border-cyan-200/60 bg-gradient-to-l from-cyan-500/90 to-blue-600/90 text-white shadow-[0_0_24px_rgba(34,211,238,0.22)] hover:brightness-110"
                       : "border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
                   }`}
                 >
-                  {notificationPermission === "granted"
-                    ? "🔔 الإشعارات مفعلة"
-                    : "🔔 تفعيل إشعارات الموقع"}
+                  {notificationPermission === "granted" && webPushEnabled
+                    ? "🔔 إشعارات المتصفح مفعلة"
+                    : "🔔 تفعيل إشعارات المتصفح"}
                 </button>
 
                 {currentUser && (

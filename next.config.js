@@ -24,8 +24,8 @@ const nextConfig = {
             value: 'camera=(), microphone=(), geolocation=()'
           },
           {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains; preload',
+            key: 'Service-Worker-Allowed',
+            value: '/',
           },
         ],
       },

@@ -23,9 +23,10 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const { processEmailQueue } = require("./email-queue");
 const { logWorkerEvent } = require("./alert-logger");
+const { sendPriceAlertPushNotifications } = require("./push-sender");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v2";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v3-push";
 
 const CHECK_INTERVAL_MS = 12000;
 const MAX_ALERTS_PER_RUN = 20;
@@ -832,6 +833,9 @@ async function checkPriceAlerts() {
     uniqueCoins: 0,
     triggered: 0,
     notificationsCreated: 0,
+    pushesSent: 0,
+    pushesFailed: 0,
+    pushesSkipped: 0,
     emailsQueued: 0,
     alertsUpdated: 0,
     skippedInvalid: 0,
@@ -960,6 +964,20 @@ async function checkPriceAlerts() {
             success: true,
           });
         }
+
+        const pushStats = await sendPriceAlertPushNotifications({
+          supabase,
+          workerEntry: WORKER_ENTRY,
+          alertId: alert.id,
+          email: userEmail,
+          title: "✅ وصل السعر إلى هدف التنبيه",
+          body: notificationMessage,
+          url: "https://www.hasanchartworld.com/alerts",
+        });
+
+        summary.pushesSent += pushStats.sent || 0;
+        summary.pushesFailed += pushStats.failed || 0;
+        summary.pushesSkipped += pushStats.skipped || 0;
 
         const { error: updateError } = await supabase
           .from("price_alerts")
@@ -1131,6 +1149,21 @@ app.get("/api/instant-analysis/:jobId", async (req, res) => {
 });
 
 app.listen(PORT, () => {
+  logWorkerEvent("PRICE_ALERT_WORKER_STARTED", {
+    worker: WORKER_ENTRY,
+    service: "hasan-chart-price-alerts-worker",
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    port: PORT,
+    checkIntervalMs: CHECK_INTERVAL_MS,
+    priceAlertsEnabled: true,
+    webPushConfigured: Boolean(
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY &&
+        process.env.VAPID_PRIVATE_KEY &&
+        process.env.VAPID_SUBJECT
+    ),
+    note: "Price alert emails and Web Push are sent ONLY from worker/index.js",
+  });
+
   logWorkerEvent("WORKER_BOOT", {
     worker: WORKER_ENTRY,
     service: "hasan-chart-price-alerts-worker",
