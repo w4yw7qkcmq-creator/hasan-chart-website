@@ -134,8 +134,6 @@ const countAdminStatusFilter = (list, filterKey, getStatus = (item) => item.stat
 
 const getSimpleStatusSelectValue = (status) => getAdminStatusKey(status);
 
-const SUPABASE_URL = "https://lzgsxdsumnteuwtjfqlm.supabase.co";
-const SUPABASE_PUBLIC_KEY = "sb_publishable_XCZkQPsJymbmnNuBR9fMpw_SVEFwZm0";
 const ADMIN_ANALYSIS_LIMIT = 50;
 const ADMIN_USERS_LIMIT = 200;
 const ADMIN_SUBSCRIPTIONS_LIMIT = 50;
@@ -158,63 +156,6 @@ const matchesAdminSearch = (item, searchValue, fields) => {
   return fields.some((field) =>
     normalizeAdminSearch(item?.[field]).includes(query)
   );
-};
-
-const getStoredAccessToken = async () => {
-  try {
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
-
-    if (error) {
-      console.error("Session load error:", error);
-      return SUPABASE_PUBLIC_KEY;
-    }
-
-    if (!session?.access_token) {
-      return SUPABASE_PUBLIC_KEY;
-    }
-
-    return session.access_token;
-  } catch (err) {
-    console.error("Access token error:", err);
-    return SUPABASE_PUBLIC_KEY;
-  }
-};
-
-const adminSelect = async (table, query = "select=*") => {
-  const accessToken = await getStoredAccessToken();
-
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-    headers: {
-      apikey: SUPABASE_PUBLIC_KEY,
-      Authorization: `Bearer ${accessToken || SUPABASE_PUBLIC_KEY}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    console.error("Admin select error:", {
-      table,
-      status: response.status,
-      data,
-    });
-
-    if (
-      data?.message?.includes("JWT") ||
-      data?.message?.includes("expired") ||
-      response.status === 401
-    ) {
-      return [];
-    }
-
-    throw new Error(data?.message || data?.hint || `فشل تحميل ${table}`);
-  }
-
-  return data || [];
 };
 
 const formatAnalysisRequest = (item) => ({
@@ -253,14 +194,10 @@ const formatAccountManagementRequest = (item) => ({
   notes: item.notes || "",
   status: item.status || "جديد",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
-  apiKey: item.api_key_encrypted ? "محفوظ بشكل مشفر" : "",
-secretKey: item.secret_key_encrypted ? "محفوظ بشكل مشفر" : "",
-password: item.trading_password_encrypted ? "محفوظ بشكل مشفر" : "",
-hasSensitiveKeys: Boolean(
-  item.api_key_encrypted ||
-    item.secret_key_encrypted ||
-    item.trading_password_encrypted
-),
+  apiKey: item.has_sensitive_keys ? "محفوظ بشكل مشفر" : "",
+  secretKey: item.has_sensitive_keys ? "محفوظ بشكل مشفر" : "",
+  password: item.has_sensitive_keys ? "محفوظ بشكل مشفر" : "",
+  hasSensitiveKeys: Boolean(item.has_sensitive_keys),
 });
 
 const upsertById = (list, item, limit) => {
@@ -501,146 +438,103 @@ export default function AdminPage() {
 
 
   useEffect(() => {
-    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+    let cancelled = false;
 
-    if (!currentUser) {
-      showAdminNotice("يجب تسجيل الدخول أولاً", "error", "تنبيه");
-      router.push("/login");
-      return;
-    }
-
-    if (currentUser.role !== "admin") {
-      showAdminNotice("هذه الصفحة خاصة بالإدارة فقط", "error", "غير مصرح");
-      router.push("/login");
-      return;
-    }
-
-    setIsAdmin(true);
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "granted") {
-        setBrowserNotificationsEnabled(true);
-      } else if (Notification.permission !== "denied") {
-        Notification.requestPermission().then((permission) => {
-          if (permission === "granted") {
-            setBrowserNotificationsEnabled(true);
-          }
+    const initAdmin = async () => {
+      try {
+        const response = await adminFetch("/api/admin/dashboard", {
+          method: "GET",
+          cache: "no-store",
         });
-      }
-    }
-    loadAdminData(currentUser);
 
-    const touchUpdatedAt = () => {
-      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+        const result = await response.json().catch(() => ({}));
+
+        if (cancelled) return;
+
+        if (response.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        if (response.status === 403) {
+          router.replace("/403");
+          return;
+        }
+
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "فشل التحقق من صلاحية الإدارة");
+        }
+
+        setIsAdmin(true);
+
+        if (typeof window !== "undefined" && "Notification" in window) {
+          if (Notification.permission === "granted") {
+            setBrowserNotificationsEnabled(true);
+          } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then((permission) => {
+              if (permission === "granted") {
+                setBrowserNotificationsEnabled(true);
+              }
+            });
+          }
+        }
+
+        await loadAdminData({ silent: false, initialResult: result });
+      } catch (error) {
+        if (cancelled) return;
+
+        showAdminNotice(
+          error?.message || "تعذر التحقق من صلاحية الإدارة",
+          "error",
+          "غير مصرح"
+        );
+        router.replace("/403");
+      }
     };
 
-    const handleAnalysisChange = (payload) => {
-      if (payload.eventType === "DELETE") {
-        setAnalysisRequests((prev) => prev.filter((item) => item.id !== payload.old.id));
-        touchUpdatedAt();
-        return;
-      }
-
-      if (!payload.new?.id) return;
-
-      const formatted = formatAnalysisRequest(payload.new);
-      setAnalysisRequests((prev) => upsertById(prev, formatted, ADMIN_ANALYSIS_LIMIT));
-      touchUpdatedAt();
-    };
-
-    const handleSubscriptionChange = (payload) => {
-      if (payload.eventType === "DELETE") {
-        setSubscriptionRequests((prev) => prev.filter((item) => item.id !== payload.old.id));
-        touchUpdatedAt();
-        return;
-      }
-
-      if (!payload.new?.id) return;
-
-      const formatted = formatSubscriptionRequest(payload.new);
-      setSubscriptionRequests((prev) => upsertById(prev, formatted, ADMIN_SUBSCRIPTIONS_LIMIT));
-      touchUpdatedAt();
-    };
-
-    // Realtime monitoring for account_management_requests
-    const handleAccountManagementChange = (payload) => {
-      if (payload.eventType === "DELETE") {
-        setAccountRequests((prev) => prev.filter((item) => item.id !== payload.old.id));
-        touchUpdatedAt();
-        return;
-      }
-
-      if (!payload.new?.id) return;
-
-      const formatted = formatAccountManagementRequest(payload.new);
-      setAccountRequests((prev) => upsertById(prev, formatted, ADMIN_SUBSCRIPTIONS_LIMIT));
-      touchUpdatedAt();
-    };
-
-    const handleProfileChange = (payload) => {
-      if (payload.eventType === "DELETE") {
-        setUsers((prev) => prev.filter((item) => item.id !== payload.old.id));
-        touchUpdatedAt();
-        return;
-      }
-
-      if (!payload.new?.id) return;
-
-      setUsers((prev) => upsertById(prev, payload.new, ADMIN_USERS_LIMIT));
-      touchUpdatedAt();
-    };
-
-    const channel = supabase
-      .channel("admin-live-dashboard")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "analysis_requests" },
-        handleAnalysisChange
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "subscription_requests" },
-        handleSubscriptionChange
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "account_management_requests" },
-        handleAccountManagementChange
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "profiles" },
-        handleProfileChange
-      )
-      .subscribe();
+    initAdmin();
 
     const backupInterval = setInterval(() => {
-      loadAdminData(currentUser, { silent: true });
+      loadAdminData({ silent: true });
     }, 60000);
 
     return () => {
+      cancelled = true;
       clearInterval(backupInterval);
-      supabase.removeChannel(channel);
     };
   }, [router]);
 
-  const loadAdminData = async (currentUser, options = {}) => {
+  const applyAdminDashboardResult = (result) => {
+    const formattedAnalysis = (result.analysis_requests || []).map(formatAnalysisRequest);
+    const formattedSubscriptions = (result.subscription_requests || []).map(
+      formatSubscriptionRequest
+    );
+    const formattedAccounts = (result.account_management_requests || []).map(
+      formatAccountManagementRequest
+    );
+
+    setUsers(result.profiles || []);
+    setAnalysisRequests(formattedAnalysis);
+    setSubscriptionRequests(formattedSubscriptions);
+    setAccountRequests(formattedAccounts);
+    setDataMode("secure-api");
+    setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+    hasLoadedAdminDataRef.current = true;
+    setHasLoadedAdminData(true);
+    setRefreshWarning("");
+  };
+
+  const loadAdminData = async (options = {}) => {
     if (!options.silent) {
       setIsRefreshing(true);
     }
 
-    const fallbackUsers = [
-      {
-        id: currentUser?.id || "admin-local",
-        email: currentUser?.email || "admin@hasanchart.com",
-        username: currentUser?.username || "admin",
-        telegram: currentUser?.telegram || "@admin",
-        role: currentUser?.role || "admin",
-        subscription_plan: currentUser?.subscription_plan || "إدارة",
-        subscription_status: currentUser?.subscription_status || "نشط",
-      },
-    ];
-
     try {
+      if (options.initialResult?.success) {
+        applyAdminDashboardResult(options.initialResult);
+        return;
+      }
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
 
@@ -654,23 +548,21 @@ export default function AdminPage() {
 
       const result = await response.json().catch(() => ({}));
 
+      if (response.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      if (response.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || "فشل تحميل بيانات لوحة الإدارة");
       }
 
-      const formattedAnalysis = (result.analysis_requests || []).map(formatAnalysisRequest);
-      const formattedSubscriptions = (result.subscription_requests || []).map(formatSubscriptionRequest);
-      const formattedAccounts = (result.account_management_requests || []).map(formatAccountManagementRequest);
-
-      setUsers(result.profiles?.length ? result.profiles : fallbackUsers);
-      setAnalysisRequests(formattedAnalysis);
-      setSubscriptionRequests(formattedSubscriptions);
-      setAccountRequests(formattedAccounts);
-      setDataMode("secure-api");
-      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
-      hasLoadedAdminDataRef.current = true;
-      setHasLoadedAdminData(true);
-      setRefreshWarning("");
+      applyAdminDashboardResult(result);
     } catch (err) {
       console.error("Admin load error:", err);
 
@@ -679,7 +571,7 @@ export default function AdminPage() {
         return;
       }
 
-      setUsers(fallbackUsers);
+      setUsers([]);
       setAnalysisRequests([]);
       setSubscriptionRequests([]);
       setAccountRequests([]);
@@ -741,62 +633,6 @@ export default function AdminPage() {
     accountRequests,
     lastNotificationIds,
   ]);
-
-  const updateUserRole = async (userId, newRole) => {
-    const updated = users.map((user) =>
-      user.id === userId ? { ...user, role: newRole } : user
-    );
-
-    setUsers(updated);
-
-    if (dataMode === "supabase") {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ role: newRole })
-        .eq("id", userId);
-
-      if (error) {
-        showAdminNotice("لم يتم تحديث الدور في Supabase. تأكد من صلاحيات الأدمن أو سياسات RLS.", "error");
-        return;
-      }
-    } else {
-      localStorage.setItem(
-        "adminUsers",
-        JSON.stringify(updated.filter((user) => user.role !== "admin"))
-      );
-    }
-
-    showAdminNotice("تم تحديث صلاحية المستخدم");
-  };
-
-  const updateUserSubscription = async (userId, plan, status) => {
-    const updated = users.map((user) =>
-      user.id === userId
-        ? { ...user, subscription_plan: plan, subscription_status: status }
-        : user
-    );
-
-    setUsers(updated);
-
-    if (dataMode === "supabase") {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ subscription_plan: plan, subscription_status: status })
-        .eq("id", userId);
-
-      if (error) {
-        showAdminNotice("لم يتم تحديث الاشتراك في Supabase. تأكد أن أعمدة subscription_plan و subscription_status موجودة.", "error");
-        return;
-      }
-    } else {
-      localStorage.setItem(
-        "adminUsers",
-        JSON.stringify(updated.filter((user) => user.role !== "admin"))
-      );
-    }
-
-    showAdminNotice("تم تحديث اشتراك المستخدم");
-  };
 
   const updateSubscriptionRequest = async (request, newStatus) => {
     const needsConfirm = newStatus === "مفعل" || newStatus === "مرفوض";
@@ -1333,8 +1169,7 @@ export default function AdminPage() {
           </span>
           <button
             onClick={() => {
-              const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-              loadAdminData(currentUser);
+              loadAdminData();
             }}
             className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 font-black text-cyan-100 transition hover:bg-cyan-400/20"
           >
@@ -1451,8 +1286,7 @@ export default function AdminPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-                  loadAdminData(currentUser);
+                  loadAdminData();
                 }}
                 className="shrink-0 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-black text-white shadow-[0_14px_38px_rgba(37,99,235,0.28)] transition hover:brightness-110"
               >

@@ -1,72 +1,25 @@
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
-import crypto from "crypto";
+import { verifyAdminSession } from "../../../../lib/admin-auth";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
 
 export const dynamic = "force-dynamic";
 
-function getAdminSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase admin configuration");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
-
-const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
-
-function getEncryptionKey() {
-  if (!encryptionSecret || encryptionSecret.length < 24) {
-    throw new Error("Missing or weak ACCOUNT_DATA_ENCRYPTION_KEY");
-  }
-
-  return crypto.createHash("sha256").update(encryptionSecret).digest();
-}
-
-function decryptValue(value) {
-  if (!value) return null;
-
-  try {
-    const [ivText, authTagText, encryptedText] = String(value).split(":");
-
-    if (!ivText || !authTagText || !encryptedText) {
-      return null;
-    }
-
-    const key = getEncryptionKey();
-    const iv = Buffer.from(ivText, "base64");
-    const authTag = Buffer.from(authTagText, "base64");
-    const encrypted = Buffer.from(encryptedText, "base64");
-
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(authTag);
-
-    const decrypted = Buffer.concat([
-      decipher.update(encrypted),
-      decipher.final(),
-    ]);
-
-    return decrypted.toString("utf8");
-  } catch (error) {
-    console.error("Account key decrypt error:", error.message);
-    return null;
-  }
-}
-
-function formatAccountForAdmin(item) {
+function sanitizeAccountRequest(item) {
   return {
-    ...item,
-    api_key: decryptValue(item.api_key_encrypted),
-    secret_key: decryptValue(item.secret_key_encrypted),
-    trading_password: decryptValue(item.trading_password_encrypted),
+    id: item.id,
+    user_id: item.user_id,
+    email: item.email,
+    platform: item.platform,
+    account_type: item.account_type,
+    capital: item.capital,
+    contact_method: item.contact_method,
+    notes: item.notes,
+    status: item.status,
+    created_at: item.created_at,
+    has_sensitive_keys: Boolean(
+      item.api_key_encrypted ||
+        item.secret_key_encrypted ||
+        item.trading_password_encrypted
+    ),
   };
 }
 
@@ -108,60 +61,45 @@ function buildAdminDashboardNotifications({ subscriptions = [], accounts = [] })
 
 export async function GET() {
   try {
-    const supabase = getAdminSupabase();
+    const adminCheck = await verifyAdminSession();
 
-    const cookieStore = await cookies();
-    const token = cookieStore.get("hc_access_token")?.value;
-
-    if (!token) {
+    if (!adminCheck.ok) {
       return Response.json(
-        { success: false, error: "يجب تسجيل الدخول أولاً" },
-        { status: 401 }
+        { success: false, error: adminCheck.error },
+        { status: adminCheck.status }
       );
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return Response.json(
-        { success: false, error: "جلسة غير صالحة" },
-        { status: 401 }
-      );
-    }
-
-    const normalizedEmail = (user.email || "").toLowerCase();
-    const fallbackAdminEmails = [
-      "ahmaagahmaadd@gmail.com",
-    ];
-
-    const { data: adminProfile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id,email,role")
-      .or(`id.eq.${user.id},email.eq.${normalizedEmail}`)
-      .maybeSingle();
-
-    const isAdminByProfile = adminProfile?.role === "admin";
-    const isAdminByFallback = fallbackAdminEmails.includes(normalizedEmail);
-
-    if (!isAdminByFallback && (profileError || !isAdminByProfile)) {
-      return Response.json(
-        { success: false, error: "غير مصرح لك بالدخول" },
-        { status: 403 }
-      );
-    }
+    const supabase = adminCheck.supabase;
 
     const [analysis, accounts, subscriptions, profiles] = await Promise.all([
       supabase
         .from("analysis_requests")
-        .select("*")
+        .select(
+          "id,user_email,username,coin,frame,status,reply,reply_image,created_at,job_status,completed_at,error_message"
+        )
         .order("created_at", { ascending: false })
         .limit(200),
-      supabase.from("account_management_requests").select("*").order("created_at", { ascending: false }).limit(200),
-      supabase.from("subscription_requests").select("*").order("created_at", { ascending: false }).limit(200),
-      supabase.from("profiles").select("*").limit(500),
+      supabase
+        .from("account_management_requests")
+        .select(
+          "id,user_id,email,platform,account_type,capital,contact_method,notes,status,created_at,api_key_encrypted,secret_key_encrypted,trading_password_encrypted"
+        )
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("subscription_requests")
+        .select(
+          "id,user_email,username,plan_name,category,price,telegram_username,payment_proof,status,started_at,expires_at,created_at"
+        )
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("profiles")
+        .select(
+          "id,email,username,telegram,role,subscription_plan,subscription_status,created_at"
+        )
+        .limit(500),
     ]);
 
     const tableErrors = {
@@ -190,7 +128,9 @@ export async function GET() {
     return Response.json({
       success: true,
       analysis_requests: analysis.error ? [] : analysis.data || [],
-      account_management_requests: accounts.error ? [] : accounts.data || [],
+      account_management_requests: accounts.error
+        ? []
+        : (accounts.data || []).map(sanitizeAccountRequest),
       subscription_requests: subscriptions.error ? [] : subscriptions.data || [],
       profiles: profiles.error ? [] : profiles.data || [],
       table_errors: tableErrors,
@@ -211,42 +151,6 @@ export async function GET() {
 }
 
 // --- Secure POST actions for account-management requests ---
-async function verifyAdminUserForAction(supabase) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("hc_access_token")?.value;
-
-  if (!token) {
-    throw new Error("يجب تسجيل الدخول أولاً");
-  }
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(token);
-
-  if (authError || !user) {
-    throw new Error("جلسة غير صالحة");
-  }
-
-  const normalizedEmail = (user.email || "").toLowerCase();
-  const fallbackAdminEmails = ["ahmaagahmaadd@gmail.com"];
-
-  const { data: adminProfile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id,email,role")
-    .or(`id.eq.${user.id},email.eq.${normalizedEmail}`)
-    .maybeSingle();
-
-  const isAdminByProfile = adminProfile?.role === "admin";
-  const isAdminByFallback = fallbackAdminEmails.includes(normalizedEmail);
-
-  if (!isAdminByFallback && (profileError || !isAdminByProfile)) {
-    throw new Error("غير مصرح لك بالدخول");
-  }
-
-  return user;
-}
-
 
 async function writeAdminLog(supabase, {
   admin,
@@ -608,9 +512,17 @@ async function notifyVipSubscribers(supabase, signal) {
 
 export async function POST(request) {
   try {
-    const supabase = getAdminSupabase();
+    const adminCheck = await verifyAdminSession();
 
-    const adminUser = await verifyAdminUserForAction(supabase);
+    if (!adminCheck.ok) {
+      return Response.json(
+        { success: false, error: adminCheck.error },
+        { status: adminCheck.status }
+      );
+    }
+
+    const supabase = adminCheck.supabase;
+    const adminUser = adminCheck.user;
 
     const payload = await request.json();
     const { action, requestId } = payload;

@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { verifyAdminSession } from "../../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -55,47 +55,18 @@ function decryptValue(value) {
   return decrypted.toString("utf8");
 }
 
-async function getAdminUser(supabase) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("hc_access_token")?.value;
-
-  if (!token) {
-    throw new Error("يجب تسجيل الدخول أولاً");
-  }
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    throw new Error("جلسة غير صالحة");
-  }
-
-  const normalizedEmail = (user.email || "").toLowerCase();
-  const fallbackAdminEmails = ["ahmaagahmaadd@gmail.com"];
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id,email,role")
-    .or(`id.eq.${user.id},email.eq.${normalizedEmail}`)
-    .maybeSingle();
-
-  const isAdminByProfile = profile?.role === "admin";
-  const isAdminByFallback = fallbackAdminEmails.includes(normalizedEmail);
-
-  if (!isAdminByProfile && !isAdminByFallback) {
-    throw new Error("غير مصرح لك بالدخول");
-  }
-
-  return user;
-}
-
 export async function POST(request) {
   try {
-    const supabase = getAdminSupabase();
-    await getAdminUser(supabase);
+    const adminCheck = await verifyAdminSession();
 
+    if (!adminCheck.ok) {
+      return Response.json(
+        { success: false, error: adminCheck.error },
+        { status: adminCheck.status }
+      );
+    }
+
+    const supabase = getAdminSupabase();
     const { requestId } = await request.json();
 
     if (!requestId) {
@@ -127,12 +98,12 @@ export async function POST(request) {
       },
     });
   } catch (error) {
-    console.error("Admin account keys API error:", error.message);
+    console.error("Admin account keys API error");
 
     return Response.json(
       {
         success: false,
-        error: error.message || "تعذر عرض المفاتيح",
+        error: "تعذر عرض المفاتيح",
       },
       { status: 500 }
     );
