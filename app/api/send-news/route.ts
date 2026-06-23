@@ -1,5 +1,19 @@
+import { verifyAdminOrCronSecret } from "../../../lib/admin-auth";
+
 export async function POST(req: Request) {
   try {
+    const authCheck = await verifyAdminOrCronSecret(req);
+
+    if (!authCheck.ok) {
+      return Response.json(
+        {
+          success: false,
+          error: authCheck.error,
+        },
+        { status: authCheck.status }
+      );
+    }
+
     const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
     const chatId = process.env.TELEGRAM_CHANNEL_ID?.trim();
 

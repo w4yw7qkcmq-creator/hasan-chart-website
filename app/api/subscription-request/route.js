@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireSessionUser } from "../../../lib/auth-session";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 
 const supabase = createClient(
@@ -46,17 +47,29 @@ async function sendAdminSubscriptionRequestEmail({ userEmail, username, planName
 
 export async function POST(request) {
   try {
+    const session = await requireSessionUser();
+
+    if (session.error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "يجب تسجيل الدخول أولاً.",
+        },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
 
-    const userEmail = String(body.user_email || body.email || "").trim().toLowerCase();
-    const username = String(body.username || userEmail || "").trim();
+    const userEmail = session.email;
+    const username = String(body.username || session.username || userEmail).trim();
     const planName = String(body.plan_name || "").trim();
     const category = String(body.category || "").trim();
     const price = String(body.price || "").trim();
     const telegramUsername = String(body.telegram_username || "").trim();
     const paymentProof = String(body.payment_proof || "").trim();
 
-    if (!userEmail || !planName || !category || !price || !telegramUsername || !paymentProof) {
+    if (!planName || !category || !price || !telegramUsername || !paymentProof) {
       return NextResponse.json(
         {
           success: false,

@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { requireSessionUser } from "../../../lib/auth-session";
+import { alertLimiter } from "../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -94,15 +96,39 @@ const resolveAlertCondition = async ({ coin, targetPrice, condition }) => {
 
 export async function POST(req) {
   try {
+    const session = await requireSessionUser();
+
+    if (session.error) {
+      return Response.json(
+        {
+          success: false,
+          error: "يجب تسجيل الدخول أولاً.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const rateLimitResult = alertLimiter(session.id);
+
+    if (!rateLimitResult.success) {
+      return Response.json(
+        {
+          success: false,
+          error: "تم إرسال عدد كبير من التنبيهات. يرجى المحاولة لاحقاً.",
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
 
     const coin = normalizeText(body?.coin, 30).toUpperCase();
     const price = normalizeText(body?.price, 30);
-    const user_email = normalizeText(body?.user_email, 120).toLowerCase();
-    const username = normalizeText(body?.username, 120);
     const condition = normalizeText(body?.condition, 20) || "auto";
+    const user_email = session.email;
+    const username = session.username;
 
-    if (!coin || !price || !user_email) {
+    if (!coin || !price) {
       return Response.json(
         {
           success: false,

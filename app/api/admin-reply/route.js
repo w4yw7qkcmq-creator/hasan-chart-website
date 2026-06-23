@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { verifyAdminSession } from "../../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -137,6 +138,15 @@ const sendEmailNotification = async ({ email, coin, reply }) => {
 
 export async function POST(req) {
   try {
+    const adminCheck = await verifyAdminSession();
+
+    if (!adminCheck.ok) {
+      return Response.json(
+        { success: false, error: adminCheck.error },
+        { status: adminCheck.status }
+      );
+    }
+
     const body = await req.json().catch(() => null);
 
     const requestId = body?.request_id;

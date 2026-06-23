@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyCronSecret } from "../../../lib/admin-auth";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 
 const supabase = createClient(
@@ -81,8 +82,20 @@ async function sendExpiredNotice({ email, planName }) {
   });
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const authCheck = verifyCronSecret(request);
+
+    if (!authCheck.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: authCheck.error,
+        },
+        { status: authCheck.status }
+      );
+    }
+
     const now = new Date().toISOString();
 
     const { data: activeSubscriptions, error: activeError } = await supabase
