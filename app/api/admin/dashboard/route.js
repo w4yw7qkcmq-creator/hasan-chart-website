@@ -269,11 +269,38 @@ async function writeAdminLog(supabase, {
   }
 }
 
+const SHARED_ADMIN_STATUSES = ["بانتظار المراجعة", "تمت المراجعة"];
+
+function normalizeAdminRequestStatus(status) {
+  const raw = String(status || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (
+    lower === "reviewed" ||
+    lower === "approved" ||
+    lower === "completed" ||
+    raw === "تمت المراجعة"
+  ) {
+    return "تمت المراجعة";
+  }
+
+  if (
+    lower === "pending" ||
+    lower === "new" ||
+    lower === "reviewing" ||
+    raw === "بانتظار المراجعة"
+  ) {
+    return "بانتظار المراجعة";
+  }
+
+  return raw;
+}
+
 const ADMIN_STATUS_TABLES = {
   subscription_requests: {
     table: "subscription_requests",
     allowedStatuses: [
-      "بانتظار المراجعة",
+      ...SHARED_ADMIN_STATUSES,
       "تم التواصل",
       "قيد التفعيل",
       "مفعل",
@@ -284,6 +311,7 @@ const ADMIN_STATUS_TABLES = {
   analysis_requests: {
     table: "analysis_requests",
     allowedStatuses: [
+      ...SHARED_ADMIN_STATUSES,
       "قيد المراجعة",
       "قيد التحليل",
       "مكتمل",
@@ -295,6 +323,7 @@ const ADMIN_STATUS_TABLES = {
   account_management_requests: {
     table: "account_management_requests",
     allowedStatuses: [
+      ...SHARED_ADMIN_STATUSES,
       "جديد",
       "قيد المراجعة",
       "نشط",
@@ -595,7 +624,7 @@ export async function POST(request) {
 
     if (action === "update-request-status") {
       const targetTableConfig = getAdminStatusTable(payload.table);
-      const newStatus = String(payload.status || "").trim();
+      const newStatus = normalizeAdminRequestStatus(payload.status);
 
       if (!targetTableConfig) {
         return Response.json(
@@ -727,7 +756,7 @@ export async function POST(request) {
     }
 
     if (action === "update-subscription-request") {
-      const newStatus = String(payload.status || "").trim();
+      const newStatus = normalizeAdminRequestStatus(payload.status);
       const userEmail = String(payload.userEmail || "").trim().toLowerCase();
       const planName = String(payload.planName || "").trim();
 
