@@ -56,6 +56,14 @@ const ADMIN_STATUS_FILTERS = [
   ["all", "الكل"],
 ];
 
+const ADMIN_TABS = [
+  { id: "overview", label: "نظرة عامة", icon: "📊" },
+  { id: "analysis", label: "طلبات التحليل", icon: "🧠" },
+  { id: "accounts", label: "إدارة الحسابات", icon: "📂" },
+  { id: "subscriptions", label: "الاشتراكات", icon: "💳" },
+  { id: "vip", label: "نشر VIP", icon: "⭐" },
+];
+
 const SIMPLE_STATUS_OPTIONS = [
   { value: "pending", label: "بانتظار المراجعة" },
   { value: "reviewed", label: "تمت المراجعة" },
@@ -275,6 +283,7 @@ export default function AdminPage() {
   const [analysisSearch, setAnalysisSearch] = useState("");
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
+  const [activeAdminTab, setActiveAdminTab] = useState("overview");
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
   const [lastNotificationIds, setLastNotificationIds] = useState([]);
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
@@ -886,6 +895,46 @@ export default function AdminPage() {
     return [...subscriptionItems, ...accountItems].slice(0, 20);
   }, [subscriptionRequests, accountRequests]);
 
+  const recentOverviewItems = useMemo(() => {
+    const items = [
+      ...analysisRequests
+        .filter((item) => getAdminStatusKey(item.status) === "pending")
+        .slice(0, 3)
+        .map((item) => ({
+          id: `analysis-${item.id}`,
+          tab: "analysis",
+          icon: "🧠",
+          title: `طلب تحليل ${item.coin}`,
+          message: `${item.username || item.userEmail || "مستخدم"} · ${item.frame || "—"}`,
+          createdAt: item.createdAt,
+        })),
+      ...accountRequests
+        .filter((item) => getAdminStatusKey(item.status) === "pending")
+        .slice(0, 3)
+        .map((item) => ({
+          id: `account-${item.id}`,
+          tab: "accounts",
+          icon: "📂",
+          title: item.type || "طلب إدارة حساب",
+          message: item.email || item.telegram || "طلب جديد",
+          createdAt: item.createdAt,
+        })),
+      ...subscriptionRequests
+        .filter((item) => getAdminStatusKey(item.status) === "pending")
+        .slice(0, 3)
+        .map((item) => ({
+          id: `subscription-${item.id}`,
+          tab: "subscriptions",
+          icon: "💳",
+          title: item.planName || "طلب اشتراك",
+          message: `${item.userEmail || item.username || "مستخدم"} · ${item.price || "—"}`,
+          createdAt: item.createdAt,
+        })),
+    ];
+
+    return items.slice(0, 6);
+  }, [analysisRequests, accountRequests, subscriptionRequests]);
+
   const filteredAnalysis = useMemo(() => {
     let list = analysisRequests.filter((req) => matchesAdminStatusFilter(req.status, filter));
 
@@ -1334,9 +1383,11 @@ export default function AdminPage() {
                               setAdminNotificationsOpen(false);
                               if (item.type === "subscription") {
                                 setSubscriptionFilter("pending");
+                                setActiveAdminTab("subscriptions");
                               }
                               if (item.type === "account") {
                                 setAccountFilter("pending");
+                                setActiveAdminTab("accounts");
                               }
                             }}
                             className="w-full rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 text-right transition hover:border-cyan-300 hover:bg-cyan-100"
@@ -1425,46 +1476,46 @@ export default function AdminPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  document.getElementById("analysis-requests")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-                className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
-              >
-                طلبات التحليل
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  document.getElementById("account-requests")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-                className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
-              >
-                إدارة الحسابات
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  document.getElementById("subscription-requests")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-                className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
-              >
-                الاشتراكات
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  document.getElementById("vip-signals")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-                className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_10px_28px_rgba(37,99,235,0.22)] transition hover:brightness-110"
-              >
-                نشر VIP
-              </button>
+              {ADMIN_TABS.filter((tab) => tab.id !== "overview").map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveAdminTab(tab.id)}
+                  className={`rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
+                    tab.id === "vip"
+                      ? "border-blue-200 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 text-white shadow-[0_10px_28px_rgba(37,99,235,0.22)] hover:brightness-110"
+                      : "border-cyan-200 bg-cyan-50 text-slate-950 hover:bg-cyan-100"
+                  }`}
+                >
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </section>
 
+        <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-3 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-4">
+          <div className="flex flex-wrap gap-2">
+            {ADMIN_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveAdminTab(tab.id)}
+                className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                  activeAdminTab === tab.id
+                    ? "border-cyan-300 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 text-white shadow-[0_12px_32px_rgba(37,99,235,0.28)]"
+                    : "border-cyan-100 bg-white/90 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
+                }`}
+              >
+                <span className="ml-2">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {activeAdminTab === "overview" && (
+          <>
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
           <AdminStat title="طلبات التحليل" value={analysisRequests.length} icon="🧠" subtitle="إجمالي الطلبات" />
           <AdminStat title="بانتظار الرد" value={stats.pendingAnalysis} icon="⏳" subtitle="طلبات تحتاج متابعة" tone="orange" />
@@ -1474,7 +1525,58 @@ export default function AdminPage() {
           <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
 
-        <section id="vip-signals" className="space-y-5 scroll-mt-6">
+        <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-2xl font-black text-slate-950">آخر الطلبات الجديدة</h2>
+              <p className="mt-2 text-sm font-bold text-slate-600">أحدث الطلبات التي تحتاج متابعة سريعة.</p>
+            </div>
+            <span className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-800">
+              {recentOverviewItems.length} طلب
+            </span>
+          </div>
+
+          {recentOverviewItems.length === 0 ? (
+            <div className="mt-5 rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/60 p-8 text-center">
+              <p className="text-3xl">✅</p>
+              <p className="mt-3 font-black text-slate-950">لا توجد طلبات جديدة حالياً</p>
+            </div>
+          ) : (
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {recentOverviewItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveAdminTab(item.tab);
+                    if (item.tab === "analysis") setFilter("pending");
+                    if (item.tab === "accounts") setAccountFilter("pending");
+                    if (item.tab === "subscriptions") setSubscriptionFilter("pending");
+                  }}
+                  className="rounded-2xl border border-cyan-100 bg-white/90 p-4 text-right transition hover:border-cyan-300 hover:bg-cyan-50"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-200 bg-cyan-50 text-xl">
+                      {item.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-slate-950">{item.title}</p>
+                      <p className="mt-1 text-sm font-bold text-slate-600">{item.message}</p>
+                      {item.createdAt && (
+                        <p className="mt-2 text-xs font-bold text-slate-400">{item.createdAt}</p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+          </>
+        )}
+
+        {activeAdminTab === "vip" && (
+        <section className="space-y-5">
           <div>
             <h2 className="text-3xl font-black">نشر توصيات VIP</h2>
             <p className="mt-2 text-slate-400">أضف توصية منفصلة لمشتركي Spot أو Futures فقط.</p>
@@ -1535,98 +1637,10 @@ export default function AdminPage() {
             </div>
           </div>
         </section>
+        )}
 
-        <section className="space-y-5">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div>
-              <h2 className="text-3xl font-black">إدارة المستخدمين والاشتراكات</h2>
-              <p className="mt-2 text-slate-400">
-                عرض المستخدمين، تغيير الصلاحية، وتفعيل باقات Spot & Futures.
-              </p>
-            </div>
-            <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100">
-              الوضع الحالي: {dataMode === "secure-api" ? "Secure API" : dataMode === "supabase" ? "Supabase" : "LocalStorage"}
-            </span>
-          </div>
-
-          {users.length === 0 ? (
-            <div className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
-              <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">👥</div>
-              <h3 className="text-2xl font-black">لا يوجد مستخدمون حالياً</h3>
-            </div>
-          ) : (
-            <div className="grid gap-5">
-              {users.map((user) => (
-                <article key={user.id} className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
-                  <div className="grid gap-5 xl:grid-cols-[1fr_auto] xl:items-center">
-                    <div className="flex items-center gap-4">
-                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-300 text-lg font-black shadow-[0_0_30px_rgba(0,163,255,0.25)]">
-                        {(user.username || user.email || "U").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="truncate text-xl font-black text-slate-100">{user.username || "مستخدم"}</h3>
-                        <p className="truncate text-sm text-slate-300">{user.email}</p>
-                        <p className="mt-1 text-xs text-cyan-100/60">{user.telegram || "لا يوجد تليجرام"}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <select
-                        value={user.role || "user"}
-                        onChange={(e) => updateUserRole(user.id, e.target.value)}
-                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
-                      >
-                        <option value="user">user</option>
-                        <option value="admin">admin</option>
-                      </select>
-
-                      <select
-                        value={user.subscription_plan || "بدون اشتراك"}
-                        onChange={(e) => updateUserSubscription(user.id, e.target.value, user.subscription_status || "نشط")}
-                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
-                      >
-                        <option value="بدون اشتراك">بدون اشتراك</option>
-                        <option value="Spot - شهر">Spot - شهر</option>
-                        <option value="Spot - 3 أشهر">Spot - 3 أشهر</option>
-                        <option value="Spot - سنة">Spot - سنة</option>
-                        <option value="Futures - شهر">Futures - شهر</option>
-                        <option value="Futures - 3 أشهر">Futures - 3 أشهر</option>
-                        <option value="Futures - سنة">Futures - سنة</option>
-                      </select>
-
-                      <select
-                        value={user.subscription_status || "غير نشط"}
-                        onChange={(e) => updateUserSubscription(user.id, user.subscription_plan || "بدون اشتراك", e.target.value)}
-                        className="rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 font-bold text-slate-100 outline-none"
-                      >
-                        <option value="غير نشط">غير نشط</option>
-                        <option value="نشط">نشط</option>
-                        <option value="منتهي">منتهي</option>
-                        <option value="موقوف">موقوف</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <p className="text-xs font-bold text-slate-500">الصلاحية</p>
-                      <p className="mt-2 font-black text-cyan-100">{user.role || "user"}</p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <p className="text-xs font-bold text-slate-500">الباقة</p>
-                      <p className="mt-2 font-black text-cyan-100">{user.subscription_plan || "بدون اشتراك"}</p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <p className="text-xs font-bold text-slate-500">حالة الاشتراك</p>
-                      <p className="mt-2 font-black text-cyan-100">{user.subscription_status || "غير نشط"}</p>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-
+        {activeAdminTab === "analysis" && (
+          <>
         <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-4 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-5">
           <div className="flex flex-wrap gap-3">
             {ADMIN_STATUS_FILTERS.map(([key, label]) => (
@@ -1820,8 +1834,11 @@ export default function AdminPage() {
             </div>
           )}
         </section>
+          </>
+        )}
 
-        <section id="account-requests" className="space-y-5 scroll-mt-6">
+        {activeAdminTab === "accounts" && (
+        <section className="space-y-5 scroll-mt-6">
           <div>
             <h2 className="text-3xl font-black text-slate-950">طلبات إدارة الحسابات</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
@@ -1957,7 +1974,10 @@ export default function AdminPage() {
             </div>
           )}
         </section>
-        <section id="subscription-requests" className="space-y-5 scroll-mt-6">
+        )}
+
+        {activeAdminTab === "subscriptions" && (
+        <section className="space-y-5 scroll-mt-6">
           <div>
             <h2 className="text-3xl font-black text-slate-950">طلبات الاشتراكات والدفع</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
@@ -2093,7 +2113,8 @@ export default function AdminPage() {
             </div>
           )}
         </section>
+        )}
       </div>
     </main>
   );
-} 
+}
