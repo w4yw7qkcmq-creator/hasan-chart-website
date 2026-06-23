@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyCronSecret } from "../../../lib/admin-auth";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { processEmailQueue } from "../../../lib/email-queue";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,7 +26,7 @@ function getDaysUntilExpiry(expiresAt) {
   return Math.ceil((expiresTime - Date.now()) / DAY_MS);
 }
 
-async function sendRenewalReminder({ email, planName, daysLeft }) {
+async function queueRenewalReminder({ email, planName, daysLeft }) {
   const title =
     daysLeft === 1
       ? "باقي يوم واحد على انتهاء اشتراكك ⏳"
@@ -44,21 +45,25 @@ async function sendRenewalReminder({ email, planName, daysLeft }) {
     is_read: false,
   });
 
-  await sendTemplateEmail({
+  return {
     to: email,
-    subject: title,
-    title,
-    content: `
+    send: () =>
+      sendTemplateEmail({
+        to: email,
+        subject: title,
+        title,
+        content: `
       <p>مرحباً،</p>
       <p>${message}</p>
       <p>للاستمرار بالوصول إلى توصيات VIP والخدمات المميزة، يمكنك تجديد اشتراكك الآن.</p>
     `,
-    actionText: "تجديد الاشتراك",
-    actionUrl: `${getSiteUrl()}/subscriptions`,
-  });
+        actionText: "تجديد الاشتراك",
+        actionUrl: `${getSiteUrl()}/subscriptions`,
+      }),
+  };
 }
 
-async function sendExpiredNotice({ email, planName }) {
+async function queueExpiredNotice({ email, planName }) {
   await supabase.from("notifications").insert({
     user_email: email,
     title: "انتهى اشتراكك ⚠️",
@@ -67,19 +72,23 @@ async function sendExpiredNotice({ email, planName }) {
     is_read: false,
   });
 
-  await sendTemplateEmail({
+  return {
     to: email,
-    subject: "انتهاء الاشتراك - HasaN CharT World",
-    title: "انتهت صلاحية اشتراكك ⚠️",
-    content: `
+    send: () =>
+      sendTemplateEmail({
+        to: email,
+        subject: "انتهاء الاشتراك - HasaN CharT World",
+        title: "انتهت صلاحية اشتراكك ⚠️",
+        content: `
       <p>انتهت صلاحية الباقة التالية:</p>
       <p style="font-size:20px"><strong>${planName}</strong></p>
       <p>تم إيقاف الوصول إلى خدمات VIP بسبب انتهاء مدة الاشتراك.</p>
       <p>يمكنك تجديد الاشتراك للعودة إلى التوصيات والخدمات المميزة.</p>
     `,
-    actionText: "تجديد الاشتراك",
-    actionUrl: `${getSiteUrl()}/subscriptions`,
-  });
+        actionText: "تجديد الاشتراك",
+        actionUrl: `${getSiteUrl()}/subscriptions`,
+      }),
+  };
 }
 
 export async function GET(request) {
@@ -112,6 +121,7 @@ export async function GET(request) {
 
     let remindersSent = 0;
     let expiredProcessed = 0;
+    const emailJobs = [];
 
     for (const subscription of activeSubscriptions || []) {
       const email = String(subscription.user_email || "").trim().toLowerCase();
@@ -138,7 +148,7 @@ export async function GET(request) {
           .eq("email", email);
 
         if (!subscription.expired_notice_sent) {
-          await sendExpiredNotice({ email, planName });
+          emailJobs.push(await queueExpiredNotice({ email, planName }));
         }
 
         expiredProcessed += 1;
@@ -146,7 +156,9 @@ export async function GET(request) {
       }
 
       if (daysLeft === 3 && !subscription.reminder_3d_sent) {
-        await sendRenewalReminder({ email, planName, daysLeft: 3 });
+        emailJobs.push(
+          await queueRenewalReminder({ email, planName, daysLeft: 3 })
+        );
 
         await supabase
           .from("subscription_requests")
@@ -157,11 +169,24 @@ export async function GET(request) {
       }
     }
 
+    const emailStats =
+      emailJobs.length > 0
+        ? await processEmailQueue(emailJobs, {
+            label: "subscription-expiry",
+          })
+        : {
+            sentCount: 0,
+            failedCount: 0,
+            skippedCount: 0,
+            failedEmails: [],
+          };
+
     return NextResponse.json({
       success: true,
       checked: activeSubscriptions?.length || 0,
       remindersSent,
       expiredProcessed,
+      emailStats,
       now,
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
+import { processEmailQueue } from "../../../../lib/email-queue";
 
 export const dynamic = "force-dynamic";
 
@@ -484,26 +485,28 @@ async function notifyVipSubscribers(supabase, signal) {
       <p style="margin-top:22px;color:#64748b;font-size:13px;line-height:1.8">هذه الرسالة مخصصة للمشتركين في توصيات VIP. يرجى الالتزام بإدارة رأس المال.</p>
     `;
 
-    const emailResults = await Promise.allSettled(
-      recipientEmails.map((email) =>
-        sendTemplateEmail({
-          to: email,
-          subject,
-          title: `🚨 توصية VIP ${label} جديدة`,
-          content: emailContent,
-          actionText: "فتح صفحة التوصيات",
-          actionUrl: signalPageUrl,
-        })
-      )
+    const emailStats = await processEmailQueue(
+      recipientEmails.map((email) => ({
+        to: email,
+        send: () =>
+          sendTemplateEmail({
+            to: email,
+            subject,
+            title: `🚨 توصية VIP ${label} جديدة`,
+            content: emailContent,
+            actionText: "فتح صفحة التوصيات",
+            actionUrl: signalPageUrl,
+          }),
+      })),
+      {
+        label: `vip-${normalizedSignalType}`,
+      }
     );
 
-    emailResults.forEach((result, index) => {
-      if (result.status === "rejected") {
-        console.error("VIP email failed:", {
-          email: recipientEmails[index],
-          error: result.reason?.message || result.reason,
-        });
-      }
+    console.log("VIP signal email queue summary:", {
+      signalType: normalizedSignalType,
+      coin,
+      ...emailStats,
     });
   } catch (error) {
     console.error("VIP subscriber notification error:", error.message || error);
