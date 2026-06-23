@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireSessionUser } from "../../../lib/auth-session";
-import { alertLimiter } from "../../../lib/rate-limit";
+import { alertLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -114,7 +114,7 @@ export async function POST(req) {
       return Response.json(
         {
           success: false,
-          error: "تم إرسال عدد كبير من التنبيهات. يرجى المحاولة لاحقاً.",
+          error: RATE_LIMIT_ERROR,
         },
         { status: 429 }
       );

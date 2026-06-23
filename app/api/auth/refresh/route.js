@@ -1,6 +1,11 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  getClientIp,
+  refreshIpLimiter,
+  RATE_LIMIT_ERROR,
+} from "../../../../lib/rate-limit";
 
 function getSupabaseServerClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,8 +23,18 @@ function getSupabaseServerClient() {
   });
 }
 
-export async function POST() {
+export async function POST(request) {
   try {
+    const clientIp = getClientIp(request);
+    const rateLimitResult = refreshIpLimiter(clientIp);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { success: false, error: RATE_LIMIT_ERROR },
+        { status: 429 }
+      );
+    }
+
     const supabase = getSupabaseServerClient();
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("hc_refresh_token")?.value;

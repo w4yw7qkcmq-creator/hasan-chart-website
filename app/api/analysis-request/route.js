@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { analysisRequestLimiter } from "../../../lib/rate-limit";
+import { analysisRequestLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -295,7 +295,7 @@ export async function POST(req) {
       return Response.json(
         {
           success: false,
-          error: "تم إرسال عدة طلبات خلال وقت قصير. يرجى المحاولة لاحقاً.",
+          error: RATE_LIMIT_ERROR,
         },
         { status: 429 }
       );

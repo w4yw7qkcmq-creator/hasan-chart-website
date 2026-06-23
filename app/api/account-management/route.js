@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
-import { accountManagementLimiter } from "../../../lib/rate-limit";
+import { accountManagementLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -155,7 +155,7 @@ export async function POST(request) {
     if (!rateLimitResult.success) {
       return NextResponse.json(
         {
-          error: "يمكنك إرسال طلب إدارة حساب واحد فقط كل 24 ساعة.",
+          error: RATE_LIMIT_ERROR,
         },
         { status: 429 }
       );

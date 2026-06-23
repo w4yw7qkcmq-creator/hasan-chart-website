@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireSessionUser } from "../../../lib/auth-session";
+import {
+  RATE_LIMIT_ERROR,
+  subscriptionRequestLimiter,
+} from "../../../lib/rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 
 const supabase = createClient(
@@ -56,6 +60,18 @@ export async function POST(request) {
           error: "يجب تسجيل الدخول أولاً.",
         },
         { status: 401 }
+      );
+    }
+
+    const rateLimitResult = subscriptionRequestLimiter(session.id);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: RATE_LIMIT_ERROR,
+        },
+        { status: 429 }
       );
     }
 
