@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
@@ -310,6 +310,8 @@ export default function AdminPage() {
   };
   const [expandedAnalysis, setExpandedAnalysis] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoadedAdminData, setHasLoadedAdminData] = useState(false);
+  const hasLoadedAdminDataRef = useRef(false);
   const [replySending, setReplySending] = useState({});
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const [vipSignalForm, setVipSignalForm] = useState({
@@ -603,23 +605,30 @@ export default function AdminPage() {
       setAccountRequests(formattedAccounts);
       setDataMode("secure-api");
       setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+      hasLoadedAdminDataRef.current = true;
+      setHasLoadedAdminData(true);
     } catch (err) {
       console.error("Admin load error:", err);
-      setUsers(fallbackUsers);
-      setAnalysisRequests([]);
-      setSubscriptionRequests([]);
-      setAccountRequests([]);
-      setDataMode("secure-api");
-      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
 
-      if (!options.silent) {
-        showAdminNotice(
-          err?.name === "AbortError"
-            ? "انتهت مهلة تحميل لوحة الإدارة. جرّب تحديث الصفحة."
-            : err?.message || "فشل تحميل بيانات لوحة الإدارة",
-          "error"
-        );
+      if (options.silent) {
+        return;
       }
+
+      if (!hasLoadedAdminDataRef.current) {
+        setUsers(fallbackUsers);
+        setAnalysisRequests([]);
+        setSubscriptionRequests([]);
+        setAccountRequests([]);
+        setDataMode("secure-api");
+        setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+      }
+
+      showAdminNotice(
+        err?.name === "AbortError"
+          ? "انتهت مهلة تحميل لوحة الإدارة. جرّب تحديث الصفحة."
+          : err?.message || "فشل تحميل بيانات لوحة الإدارة",
+        "error"
+      );
     } finally {
       setIsRefreshing(false);
     }
