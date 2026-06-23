@@ -95,10 +95,11 @@ export default function MyAnalysisPage() {
       if (!request?.id || !currentUser?.email || request.replyImage) return;
 
       const response = await fetch(
-        `/api/my-analysis-image?id=${encodeURIComponent(request.id)}&email=${encodeURIComponent(currentUser.email)}`,
+        `/api/my-analysis-image?id=${encodeURIComponent(request.id)}`,
         {
           method: "GET",
           cache: "no-store",
+          credentials: "include",
         }
       );
 
@@ -153,11 +154,10 @@ export default function MyAnalysisPage() {
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await fetch(
-        `/api/my-analysis?email=${encodeURIComponent(user.email)}`,
-        {
+      const response = await fetch("/api/my-analysis", {
           method: "GET",
           cache: "no-store",
+          credentials: "include",
           signal: controller.signal,
         }
       );
