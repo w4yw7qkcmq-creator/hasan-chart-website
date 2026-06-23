@@ -108,7 +108,7 @@ export async function POST(req) {
       );
     }
 
-    const rateLimitResult = alertLimiter(session.id);
+    const rateLimitResult = await alertLimiter(session.id);
 
     if (!rateLimitResult.success) {
       return Response.json(

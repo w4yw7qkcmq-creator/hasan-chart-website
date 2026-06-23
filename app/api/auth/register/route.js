@@ -7,7 +7,7 @@ import {
 
 export async function POST(request) {
   const clientIp = getClientIp(request);
-  const rateLimitResult = registerIpLimiter(clientIp);
+  const rateLimitResult = await registerIpLimiter(clientIp);
 
   if (!rateLimitResult.success) {
     return NextResponse.json(

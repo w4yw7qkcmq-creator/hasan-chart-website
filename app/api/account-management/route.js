@@ -150,7 +150,7 @@ export async function POST(request) {
       );
     }
 
-    const rateLimitResult = accountManagementLimiter(user.id);
+    const rateLimitResult = await accountManagementLimiter(user.id);
 
     if (!rateLimitResult.success) {
       return NextResponse.json(

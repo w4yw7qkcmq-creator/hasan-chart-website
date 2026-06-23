@@ -39,7 +39,7 @@ function getSafeUser(user) {
 export async function POST(request) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimitResult = loginIpLimiter(clientIp);
+    const rateLimitResult = await loginIpLimiter(clientIp);
 
     if (!rateLimitResult.success) {
       return NextResponse.json({ error: RATE_LIMIT_ERROR }, { status: 429 });

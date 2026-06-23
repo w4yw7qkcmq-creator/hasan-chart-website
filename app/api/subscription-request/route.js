@@ -63,7 +63,7 @@ export async function POST(request) {
       );
     }
 
-    const rateLimitResult = subscriptionRequestLimiter(session.id);
+    const rateLimitResult = await subscriptionRequestLimiter(session.id);
 
     if (!rateLimitResult.success) {
       return NextResponse.json(

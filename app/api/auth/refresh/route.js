@@ -26,7 +26,7 @@ function getSupabaseServerClient() {
 export async function POST(request) {
   try {
     const clientIp = getClientIp(request);
-    const rateLimitResult = refreshIpLimiter(clientIp);
+    const rateLimitResult = await refreshIpLimiter(clientIp);
 
     if (!rateLimitResult.success) {
       return NextResponse.json(

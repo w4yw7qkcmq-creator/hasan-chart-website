@@ -289,7 +289,7 @@ export async function POST(req) {
       );
     }
 
-    const rateLimitResult = analysisRequestLimiter(user.id);
+    const rateLimitResult = await analysisRequestLimiter(user.id);
 
     if (!rateLimitResult.success) {
       return Response.json(
