@@ -3648,6 +3648,8 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
   }
 }
 
+console.log("WORKER_BOOT {\"worker\":\"worker/news-worker.js\",\"service\":\"hasan-chart-news-worker\",\"priceAlertsEnabled\":false,\"note\":\"This service does NOT send price alert emails. Use worker/index.js for price_alerts.\"}");
+
 console.log("🚀 News Worker Started...");
 
 fetchForexNews();

@@ -3,6 +3,8 @@ const MIN_DELAY_MS = 350;
 const RATE_LIMIT_RETRY_WAIT_MS = 10000;
 const MAX_RETRIES = 3;
 
+const { logWorkerEvent } = require("./alert-logger");
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -72,7 +74,7 @@ async function sendWithRetry(sendFn, { to, label, attempt = 0 }) {
   }
 
   if (result?.success !== false) {
-    console.log("EMAIL_SEND_SUCCESS", {
+    logWorkerEvent("EMAIL_SEND_SUCCESS", {
       to,
       label,
       attempt,
@@ -85,7 +87,7 @@ async function sendWithRetry(sendFn, { to, label, attempt = 0 }) {
   if (isRateLimitError(result) && attempt < MAX_RETRIES) {
     const nextAttempt = attempt + 1;
 
-    console.warn("EMAIL_SEND_RETRY", {
+    logWorkerEvent("EMAIL_SEND_RETRY", {
       to,
       label,
       attempt: nextAttempt,
@@ -100,7 +102,7 @@ async function sendWithRetry(sendFn, { to, label, attempt = 0 }) {
     return sendWithRetry(sendFn, { to, label, attempt: nextAttempt });
   }
 
-  console.error("EMAIL_SEND_FAILED", {
+  logWorkerEvent("EMAIL_SEND_FAILED", {
     to,
     label,
     attempt,
@@ -130,8 +132,9 @@ async function processEmailQueue(items, options = {}) {
     failedEmails: [],
   };
 
-  console.log("EMAIL_QUEUE_STARTED", {
+  logWorkerEvent("EMAIL_QUEUE_STARTED", {
     label,
+    worker: options.worker || "worker/email-queue.js",
     total: queueItems.length,
     maxPerSecond: limiter.maxPerSecond,
     minDelayMs: limiter.minDelayMs,
@@ -168,8 +171,9 @@ async function processEmailQueue(items, options = {}) {
     });
   }
 
-  console.log("EMAIL_QUEUE_FINISHED", {
+  logWorkerEvent("EMAIL_QUEUE_FINISHED", {
     label,
+    worker: options.worker || "worker/email-queue.js",
     ...stats,
   });
 

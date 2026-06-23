@@ -22,6 +22,10 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 const { processEmailQueue } = require("./email-queue");
+const { logWorkerEvent } = require("./alert-logger");
+
+const WORKER_ENTRY = "worker/index.js";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v2";
 
 const CHECK_INTERVAL_MS = 12000;
 const MAX_ALERTS_PER_RUN = 20;
@@ -669,8 +673,30 @@ const sendTriggeredAlertEmail = async ({
   condition,
   targetPrice,
   currentPrice,
+  alertId = null,
 }) => {
+  const coinLabel = formatCoinPair(coin);
+
+  logWorkerEvent("ALERT_EMAIL_SEND_START", {
+    worker: WORKER_ENTRY,
+    alertId,
+    email,
+    coin: coinLabel,
+    targetPrice,
+    requestedPrice: targetPrice,
+    currentPrice,
+    condition,
+    conditionLabel: getConditionLabel(condition),
+  });
+
   if (!resendApiKey || !email) {
+    logWorkerEvent("ALERT_EMAIL_SEND_SKIPPED", {
+      worker: WORKER_ENTRY,
+      alertId,
+      email,
+      reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
+    });
+
     return {
       success: false,
       skipped: true,
@@ -679,7 +705,6 @@ const sendTriggeredAlertEmail = async ({
     };
   }
 
-  const coinLabel = formatCoinPair(coin);
   const safeCoin = escapeHtml(coinLabel);
   const conditionLabel = getConditionLabel(condition);
   const safeConditionLabel = escapeHtml(conditionLabel);
@@ -739,6 +764,17 @@ const sendTriggeredAlertEmail = async ({
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    logWorkerEvent("ALERT_EMAIL_SEND_FAILED", {
+      worker: WORKER_ENTRY,
+      alertId,
+      email,
+      coin: coinLabel,
+      targetPrice,
+      currentPrice,
+      status: response.status,
+      error: data?.message || response.statusText || "Email provider error",
+    });
+
     return {
       success: false,
       sent: false,
@@ -747,6 +783,16 @@ const sendTriggeredAlertEmail = async ({
       result: data,
     };
   }
+
+  logWorkerEvent("ALERT_EMAIL_SENT", {
+    worker: WORKER_ENTRY,
+    alertId,
+    email,
+    coin: coinLabel,
+    targetPrice,
+    currentPrice,
+    resendId: data?.id || null,
+  });
 
   return {
     success: true,
@@ -774,7 +820,9 @@ const shouldTriggerAlert = ({ condition, targetPrice, currentPrice }) => {
 async function checkPriceAlerts() {
   const startedAt = new Date().toISOString();
 
-  console.log("ALERT_CHECK_STARTED", {
+  logWorkerEvent("ALERT_CHECK_STARTED", {
+    worker: WORKER_ENTRY,
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
     timestamp: startedAt,
     intervalMs: CHECK_INTERVAL_MS,
   });
@@ -797,15 +845,19 @@ async function checkPriceAlerts() {
     .limit(MAX_ALERTS_PER_RUN);
 
   if (error) {
-    console.log("ALERT_CHECK_FINISHED", {
+    logWorkerEvent("ALERT_CHECK_FINISHED", {
       ...summary,
+      worker: WORKER_ENTRY,
       error: error.message,
     });
     return;
   }
 
   if (!alerts || alerts.length === 0) {
-    console.log("ALERT_CHECK_FINISHED", summary);
+    logWorkerEvent("ALERT_CHECK_FINISHED", {
+      ...summary,
+      worker: WORKER_ENTRY,
+    });
     return;
   }
 
@@ -859,7 +911,8 @@ async function checkPriceAlerts() {
 
         const conditionLabel = getConditionLabel(condition);
 
-        console.log("ALERT_TRIGGERED", {
+        logWorkerEvent("ALERT_TRIGGERED", {
+          worker: WORKER_ENTRY,
           alertId: alert.id,
           email: userEmail,
           coin: formatCoinPair(coin),
@@ -877,7 +930,7 @@ async function checkPriceAlerts() {
           condition,
         });
 
-        const { error: notificationError } = await supabase
+        const { data: notificationRow, error: notificationError } = await supabase
           .from("notifications")
           .insert({
             user_email: userEmail,
@@ -885,10 +938,13 @@ async function checkPriceAlerts() {
             message: notificationMessage,
             type: "price-alert",
             is_read: false,
-          });
+          })
+          .select("id")
+          .single();
 
         if (notificationError) {
-          console.error("ALERT_NOTIFICATION_CREATED", {
+          logWorkerEvent("ALERT_NOTIFICATION_CREATED", {
+            worker: WORKER_ENTRY,
             alertId: alert.id,
             email: userEmail,
             success: false,
@@ -896,9 +952,11 @@ async function checkPriceAlerts() {
           });
         } else {
           summary.notificationsCreated += 1;
-          console.log("ALERT_NOTIFICATION_CREATED", {
+          logWorkerEvent("ALERT_NOTIFICATION_CREATED", {
+            worker: WORKER_ENTRY,
             alertId: alert.id,
             email: userEmail,
+            notificationId: notificationRow?.id || null,
             success: true,
           });
         }
@@ -913,7 +971,8 @@ async function checkPriceAlerts() {
           .eq("id", alert.id);
 
         if (updateError) {
-          console.error("ALERT_STATUS_UPDATE_FAILED", {
+          logWorkerEvent("ALERT_STATUS_UPDATE_FAILED", {
+            worker: WORKER_ENTRY,
             alertId: alert.id,
             error: updateError.message,
           });
@@ -923,6 +982,7 @@ async function checkPriceAlerts() {
 
         emailJobs.push({
           to: userEmail,
+          alertId: alert.id,
           send: () =>
             sendTriggeredAlertEmail({
               email: userEmail,
@@ -930,16 +990,20 @@ async function checkPriceAlerts() {
               condition,
               targetPrice,
               currentPrice,
+              alertId: alert.id,
             }),
         });
 
         summary.emailsQueued += 1;
         summary.triggered += 1;
 
-        console.log("ALERT_EMAIL_QUEUED", {
+        logWorkerEvent("ALERT_EMAIL_QUEUED", {
+          worker: WORKER_ENTRY,
           alertId: alert.id,
           email: userEmail,
           coin: formatCoinPair(coin),
+          targetPrice,
+          currentPrice,
         });
 
         triggeredItems.push({
@@ -949,9 +1013,10 @@ async function checkPriceAlerts() {
         });
       }
     } catch (error) {
-      console.error("ALERT_COIN_CHECK_FAILED", {
+      logWorkerEvent("ALERT_COIN_CHECK_FAILED", {
+        worker: WORKER_ENTRY,
         coin,
-        error: error?.message || error,
+        error: error?.message || String(error),
       });
     }
   }
@@ -959,11 +1024,13 @@ async function checkPriceAlerts() {
   if (emailJobs.length > 0) {
     summary.emailStats = await processEmailQueue(emailJobs, {
       label: "price-alerts",
+      worker: WORKER_ENTRY,
     });
   }
 
-  console.log("ALERT_CHECK_FINISHED", {
+  logWorkerEvent("ALERT_CHECK_FINISHED", {
     ...summary,
+    worker: WORKER_ENTRY,
     triggeredItems,
     finishedAt: new Date().toISOString(),
   });
@@ -974,7 +1041,10 @@ app.get("/health", async (_req, res) => {
     success: true,
     status: "online",
     service: "hasan-chart-worker",
+    workerEntry: WORKER_ENTRY,
+    priceAlertsModuleVersion: PRICE_ALERTS_MODULE_VERSION,
     alertsWorker: true,
+    checkIntervalMs: CHECK_INTERVAL_MS,
     timestamp: new Date().toISOString(),
   });
 });
@@ -1061,10 +1131,24 @@ app.get("/api/instant-analysis/:jobId", async (req, res) => {
 });
 
 app.listen(PORT, () => {
+  logWorkerEvent("WORKER_BOOT", {
+    worker: WORKER_ENTRY,
+    service: "hasan-chart-price-alerts-worker",
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    port: PORT,
+    checkIntervalMs: CHECK_INTERVAL_MS,
+    priceAlertsEnabled: true,
+    note: "Price alert emails are sent ONLY from this worker entry (worker/index.js), not news-worker.js",
+  });
+
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
 });
 
 setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
 
-console.log("🚀 Price Alerts + AI Worker started...");
+logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
+  worker: WORKER_ENTRY,
+  intervalMs: CHECK_INTERVAL_MS,
+});
+
 checkPriceAlerts();
