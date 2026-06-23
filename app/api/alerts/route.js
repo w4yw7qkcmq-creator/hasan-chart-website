@@ -34,6 +34,24 @@ const normalizeSymbol = (value) => {
     .replace(/[^A-Z0-9]/g, "");
 };
 
+const toOkxInstId = (symbol) => {
+  const cleanSymbol = normalizeSymbol(symbol);
+
+  if (!cleanSymbol) {
+    throw new Error("EMPTY_SYMBOL");
+  }
+
+  const base = cleanSymbol.endsWith("USDT")
+    ? cleanSymbol.slice(0, -4)
+    : cleanSymbol;
+
+  if (!base) {
+    throw new Error("EMPTY_SYMBOL");
+  }
+
+  return `${base}-USDT`;
+};
+
 const getOkxMarketPrice = async (symbol) => {
   const cleanSymbol = normalizeSymbol(symbol);
 
@@ -41,7 +59,7 @@ const getOkxMarketPrice = async (symbol) => {
     throw new Error("EMPTY_SYMBOL");
   }
 
-  const okxSymbol = cleanSymbol.replace("USDT", "-USDT");
+  const okxSymbol = toOkxInstId(symbol);
 
   const response = await fetch(
     `https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(okxSymbol)}`,

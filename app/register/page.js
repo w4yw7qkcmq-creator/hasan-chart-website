@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import { useAppModal } from "../components/AppModalProvider";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
@@ -61,6 +62,7 @@ function RegisterBrandMark() {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { showAppModal } = useAppModal();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [telegram, setTelegram] = useState("");
@@ -132,22 +134,38 @@ export default function RegisterPage() {
     const cleanTelegram = telegram.trim();
 
     if (!cleanUsername || !cleanEmail || !password || !confirmPassword) {
-      alert("املأ جميع الحقول المطلوبة");
+      showAppModal({
+        type: "warning",
+        title: "بيانات ناقصة",
+        message: "املأ جميع الحقول المطلوبة",
+      });
       return;
     }
 
     if (password.length < 6) {
-      alert("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+      showAppModal({
+        type: "warning",
+        title: "كلمة مرور ضعيفة",
+        message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("كلمة المرور وتأكيدها غير متطابقين");
+      showAppModal({
+        type: "warning",
+        title: "كلمات المرور غير متطابقة",
+        message: "كلمة المرور وتأكيدها غير متطابقين",
+      });
       return;
     }
 
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      alert("يرجى تأكيد أنك لست روبوت قبل إنشاء الحساب");
+      showAppModal({
+        type: "warning",
+        title: "تحقق أمني مطلوب",
+        message: "يرجى تأكيد أنك لست روبوت قبل إنشاء الحساب",
+      });
       return;
     }
 
@@ -156,7 +174,11 @@ export default function RegisterPage() {
     const captchaCheck = await verifyTurnstileToken(turnstileToken);
 
     if (!captchaCheck.ok) {
-      alert(captchaCheck.error);
+      showAppModal({
+        type: "error",
+        title: "فشل التحقق الأمني",
+        message: captchaCheck.error,
+      });
       setLoading(false);
       resetTurnstile();
       return;
@@ -176,13 +198,22 @@ export default function RegisterPage() {
       });
 
       if (error) {
-        alert(error.message || "حدث خطأ أثناء إنشاء الحساب");
+        showAppModal({
+          type: "error",
+          title: "تعذر إنشاء الحساب",
+          message: error.message || "حدث خطأ أثناء إنشاء الحساب",
+        });
         setLoading(false);
         resetTurnstile();
         return;
       }
 
-      alert("تم إنشاء الحساب بنجاح ✅\n\nأرسلنا رابط تفعيل إلى بريدك الإلكتروني.\nقم بتفعيل الحساب أولاً ثم سجل الدخول.");
+      showAppModal({
+        type: "success",
+        title: "تم إنشاء الحساب بنجاح",
+        message:
+          "أرسلنا رابط تفعيل إلى بريدك الإلكتروني.\nقم بتفعيل الحساب أولاً ثم سجل الدخول.",
+      });
 
       setUsername("");
       setEmail("");
@@ -194,7 +225,11 @@ export default function RegisterPage() {
       router.push("/login");
       return;
     } catch (err) {
-      alert("حدث خطأ غير متوقع أثناء إنشاء الحساب");
+      showAppModal({
+        type: "error",
+        title: "تعذر إنشاء الحساب",
+        message: "حدث خطأ غير متوقع أثناء إنشاء الحساب",
+      });
       resetTurnstile();
     } finally {
       setLoading(false);

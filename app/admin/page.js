@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import AppModal from "../components/AppModal";
 
 function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
   const glow =
@@ -276,6 +278,7 @@ export default function AdminPage() {
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
   const [lastNotificationIds, setLastNotificationIds] = useState([]);
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
+  const adminNotificationsRef = useRef(null);
   const updateRequestStatus = async (table, requestId, newStatus) => {
     const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${getAdminStatusLabel(newStatus)}؟`);
     if (!confirmed) return;
@@ -386,6 +389,41 @@ export default function AdminPage() {
       };
     });
   };
+
+  useEffect(() => {
+    if (!adminNotificationsOpen) return;
+
+    const handlePointerDown = (event) => {
+      if (
+        adminNotificationsRef.current &&
+        !adminNotificationsRef.current.contains(event.target)
+      ) {
+        setAdminNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [adminNotificationsOpen]);
+
+  useEffect(() => {
+    return () => {
+      setProofPreview(null);
+      setAdminNotificationsOpen(false);
+      setAdminNotice((current) => ({ ...current, open: false }));
+      setAdminConfirm((current) => {
+        if (typeof current.resolve === "function") {
+          current.resolve(false);
+        }
+
+        return {
+          open: false,
+          message: "",
+          resolve: null,
+        };
+      });
+    };
+  }, []);
 
   // Helper for admin API calls with auto session refresh
   const adminFetch = async (url, options = {}) => {
@@ -1155,78 +1193,58 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
-      {adminNotice.open && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-4 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
-            <div className={`mx-auto mb-5 grid h-24 w-24 place-items-center rounded-full border-4 ${adminNotice.type === "error" ? "border-red-400 text-red-500 shadow-[0_0_55px_rgba(239,68,68,0.25)]" : "border-emerald-400 text-emerald-500 shadow-[0_0_55px_rgba(52,211,153,0.35)]"}`}>
-              <span className="text-5xl font-black">{adminNotice.type === "error" ? "!" : "✓"}</span>
-            </div>
-            <h3 className="text-3xl font-black leading-tight">{adminNotice.title}</h3>
-            <p className="mt-4 leading-8 text-slate-600">{adminNotice.message}</p>
-            <button
-              onClick={() => setAdminNotice((current) => ({ ...current, open: false }))}
-              className="mt-7 rounded-2xl px-8 py-3 text-lg font-black text-blue-600 transition hover:bg-blue-50"
-            >
-              حسناً
-            </button>
-          </div>
-        </div>
-      )}
+    <main className="relative z-0 overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+      <AppModal
+        open={adminNotice.open}
+        type={adminNotice.type === "error" ? "error" : "success"}
+        title={adminNotice.title}
+        message={adminNotice.message}
+        onClose={() => setAdminNotice((current) => ({ ...current, open: false }))}
+      />
 
-      {proofPreview && isValidPreviewUrl(proofPreview) && (
-        <div
-          className="fixed inset-0 z-[9999] flex flex-col bg-slate-950/75 backdrop-blur-md"
-          onClick={() => setProofPreview(null)}
-        >
-          <div className="flex shrink-0 items-center justify-between gap-4 border-b border-cyan-200/70 bg-white/95 px-4 py-4 md:px-6">
-            <p className="text-lg font-black text-slate-950">معاينة الصورة</p>
-            <button
-              type="button"
+      {proofPreview && isValidPreviewUrl(proofPreview) && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="pointer-events-auto fixed inset-0 z-[200] flex flex-col bg-slate-950/75 backdrop-blur-md"
               onClick={() => setProofPreview(null)}
-              className="rounded-2xl border border-cyan-200 bg-white px-6 py-3 font-black text-slate-950 shadow-[0_10px_30px_rgba(14,165,233,0.12)] transition hover:bg-cyan-50"
             >
-              إغلاق
-            </button>
-          </div>
-          <div
-            className="flex flex-1 items-center justify-center overflow-auto p-4 md:p-8"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={proofPreview}
-              alt="معاينة الصورة"
-              className="max-h-[calc(100vh-88px)] max-w-full rounded-2xl border border-cyan-100 bg-white object-contain shadow-[0_20px_70px_rgba(14,165,233,0.2)]"
-            />
-          </div>
-        </div>
-      )}
+              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-cyan-200/70 bg-white/95 px-4 py-4 md:px-6">
+                <p className="text-lg font-black text-slate-950">معاينة الصورة</p>
+                <button
+                  type="button"
+                  onClick={() => setProofPreview(null)}
+                  className="rounded-2xl border border-cyan-200 bg-white px-6 py-3 font-black text-slate-950 shadow-[0_10px_30px_rgba(14,165,233,0.12)] transition hover:bg-cyan-50"
+                >
+                  إغلاق
+                </button>
+              </div>
+              <div
+                className="flex flex-1 items-center justify-center overflow-auto p-4 md:p-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img
+                  src={proofPreview}
+                  alt="معاينة الصورة"
+                  className="max-h-[calc(100vh-88px)] max-w-full rounded-2xl border border-cyan-100 bg-white object-contain shadow-[0_20px_70px_rgba(14,165,233,0.2)]"
+                />
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
-      {adminConfirm.open && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 px-4 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
-            <div className="mx-auto mb-5 grid h-24 w-24 place-items-center rounded-full border-4 border-amber-400 text-amber-500 shadow-[0_0_55px_rgba(245,158,11,0.25)]">
-              <span className="text-5xl font-black">؟</span>
-            </div>
-            <h3 className="text-3xl font-black leading-tight">تأكيد العملية</h3>
-            <p className="mt-4 leading-8 text-slate-600">{adminConfirm.message}</p>
-            <div className="mt-7 grid grid-cols-2 gap-3">
-              <button
-                onClick={() => closeAdminConfirm(false)}
-                className="rounded-2xl border border-slate-200 bg-slate-100 px-6 py-3 font-black text-slate-700 transition hover:bg-slate-200"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={() => closeAdminConfirm(true)}
-                className="rounded-2xl bg-gradient-to-l from-red-700 via-red-500 to-rose-400 px-6 py-3 font-black text-white shadow-[0_14px_38px_rgba(239,68,68,0.32)] transition hover:brightness-110"
-              >
-                تأكيد
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AppModal
+        open={adminConfirm.open}
+        type="warning"
+        title="تأكيد العملية"
+        message={adminConfirm.message}
+        mode="confirm"
+        confirmText="تأكيد"
+        cancelText="إلغاء"
+        onConfirm={() => closeAdminConfirm(true)}
+        onCancel={() => closeAdminConfirm(false)}
+      />
+
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
 
@@ -1277,7 +1295,7 @@ export default function AdminPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="relative">
+              <div className="relative" ref={adminNotificationsRef}>
                 <button
                   type="button"
                   onClick={() => setAdminNotificationsOpen((prev) => !prev)}
@@ -1292,7 +1310,7 @@ export default function AdminPage() {
                 </button>
 
                 {adminNotificationsOpen && (
-                  <div className="fixed left-1/2 top-24 z-[9999] w-[min(92vw,520px)] -translate-x-1/2 overflow-hidden rounded-[28px] border border-cyan-200 bg-white/95 p-4 text-right text-slate-950 shadow-[0_24px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+                  <div className="absolute right-0 top-full z-[140] mt-3 w-[min(92vw,520px)] overflow-hidden rounded-[28px] border border-cyan-200 bg-white/95 p-4 text-right text-slate-950 shadow-[0_24px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
                     <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
                       <h3 className="text-lg font-black text-slate-950">مركز إشعارات الأدمن</h3>
                       <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-blacktext-cyan-200">

@@ -1,11 +1,12 @@
 
-
 "use client";
 
 import { useState } from "react";
+import { useAppModal } from "./AppModalProvider";
 
 export default function CopyArticleButton({ url }) {
   const [copied, setCopied] = useState(false);
+  const { showAppModal } = useAppModal();
 
   async function handleCopy() {
     try {
@@ -13,7 +14,11 @@ export default function CopyArticleButton({ url }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch (error) {
-      window.prompt("انسخ رابط الخبر:", url);
+      showAppModal({
+        type: "info",
+        title: "انسخ رابط الخبر",
+        message: url,
+      });
     }
   }
 

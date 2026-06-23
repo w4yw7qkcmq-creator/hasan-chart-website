@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import AppModal from "../components/AppModal";
 
 const plans = [
   {
@@ -317,35 +318,13 @@ export default function SubscriptionsPage() {
   return (
     <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
       {notification && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/55 px-5 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[34px] border border-white/70 bg-white p-8 text-center text-slate-950 shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
-            <div
-              className={`mx-auto mb-6 grid h-24 w-24 place-items-center rounded-full border-[6px] text-5xl shadow-[0_0_50px_rgba(16,185,129,0.22)] ${
-                notification.type === "success"
-                  ? "border-emerald-400 text-emerald-500"
-                  : "border-red-400 text-red-500"
-              }`}
-            >
-              {notification.type === "success" ? "✓" : "!"}
-            </div>
-
-            <h3 className="text-3xl font-black leading-relaxed text-slate-950">
-              {notification.title}
-            </h3>
-
-            <p className="mx-auto mt-4 max-w-sm text-lg font-bold leading-9 text-slate-600">
-              {notification.message}
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setNotification(null)}
-              className="mt-8 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-8 py-3 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.28)] transition hover:scale-[1.02]"
-            >
-              حسناً
-            </button>
-          </div>
-        </div>
+        <AppModal
+          open={Boolean(notification)}
+          type={notification.type === "success" ? "success" : notification.type === "warning" ? "warning" : "error"}
+          title={notification.title}
+          message={notification.message}
+          onClose={() => setNotification(null)}
+        />
       )}
       {selectedPlan && (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-950/60 px-5 backdrop-blur-md">

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import { useAppModal } from "../components/AppModalProvider";
 
 function BrandMark({ size = "lg" }) {
   const box = size === "sm" ? "h-16 w-16" : "h-24 w-24";
@@ -74,6 +75,7 @@ const verifyTurnstileToken = async (token) => {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { showAppModal } = useAppModal();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
@@ -156,12 +158,20 @@ export default function LoginPage() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail || !password) {
-      alert("اكتب البريد الإلكتروني وكلمة المرور");
+      showAppModal({
+        type: "warning",
+        title: "بيانات ناقصة",
+        message: "اكتب البريد الإلكتروني وكلمة المرور",
+      });
       return;
     }
 
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      alert("يرجى تأكيد أنك لست روبوت قبل تسجيل الدخول");
+      showAppModal({
+        type: "warning",
+        title: "تحقق أمني مطلوب",
+        message: "يرجى تأكيد أنك لست روبوت قبل تسجيل الدخول",
+      });
       return;
     }
 
@@ -170,7 +180,11 @@ export default function LoginPage() {
     const captchaCheck = await verifyTurnstileToken(turnstileToken);
 
     if (!captchaCheck.ok) {
-      alert(captchaCheck.error);
+      showAppModal({
+        type: "error",
+        title: "فشل التحقق الأمني",
+        message: captchaCheck.error,
+      });
       setLoading(false);
       setTurnstileToken("");
       if (window.turnstile && turnstileWidgetId.current !== null) {
@@ -200,7 +214,11 @@ export default function LoginPage() {
       const user = result?.user || null;
 
       if (error || !user) {
-        alert(error || "بيانات الدخول غير صحيحة");
+        showAppModal({
+          type: "error",
+          title: "فشل تسجيل الدخول",
+          message: error || "بيانات الدخول غير صحيحة",
+        });
         setLoading(false);
         setTurnstileToken("");
         if (window.turnstile && turnstileWidgetId.current !== null) {
@@ -230,7 +248,11 @@ export default function LoginPage() {
       window.location.href = role === "admin" ? "/admin" : "/my-dashboard";
     } catch (err) {
       console.error("Login error:", err);
-      alert("حدث خطأ أثناء تسجيل الدخول. جرّب مرة ثانية.");
+      showAppModal({
+        type: "error",
+        title: "فشل تسجيل الدخول",
+        message: "حدث خطأ أثناء تسجيل الدخول. جرّب مرة ثانية.",
+      });
       setLoading(false);
       setTurnstileToken("");
       if (window.turnstile && turnstileWidgetId.current !== null) {
@@ -243,7 +265,11 @@ export default function LoginPage() {
     const cleanEmail = (resetEmail || email).trim().toLowerCase();
 
     if (!cleanEmail) {
-      alert("اكتب البريد الإلكتروني أولاً");
+      showAppModal({
+        type: "warning",
+        title: "بيانات ناقصة",
+        message: "اكتب البريد الإلكتروني أولاً",
+      });
       return;
     }
 
@@ -256,11 +282,19 @@ export default function LoginPage() {
     setResetLoading(false);
 
     if (error) {
-      alert("حدث خطأ أثناء إرسال رابط تغيير كلمة المرور");
+      showAppModal({
+        type: "error",
+        title: "تعذر إرسال الرابط",
+        message: "حدث خطأ أثناء إرسال رابط تغيير كلمة المرور",
+      });
       return;
     }
 
-    alert("تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني");
+    showAppModal({
+      type: "success",
+      title: "تم إرسال الرابط",
+      message: "تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني",
+    });
   };
 
   return (

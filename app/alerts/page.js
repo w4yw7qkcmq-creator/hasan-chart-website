@@ -1,5 +1,7 @@
 "use client";
+
 import { useEffect, useState } from "react";
+import AppModal from "../components/AppModal";
 
 export default function Alerts() {
   const [coin, setCoin] = useState("");
@@ -7,7 +9,7 @@ export default function Alerts() {
   const [condition, setCondition] = useState("above");
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [modal, setModal] = useState({ open: false, type: "info", title: "", message: "" });
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -19,13 +21,21 @@ export default function Alerts() {
     }
   }, []);
 
+  const showModal = ({ type, title, message }) => {
+    setModal({ open: true, type, title, message });
+  };
+
   const handleAddAlert = async (e) => {
     e.preventDefault();
 
     if (loading) return;
 
     if (!currentUser?.email) {
-      setMessage("يجب تسجيل الدخول أولاً قبل إنشاء تنبيه سعري.");
+      showModal({
+        type: "warning",
+        title: "يجب تسجيل الدخول",
+        message: "يجب تسجيل الدخول أولاً قبل إنشاء تنبيه سعري.",
+      });
       return;
     }
 
@@ -33,12 +43,15 @@ export default function Alerts() {
     const cleanPrice = String(price || "").trim();
 
     if (!cleanCoin || !cleanPrice) {
-      setMessage("اكتب اسم العملة والسعر المستهدف.");
+      showModal({
+        type: "warning",
+        title: "بيانات ناقصة",
+        message: "اكتب اسم العملة والسعر المستهدف.",
+      });
       return;
     }
 
     setLoading(true);
-    setMessage("");
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 9000);
@@ -79,15 +92,22 @@ export default function Alerts() {
       setCoin("");
       setPrice("");
       setCondition("above");
-      setMessage(result?.message || "✅ تم إضافة التنبيه بنجاح، وسيصلك إيميل فقط عند تحقق السعر.");
+      showModal({
+        type: "success",
+        title: "تم إضافة التنبيه بنجاح",
+        message: result?.message || "سيتم إرسال الإيميل فقط عند تحقق السعر.",
+      });
     } catch (err) {
       console.error("Alert API error:", err);
 
-      setMessage(
-        err?.name === "AbortError"
-          ? "السيرفر لم يرد خلال 9 ثواني. جرّب مرة ثانية."
-          : err?.message || "حدث خطأ أثناء إضافة التنبيه"
-      );
+      showModal({
+        type: "error",
+        title: "تعذر إضافة التنبيه",
+        message:
+          err?.name === "AbortError"
+            ? "السيرفر لم يرد خلال 9 ثواني. جرّب مرة ثانية."
+            : err?.message || "حدث خطأ أثناء إضافة التنبيه",
+      });
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);
@@ -96,6 +116,14 @@ export default function Alerts() {
 
   return (
     <main className="min-h-screen bg-[#020617] px-4 py-12 text-white">
+      <AppModal
+        open={modal.open}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        onClose={() => setModal((current) => ({ ...current, open: false }))}
+      />
+
       <div className="mx-auto max-w-xl space-y-6">
         <h1 className="text-3xl font-bold">التنبيهات السعرية</h1>
         <p className="text-slate-400">
@@ -113,7 +141,7 @@ export default function Alerts() {
             type="text"
             value={coin}
             onChange={(e) => setCoin(e.target.value)}
-            placeholder="اسم العملة (مثال: BTCUSDT)"
+            placeholder="اسم العملة (مثال: BTC أو BTCUSDT)"
             required
             className="w-full rounded-2xl border border-white/10 bg-[#111827] p-4 text-white outline-none"
           />
@@ -135,12 +163,6 @@ export default function Alerts() {
             <option value="above">عند الصعود فوق السعر</option>
             <option value="below">عند الهبوط تحت السعر</option>
           </select>
-
-          {message && (
-            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 p-4 text-center text-sm font-bold text-cyan-100">
-              {message}
-            </div>
-          )}
 
           <button
             type="submit"

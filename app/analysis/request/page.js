@@ -9,6 +9,7 @@ export default function RequestAnalysis() {
   const [submitting, setSubmitting] = useState(false);
   const [modal, setModal] = useState({
     open: false,
+    type: "success",
     title: "تم إرسال الطلب بنجاح",
     message: "تم إرسال طلب التحليل وسيتم إعلامك عند جاهزية النتيجة.",
   });
@@ -34,6 +35,7 @@ export default function RequestAnalysis() {
       if (!response.ok) {
         setModal({
           open: true,
+          type: "error",
           title: "تعذر إرسال الطلب",
           message: result.error || "حدث خطأ أثناء إرسال طلب التحليل، يرجى المحاولة مرة أخرى.",
         });
@@ -44,12 +46,14 @@ export default function RequestAnalysis() {
       setTimeframe("");
       setModal({
         open: true,
+        type: "success",
         title: "تم إرسال الطلب بنجاح",
         message: "تم إرسال طلب التحليل وسيتم إعلامك عند جاهزية النتيجة.",
       });
     } catch (error) {
       setModal({
         open: true,
+        type: "error",
         title: "تعذر إرسال الطلب",
         message: "حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.",
       });
@@ -62,6 +66,7 @@ export default function RequestAnalysis() {
     <main className="min-h-screen bg-[#020617] text-white py-12 px-4">
       <SuccessModal
         open={modal.open}
+        type={modal.type}
         title={modal.title}
         message={modal.message}
         onClose={() => setModal((current) => ({ ...current, open: false }))}

@@ -33,6 +33,7 @@ export default function AccountManagement() {
 
   const [successModal, setSuccessModal] = useState({
     open: false,
+    type: "success",
     title: "تم إرسال الطلب بنجاح",
     message: "تم إرسال طلب إدارة الحساب إلى فريق الإدارة وسيتم التواصل معك قريباً.",
   });
@@ -71,6 +72,7 @@ export default function AccountManagement() {
     if (!validation.valid) {
       setSuccessModal({
         open: true,
+        type: "error",
         title: "ملف غير مسموح",
         message: validation.message,
       });
@@ -111,6 +113,7 @@ export default function AccountManagement() {
     if (!fileValidation.valid) {
       setSuccessModal({
         open: true,
+        type: "error",
         title: "ملف غير مسموح",
         message: fileValidation.message,
       });
@@ -149,6 +152,7 @@ export default function AccountManagement() {
       if (!response.ok) {
         setSuccessModal({
           open: true,
+          type: "error",
           title: "تعذر إرسال الطلب",
           message: result.error || "حدث خطأ أثناء إرسال الطلب، يرجى المحاولة مرة أخرى.",
         });
@@ -157,6 +161,7 @@ export default function AccountManagement() {
 
       setSuccessModal({
         open: true,
+        type: "success",
         title: "تم إرسال الطلب بنجاح",
         message: "تم إرسال طلب إدارة الحساب إلى فريق الإدارة وسيتم التواصل معك قريباً.",
       });
@@ -165,6 +170,7 @@ export default function AccountManagement() {
     } catch (error) {
       setSuccessModal({
         open: true,
+        type: "error",
         title: "تعذر إرسال الطلب",
         message: "حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.",
       });
@@ -196,6 +202,7 @@ export default function AccountManagement() {
     <main className="min-h-screen bg-[#020617] text-white py-12 px-4">
       <SuccessModal
         open={successModal.open}
+        type={successModal.type}
         title={successModal.title}
         message={successModal.message}
         onClose={() => setSuccessModal((current) => ({ ...current, open: false }))}

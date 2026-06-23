@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
+import { AppModalProvider, useAppModal } from "./components/AppModalProvider";
 
 const menuItems = [
   { href: "/", icon: "🏠", label: "الرئيسية" },
@@ -68,9 +69,10 @@ const getAnalysisReplyKey = (row) => {
   return `${id}:${signature}`;
 };
 
-export default function RootLayout({ children }) {
+function RootLayoutContent({ children }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { showAppModal } = useAppModal();
   const [currentUser, setCurrentUser] = useState(null);
   const [globalNotice, setGlobalNotice] = useState("");
   const [globalNoticeHref, setGlobalNoticeHref] = useState("");
@@ -127,7 +129,11 @@ export default function RootLayout({ children }) {
   const enableBrowserNotifications = async () => {
     if (typeof window === "undefined") return;
     if (!("Notification" in window)) {
-      alert("المتصفح لا يدعم الإشعارات");
+      showAppModal({
+        type: "warning",
+        title: "الإشعارات غير مدعومة",
+        message: "المتصفح لا يدعم الإشعارات",
+      });
       return;
     }
 
@@ -143,7 +149,11 @@ export default function RootLayout({ children }) {
       setGlobalNotice("🔔 تم تفعيل إشعارات الموقع بنجاح");
       setGlobalNoticeHref("");
     } else {
-      alert("تم رفض الإشعارات من المتصفح");
+      showAppModal({
+        type: "warning",
+        title: "تم رفض الإشعارات",
+        message: "تم رفض الإشعارات من المتصفح. يمكنك تفعيلها لاحقاً من إعدادات المتصفح.",
+      });
     }
   };
 
@@ -771,75 +781,7 @@ export default function RootLayout({ children }) {
   }, [currentUser]);
 
   return (
-    <html lang="ar" dir="rtl" data-theme={theme}>
-      <head>
-        <title>HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول</title>
-        <meta
-          name="description"
-          content="HasaN CharT World منصة احترافية لمتابعة أسواق المال، تشمل تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، تنبيهات سعرية، أخبار اقتصادية، وطلبات تحليل العملات."
-        />
-        <meta
-          name="keywords"
-          content="HasaN CharT World, حسن شارت, تحليل بيتكوين, تحليل العملات الرقمية, توصيات كريبتو, توصيات فوركس, توصيات Spot, توصيات Futures, أخبار اقتصادية, تنبيهات سعرية, إدارة حسابات التداول"
-        />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://www.hasanchartworld.com" />
-        <meta name="application-name" content="HasaN CharT World" />
-        <meta name="apple-mobile-web-app-title" content="HasaN CharT World" />
-        <meta name="name" content="HasaN CharT World" />
-        <meta itemProp="name" content="HasaN CharT World" />
-        <meta name="theme-color" content="#020617" />
-        <link rel="icon" type="image/png" sizes="1024x1024" href="/favicon.png" />
-        <link rel="shortcut icon" type="image/png" href="/favicon.png" />
-        <link rel="apple-touch-icon" sizes="1024x1024" href="/favicon.png" />
-
-        <meta property="og:type" content="website" />
-        <meta property="og:locale" content="ar_AR" />
-        <meta property="og:url" content="https://www.hasanchartworld.com" />
-        <meta property="og:site_name" content="HasaN CharT World" />
-        <meta property="og:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
-        <meta property="og:determiner" content="" />
-        <meta
-          property="og:description"
-          content="منصة HasaN CharT World تقدم تحليلات للأسواق المالية، توصيات Spot و Futures، أخبار اقتصادية، تنبيهات سعرية، وخدمات احترافية للمتداولين."
-        />
-        <meta property="og:image" content="https://www.hasanchartworld.com/favicon.png" />
-        <meta property="og:image:secure_url" content="https://www.hasanchartworld.com/favicon.png" />
-        <meta property="og:image:width" content="512" />
-        <meta property="og:image:height" content="512" />
-        <meta property="og:image:alt" content="HasaN CharT World Logo" />
-
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
-        <meta
-          name="twitter:description"
-          content="تابع تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، الأخبار الاقتصادية، والتنبيهات السعرية عبر منصة HasaN CharT World."
-        />
-        <meta name="twitter:image" content="https://www.hasanchartworld.com/favicon.png" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebSite",
-              name: "HasaN CharT World",
-              alternateName: ["HasaN CharT", "Hasan Chart World", "حسن شارت"],
-              url: "https://www.hasanchartworld.com",
-              description:
-                "منصة احترافية لمتابعة أسواق المال، تحليلات العملات الرقمية والفوركس، توصيات التداول، الأخبار الاقتصادية والتنبيهات السعرية.",
-              publisher: {
-                "@type": "Organization",
-                name: "HasaN CharT World",
-                logo: {
-                  "@type": "ImageObject",
-                  url: "https://www.hasanchartworld.com/favicon.png",
-                },
-              },
-            }),
-          }}
-        />
-      </head>
-      <body className="min-h-screen bg-[#020617] text-white antialiased overflow-x-hidden">
+    <>
         {globalNotice && (
           <div className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl">
             <div className="flex items-start justify-between gap-4">
@@ -978,7 +920,7 @@ export default function RootLayout({ children }) {
               </aside>
             </div>
           )}
-          <aside className="hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden bg-[#020817] border-l border-cyan-300/20 shadow-[0_0_80px_rgba(0,102,255,0.24)] backdrop-blur-2xl p-4 z-50 flex-col relative">
+          <aside className="relative z-[110] hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden bg-[#020817] border-l border-cyan-300/20 shadow-[0_0_80px_rgba(0,102,255,0.24)] backdrop-blur-2xl p-4 flex-col">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
             <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
@@ -1157,7 +1099,7 @@ export default function RootLayout({ children }) {
                     </button>
 
                     {notificationMenuOpen && (
-                      <div className="fixed left-5 top-20 z-[99999] min-h-[130px] w-[360px] max-w-[calc(100vw-40px)] rounded-[28px] border border-cyan-200/40 bg-white p-4 text-slate-950 shadow-[0_24px_80px_rgba(0,102,255,0.22)] backdrop-blur-2xl">
+                      <div className="fixed left-5 top-20 z-[120] min-h-[130px] w-[360px] max-w-[calc(100vw-40px)] rounded-[28px] border border-cyan-200/40 bg-white p-4 text-slate-950 shadow-[0_24px_80px_rgba(0,102,255,0.22)] backdrop-blur-2xl">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <h3 className="font-black text-xl text-slate-950">
                             الإشعارات
@@ -1249,6 +1191,84 @@ export default function RootLayout({ children }) {
             <main className="w-full p-3 pt-3 md:p-4 md:pt-4">{children}</main>
           </div>
         </div>
+    </>
+  );
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="ar" dir="rtl">
+      <head>
+        <title>HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول</title>
+        <meta
+          name="description"
+          content="HasaN CharT World منصة احترافية لمتابعة أسواق المال، تشمل تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، تنبيهات سعرية، أخبار اقتصادية، وطلبات تحليل العملات."
+        />
+        <meta
+          name="keywords"
+          content="HasaN CharT World, حسن شارت, تحليل بيتكوين, تحليل العملات الرقمية, توصيات كريبتو, توصيات فوركس, توصيات Spot, توصيات Futures, أخبار اقتصادية, تنبيهات سعرية, إدارة حسابات التداول"
+        />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://www.hasanchartworld.com" />
+        <meta name="application-name" content="HasaN CharT World" />
+        <meta name="apple-mobile-web-app-title" content="HasaN CharT World" />
+        <meta name="name" content="HasaN CharT World" />
+        <meta itemProp="name" content="HasaN CharT World" />
+        <meta name="theme-color" content="#020617" />
+        <link rel="icon" type="image/png" sizes="1024x1024" href="/favicon.png" />
+        <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" sizes="1024x1024" href="/favicon.png" />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:locale" content="ar_AR" />
+        <meta property="og:url" content="https://www.hasanchartworld.com" />
+        <meta property="og:site_name" content="HasaN CharT World" />
+        <meta property="og:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
+        <meta property="og:determiner" content="" />
+        <meta
+          property="og:description"
+          content="منصة HasaN CharT World تقدم تحليلات للأسواق المالية، توصيات Spot و Futures، أخبار اقتصادية، تنبيهات سعرية، وخدمات احترافية للمتداولين."
+        />
+        <meta property="og:image" content="https://www.hasanchartworld.com/favicon.png" />
+        <meta property="og:image:secure_url" content="https://www.hasanchartworld.com/favicon.png" />
+        <meta property="og:image:width" content="512" />
+        <meta property="og:image:height" content="512" />
+        <meta property="og:image:alt" content="HasaN CharT World Logo" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
+        <meta
+          name="twitter:description"
+          content="تابع تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، الأخبار الاقتصادية، والتنبيهات السعرية عبر منصة HasaN CharT World."
+        />
+        <meta name="twitter:image" content="https://www.hasanchartworld.com/favicon.png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "HasaN CharT World",
+              alternateName: ["HasaN CharT", "Hasan Chart World", "حسن شارت"],
+              url: "https://www.hasanchartworld.com",
+              description:
+                "منصة احترافية لمتابعة أسواق المال، تحليلات العملات الرقمية والفوركس، توصيات التداول، الأخبار الاقتصادية والتنبيهات السعرية.",
+              publisher: {
+                "@type": "Organization",
+                name: "HasaN CharT World",
+                logo: {
+                  "@type": "ImageObject",
+                  url: "https://www.hasanchartworld.com/favicon.png",
+                },
+              },
+            }),
+          }}
+        />
+      </head>
+      <body className="min-h-screen bg-[#020617] text-white antialiased overflow-x-hidden">
+        <AppModalProvider>
+          <RootLayoutContent>{children}</RootLayoutContent>
+        </AppModalProvider>
       </body>
     </html>
   );
