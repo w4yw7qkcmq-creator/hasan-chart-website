@@ -33,87 +33,102 @@ function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
 
 
 function StatusBadge({ status }) {
-  const isDone = status === "مكتمل" || status === "تم الرد" || status === "مفعل" || status === "نشط";
-  const isPending = !status || status === "قيد المراجعة" || status === "بانتظار المراجعة" || status === "جديد";
-  const isArchived = status === "مؤرشف";
+  const isReviewed = getAdminStatusKey(status) === "reviewed";
 
   return (
     <span
       className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${
-        isArchived
-          ? "border-slate-300 bg-slate-100 text-slate-800"
-          : isDone
+        isReviewed
           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : isPending
-          ? "border-amber-200 bg-amber-50 text-amber-800"
-          : "border-cyan-200 bg-cyan-50 text-cyan-800"
+          : "border-amber-200 bg-amber-50 text-amber-800"
       }`}
     >
-      {status || "بانتظار المراجعة"}
+      {getAdminStatusLabel(status)}
     </span>
   );
 }
+
+const ADMIN_STATUS_FILTERS = [
+  ["pending", "بانتظار المراجعة"],
+  ["reviewed", "تمت المراجعة"],
+  ["all", "الكل"],
+];
+
+const SIMPLE_STATUS_OPTIONS = [
+  { value: "pending", label: "بانتظار المراجعة" },
+  { value: "reviewed", label: "تمت المراجعة" },
+];
+
+const PENDING_STATUS_VALUES = new Set([
+  "pending",
+  "new",
+  "reviewing",
+  "قيد المراجعة",
+  "بانتظار المراجعة",
+  "جديد",
+  "قيد المعالجة",
+  "قيد التحليل",
+]);
+
+const REVIEWED_STATUS_VALUES = new Set([
+  "reviewed",
+  "approved",
+  "completed",
+  "تمت المراجعة",
+  "تم الرد",
+  "مكتمل",
+  "مفعل",
+  "تم التواصل",
+  "قيد التفعيل",
+  "نشط",
+  "مرفوض",
+  "مؤرشف",
+  "مغلق",
+  "بانتظار الدفع",
+]);
+
+const normalizeAdminStatusValue = (status) => String(status || "").trim().toLowerCase();
+
+const getAdminStatusKey = (status) => {
+  const raw = String(status || "").trim();
+  const normalized = normalizeAdminStatusValue(status);
+
+  if (
+    !raw ||
+    PENDING_STATUS_VALUES.has(raw) ||
+    PENDING_STATUS_VALUES.has(normalized)
+  ) {
+    return "pending";
+  }
+
+  if (REVIEWED_STATUS_VALUES.has(raw) || REVIEWED_STATUS_VALUES.has(normalized)) {
+    return "reviewed";
+  }
+
+  return "pending";
+};
+
+const getAdminStatusLabel = (status) => {
+  if (status === "reviewed") return "تمت المراجعة";
+  if (status === "pending") return "بانتظار المراجعة";
+  return getAdminStatusKey(status) === "reviewed" ? "تمت المراجعة" : "بانتظار المراجعة";
+};
+
+const matchesAdminStatusFilter = (status, filterKey) => {
+  if (filterKey === "all") return true;
+  return getAdminStatusKey(status) === filterKey;
+};
+
+const countAdminStatusFilter = (list, filterKey, getStatus = (item) => item.status) =>
+  list.filter((item) => matchesAdminStatusFilter(getStatus(item), filterKey)).length;
+
+const getSimpleStatusSelectValue = (status) => getAdminStatusKey(status);
 
 const SUPABASE_URL = "https://lzgsxdsumnteuwtjfqlm.supabase.co";
 const SUPABASE_PUBLIC_KEY = "sb_publishable_XCZkQPsJymbmnNuBR9fMpw_SVEFwZm0";
 const ADMIN_ANALYSIS_LIMIT = 50;
 const ADMIN_USERS_LIMIT = 200;
 const ADMIN_SUBSCRIPTIONS_LIMIT = 50;
-
-const ANALYSIS_STATUS_OPTIONS = [
-  "قيد المراجعة",
-  "قيد التحليل",
-  "تم الرد",
-  "مكتمل",
-  "مرفوض",
-  "مؤرشف",
-];
-
-const SUBSCRIPTION_STATUS_OPTIONS = [
-  "بانتظار المراجعة",
-  "تم التواصل",
-  "قيد التفعيل",
-  "مفعل",
-  "مرفوض",
-  "مؤرشف",
-];
-
-const ACCOUNT_STATUS_OPTIONS = [
-  "جديد",
-  "قيد المراجعة",
-  "نشط",
-  "مغلق",
-  "مرفوض",
-  "مؤرشف",
-];
-
-const ANALYSIS_FILTERS = [
-  ["all", "كل طلبات التحليل"],
-  ["pending", "بانتظار المراجعة"],
-  ["processing", "قيد التحليل"],
-  ["answered", "تم الرد"],
-  ["rejected", "مرفوض"],
-  ["archived", "مؤرشف"],
-];
-
-const SUBSCRIPTION_FILTERS = [
-  ["all", "كل طلبات الاشتراك"],
-  ["pending", "بانتظار المراجعة"],
-  ["contacted", "تم التواصل"],
-  ["active", "مفعل"],
-  ["rejected", "مرفوض"],
-  ["archived", "مؤرشف"],
-];
-
-
-const ACCOUNT_FILTERS = [
-  ["all", "كل طلبات إدارة الحسابات"],
-  ["new", "جديد"],
-  ["reviewing", "قيد المراجعة"],
-  ["active", "نشط"],
-  ["closed", "مغلق"],
-  ["archived", "مؤرشف"],
-];
 
 // --- Admin search helpers ---
 const normalizeAdminSearch = (value) => String(value || "").trim().toLowerCase();
@@ -262,7 +277,7 @@ export default function AdminPage() {
   const [lastNotificationIds, setLastNotificationIds] = useState([]);
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
   const updateRequestStatus = async (table, requestId, newStatus) => {
-    const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${newStatus}؟`);
+    const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${getAdminStatusLabel(newStatus)}؟`);
     if (!confirmed) return;
 
     try {
@@ -639,11 +654,11 @@ export default function AdminPage() {
     if (!browserNotificationsEnabled) return;
 
     const pendingSubscriptions = subscriptionRequests.filter(
-      (item) => item.status === "بانتظار المراجعة" || item.status === "قيد المعالجة"
+      (item) => getAdminStatusKey(item.status) === "pending"
     );
 
     const pendingAccounts = accountRequests.filter(
-      (item) => item.status === "جديد" || item.status === "بانتظار المراجعة"
+      (item) => getAdminStatusKey(item.status) === "pending"
     );
 
     const notifications = [
@@ -799,17 +814,17 @@ export default function AdminPage() {
   };
 
   const stats = useMemo(() => {
-    const pendingAnalysis = analysisRequests.filter((req) => req.status !== "مكتمل" && req.status !== "تم الرد" && req.status !== "مؤرشف").length;
-    const completedAnalysis = analysisRequests.filter((req) => req.status === "مكتمل" || req.status === "تم الرد").length;
-    const pendingAccounts = accountRequests.filter((req) => req.status !== "نشط" && req.status !== "مغلق" && req.status !== "مؤرشف").length;
-    const pendingSubscriptions = subscriptionRequests.filter((req) => req.status !== "مفعل" && req.status !== "مؤرشف").length;
+    const pendingAnalysis = analysisRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
+    const completedAnalysis = analysisRequests.filter((req) => getAdminStatusKey(req.status) === "reviewed").length;
+    const pendingAccounts = accountRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
+    const pendingSubscriptions = subscriptionRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
 
     return { pendingAnalysis, completedAnalysis, pendingAccounts, pendingSubscriptions, usersCount: users.length };
   }, [analysisRequests, accountRequests, subscriptionRequests, users]);
 
   const adminNotifications = useMemo(() => {
     const subscriptionItems = subscriptionRequests
-      .filter((item) => item.status === "بانتظار المراجعة" || item.status === "قيد المعالجة")
+      .filter((item) => getAdminStatusKey(item.status) === "pending")
       .map((item) => ({
         id: `subscription-${item.id}`,
         type: "subscription",
@@ -820,7 +835,7 @@ export default function AdminPage() {
       }));
 
     const accountItems = accountRequests
-      .filter((item) => item.status === "جديد" || item.status === "بانتظار المراجعة")
+      .filter((item) => getAdminStatusKey(item.status) === "pending")
       .map((item) => ({
         id: `account-${item.id}`,
         type: "account",
@@ -834,14 +849,7 @@ export default function AdminPage() {
   }, [subscriptionRequests, accountRequests]);
 
   const filteredAnalysis = useMemo(() => {
-    let list = analysisRequests;
-
-    if (filter === "pending") list = list.filter((req) => req.status === "قيد المراجعة" || !req.status);
-    else if (filter === "processing") list = list.filter((req) => req.status === "قيد التحليل");
-    else if (filter === "answered") list = list.filter((req) => req.status === "تم الرد" || req.status === "مكتمل");
-    else if (filter === "rejected") list = list.filter((req) => req.status === "مرفوض");
-    else if (filter === "archived") list = list.filter((req) => req.status === "مؤرشف");
-    else list = list.filter((req) => req.status !== "مؤرشف");
+    let list = analysisRequests.filter((req) => matchesAdminStatusFilter(req.status, filter));
 
     return list.filter((req) =>
       matchesAdminSearch(req, analysisSearch, ["coin", "frame", "userEmail", "username", "status"])
@@ -849,14 +857,9 @@ export default function AdminPage() {
   }, [analysisRequests, filter, analysisSearch]);
 
   const filteredSubscriptions = useMemo(() => {
-    let list = subscriptionRequests;
-
-    if (subscriptionFilter === "pending") list = list.filter((req) => req.status === "بانتظار المراجعة" || req.status === "قيد المعالجة" || !req.status);
-    else if (subscriptionFilter === "contacted") list = list.filter((req) => req.status === "تم التواصل");
-    else if (subscriptionFilter === "active") list = list.filter((req) => req.status === "مفعل");
-    else if (subscriptionFilter === "rejected") list = list.filter((req) => req.status === "مرفوض");
-    else if (subscriptionFilter === "archived") list = list.filter((req) => req.status === "مؤرشف");
-    else list = list.filter((req) => req.status !== "مؤرشف");
+    let list = subscriptionRequests.filter((req) =>
+      matchesAdminStatusFilter(req.status, subscriptionFilter)
+    );
 
     return list.filter((req) =>
       matchesAdminSearch(req, subscriptionSearch, [
@@ -872,14 +875,7 @@ export default function AdminPage() {
   }, [subscriptionRequests, subscriptionFilter, subscriptionSearch]);
 
   const filteredAccounts = useMemo(() => {
-    let list = accountRequests;
-
-    if (accountFilter === "new") list = list.filter((req) => req.status === "جديد" || !req.status);
-    else if (accountFilter === "reviewing") list = list.filter((req) => req.status === "قيد المراجعة");
-    else if (accountFilter === "active") list = list.filter((req) => req.status === "نشط");
-    else if (accountFilter === "closed") list = list.filter((req) => req.status === "مغلق");
-    else if (accountFilter === "archived") list = list.filter((req) => req.status === "مؤرشف");
-    else list = list.filter((req) => req.status !== "مؤرشف");
+    let list = accountRequests.filter((req) => matchesAdminStatusFilter(req.status, accountFilter));
 
     return list.filter((req) =>
       matchesAdminSearch(req, accountSearch, [
@@ -1113,36 +1109,7 @@ export default function AdminPage() {
   };
 
   const approveAccountRequest = async (id) => {
-    try {
-      const response = await adminFetch("/api/admin/dashboard", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "approve-account-request",
-          requestId: id,
-        }),
-      });
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "تعذر تحديث حالة الطلب");
-      }
-
-      setAccountRequests((prev) =>
-        prev.map((req) =>
-          req.id === id
-            ? { ...req, status: "قيد المراجعة", reviewedAt: new Date().toLocaleString("ar") }
-            : req
-        )
-      );
-
-      showAdminNotice("تم تحديث حالة طلب إدارة الحساب");
-    } catch (error) {
-      showAdminNotice(error?.message || "تعذر تحديث حالة الطلب", "error");
-    }
+    await updateRequestStatus("account_management_requests", id, "reviewed");
   };
 
   const deleteAccountRequest = async (id) => {
@@ -1351,7 +1318,7 @@ export default function AdminPage() {
                                 setSubscriptionFilter("pending");
                               }
                               if (item.type === "account") {
-                                setAccountFilter("new");
+                                setAccountFilter("pending");
                               }
                             }}
                             className="w-full rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 text-right transition hover:border-cyan-300 hover:bg-cyan-100"
@@ -1644,7 +1611,7 @@ export default function AdminPage() {
 
         <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-4 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-5">
           <div className="flex flex-wrap gap-3">
-            {ANALYSIS_FILTERS.map(([key, label]) => (
+            {ADMIN_STATUS_FILTERS.map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
@@ -1654,7 +1621,7 @@ export default function AdminPage() {
                     : "border-cyan-100 bg-white/80 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
                 }`}
               >
-                {label}
+                {label} ({countAdminStatusFilter(analysisRequests, key)})
               </button>
             ))}
           </div>
@@ -1722,14 +1689,21 @@ export default function AdminPage() {
                         {expandedAnalysis[req.id] ? "إخفاء التفاصيل" : "عرض التفاصيل"}
                       </button>
                       <select
-                        value={req.status || "قيد المراجعة"}
+                        value={getSimpleStatusSelectValue(req.status)}
                         onChange={(e) => updateRequestStatus("analysis_requests", req.id, e.target.value)}
                         className="min-w-0 flex-1 rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none"
                       >
-                        {ANALYSIS_STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>{status}</option>
+                        {SIMPLE_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
+                      <button
+                        type="button"
+                        onClick={() => updateRequestStatus("analysis_requests", req.id, "reviewed")}
+                        className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(16,185,129,0.32)] transition hover:scale-[1.01] hover:brightness-110"
+                      >
+                        تمت المراجعة
+                      </button>
                     </div>
 
                     {!expandedAnalysis[req.id] && req.reply && (
@@ -1834,7 +1808,7 @@ export default function AdminPage() {
             <h2 className="text-3xl font-black text-slate-950">طلبات إدارة الحسابات</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
             <div className="mt-4 flex flex-wrap gap-3">
-              {ACCOUNT_FILTERS.map(([key, label]) => (
+              {ADMIN_STATUS_FILTERS.map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setAccountFilter(key)}
@@ -1844,7 +1818,7 @@ export default function AdminPage() {
                       : "border-cyan-100 bg-white/80 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
                   }`}
                 >
-                  {label}
+                  {label} ({countAdminStatusFilter(accountRequests, key)})
                 </button>
               ))}
             </div>
@@ -1881,12 +1855,12 @@ export default function AdminPage() {
 
                     <div className="flex flex-wrap gap-3">
                       <select
-                        value={req.status || "جديد"}
+                        value={getSimpleStatusSelectValue(req.status)}
                         onChange={(e) => updateRequestStatus("account_management_requests", req.id, e.target.value)}
                         className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none"
                       >
-                        {ACCOUNT_STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>{status}</option>
+                        {SIMPLE_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
                       {req.hasSensitiveKeys ? (
@@ -1970,7 +1944,7 @@ export default function AdminPage() {
             <h2 className="text-3xl font-black text-slate-950">طلبات الاشتراكات والدفع</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
             <div className="mt-4 flex flex-wrap gap-3">
-              {SUBSCRIPTION_FILTERS.map(([key, label]) => (
+              {ADMIN_STATUS_FILTERS.map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setSubscriptionFilter(key)}
@@ -1980,7 +1954,7 @@ export default function AdminPage() {
                       : "border-cyan-100 bg-white/80 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
                   }`}
                 >
-                  {label}
+                  {label} ({countAdminStatusFilter(subscriptionRequests, key)})
                 </button>
               ))}
             </div>
@@ -2032,37 +2006,26 @@ export default function AdminPage() {
 
                     <div className="flex flex-col gap-3 sm:flex-row">
                       <select
-                        value={req.status || "بانتظار المراجعة"}
-                        onChange={(e) => {
-                          if (e.target.value === "مفعل") {
-                            updateSubscriptionRequest(req, "مفعل");
-                          } else {
-                            updateRequestStatus("subscription_requests", req.id, e.target.value);
-                          }
-                        }}
+                        value={getSimpleStatusSelectValue(req.status)}
+                        onChange={(e) => updateRequestStatus("subscription_requests", req.id, e.target.value)}
                         className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 font-black text-slate-950 outline-none"
                       >
-                        {SUBSCRIPTION_STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>{status}</option>
+                        {SIMPLE_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
+                      <button
+                        type="button"
+                        onClick={() => updateRequestStatus("subscription_requests", req.id, "reviewed")}
+                        className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(16,185,129,0.32)] transition hover:scale-[1.01] hover:brightness-110"
+                      >
+                        تمت المراجعة
+                      </button>
                       <button
                         onClick={() => updateSubscriptionRequest(req, "مفعل")}
                         className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(16,185,129,0.32)] transition hover:scale-[1.01] hover:brightness-110"
                       >
                         تفعيل الاشتراك
-                      </button>
-                      <button
-                        onClick={() => updateSubscriptionRequest(req, "بانتظار الدفع")}
-                        className="rounded-2xl bg-gradient-to-l from-amber-700 via-yellow-500 to-orange-300 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(245,158,11,0.32)] transition hover:scale-[1.01] hover:brightness-110"
-                      >
-                        بانتظار الدفع
-                      </button>
-                      <button
-                        onClick={() => updateSubscriptionRequest(req, "مرفوض")}
-                        className="rounded-2xl bg-gradient-to-l from-red-800 via-red-600 to-rose-400 px-5 py-3 font-black text-white shadow-[0_14px_38px_rgba(239,68,68,0.32)] transition hover:scale-[1.01] hover:brightness-110"
-                      >
-                        رفض
                       </button>
                     </div>
                   </div>
