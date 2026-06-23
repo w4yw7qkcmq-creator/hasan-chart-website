@@ -1370,6 +1370,102 @@ export default function AdminPage() {
           </div>
         </section>
 
+        <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
+          {adminNotifications.length > 0 && (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800">
+              يوجد طلبات جديدة تحتاج مراجعة
+            </div>
+          )}
+
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">Admin Command Center</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-black text-emerald-800">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                    Online / Active
+                  </span>
+                  <span className="text-sm text-slate-600">
+                    آخر تحديث:{" "}
+                    <span className="font-black text-slate-950">
+                      {lastUpdatedAt || "بانتظار أول تحديث"}
+                    </span>
+                  </span>
+                  {isRefreshing && (
+                    <span className="text-sm font-bold text-cyan-700">جاري التحديث...</span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+                  loadAdminData(currentUser);
+                }}
+                className="shrink-0 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-black text-white shadow-[0_14px_38px_rgba(37,99,235,0.28)] transition hover:brightness-110"
+              >
+                تحديث الآن
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-cyan-100 bg-white/90 px-4 py-3">
+                <p className="text-xs font-bold text-slate-600">طلبات التحليل المنتظرة</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">{stats.pendingAnalysis}</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-100 bg-white/90 px-4 py-3">
+                <p className="text-xs font-bold text-slate-600">إدارة الحسابات المنتظرة</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">{stats.pendingAccounts}</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-100 bg-white/90 px-4 py-3">
+                <p className="text-xs font-bold text-slate-600">طلبات الاشتراك المنتظرة</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">{stats.pendingSubscriptions}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById("analysis-requests")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
+              >
+                طلبات التحليل
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById("account-requests")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
+              >
+                إدارة الحسابات
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById("subscription-requests")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
+              >
+                الاشتراكات
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById("vip-signals")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_10px_28px_rgba(37,99,235,0.22)] transition hover:brightness-110"
+              >
+                نشر VIP
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
           <AdminStat title="طلبات التحليل" value={analysisRequests.length} icon="🧠" subtitle="إجمالي الطلبات" />
           <AdminStat title="بانتظار الرد" value={stats.pendingAnalysis} icon="⏳" subtitle="طلبات تحتاج متابعة" tone="orange" />
@@ -1379,7 +1475,7 @@ export default function AdminPage() {
           <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
 
-        <section className="space-y-5">
+        <section id="vip-signals" className="space-y-5 scroll-mt-6">
           <div>
             <h2 className="text-3xl font-black">نشر توصيات VIP</h2>
             <p className="mt-2 text-slate-400">أضف توصية منفصلة لمشتركي Spot أو Futures فقط.</p>
@@ -1558,7 +1654,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="space-y-5">
+        <section id="analysis-requests" className="space-y-5 scroll-mt-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-3xl font-black text-slate-950">طلبات تحليل العملات</h2>
@@ -1719,7 +1815,7 @@ export default function AdminPage() {
           )}
         </section>
 
-        <section className="space-y-5">
+        <section id="account-requests" className="space-y-5 scroll-mt-6">
           <div>
             <h2 className="text-3xl font-black text-slate-950">طلبات إدارة الحسابات</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
@@ -1855,7 +1951,7 @@ export default function AdminPage() {
             </div>
           )}
         </section>
-        <section className="space-y-5">
+        <section id="subscription-requests" className="space-y-5 scroll-mt-6">
           <div>
             <h2 className="text-3xl font-black text-slate-950">طلبات الاشتراكات والدفع</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
