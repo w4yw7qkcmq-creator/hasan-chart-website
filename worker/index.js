@@ -24,6 +24,7 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 const { processEmailQueue } = require("./email-queue");
 const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications } = require("./push-sender");
+const { buildEmailLogoHtml } = require("./email-branding");
 
 const WORKER_ENTRY = "worker/index.js";
 const PRICE_ALERTS_MODULE_VERSION = "2026-06-24-v6-real-sender-log";
@@ -111,7 +112,7 @@ async function doPushForAlertOwner({
       alertId,
       email,
       userId,
-      title: "✅ وصل السعر إلى هدف التنبيه",
+      title: "🔔 وصل السعر إلى هدف التنبيه",
       body: pushBody,
       url: "https://www.hasanchartworld.com/alerts",
     });
@@ -837,6 +838,7 @@ const sendTriggeredAlertEmail = async ({
   const safeConditionLabel = escapeHtml(conditionLabel);
   const safeTargetPrice = escapeHtml(formatNumber(targetPrice));
   const safeCurrentPrice = escapeHtml(formatNumber(currentPrice));
+  const logoHtml = buildEmailLogoHtml();
 
   console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
     file: "worker/index.js",
@@ -859,7 +861,7 @@ const sendTriggeredAlertEmail = async ({
     body: JSON.stringify({
       from: "HasaN CharT World <alerts@hasanchartworld.com>",
       to: email,
-      subject: `✅ وصل السعر إلى هدف التنبيه - ${safeCoin}`,
+      subject: `🔔 وصل السعر إلى هدف التنبيه - ${safeCoin}`,
       html: `
 <div style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;color:#ffffff;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#020617;width:100%;padding:24px 12px;">
@@ -868,8 +870,9 @@ const sendTriggeredAlertEmail = async ({
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px;background:#07142f;border-radius:24px;overflow:hidden;border:1px solid rgba(34,211,238,0.18);box-shadow:0 0 40px rgba(37,99,235,0.22);">
           <tr>
             <td style="background:linear-gradient(135deg,#07142f 0%,#0b63ff 55%,#06b6d4 100%);padding:34px 22px;text-align:center;">
+              ${logoHtml}
               <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.6;font-weight:900;text-align:center;">
-                ✅ وصل السعر إلى هدف التنبيه
+                🔔 وصل السعر إلى هدف التنبيه
               </h1>
             </td>
           </tr>
@@ -1118,7 +1121,7 @@ async function checkPriceAlerts() {
           .from("notifications")
           .insert({
             user_email: userEmail,
-            title: "✅ وصل السعر إلى هدف التنبيه",
+            title: "🔔 وصل السعر إلى هدف التنبيه",
             message: notificationMessage,
             type: "price-alert",
             is_read: false,

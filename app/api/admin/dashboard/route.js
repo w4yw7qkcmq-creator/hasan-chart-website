@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
+import { buildEmailLogoHtml } from "../../../../lib/email-branding.js";
 import { processEmailQueue } from "../../../../lib/email-queue";
 import {
   sendAccountManagementAcceptedPush,
@@ -289,11 +290,13 @@ function matchesSignalSubscription(planText, signalType) {
 
 function buildVipSignalEmailHtml({ signalType, coin, entry, targets, stopLoss, notes }) {
   const label = signalTypeLabel(signalType);
+  const logoHtml = buildEmailLogoHtml(getSiteUrl());
 
   return `
     <div dir="rtl" style="font-family: Arial, sans-serif; background:#f8fafc; padding:24px; color:#0f172a;">
       <div style="max-width:620px; margin:0 auto; background:white; border-radius:24px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 18px 60px rgba(15,23,42,.08);">
         <div style="background:linear-gradient(135deg,#06b6d4,#2563eb); color:white; padding:28px; text-align:center;">
+          ${logoHtml}
           <div style="font-size:14px; font-weight:800; opacity:.95;">HasaN CharT World</div>
           <h1 style="margin:10px 0 0; font-size:26px;">🚨 توصية VIP ${label} جديدة</h1>
         </div>

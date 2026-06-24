@@ -413,7 +413,7 @@ function RootLayoutContent({ children }) {
           if (notification.type === "price-alert") {
             showAppModal({
               type: "success",
-              title: notification.title || "✅ وصل السعر إلى هدف التنبيه",
+              title: notification.title || "🔔 وصل السعر إلى هدف التنبيه",
               message: notification.message || "",
               autoCloseMs: 10000,
             });
@@ -480,7 +480,7 @@ function RootLayoutContent({ children }) {
           ) {
             showAppModal({
               type: "success",
-              title: notification.title || "✅ وصل السعر إلى هدف التنبيه",
+              title: notification.title || "🔔 وصل السعر إلى هدف التنبيه",
               message: notification.message || "",
               autoCloseMs: 10000,
             });

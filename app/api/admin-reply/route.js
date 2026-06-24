@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSession } from "../../../lib/admin-auth";
+import { buildEmailLogoHtml } from "../../../lib/email-branding.js";
 import { sendAnalysisReadyPush } from "../../../lib/push-notifications";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,7 @@ const sendEmailNotification = async ({ email, coin, reply }) => {
 
   const safeCoin = escapeHtml(coin);
   const safeReply = escapeHtml(reply);
+  const logoHtml = buildEmailLogoHtml();
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -68,6 +70,7 @@ const sendEmailNotification = async ({ email, coin, reply }) => {
           <tr>
             <td style="padding:0;">
               <div style="background:linear-gradient(135deg,#07142f 0%,#0b63ff 55%,#06b6d4 100%);padding:30px 22px;text-align:center;">
+                ${logoHtml}
                 <div style="display:inline-block;background:rgba(2,6,23,0.28);border:1px solid rgba(255,255,255,0.28);border-radius:999px;padding:9px 16px;color:#ffffff;font-size:13px;font-weight:800;letter-spacing:0.3px;white-space:nowrap;">
                   HasaN CharT World
                 </div>

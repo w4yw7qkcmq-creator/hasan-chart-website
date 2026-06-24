@@ -7,6 +7,10 @@ const corsHeaders = {
 };
 
 const ADMIN_EMAIL_SECRET = Deno.env.get("ADMIN_EMAIL_SECRET") || "";
+const EMAIL_LOGO_URL = "https://www.hasanchartworld.com/favicon.png";
+
+const buildEmailLogoHtml = () =>
+  `<img src="${EMAIL_LOGO_URL}" alt="HasaN CharT World" width="64" height="64" style="display:block;border-radius:16px;margin:0 auto 16px;" />`;
 
 const escapeHtml = (value: string) =>
   String(value || "")
@@ -49,6 +53,7 @@ serve(async (req) => {
 
     const safeCoin = escapeHtml(coin);
     const safeReply = escapeHtml(reply);
+    const logoHtml = buildEmailLogoHtml();
 
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -70,6 +75,7 @@ serve(async (req) => {
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#07142f;border:1px solid #1e3a5f;border-radius:22px;overflow:hidden;">
 <tr>
 <td align="center" style="background:#0ea5e9;padding:28px 18px;">
+${logoHtml}
 <div style="font-size:28px;font-weight:900;color:white;">HasaN CharT World</div>
 <div style="margin-top:10px;font-size:14px;color:#e0f2fe;">تم الرد على طلب التحليل الخاص بك</div>
 </td>
