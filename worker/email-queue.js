@@ -74,6 +74,13 @@ async function sendWithRetry(sendFn, { to, label, attempt = 0 }) {
   }
 
   if (result?.success !== false) {
+    console.log("EMAIL_SEND_SUCCESS", {
+      to,
+      label,
+      attempt,
+      id: result?.id || null,
+    });
+
     logWorkerEvent("EMAIL_SEND_SUCCESS", {
       to,
       label,

@@ -163,6 +163,13 @@ async function sendPriceAlertPushNotifications({
   const normalizedEmail = String(email || "").trim().toLowerCase();
   let resolvedUserId = String(userId || "").trim() || null;
 
+  console.log("PRICE_ALERT_PUSH_START", {
+    alertId,
+    email: normalizedEmail || null,
+    userId: resolvedUserId,
+    worker: workerEntry,
+  });
+
   logWorkerEvent("PRICE_ALERT_PUSH_START", {
     worker: workerEntry,
     alertId,
@@ -288,6 +295,12 @@ async function sendPriceAlertPushNotifications({
 
     if (outcome.success) {
       sent += 1;
+      console.log("PRICE_ALERT_PUSH_SENT", {
+        alertId,
+        email: normalizedEmail || subscriptionRow.email || null,
+        subscriptionId: subscriptionRow.id,
+        worker: workerEntry,
+      });
       logWorkerEvent("PRICE_ALERT_PUSH_SENT", {
         worker: workerEntry,
         success: true,
@@ -302,6 +315,14 @@ async function sendPriceAlertPushNotifications({
     }
 
     failed += 1;
+
+    console.log("PRICE_ALERT_PUSH_FAILED", {
+      alertId,
+      email: normalizedEmail || subscriptionRow.email || null,
+      message: outcome.message || outcome.error || "WEB_PUSH_SEND_FAILED",
+      statusCode: outcome.statusCode || null,
+      body: outcome.body || null,
+    });
 
     logPriceAlertPushFailed(workerEntry, {
       alertId,

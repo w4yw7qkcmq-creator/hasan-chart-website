@@ -93,11 +93,19 @@ async function doPushForAlertOwner({
   coin,
   targetPrice,
   currentPrice,
+  source = "worker/index.js",
 }) {
   const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
 
+  console.log("PRICE_ALERT_PUSH_START", {
+    alertId,
+    email,
+    userId: userId || null,
+    source,
+  });
+
   try {
-    return await sendPriceAlertPushNotifications({
+    const stats = await sendPriceAlertPushNotifications({
       supabase,
       workerEntry: WORKER_ENTRY,
       alertId,
@@ -107,13 +115,27 @@ async function doPushForAlertOwner({
       body: pushBody,
       url: "https://www.hasanchartworld.com/alerts",
     });
+
+    if ((stats?.sent || 0) > 0) {
+      console.log("PRICE_ALERT_PUSH_SENT", {
+        alertId,
+        email,
+        userId: userId || null,
+        source,
+        stats,
+      });
+    }
+
+    return stats;
   } catch (pushError) {
+    console.log("PRICE_ALERT_PUSH_FAILED", pushError);
     logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
       worker: WORKER_ENTRY,
       success: false,
       alertId,
       email,
       userId: userId || null,
+      source,
       message: pushError?.message || String(pushError),
       statusCode: pushError?.statusCode || null,
       body: pushError?.body || null,
@@ -857,6 +879,16 @@ const sendTriggeredAlertEmail = async ({
     resendId: data?.id || null,
   });
 
+  await doPushForAlertOwner({
+    alertId,
+    email,
+    userId,
+    coin,
+    targetPrice,
+    currentPrice,
+    source: "worker/index.js::sendTriggeredAlertEmail",
+  });
+
   return {
     success: true,
     sent: true,
@@ -1061,19 +1093,6 @@ async function checkPriceAlerts() {
             }),
         });
 
-        const pushStats = await doPushForAlertOwner({
-          alertId: alert.id,
-          email: userEmail,
-          userId: alert.user_id || null,
-          coin,
-          targetPrice,
-          currentPrice,
-        });
-
-        summary.pushesSent += pushStats?.sent || 0;
-        summary.pushesFailed += pushStats?.failed || 0;
-        summary.pushesSkipped += pushStats?.skipped || 0;
-
         summary.emailsQueued += 1;
         summary.triggered += 1;
 
@@ -1239,13 +1258,8 @@ app.listen(PORT, () => {
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
 });
 
-setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
-
-logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
+logWorkerEvent("PRICE_ALERTS_SCHEDULER_DISABLED", {
   worker: WORKER_ENTRY,
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-  intervalMs: CHECK_INTERVAL_MS,
-  realEmailPath: "worker/index.js::sendTriggeredAlertEmail",
+  note: "Price alerts run on Next.js instrumentation (lib/price-alerts-runner sendTriggeredAlertEmail). Worker scheduler disabled to avoid duplicate emails.",
 });
-
-checkPriceAlerts();
