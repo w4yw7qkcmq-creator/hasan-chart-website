@@ -75,8 +75,21 @@ async function sendPriceAlertPushNotifications({
 }) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
 
+  logWorkerEvent("ALERT_PUSH_START", {
+    worker: workerEntry,
+    alertId,
+    email: normalizedEmail || null,
+  });
+
   if (!normalizedEmail) {
-    return { sent: 0, failed: 0, skipped: 0 };
+    logWorkerEvent("ALERT_PUSH_FAILED", {
+      worker: workerEntry,
+      alertId,
+      success: false,
+      error: "MISSING_ALERT_EMAIL",
+    });
+
+    return { sent: 0, failed: 0, skipped: 1 };
   }
 
   if (!configureWebPush()) {
@@ -93,10 +106,19 @@ async function sendPriceAlertPushNotifications({
 
   const { data: subscriptions, error } = await supabase
     .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth, email, anonymous_id")
+    .select("id, endpoint, p256dh, auth, email, anonymous_id, user_id")
     .eq("email", normalizedEmail);
 
   if (error) {
+    logWorkerEvent("ALERT_PUSH_SUBSCRIPTIONS_FOUND", {
+      worker: workerEntry,
+      alertId,
+      email: normalizedEmail,
+      count: 0,
+      subscriptionIds: [],
+      queryError: error.message,
+    });
+
     logWorkerEvent("ALERT_PUSH_FAILED", {
       worker: workerEntry,
       alertId,
@@ -108,7 +130,17 @@ async function sendPriceAlertPushNotifications({
     return { sent: 0, failed: 1, skipped: 0 };
   }
 
-  if (!subscriptions?.length) {
+  const subscriptionList = subscriptions || [];
+
+  logWorkerEvent("ALERT_PUSH_SUBSCRIPTIONS_FOUND", {
+    worker: workerEntry,
+    alertId,
+    email: normalizedEmail,
+    count: subscriptionList.length,
+    subscriptionIds: subscriptionList.map((row) => row.id),
+  });
+
+  if (subscriptionList.length === 0) {
     logWorkerEvent("ALERT_PUSH_FAILED", {
       worker: workerEntry,
       alertId,
@@ -120,19 +152,45 @@ async function sendPriceAlertPushNotifications({
     return { sent: 0, failed: 0, skipped: 1 };
   }
 
+  const stats = await sendPushPayloadToSubscriptions({
+    supabase,
+    workerEntry,
+    alertId,
+    email: normalizedEmail,
+    subscriptionList,
+    title,
+    body,
+    url,
+    tagPrefix: "price-alert",
+  });
+
+  return { sent: stats.sent, failed: stats.failed, skipped: 0 };
+}
+
+async function sendPushPayloadToSubscriptions({
+  supabase,
+  workerEntry,
+  alertId,
+  email,
+  subscriptionList,
+  title,
+  body,
+  url,
+  tagPrefix = "price-alert",
+}) {
   const payload = {
     title,
     body,
     url,
     icon: "/logo.png",
-    type: "price-alert",
-    tag: `price-alert-${alertId}`,
+    type: tagPrefix === "test-push" ? "test-push" : "price-alert",
+    tag: `${tagPrefix}-${alertId}`,
   };
 
   let sent = 0;
   let failed = 0;
 
-  for (const subscriptionRow of subscriptions) {
+  for (const subscriptionRow of subscriptionList) {
     const outcome = await sendWebPushNotification(subscriptionRow, payload);
 
     if (outcome.success) {
@@ -140,7 +198,7 @@ async function sendPriceAlertPushNotifications({
       logWorkerEvent("ALERT_PUSH_SENT", {
         worker: workerEntry,
         alertId,
-        email: normalizedEmail,
+        email: email || subscriptionRow.email || null,
         subscriptionId: subscriptionRow.id,
         endpoint: subscriptionRow.endpoint,
         success: true,
@@ -152,7 +210,7 @@ async function sendPriceAlertPushNotifications({
     logWorkerEvent("ALERT_PUSH_FAILED", {
       worker: workerEntry,
       alertId,
-      email: normalizedEmail,
+      email: email || subscriptionRow.email || null,
       subscriptionId: subscriptionRow.id,
       endpoint: subscriptionRow.endpoint,
       success: false,
@@ -165,10 +223,88 @@ async function sendPriceAlertPushNotifications({
     }
   }
 
-  return { sent, failed, skipped: 0 };
+  return { sent, failed };
+}
+
+async function sendTestPushToAllSubscriptions({ supabase, workerEntry }) {
+  const title = "🔔 اختبار إشعارات المتصفح";
+  const body = "تم إرسال إشعار الاختبار بنجاح من HasaN CharT World";
+  const url = "https://www.hasanchartworld.com";
+  const alertId = "test-push";
+
+  logWorkerEvent("ALERT_PUSH_START", {
+    worker: workerEntry,
+    alertId,
+    test: true,
+    scope: "all_subscriptions",
+  });
+
+  const { data: subscriptions, error } = await supabase
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth, email, anonymous_id, user_id");
+
+  if (error) {
+    logWorkerEvent("ALERT_PUSH_SUBSCRIPTIONS_FOUND", {
+      worker: workerEntry,
+      alertId,
+      count: 0,
+      subscriptionIds: [],
+      queryError: error.message,
+    });
+
+    logWorkerEvent("ALERT_PUSH_FAILED", {
+      worker: workerEntry,
+      alertId,
+      success: false,
+      error: error.message,
+    });
+
+    return { sent: 0, failed: 1, skipped: 0, total: 0, error: error.message };
+  }
+
+  const subscriptionList = subscriptions || [];
+
+  logWorkerEvent("ALERT_PUSH_SUBSCRIPTIONS_FOUND", {
+    worker: workerEntry,
+    alertId,
+    count: subscriptionList.length,
+    subscriptionIds: subscriptionList.map((row) => row.id),
+    test: true,
+  });
+
+  if (subscriptionList.length === 0) {
+    logWorkerEvent("ALERT_PUSH_FAILED", {
+      worker: workerEntry,
+      alertId,
+      success: false,
+      error: "NO_PUSH_SUBSCRIPTIONS",
+    });
+
+    return { sent: 0, failed: 0, skipped: 1, total: 0 };
+  }
+
+  const stats = await sendPushPayloadToSubscriptions({
+    supabase,
+    workerEntry,
+    alertId,
+    email: null,
+    subscriptionList,
+    title,
+    body,
+    url,
+    tagPrefix: "test-push",
+  });
+
+  return {
+    sent: stats.sent,
+    failed: stats.failed,
+    skipped: 0,
+    total: subscriptionList.length,
+  };
 }
 
 module.exports = {
   isWebPushConfigured,
   sendPriceAlertPushNotifications,
+  sendTestPushToAllSubscriptions,
 };
