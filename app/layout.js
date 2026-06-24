@@ -415,6 +415,7 @@ function RootLayoutContent({ children }) {
               type: "success",
               title: notification.title || "✅ وصل السعر إلى هدف التنبيه",
               message: notification.message || "",
+              autoCloseMs: 10000,
             });
           }
 
@@ -481,6 +482,7 @@ function RootLayoutContent({ children }) {
               type: "success",
               title: notification.title || "✅ وصل السعر إلى هدف التنبيه",
               message: notification.message || "",
+              autoCloseMs: 10000,
             });
 
             notifiedSiteItems.unshift(notificationKey);

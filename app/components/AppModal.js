@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 const TYPE_STYLES = {
@@ -33,11 +34,26 @@ export default function AppModal({
   buttonText = "حسناً",
   confirmText = "تأكيد",
   cancelText = "إلغاء",
+  autoCloseMs = null,
   mode = "alert",
   onClose,
   onConfirm,
   onCancel,
 }) {
+  useEffect(() => {
+    if (!open || !autoCloseMs || mode === "confirm") {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      onClose?.();
+    }, autoCloseMs);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [open, autoCloseMs, mode, onClose]);
+
   if (!open || typeof document === "undefined") return null;
 
   const styles = TYPE_STYLES[type] || TYPE_STYLES.info;

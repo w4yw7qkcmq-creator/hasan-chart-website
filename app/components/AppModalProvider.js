@@ -23,6 +23,7 @@ export function AppModalProvider({ children }) {
     mode: "alert",
     confirmText: "تأكيد",
     cancelText: "إلغاء",
+    autoCloseMs: null,
     resolve: null,
   });
 
@@ -47,13 +48,14 @@ export function AppModalProvider({ children }) {
   }, [pathname, closeModal]);
 
   const showAppModal = useCallback(
-    ({ type = "info", title, message, buttonText = "حسناً" } = {}) => {
+    ({ type = "info", title, message, buttonText = "حسناً", autoCloseMs = null } = {}) => {
       setModal({
         open: true,
         type,
         title: title || DEFAULT_TITLES[type] || DEFAULT_TITLES.info,
         message: message || "",
         buttonText,
+        autoCloseMs,
         mode: "alert",
         confirmText: "تأكيد",
         cancelText: "إلغاء",
@@ -78,6 +80,7 @@ export function AppModalProvider({ children }) {
           title,
           message,
           buttonText: "حسناً",
+          autoCloseMs: null,
           mode: "confirm",
           confirmText,
           cancelText,
@@ -140,6 +143,7 @@ export function AppModalProvider({ children }) {
           buttonText={modal.buttonText}
           confirmText={modal.confirmText}
           cancelText={modal.cancelText}
+          autoCloseMs={modal.autoCloseMs}
           mode={modal.mode}
           onClose={handleClose}
           onConfirm={handleConfirm}
