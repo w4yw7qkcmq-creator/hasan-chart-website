@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>HasaN CharT World</title>
+  <circle cx="256" cy="256" r="256" fill="#020617"/>
+  <circle cx="256" cy="256" r="236" fill="none" stroke="#d4af37" stroke-width="16"/>
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#06b6d4" stroke-width="10"/>
+  <rect x="156" y="292" width="64" height="96" fill="#2563eb"/>
+  <rect x="292" y="212" width="64" height="176" fill="#06b6d4"/>
+  <rect x="250" y="168" width="12" height="220" fill="#94a3b8"/>
+  <rect x="224" y="224" width="64" height="104" fill="#0b63ff"/>
+  <path fill="#d4af37" d="M256 96 L316 176 H280 V224 H232 V176 H196 Z"/>
+  <rect x="128" y="400" width="256" height="14" fill="#d4af37"/>
+</svg>
