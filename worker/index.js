@@ -26,7 +26,7 @@ const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications } = require("./push-sender");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-24-v5-worker-real-email-path";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-24-v6-real-sender-log";
 
 const CHECK_INTERVAL_MS = 12000;
 const MAX_ALERTS_PER_RUN = 20;
@@ -796,6 +796,18 @@ const sendTriggeredAlertEmail = async ({
   const safeTargetPrice = escapeHtml(formatNumber(targetPrice));
   const safeCurrentPrice = escapeHtml(formatNumber(currentPrice));
 
+  console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
+    file: "worker/index.js",
+    function: "sendTriggeredAlertEmail",
+    alertId,
+    email,
+    userId: userId || null,
+    coin: coinLabel,
+    targetPrice,
+    currentPrice,
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+  });
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -1021,6 +1033,38 @@ async function checkPriceAlerts() {
           conditionLabel,
         });
 
+        const { data: claimedAlert, error: claimError } = await supabase
+          .from("price_alerts")
+          .update({
+            status: "triggered",
+            triggered_at: new Date().toISOString(),
+            triggered_price: String(currentPrice),
+          })
+          .eq("id", alert.id)
+          .eq("status", "active")
+          .select("id")
+          .maybeSingle();
+
+        if (claimError) {
+          logWorkerEvent("ALERT_STATUS_UPDATE_FAILED", {
+            worker: WORKER_ENTRY,
+            alertId: alert.id,
+            error: claimError.message,
+          });
+          continue;
+        }
+
+        if (!claimedAlert?.id) {
+          logWorkerEvent("ALERT_ALREADY_CLAIMED", {
+            worker: WORKER_ENTRY,
+            alertId: alert.id,
+            email: userEmail,
+          });
+          continue;
+        }
+
+        summary.alertsUpdated += 1;
+
         const notificationMessage = buildPriceAlertNotificationMessage({
           coin,
           targetPrice,
@@ -1057,25 +1101,6 @@ async function checkPriceAlerts() {
             notificationId: notificationRow?.id || null,
             success: true,
           });
-        }
-
-        const { error: updateError } = await supabase
-          .from("price_alerts")
-          .update({
-            status: "triggered",
-            triggered_at: new Date().toISOString(),
-            triggered_price: String(currentPrice),
-          })
-          .eq("id", alert.id);
-
-        if (updateError) {
-          logWorkerEvent("ALERT_STATUS_UPDATE_FAILED", {
-            worker: WORKER_ENTRY,
-            alertId: alert.id,
-            error: updateError.message,
-          });
-        } else {
-          summary.alertsUpdated += 1;
         }
 
         emailJobs.push({
@@ -1258,8 +1283,22 @@ app.listen(PORT, () => {
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
 });
 
-logWorkerEvent("PRICE_ALERTS_SCHEDULER_DISABLED", {
+setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
+
+console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
+  file: "worker/index.js",
+  function: "module_init",
+  action: "PRICE_ALERTS_SCHEDULER_STARTED",
+  moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+  intervalMs: CHECK_INTERVAL_MS,
+  realEmailPath: "worker/index.js::sendTriggeredAlertEmail",
+});
+
+logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
   worker: WORKER_ENTRY,
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-  note: "Price alerts run on Next.js instrumentation (lib/price-alerts-runner sendTriggeredAlertEmail). Worker scheduler disabled to avoid duplicate emails.",
+  intervalMs: CHECK_INTERVAL_MS,
+  realEmailPath: "worker/index.js::sendTriggeredAlertEmail",
 });
+
+checkPriceAlerts();

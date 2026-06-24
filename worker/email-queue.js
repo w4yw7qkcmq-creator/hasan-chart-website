@@ -157,6 +157,16 @@ async function processEmailQueue(items, options = {}) {
 
     await limiter.waitForSlot();
 
+    if (label === "price-alerts" || label === "price-alerts-real-path") {
+      console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
+        file: "worker/email-queue.js",
+        function: "processEmailQueue",
+        label,
+        to,
+        alertId: item?.alertId || null,
+      });
+    }
+
     const outcome = await sendWithRetry(item.send, { to, label });
 
     limiter.markSent();
