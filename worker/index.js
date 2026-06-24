@@ -177,6 +177,36 @@ const formatNumber = (value) => {
 };
 
 
+const normalizeOkxInstrument = (coin) => {
+  const raw = String(coin || "").trim().toUpperCase();
+
+  if (!raw) {
+    throw new Error("EMPTY_SYMBOL");
+  }
+
+  if (raw.includes("-")) {
+    return raw.replace(/[^A-Z0-9-]/g, "");
+  }
+
+  const cleanSymbol = normalizeSymbol(coin);
+
+  if (!cleanSymbol) {
+    throw new Error("EMPTY_SYMBOL");
+  }
+
+  if (cleanSymbol.endsWith("USDT")) {
+    const base = cleanSymbol.slice(0, -4);
+
+    if (!base) {
+      throw new Error("EMPTY_SYMBOL");
+    }
+
+    return `${base}-USDT`;
+  }
+
+  return `${cleanSymbol}-USDT`;
+};
+
 const getMarketPrice = async (symbol) => {
   const cleanSymbol = normalizeSymbol(symbol);
 
@@ -184,13 +214,19 @@ const getMarketPrice = async (symbol) => {
     throw new Error("EMPTY_SYMBOL");
   }
 
-  const okxSymbol = cleanSymbol.replace("USDT", "-USDT");
+  const okxSymbol = normalizeOkxInstrument(symbol);
 
   const response = await fetch(
     `https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(okxSymbol)}`
   );
 
-  const data = await response.json();
+  console.log("OKX_PRICE_FETCH_ATTEMPT", {
+    coin: symbol,
+    okxSymbol,
+    status: response.status,
+  });
+
+  const data = await response.json().catch(() => null);
   const price = Number(data?.data?.[0]?.last);
 
   if (Number.isFinite(price)) {
@@ -207,12 +243,18 @@ const getMarketCandles = async (symbol, bar = "15m", limit = 120) => {
     throw new Error("EMPTY_SYMBOL");
   }
 
-  const okxSymbol = cleanSymbol.replace("USDT", "-USDT");
+  const okxSymbol = normalizeOkxInstrument(symbol);
   const response = await fetch(
     `https://www.okx.com/api/v5/market/candles?instId=${encodeURIComponent(okxSymbol)}&bar=${encodeURIComponent(bar)}&limit=${encodeURIComponent(String(limit))}`
   );
 
-  const data = await response.json();
+  console.log("OKX_PRICE_FETCH_ATTEMPT", {
+    coin: symbol,
+    okxSymbol,
+    status: response.status,
+  });
+
+  const data = await response.json().catch(() => null);
 
   if (!response.ok || data?.code !== "0" || !Array.isArray(data?.data)) {
     throw new Error(`تعذر جلب شموع ${cleanSymbol} من OKX`);
