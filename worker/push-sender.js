@@ -39,11 +39,22 @@ function toWebPushSubscription(row) {
   };
 }
 
+function formatPushError(error) {
+  return {
+    message: error?.message || null,
+    statusCode: error?.statusCode || null,
+    body: error?.body || null,
+  };
+}
+
 async function sendWebPushNotification(subscriptionRow, payload) {
   if (!configureWebPush()) {
     return {
       success: false,
       skipped: true,
+      message: "WEB_PUSH_NOT_CONFIGURED",
+      statusCode: null,
+      body: null,
       error: "WEB_PUSH_NOT_CONFIGURED",
     };
   }
@@ -57,23 +68,46 @@ async function sendWebPushNotification(subscriptionRow, payload) {
     return {
       success: true,
       statusCode: response?.statusCode || 201,
+      message: null,
+      body: null,
     };
   } catch (error) {
+    const formatted = formatPushError(error);
+
     return {
       success: false,
-      statusCode: error?.statusCode || null,
-      error: error?.body || error?.message || "WEB_PUSH_SEND_FAILED",
+      ...formatted,
+      error: formatted.body || formatted.message || "WEB_PUSH_SEND_FAILED",
     };
   }
 }
 
+async function resolveUserIdForEmail(supabase, email) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("email", normalizedEmail)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.id || null;
+}
+
 async function findPushSubscriptionsForRecipient(
   supabase,
-  { email, userId, anonymousId } = {}
+  { email, userId } = {}
 ) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedUserId = String(userId || "").trim();
-  const normalizedAnonymousId = String(anonymousId || "").trim();
   const seenIds = new Set();
   const rows = [];
 
@@ -89,7 +123,7 @@ async function findPushSubscriptionsForRecipient(
     const { data, error } = await supabase
       .from("push_subscriptions")
       .select(SUBSCRIPTION_COLUMNS)
-      .eq("email", normalizedEmail);
+      .ilike("email", normalizedEmail);
 
     if (error) throw error;
     collectRows(data);
@@ -105,123 +139,15 @@ async function findPushSubscriptionsForRecipient(
     collectRows(data);
   }
 
-  if (normalizedAnonymousId) {
-    const { data, error } = await supabase
-      .from("push_subscriptions")
-      .select(SUBSCRIPTION_COLUMNS)
-      .eq("anonymous_id", normalizedAnonymousId);
-
-    if (error) throw error;
-    collectRows(data);
-  }
-
   return rows;
 }
 
-async function sendTargetedPushNotifications({
-  supabase,
-  workerEntry,
-  email,
-  userId,
-  anonymousId,
-  title,
-  body,
-  url,
-  type,
-  tag,
-  successLogTag,
-  meta = {},
-}) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
-
-  if (!configureWebPush()) {
-    logWorkerEvent(successLogTag, {
-      worker: workerEntry,
-      success: false,
-      error: "WEB_PUSH_NOT_CONFIGURED",
-      email: normalizedEmail || null,
-      userId: userId || null,
-      anonymousId: anonymousId || null,
-      ...meta,
-    });
-
-    return { sent: 0, failed: 0, skipped: 1 };
-  }
-
-  let subscriptionList = [];
-
-  try {
-    subscriptionList = await findPushSubscriptionsForRecipient(supabase, {
-      email: normalizedEmail,
-      userId,
-      anonymousId,
-    });
-  } catch (error) {
-    logWorkerEvent(successLogTag, {
-      worker: workerEntry,
-      success: false,
-      error: error?.message || "SUBSCRIPTION_LOOKUP_FAILED",
-      email: normalizedEmail || null,
-      userId: userId || null,
-      anonymousId: anonymousId || null,
-      ...meta,
-    });
-
-    return { sent: 0, failed: 1, skipped: 0 };
-  }
-
-  if (subscriptionList.length === 0) {
-    logWorkerEvent(successLogTag, {
-      worker: workerEntry,
-      success: false,
-      error: "NO_PUSH_SUBSCRIPTIONS",
-      email: normalizedEmail || null,
-      userId: userId || null,
-      anonymousId: anonymousId || null,
-      ...meta,
-    });
-
-    return { sent: 0, failed: 0, skipped: 1 };
-  }
-
-  const payload = {
-    title,
-    body,
-    url,
-    icon: "/logo.png",
-    type,
-    tag,
-  };
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const subscriptionRow of subscriptionList) {
-    const outcome = await sendWebPushNotification(subscriptionRow, payload);
-
-    if (outcome.success) {
-      sent += 1;
-      logWorkerEvent(successLogTag, {
-        worker: workerEntry,
-        success: true,
-        email: normalizedEmail || subscriptionRow.email || null,
-        userId: userId || subscriptionRow.user_id || null,
-        anonymousId: anonymousId || subscriptionRow.anonymous_id || null,
-        subscriptionId: subscriptionRow.id,
-        endpoint: subscriptionRow.endpoint,
-        ...meta,
-      });
-      continue;
-    }
-
-    failed += 1;
-
-    if (outcome.statusCode === 404 || outcome.statusCode === 410) {
-      await supabase.from("push_subscriptions").delete().eq("id", subscriptionRow.id);
-    }
-  }
-
-  return { sent, failed, skipped: 0 };
+function logPriceAlertPushFailed(workerEntry, payload) {
+  logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
+    worker: workerEntry,
+    success: false,
+    ...payload,
+  });
 }
 
 async function sendPriceAlertPushNotifications({
@@ -234,19 +160,167 @@ async function sendPriceAlertPushNotifications({
   body,
   url = "https://www.hasanchartworld.com/alerts",
 }) {
-  return sendTargetedPushNotifications({
-    supabase,
-    workerEntry,
-    email,
-    userId,
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  let resolvedUserId = String(userId || "").trim() || null;
+
+  logWorkerEvent("PRICE_ALERT_PUSH_START", {
+    worker: workerEntry,
+    alertId,
+    email: normalizedEmail || null,
+    userId: resolvedUserId,
+    webPushConfigured: isWebPushConfigured(),
+    title,
+    bodyPreview: String(body || "").slice(0, 180),
+  });
+
+  if (!normalizedEmail && !resolvedUserId) {
+    logPriceAlertPushFailed(workerEntry, {
+      alertId,
+      email: null,
+      userId: null,
+      message: "MISSING_ALERT_RECIPIENT",
+      statusCode: null,
+      body: null,
+      error: "MISSING_ALERT_RECIPIENT",
+    });
+
+    return { sent: 0, failed: 1, skipped: 0 };
+  }
+
+  if (!configureWebPush()) {
+    logPriceAlertPushFailed(workerEntry, {
+      alertId,
+      email: normalizedEmail || null,
+      userId: resolvedUserId,
+      message: "WEB_PUSH_NOT_CONFIGURED",
+      statusCode: null,
+      body: null,
+      error: "WEB_PUSH_NOT_CONFIGURED",
+      missingEnv: {
+        hasPublicKey: Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()),
+        hasPrivateKey: Boolean(process.env.VAPID_PRIVATE_KEY?.trim()),
+        hasSubject: Boolean(process.env.VAPID_SUBJECT?.trim()),
+      },
+    });
+
+    return { sent: 0, failed: 1, skipped: 0 };
+  }
+
+  if (!resolvedUserId && normalizedEmail) {
+    try {
+      resolvedUserId = await resolveUserIdForEmail(supabase, normalizedEmail);
+    } catch (error) {
+      logPriceAlertPushFailed(workerEntry, {
+        alertId,
+        email: normalizedEmail,
+        userId: null,
+        phase: "resolve_user_id",
+        message: error?.message || "PROFILE_LOOKUP_FAILED",
+        statusCode: error?.statusCode || null,
+        body: error?.details || error?.hint || null,
+        error: error?.message || "PROFILE_LOOKUP_FAILED",
+      });
+
+      return { sent: 0, failed: 1, skipped: 0 };
+    }
+  }
+
+  let subscriptionList = [];
+
+  try {
+    subscriptionList = await findPushSubscriptionsForRecipient(supabase, {
+      email: normalizedEmail,
+      userId: resolvedUserId,
+    });
+  } catch (error) {
+    logPriceAlertPushFailed(workerEntry, {
+      alertId,
+      email: normalizedEmail || null,
+      userId: resolvedUserId,
+      phase: "subscription_lookup",
+      message: error?.message || "SUBSCRIPTION_LOOKUP_FAILED",
+      statusCode: error?.statusCode || null,
+      body: error?.details || error?.hint || null,
+      error: error?.message || "SUBSCRIPTION_LOOKUP_FAILED",
+    });
+
+    return { sent: 0, failed: 1, skipped: 0 };
+  }
+
+  logWorkerEvent("PRICE_ALERT_PUSH_START", {
+    worker: workerEntry,
+    alertId,
+    email: normalizedEmail || null,
+    userId: resolvedUserId,
+    subscriptionCount: subscriptionList.length,
+    subscriptionIds: subscriptionList.map((row) => row.id),
+    phase: "subscriptions_loaded",
+  });
+
+  if (subscriptionList.length === 0) {
+    logPriceAlertPushFailed(workerEntry, {
+      alertId,
+      email: normalizedEmail || null,
+      userId: resolvedUserId,
+      message: "NO_PUSH_SUBSCRIPTIONS",
+      statusCode: null,
+      body: null,
+      error: "NO_PUSH_SUBSCRIPTIONS",
+    });
+
+    return { sent: 0, failed: 0, skipped: 1 };
+  }
+
+  const payload = {
     title,
     body,
     url,
+    icon: "/logo.png",
     type: "price-alert",
     tag: `price-alert-${alertId}`,
-    successLogTag: "PRICE_ALERT_PUSH_SENT",
-    meta: { alertId },
-  });
+  };
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const subscriptionRow of subscriptionList) {
+    const outcome = await sendWebPushNotification(subscriptionRow, payload);
+
+    if (outcome.success) {
+      sent += 1;
+      logWorkerEvent("PRICE_ALERT_PUSH_SENT", {
+        worker: workerEntry,
+        success: true,
+        alertId,
+        email: normalizedEmail || subscriptionRow.email || null,
+        userId: resolvedUserId || subscriptionRow.user_id || null,
+        subscriptionId: subscriptionRow.id,
+        endpoint: subscriptionRow.endpoint,
+        statusCode: outcome.statusCode || 201,
+      });
+      continue;
+    }
+
+    failed += 1;
+
+    logPriceAlertPushFailed(workerEntry, {
+      alertId,
+      email: normalizedEmail || subscriptionRow.email || null,
+      userId: resolvedUserId || subscriptionRow.user_id || null,
+      subscriptionId: subscriptionRow.id,
+      endpoint: subscriptionRow.endpoint,
+      message: outcome.message || outcome.error || "WEB_PUSH_SEND_FAILED",
+      statusCode: outcome.statusCode || null,
+      body: outcome.body || null,
+      error: outcome.error || outcome.message || "WEB_PUSH_SEND_FAILED",
+    });
+
+    if (outcome.statusCode === 404 || outcome.statusCode === 410) {
+      await supabase.from("push_subscriptions").delete().eq("id", subscriptionRow.id);
+    }
+  }
+
+  return { sent, failed, skipped: 0 };
 }
 
 module.exports = {

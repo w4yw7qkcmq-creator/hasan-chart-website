@@ -26,7 +26,7 @@ const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications } = require("./push-sender");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v3-push";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v4-price-alert-push";
 
 const CHECK_INTERVAL_MS = 12000;
 const MAX_ALERTS_PER_RUN = 20;
@@ -74,6 +74,16 @@ const getConditionLabel = (condition) => {
   return normalizeCondition(condition) === "below"
     ? "وصول السعر للأسفل"
     : "وصول السعر للأعلى";
+};
+
+const buildPriceAlertPushBody = ({ coin, targetPrice, currentPrice }) => {
+  const coinLabel = formatCoinPair(coin);
+
+  return [
+    `العملة: ${coinLabel}`,
+    `السعر المطلوب: ${formatNumber(targetPrice)}`,
+    `السعر الحالي: ${formatNumber(currentPrice)}`,
+  ].join(" | ");
 };
 
 const buildPriceAlertNotificationMessage = ({
@@ -915,7 +925,7 @@ async function checkPriceAlerts() {
 
         const conditionLabel = getConditionLabel(condition);
 
-        logWorkerEvent("ALERT_TRIGGERED", {
+        logWorkerEvent("PRICE_ALERT_TRIGGERED", {
           worker: WORKER_ENTRY,
           alertId: alert.id,
           email: userEmail,
@@ -932,6 +942,12 @@ async function checkPriceAlerts() {
           targetPrice,
           currentPrice,
           condition,
+        });
+
+        const pushBody = buildPriceAlertPushBody({
+          coin,
+          targetPrice,
+          currentPrice,
         });
 
         const { data: notificationRow, error: notificationError } = await supabase
@@ -964,21 +980,6 @@ async function checkPriceAlerts() {
             success: true,
           });
         }
-
-        const pushStats = await sendPriceAlertPushNotifications({
-          supabase,
-          workerEntry: WORKER_ENTRY,
-          alertId: alert.id,
-          email: userEmail,
-          userId: alert.user_id || null,
-          title: "✅ وصل السعر إلى هدف التنبيه",
-          body: notificationMessage,
-          url: "https://www.hasanchartworld.com/alerts",
-        });
-
-        summary.pushesSent += pushStats.sent || 0;
-        summary.pushesFailed += pushStats.failed || 0;
-        summary.pushesSkipped += pushStats.skipped || 0;
 
         const { error: updateError } = await supabase
           .from("price_alerts")
@@ -1024,6 +1025,36 @@ async function checkPriceAlerts() {
           targetPrice,
           currentPrice,
         });
+
+        try {
+          const pushStats = await sendPriceAlertPushNotifications({
+            supabase,
+            workerEntry: WORKER_ENTRY,
+            alertId: alert.id,
+            email: userEmail,
+            userId: alert.user_id || null,
+            title: "✅ وصل السعر إلى هدف التنبيه",
+            body: pushBody,
+            url: "https://www.hasanchartworld.com/alerts",
+          });
+
+          summary.pushesSent += pushStats.sent || 0;
+          summary.pushesFailed += pushStats.failed || 0;
+          summary.pushesSkipped += pushStats.skipped || 0;
+        } catch (pushError) {
+          summary.pushesFailed += 1;
+
+          logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
+            worker: WORKER_ENTRY,
+            success: false,
+            alertId: alert.id,
+            email: userEmail,
+            message: pushError?.message || String(pushError),
+            statusCode: pushError?.statusCode || null,
+            body: pushError?.body || null,
+            error: pushError?.message || String(pushError),
+          });
+        }
 
         triggeredItems.push({
           alertId: alert.id,
