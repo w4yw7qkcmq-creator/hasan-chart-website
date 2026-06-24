@@ -86,6 +86,44 @@ const buildPriceAlertPushBody = ({ coin, targetPrice, currentPrice }) => {
   ].join(" | ");
 };
 
+async function doPushForAlertOwner({
+  alertId,
+  email,
+  userId,
+  coin,
+  targetPrice,
+  currentPrice,
+}) {
+  const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
+
+  try {
+    return await sendPriceAlertPushNotifications({
+      supabase,
+      workerEntry: WORKER_ENTRY,
+      alertId,
+      email,
+      userId,
+      title: "✅ وصل السعر إلى هدف التنبيه",
+      body: pushBody,
+      url: "https://www.hasanchartworld.com/alerts",
+    });
+  } catch (pushError) {
+    logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
+      worker: WORKER_ENTRY,
+      success: false,
+      alertId,
+      email,
+      userId: userId || null,
+      message: pushError?.message || String(pushError),
+      statusCode: pushError?.statusCode || null,
+      body: pushError?.body || null,
+      error: pushError?.message || String(pushError),
+    });
+
+    return { sent: 0, failed: 1, skipped: 0 };
+  }
+}
+
 const buildPriceAlertNotificationMessage = ({
   coin,
   targetPrice,
@@ -688,7 +726,6 @@ const sendTriggeredAlertEmail = async ({
   userId = null,
 }) => {
   const coinLabel = formatCoinPair(coin);
-  const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
 
   logWorkerEvent("PRICE_ALERT_EMAIL_REAL_PATH_FOUND", {
     worker: WORKER_ENTRY,
@@ -702,33 +739,6 @@ const sendTriggeredAlertEmail = async ({
     currentPrice,
     condition,
   });
-
-  const sendPushForAlertOwner = async () => {
-    try {
-      await sendPriceAlertPushNotifications({
-        supabase,
-        workerEntry: WORKER_ENTRY,
-        alertId,
-        email,
-        userId,
-        title: "✅ وصل السعر إلى هدف التنبيه",
-        body: pushBody,
-        url: "https://www.hasanchartworld.com/alerts",
-      });
-    } catch (pushError) {
-      logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
-        worker: WORKER_ENTRY,
-        success: false,
-        alertId,
-        email,
-        userId: userId || null,
-        message: pushError?.message || String(pushError),
-        statusCode: pushError?.statusCode || null,
-        body: pushError?.body || null,
-        error: pushError?.message || String(pushError),
-      });
-    }
-  };
 
   logWorkerEvent("ALERT_EMAIL_SEND_START", {
     worker: WORKER_ENTRY,
@@ -749,8 +759,6 @@ const sendTriggeredAlertEmail = async ({
       email,
       reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
     });
-
-    await sendPushForAlertOwner();
 
     return {
       success: false,
@@ -830,8 +838,6 @@ const sendTriggeredAlertEmail = async ({
       error: data?.message || response.statusText || "Email provider error",
     });
 
-    await sendPushForAlertOwner();
-
     return {
       success: false,
       sent: false,
@@ -850,8 +856,6 @@ const sendTriggeredAlertEmail = async ({
     currentPrice,
     resendId: data?.id || null,
   });
-
-  await sendPushForAlertOwner();
 
   return {
     success: true,
@@ -1056,6 +1060,19 @@ async function checkPriceAlerts() {
               userId: alert.user_id || null,
             }),
         });
+
+        const pushStats = await doPushForAlertOwner({
+          alertId: alert.id,
+          email: userEmail,
+          userId: alert.user_id || null,
+          coin,
+          targetPrice,
+          currentPrice,
+        });
+
+        summary.pushesSent += pushStats?.sent || 0;
+        summary.pushesFailed += pushStats?.failed || 0;
+        summary.pushesSkipped += pushStats?.skipped || 0;
 
         summary.emailsQueued += 1;
         summary.triggered += 1;
