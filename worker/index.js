@@ -1193,7 +1193,7 @@ app.listen(PORT, () => {
         process.env.VAPID_PRIVATE_KEY &&
         process.env.VAPID_SUBJECT
     ),
-    note: "Price alert emails and Web Push are sent ONLY from worker/index.js",
+    note: "Price alert email + Web Push run from Next.js lib/price-alerts-runner.js (instrumentation), not this worker entry",
   });
 
   logWorkerEvent("WORKER_BOOT", {
@@ -1203,17 +1203,14 @@ app.listen(PORT, () => {
     port: PORT,
     checkIntervalMs: CHECK_INTERVAL_MS,
     priceAlertsEnabled: true,
-    note: "Price alert emails are sent ONLY from this worker entry (worker/index.js), not news-worker.js",
+    note: "Price alert email + Web Push run from Next.js lib/price-alerts-runner.js (instrumentation), not this worker entry",
   });
 
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
 });
 
-setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
-
-logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
+logWorkerEvent("PRICE_ALERTS_SCHEDULER_DISABLED", {
   worker: WORKER_ENTRY,
-  intervalMs: CHECK_INTERVAL_MS,
+  moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+  note: "Price alert email + Web Push run from Next.js instrumentation (lib/price-alerts-runner.js), not worker/index.js",
 });
-
-checkPriceAlerts();
