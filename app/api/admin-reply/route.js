@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSession } from "../../../lib/admin-auth";
+import { sendAnalysisReadyPush } from "../../../lib/push-notifications";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -205,6 +206,13 @@ export async function POST(req) {
       email: emailTarget,
       coin: coinTarget,
       reply,
+    });
+
+    await sendAnalysisReadyPush({
+      supabase,
+      email: emailTarget,
+      coin: coinTarget,
+      requestId,
     });
 
     return Response.json({

@@ -23,7 +23,7 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const { processEmailQueue } = require("./email-queue");
 const { logWorkerEvent } = require("./alert-logger");
-const { sendPriceAlertPushNotifications, sendTestPushToAllSubscriptions } = require("./push-sender");
+const { sendPriceAlertPushNotifications } = require("./push-sender");
 
 const WORKER_ENTRY = "worker/index.js";
 const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v3-push";
@@ -970,6 +970,7 @@ async function checkPriceAlerts() {
           workerEntry: WORKER_ENTRY,
           alertId: alert.id,
           email: userEmail,
+          userId: alert.user_id || null,
           title: "✅ وصل السعر إلى هدف التنبيه",
           body: notificationMessage,
           url: "https://www.hasanchartworld.com/alerts",
@@ -1065,36 +1066,6 @@ app.get("/health", async (_req, res) => {
     checkIntervalMs: CHECK_INTERVAL_MS,
     timestamp: new Date().toISOString(),
   });
-});
-
-app.post("/api/test-push", async (_req, res) => {
-  try {
-    logWorkerEvent("TEST_PUSH_ROUTE_HIT", {
-      worker: WORKER_ENTRY,
-      route: "/api/test-push",
-    });
-
-    const stats = await sendTestPushToAllSubscriptions({
-      supabase,
-      workerEntry: WORKER_ENTRY,
-    });
-
-    return res.json({
-      success: true,
-      message: "تم إرسال إشعار الاختبار",
-      stats,
-    });
-  } catch (error) {
-    logWorkerEvent("TEST_PUSH_ROUTE_FAILED", {
-      worker: WORKER_ENTRY,
-      error: error?.message || String(error),
-    });
-
-    return res.status(500).json({
-      success: false,
-      error: error?.message || "TEST_PUSH_FAILED",
-    });
-  }
 });
 
 app.post("/api/instant-analysis", async (req, res) => {

@@ -1,6 +1,11 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
 import { processEmailQueue } from "../../../../lib/email-queue";
+import {
+  sendAccountManagementAcceptedPush,
+  sendAnalysisReadyPush,
+  sendVipSignalPush,
+} from "../../../../lib/push-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -413,7 +418,7 @@ function isActiveSubscriptionRow(item) {
 
 async function notifyVipSubscribers(supabase, signal) {
   try {
-    const { signalType, coin, entry, targets, stopLoss, notes } = signal;
+    const { signalType, coin, entry, targets, stopLoss, notes, signalId } = signal;
     const normalizedSignalType = normalizeVipSignalType(signalType);
     const label = signalTypeLabel(normalizedSignalType);
 
@@ -508,6 +513,27 @@ async function notifyVipSubscribers(supabase, signal) {
       coin,
       ...emailStats,
     });
+
+    const pushResults = await Promise.all(
+      recipientEmails.map((email) =>
+        sendVipSignalPush({
+          supabase,
+          email,
+          signalType: normalizedSignalType,
+          coin,
+          signalId: signalId || `${normalizedSignalType}-${coin}`,
+        })
+      )
+    );
+
+    console.log("VIP signal push summary:", {
+      signalType: normalizedSignalType,
+      coin,
+      recipients: recipientEmails.length,
+      sent: pushResults.reduce((sum, item) => sum + (item.sent || 0), 0),
+      failed: pushResults.reduce((sum, item) => sum + (item.failed || 0), 0),
+      skipped: pushResults.reduce((sum, item) => sum + (item.skipped || 0), 0),
+    });
   } catch (error) {
     console.error("VIP subscriber notification error:", error.message || error);
   }
@@ -555,6 +581,16 @@ export async function POST(request) {
         );
       }
 
+      const { data: existingRow, error: fetchError } = await supabase
+        .from(targetTableConfig.table)
+        .select("id, user_email, email, user_id, coin, platform")
+        .eq("id", requestId)
+        .maybeSingle();
+
+      if (fetchError) {
+        throw new Error(fetchError.message || "تعذر قراءة بيانات الطلب");
+      }
+
       const { error } = await supabase
         .from(targetTableConfig.table)
         .update({ status: newStatus })
@@ -573,6 +609,31 @@ export async function POST(request) {
           status: newStatus,
         },
       });
+
+      if (
+        targetTableConfig.table === "account_management_requests" &&
+        newStatus === "نشط"
+      ) {
+        await sendAccountManagementAcceptedPush({
+          supabase,
+          email: existingRow?.email,
+          userId: existingRow?.user_id,
+          requestId,
+          platform: existingRow?.platform,
+        });
+      }
+
+      if (
+        targetTableConfig.table === "analysis_requests" &&
+        (newStatus === "مكتمل" || newStatus === "تم الرد")
+      ) {
+        await sendAnalysisReadyPush({
+          supabase,
+          email: existingRow?.user_email,
+          coin: existingRow?.coin,
+          requestId,
+        });
+      }
 
       return Response.json({ success: true });
     }
@@ -628,6 +689,7 @@ export async function POST(request) {
         targets,
         stopLoss,
         notes,
+        signalId: data?.id || null,
       });
 
       return Response.json({ success: true, id: data?.id || null });
@@ -642,6 +704,16 @@ export async function POST(request) {
           { success: false, error: "الرد مطلوب" },
           { status: 400 }
         );
+      }
+
+      const { data: existingRequest, error: fetchError } = await supabase
+        .from("analysis_requests")
+        .select("id, user_email, coin")
+        .eq("id", requestId)
+        .maybeSingle();
+
+      if (fetchError) {
+        throw new Error(fetchError.message || "تعذر قراءة طلب التحليل");
       }
 
       const { error } = await supabase
@@ -665,6 +737,13 @@ export async function POST(request) {
         details: {
           hasImage: Boolean(replyImage),
         },
+      });
+
+      await sendAnalysisReadyPush({
+        supabase,
+        email: existingRequest?.user_email,
+        coin: existingRequest?.coin,
+        requestId,
       });
 
       return Response.json({ success: true });
