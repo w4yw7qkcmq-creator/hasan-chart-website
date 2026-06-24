@@ -26,7 +26,7 @@ const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications } = require("./push-sender");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v4-price-alert-push";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-24-v5-worker-real-email-path";
 
 const CHECK_INTERVAL_MS = 12000;
 const MAX_ALERTS_PER_RUN = 20;
@@ -685,8 +685,50 @@ const sendTriggeredAlertEmail = async ({
   targetPrice,
   currentPrice,
   alertId = null,
+  userId = null,
 }) => {
   const coinLabel = formatCoinPair(coin);
+  const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
+
+  logWorkerEvent("PRICE_ALERT_EMAIL_REAL_PATH_FOUND", {
+    worker: WORKER_ENTRY,
+    file: "worker/index.js",
+    function: "sendTriggeredAlertEmail",
+    alertId,
+    email,
+    userId: userId || null,
+    coin: coinLabel,
+    targetPrice,
+    currentPrice,
+    condition,
+  });
+
+  const sendPushForAlertOwner = async () => {
+    try {
+      await sendPriceAlertPushNotifications({
+        supabase,
+        workerEntry: WORKER_ENTRY,
+        alertId,
+        email,
+        userId,
+        title: "✅ وصل السعر إلى هدف التنبيه",
+        body: pushBody,
+        url: "https://www.hasanchartworld.com/alerts",
+      });
+    } catch (pushError) {
+      logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
+        worker: WORKER_ENTRY,
+        success: false,
+        alertId,
+        email,
+        userId: userId || null,
+        message: pushError?.message || String(pushError),
+        statusCode: pushError?.statusCode || null,
+        body: pushError?.body || null,
+        error: pushError?.message || String(pushError),
+      });
+    }
+  };
 
   logWorkerEvent("ALERT_EMAIL_SEND_START", {
     worker: WORKER_ENTRY,
@@ -707,6 +749,8 @@ const sendTriggeredAlertEmail = async ({
       email,
       reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
     });
+
+    await sendPushForAlertOwner();
 
     return {
       success: false,
@@ -786,6 +830,8 @@ const sendTriggeredAlertEmail = async ({
       error: data?.message || response.statusText || "Email provider error",
     });
 
+    await sendPushForAlertOwner();
+
     return {
       success: false,
       sent: false,
@@ -804,6 +850,8 @@ const sendTriggeredAlertEmail = async ({
     currentPrice,
     resendId: data?.id || null,
   });
+
+  await sendPushForAlertOwner();
 
   return {
     success: true,
@@ -944,12 +992,6 @@ async function checkPriceAlerts() {
           condition,
         });
 
-        const pushBody = buildPriceAlertPushBody({
-          coin,
-          targetPrice,
-          currentPrice,
-        });
-
         const { data: notificationRow, error: notificationError } = await supabase
           .from("notifications")
           .insert({
@@ -1011,6 +1053,7 @@ async function checkPriceAlerts() {
               targetPrice,
               currentPrice,
               alertId: alert.id,
+              userId: alert.user_id || null,
             }),
         });
 
@@ -1025,36 +1068,6 @@ async function checkPriceAlerts() {
           targetPrice,
           currentPrice,
         });
-
-        try {
-          const pushStats = await sendPriceAlertPushNotifications({
-            supabase,
-            workerEntry: WORKER_ENTRY,
-            alertId: alert.id,
-            email: userEmail,
-            userId: alert.user_id || null,
-            title: "✅ وصل السعر إلى هدف التنبيه",
-            body: pushBody,
-            url: "https://www.hasanchartworld.com/alerts",
-          });
-
-          summary.pushesSent += pushStats.sent || 0;
-          summary.pushesFailed += pushStats.failed || 0;
-          summary.pushesSkipped += pushStats.skipped || 0;
-        } catch (pushError) {
-          summary.pushesFailed += 1;
-
-          logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
-            worker: WORKER_ENTRY,
-            success: false,
-            alertId: alert.id,
-            email: userEmail,
-            message: pushError?.message || String(pushError),
-            statusCode: pushError?.statusCode || null,
-            body: pushError?.body || null,
-            error: pushError?.message || String(pushError),
-          });
-        }
 
         triggeredItems.push({
           alertId: alert.id,
@@ -1193,7 +1206,7 @@ app.listen(PORT, () => {
         process.env.VAPID_PRIVATE_KEY &&
         process.env.VAPID_SUBJECT
     ),
-    note: "Price alert email + Web Push run from Next.js lib/price-alerts-runner.js (instrumentation), not this worker entry",
+    note: "Price alert email + Web Push are sent from worker/index.js sendTriggeredAlertEmail",
   });
 
   logWorkerEvent("WORKER_BOOT", {
@@ -1203,14 +1216,19 @@ app.listen(PORT, () => {
     port: PORT,
     checkIntervalMs: CHECK_INTERVAL_MS,
     priceAlertsEnabled: true,
-    note: "Price alert email + Web Push run from Next.js lib/price-alerts-runner.js (instrumentation), not this worker entry",
+    note: "Price alert email + Web Push are sent from worker/index.js sendTriggeredAlertEmail",
   });
 
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
 });
 
-logWorkerEvent("PRICE_ALERTS_SCHEDULER_DISABLED", {
+setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
+
+logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
   worker: WORKER_ENTRY,
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-  note: "Price alert email + Web Push run from Next.js instrumentation (lib/price-alerts-runner.js), not worker/index.js",
+  intervalMs: CHECK_INTERVAL_MS,
+  realEmailPath: "worker/index.js::sendTriggeredAlertEmail",
 });
+
+checkPriceAlerts();
