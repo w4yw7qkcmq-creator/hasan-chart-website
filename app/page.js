@@ -24,6 +24,7 @@ export default function Home() {
     ETHUSDT: "0",
     SOLUSDT: "0",
   });
+  const [liveFeedStatus, setLiveFeedStatus] = useState("connecting");
 
   const [analysisCoin, setAnalysisCoin] = useState("");
   const [analysisFrame, setAnalysisFrame] = useState("");
@@ -109,24 +110,75 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const ws = new WebSocket(
-      "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade"
-    );
+    if (typeof window === "undefined" || typeof WebSocket === "undefined") {
+      setLiveFeedStatus("offline");
+      return undefined;
+    }
 
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      const d = msg.data;
+    let ws;
+    let closedByCleanup = false;
+    let reconnectTimer;
 
-      if (d?.s && d?.p) {
-        const livePrice = Number(d.p);
-        setPrices((prev) => ({
-          ...prev,
-          [d.s]: livePrice.toLocaleString(),
-        }));
+    const connect = () => {
+      if (closedByCleanup) return;
+
+      setLiveFeedStatus((current) => (current === "live" ? "live" : "connecting"));
+
+      try {
+        ws = new WebSocket(
+          "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade"
+        );
+      } catch {
+        setLiveFeedStatus("retrying");
+        reconnectTimer = window.setTimeout(connect, 5000);
+        return;
       }
+
+      ws.onopen = () => {
+        setLiveFeedStatus("live");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          const d = msg.data;
+
+          if (d?.s && d?.p) {
+            const livePrice = Number(d.p);
+            setPrices((prev) => ({
+              ...prev,
+              [d.s]: livePrice.toLocaleString(),
+            }));
+          }
+        } catch {
+          // Ignore malformed websocket payloads.
+        }
+      };
+
+      ws.onerror = () => {
+        if (!closedByCleanup) {
+          setLiveFeedStatus((current) => (current === "live" ? "live" : "retrying"));
+        }
+      };
+
+      ws.onclose = () => {
+        if (closedByCleanup) return;
+
+        setLiveFeedStatus("retrying");
+        reconnectTimer = window.setTimeout(connect, 5000);
+      };
     };
 
-    return () => ws.close();
+    connect();
+
+    return () => {
+      closedByCleanup = true;
+      clearTimeout(reconnectTimer);
+
+      if (ws && ws.readyState <= WebSocket.OPEN) {
+        ws.close();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -437,13 +489,15 @@ export default function Home() {
                     <p className="site-price-card__eyebrow">Market Pulse</p>
                     <h3 className="site-price-card__title mb-0">BTC / ETH / SOL</h3>
                   </div>
-                  <span className="site-market-pulse-badge">WebSocket</span>
+                  <span className="site-market-pulse-badge">
+                    {liveFeedStatus === "live" ? "Binance Live" : "جاري التحديث..."}
+                  </span>
                 </div>
 
                 <div className="space-y-3">
-                  <MiniTicker symbol="BTC" price={prices.BTCUSDT} />
-                  <MiniTicker symbol="ETH" price={prices.ETHUSDT} />
-                  <MiniTicker symbol="SOL" price={prices.SOLUSDT} />
+                  <MiniTicker symbol="BTC" price={prices.BTCUSDT} live={liveFeedStatus === "live"} />
+                  <MiniTicker symbol="ETH" price={prices.ETHUSDT} live={liveFeedStatus === "live"} />
+                  <MiniTicker symbol="SOL" price={prices.SOLUSDT} live={liveFeedStatus === "live"} />
                 </div>
               </div>
             </div>
@@ -535,8 +589,8 @@ export default function Home() {
               width="100%"
               height="520"
               frameBorder="0"
-              allowTransparency="true"
               scrolling="no"
+              title={`TradingView chart ${chartSymbol}`}
             />
           </div>
         </section>
@@ -727,16 +781,17 @@ function TradingViewPrice({ title, symbol, tvSymbol }) {
       <p className="site-price-card__eyebrow">{title}</p>
       <h3 className="site-price-card__title">{symbol}</h3>
       <TradingViewWidget symbol={tvSymbol} height="120" />
-      <p className="site-price-card__status">● TradingView Live</p>
     </div>
   );
 }
 
-function MiniTicker({ symbol, price }) {
+function MiniTicker({ symbol, price, live = false }) {
+  const displayPrice = live && price !== "0" ? `$${price}` : "جاري التحديث...";
+
   return (
     <div className="site-price-card site-price-card--pulse">
       <span className="site-price-card__title mb-0 text-base">{symbol}</span>
-      <span className="site-price-card__value text-base">${price}</span>
+      <span className="site-price-card__value text-base">{displayPrice}</span>
     </div>
   );
 }
@@ -797,17 +852,18 @@ function MarketWindow({ title, label, symbol }) {
       <p className="site-price-card__eyebrow">{label}</p>
       <h3 className="site-price-card__title">{title}</h3>
       <TradingViewWidget symbol={symbol} height="120" />
-      <p className="site-price-card__status">● TradingView Live</p>
     </div>
   );
 }
 
 function TradingViewWidget({ symbol, height = "120" }) {
   const containerRef = useRef(null);
+  const [feedStatus, setFeedStatus] = useState("loading");
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) return undefined;
 
+    setFeedStatus("loading");
     containerRef.current.innerHTML = "";
 
     const widgetBox = document.createElement("div");
@@ -825,14 +881,42 @@ function TradingViewWidget({ symbol, height = "120" }) {
       locale: "ar",
     });
 
+    script.onload = () => {
+      setFeedStatus("live");
+    };
+
+    script.onerror = () => {
+      setFeedStatus("updating");
+    };
+
     containerRef.current.appendChild(script);
+
+    const fallbackTimer = window.setTimeout(() => {
+      setFeedStatus((current) => (current === "loading" ? "updating" : current));
+    }, 8000);
+
+    return () => {
+      clearTimeout(fallbackTimer);
+    };
   }, [symbol]);
 
+  const statusLabel = feedStatus === "live" ? "TradingView Live" : "جاري التحديث...";
+
   return (
-    <div
-      ref={containerRef}
-      className="tradingview-widget-container overflow-hidden rounded-2xl border border-slate-800 bg-black shadow-[inset_0_0_30px_rgba(0,0,0,0.65)]"
-      style={{ height }}
-    />
+    <div>
+      <div className="relative">
+        <div
+          ref={containerRef}
+          className="tradingview-widget-container overflow-hidden rounded-2xl border border-slate-800 bg-black shadow-[inset_0_0_30px_rgba(0,0,0,0.65)]"
+          style={{ height }}
+        />
+        {feedStatus !== "live" ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-950/70 text-xs font-bold text-cyan-200">
+            جاري التحديث...
+          </div>
+        ) : null}
+      </div>
+      <p className="site-price-card__status">● {statusLabel}</p>
+    </div>
   );
 }
