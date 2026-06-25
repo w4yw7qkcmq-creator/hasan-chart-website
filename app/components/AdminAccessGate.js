@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "./AuthProvider";
 
-function AdminAccessLoading() {
+function AdminAccessLoading({ title = "جاري التحقق من صلاحيات الإدارة" }) {
   return (
     <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
@@ -13,7 +13,7 @@ function AdminAccessLoading() {
           <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/25 bg-cyan-400/10 text-4xl">
             ⏳
           </div>
-          <h1 className="text-3xl font-black">جاري التحقق من الجلسة</h1>
+          <h1 className="text-3xl font-black">{title}</h1>
           <p className="mt-3 leading-7 text-slate-400">يرجى الانتظار حتى اكتمال فحص صلاحيات الإدارة...</p>
         </div>
       </div>
@@ -23,28 +23,37 @@ function AdminAccessLoading() {
 
 export function AdminAccessGate({ children }) {
   const router = useRouter();
-  const { authResolved, status, isAdmin } = useAuth();
+  const { authResolved, profileReady, user, isAdmin } = useAuth();
 
   useEffect(() => {
     if (!authResolved) return;
-
-    if (status === "unauthenticated") {
+    if (!user?.email) {
       router.replace("/login");
-      return;
     }
+  }, [authResolved, user?.email, router]);
 
-    if (status === "authenticated" && !isAdmin) {
+  useEffect(() => {
+    if (!authResolved || !profileReady || !user?.email) return;
+    if (!isAdmin) {
       router.replace("/403");
     }
-  }, [authResolved, status, isAdmin, router]);
+  }, [authResolved, profileReady, user?.email, isAdmin, router]);
 
-  if (!authResolved || status === "loading") {
+  if (!authResolved) {
     return <AdminAccessLoading />;
   }
 
-  if (status === "unauthenticated" || !isAdmin) {
+  if (!user?.email) {
     return <AdminAccessLoading />;
   }
 
-  return children;
+  if (isAdmin) {
+    return children;
+  }
+
+  if (!profileReady) {
+    return <AdminAccessLoading />;
+  }
+
+  return <AdminAccessLoading title="غير مصرح" />;
 }

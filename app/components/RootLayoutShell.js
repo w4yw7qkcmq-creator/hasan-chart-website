@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import {
@@ -13,7 +13,9 @@ import {
 } from "../../lib/push-client";
 import { useAppModal } from "./AppModalProvider";
 import { useAuth } from "./AuthProvider";
-import BootstrapLoading from "./BootstrapLoading";
+import { useBootstrapLoadingOverlay } from "../hooks/useBootstrapLoadingOverlay";
+import { NotificationBell } from "./notifications/NotificationBell";
+import { useNotifications } from "./notifications/NotificationProvider";
 import { useTheme } from "./ThemeProvider";
 
 const menuItems = [
@@ -70,16 +72,121 @@ function hasActiveSubscriptionStatus(status) {
   return normalized === "نشط" || normalized === "active" || normalized === "مفعل";
 }
 
-const getAnalysisReplyKey = (row) => {
-  const id = String(row?.id || "");
-  const reply = String(row?.reply || "");
-  const image = String(row?.reply_image || row?.replyImage || "");
-  const signature = `${reply.length}:${reply.slice(0, 80)}:${image.length}`;
-  return `${id}:${signature}`;
-};
+function resolveMenuItemState(item, authResolved, currentUser) {
+  if (!item.auth && !item.plan) {
+    return "visible";
+  }
 
-const BOOTSTRAP_LOADING_DELAY_MS = 700;
-const BOOTSTRAP_LOADING_EXIT_MS = 320;
+  if (!authResolved) {
+    return "pending";
+  }
+
+  if (item.auth && !currentUser) {
+    return "hidden";
+  }
+
+  const hasActiveSubscription = hasActiveSubscriptionStatus(currentUser?.subscription_status);
+  const { hasSpot: hasSpotPlan, hasFutures: hasFuturesPlan } = getUserPlanAccess(currentUser);
+
+  if (item.plan === "spot" && (!hasActiveSubscription || !hasSpotPlan)) {
+    return "hidden";
+  }
+
+  if (item.plan === "futures" && (!hasActiveSubscription || !hasFuturesPlan)) {
+    return "hidden";
+  }
+
+  return "visible";
+}
+
+const sidebarMenuItemClass =
+  "group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-cyan-300/15 bg-white/[0.045] px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10";
+
+const sidebarMenuItemDesktopClass = `${sidebarMenuItemClass} hover:-translate-x-1 hover:shadow-[0_16px_38px_rgba(0,102,255,0.28)]`;
+
+function SidebarMenuItem({
+  item,
+  state,
+  unreadAnalysisCount = 0,
+  onNavigate,
+  variant = "desktop",
+}) {
+  const itemClass = variant === "desktop" ? sidebarMenuItemDesktopClass : sidebarMenuItemClass;
+
+  if (state === "hidden") {
+    return null;
+  }
+
+  if (state === "pending") {
+    return (
+      <div
+        className={`${itemClass} pointer-events-none cursor-wait opacity-60`}
+        aria-hidden="true"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">
+          {item.icon}
+        </span>
+        <span className="font-bold leading-none">{item.label}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      key={item.href}
+      href={item.href}
+      onClick={onNavigate}
+      className={itemClass}
+    >
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">
+        {item.icon}
+      </span>
+      <span className="font-bold leading-none">{item.label}</span>
+      {item.href === "/my-analysis" && unreadAnalysisCount > 0 && (
+        <span className="mr-auto grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
+          {unreadAnalysisCount > 9 ? "9+" : unreadAnalysisCount}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function AdminMenuSection({ authResolved, isAdmin, onNavigate, variant = "desktop" }) {
+  const sessionPending = !authResolved;
+
+  if (!sessionPending && !isAdmin) {
+    return null;
+  }
+
+  const adminLinkClass =
+    variant === "desktop"
+      ? "group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:-translate-x-1 hover:border-emerald-300/45 hover:bg-gradient-to-l hover:from-emerald-500/65 hover:to-cyan-400/20"
+      : "group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-emerald-300/45 hover:bg-gradient-to-l hover:from-emerald-500/65 hover:to-cyan-400/20";
+
+  return (
+    <>
+      <div className="my-3 border-t border-cyan-300/15" />
+      {sessionPending ? (
+        <div
+          className={`${adminLinkClass} pointer-events-none cursor-wait opacity-60`}
+          aria-hidden="true"
+        >
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 animate-pulse">
+            🛠
+          </span>
+          <span className="h-4 w-28 animate-pulse rounded bg-white/20" />
+        </div>
+      ) : (
+        <Link href="/admin" onClick={onNavigate} className={adminLinkClass}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10">
+            🛠
+          </span>
+          <span className="font-bold leading-none">لوحة الإدارة</span>
+        </Link>
+      )}
+    </>
+  );
+}
 
 function RootLayoutShell({ children }) {
   const router = useRouter();
@@ -91,54 +198,11 @@ function RootLayoutShell({ children }) {
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [unreadAnalysisReplies, setUnreadAnalysisReplies] = useState(0);
-  const [siteNotifications, setSiteNotifications] = useState([]);
-  const [siteNotificationBadgeCleared, setSiteNotificationBadgeCleared] = useState(false);
-  const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
+  const { unreadAnalysisCount } = useNotifications();
   const { theme, toggleTheme } = useTheme();
   const isAuthPage = pathname === "/login" || pathname === "/register";
-  const [loadingOverlayState, setLoadingOverlayState] = useState("hidden");
-  const authResolvedRef = useRef(authResolved);
-
-  useEffect(() => {
-    authResolvedRef.current = authResolved;
-  }, [authResolved]);
-
-  useEffect(() => {
-    if (authResolved) {
-      setLoadingOverlayState((current) => (current === "visible" ? "exiting" : "hidden"));
-      return;
-    }
-
-    setLoadingOverlayState("hidden");
-
-    const showTimer = window.setTimeout(() => {
-      if (!authResolvedRef.current) {
-        setLoadingOverlayState("visible");
-      }
-    }, BOOTSTRAP_LOADING_DELAY_MS);
-
-    return () => {
-      window.clearTimeout(showTimer);
-    };
-  }, [authResolved]);
-
-  useEffect(() => {
-    if (loadingOverlayState !== "exiting") return;
-
-    const hideTimer = window.setTimeout(() => {
-      setLoadingOverlayState("hidden");
-    }, BOOTSTRAP_LOADING_EXIT_MS);
-
-    return () => {
-      window.clearTimeout(hideTimer);
-    };
-  }, [loadingOverlayState]);
-
-  const bootstrapOverlay =
-    loadingOverlayState !== "hidden" ? (
-      <BootstrapLoading exiting={loadingOverlayState === "exiting"} />
-    ) : null;
+  const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
+    useBootstrapLoadingOverlay(authResolved, { enabled: !isAuthPage });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -320,264 +384,6 @@ function RootLayoutShell({ children }) {
       });
   }, [currentUser?.email]);
 
-  useEffect(() => {
-    if (!currentUser?.email) return;
-
-    const notifyIfNewReply = (row) => {
-      if (!row?.id || !row?.reply) return;
-      if (String(row.user_email || "").toLowerCase() !== String(currentUser.email || "").toLowerCase()) return;
-
-      const replyKey = getAnalysisReplyKey(row);
-      const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
-      const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
-
-      if (!seenReplies.includes(replyKey)) {
-        setUnreadAnalysisReplies((count) => Math.max(1, count + 1));
-      }
-
-      if (notifiedReplies.includes(replyKey)) return;
-
-      localStorage.setItem(
-        "notifiedAnalysisReplies",
-        JSON.stringify([replyKey, ...notifiedReplies].slice(0, 100))
-      );
-
-      triggerReplyNotification(row.coin);
-    };
-
-    const checkLatestAnalysisReplies = async () => {
-      try {
-        const response = await fetch(
-          `/api/my-analysis`,
-          { method: "GET", cache: "no-store", credentials: "include" }
-        );
-
-        const result = await response.json().catch(() => null);
-        const data = result?.requests || [];
-
-        if (!response.ok || !result?.success || !data.length) return;
-
-        const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
-        const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
-
-        const newReply = data.find((row) => {
-          const key = getAnalysisReplyKey(row);
-          return row?.reply && !seenReplies.includes(key) && !notifiedReplies.includes(key);
-        });
-
-        if (!newReply) return;
-
-        const replyKey = getAnalysisReplyKey(newReply);
-        localStorage.setItem(
-          "notifiedAnalysisReplies",
-          JSON.stringify([replyKey, ...notifiedReplies].slice(0, 100))
-        );
-
-        setUnreadAnalysisReplies((count) => Math.max(1, count + 1));
-        triggerReplyNotification(newReply.coin);
-      } catch (err) {
-        console.warn("Analysis reply notification check skipped:", err?.message || err);
-      }
-    };
-
-    checkLatestAnalysisReplies();
-    const analysisReplyTimer = setInterval(checkLatestAnalysisReplies, 10000);
-
-    const channel = supabase
-      .channel(`global-analysis-replies-${currentUser.email}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "analysis_requests",
-          filter: `user_email=eq.${currentUser.email}`,
-        },
-        (payload) => {
-          notifyIfNewReply(payload.new);
-          checkLatestAnalysisReplies();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(analysisReplyTimer);
-      supabase.removeChannel(channel);
-    };
-  }, [currentUser, pathname]);
-
-  useEffect(() => {
-    if (!currentUser?.email) {
-      setSiteNotifications([]);
-      return;
-    }
-
-    const loadSiteNotifications = async () => {
-      try {
-        const response = await fetch("/api/my-notifications", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
-        });
-
-        const result = await response.json().catch(() => null);
-        const notifications = result?.notifications || [];
-
-        if (!response.ok || !result?.success) return;
-
-        const notifiedSiteItems = JSON.parse(localStorage.getItem("notifiedSiteNotifications") || "[]");
-
-        notifications.forEach((notification) => {
-          const notificationKey = String(notification.id || "");
-
-          if (!notificationKey || notifiedSiteItems.includes(notificationKey)) {
-            return;
-          }
-
-          if (notification.type === "price-alert") {
-            showAppModal({
-              type: "success",
-              title: notification.title || "🔔 وصل السعر إلى هدف التنبيه",
-              message: notification.message || "",
-              autoCloseMs: 10000,
-            });
-          }
-
-          if (
-            (notification.type === "vip-spot" ||
-              notification.type === "vip-futures" ||
-              notification.type === "subscription-expired") &&
-            typeof window !== "undefined" &&
-            "Notification" in window &&
-            Notification.permission === "granted"
-          ) {
-            new Notification(notification.title || "HasaN CharT World", {
-              body: notification.message || "تم نشر توصية جديدة",
-              icon: "/logo.png",
-            });
-          }
-
-          notifiedSiteItems.unshift(notificationKey);
-        });
-
-        localStorage.setItem(
-          "notifiedSiteNotifications",
-          JSON.stringify(notifiedSiteItems.slice(0, 100))
-        );
-
-        setSiteNotifications(notifications);
-        if (notifications.length > 0 && !notificationMenuOpen) {
-          setSiteNotificationBadgeCleared(false);
-        }
-      } catch (err) {
-        console.warn("Site notifications skipped:", err?.message || err);
-      }
-    };
-
-    loadSiteNotifications();
-    const timer = setInterval(loadSiteNotifications, 10000);
-
-    const channel = supabase
-      .channel(`global-site-notifications-${currentUser.email}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_email=eq.${currentUser.email}`,
-        },
-        (payload) => {
-          const notification = payload.new;
-          setSiteNotifications((prev) => [notification, ...prev].slice(0, 10));
-          setSiteNotificationBadgeCleared(false);
-
-          const notificationKey = String(notification?.id || "");
-          const notifiedSiteItems = JSON.parse(
-            localStorage.getItem("notifiedSiteNotifications") || "[]"
-          );
-
-          if (
-            notification?.type === "price-alert" &&
-            notificationKey &&
-            !notifiedSiteItems.includes(notificationKey)
-          ) {
-            showAppModal({
-              type: "success",
-              title: notification.title || "🔔 وصل السعر إلى هدف التنبيه",
-              message: notification.message || "",
-              autoCloseMs: 10000,
-            });
-
-            notifiedSiteItems.unshift(notificationKey);
-            localStorage.setItem(
-              "notifiedSiteNotifications",
-              JSON.stringify(notifiedSiteItems.slice(0, 100))
-            );
-          }
-
-          const message = notification?.title || "وصلك إشعار جديد";
-          setGlobalNotice(message);
-          setGlobalNoticeHref(
-            notification?.type === "subscription" || notification?.type === "subscription-expired"
-              ? "/subscriptions"
-              : notification?.type === "vip-futures"
-                ? "/vip-futures"
-                : notification?.type === "vip-spot"
-                  ? "/vip-spot"
-                  : ""
-          );
-          setNotificationMenuOpen(true);
-
-          if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-            new Notification("HasaN CharT", {
-              body: notification?.message || message,
-              icon: "/logo.png",
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(timer);
-      supabase.removeChannel(channel);
-    };
-  }, [currentUser, showAppModal]);
-
-  useEffect(() => {
-    if (!currentUser?.email) {
-      setUnreadAnalysisReplies(0);
-      return;
-    }
-
-    const refreshUnreadReplies = async () => {
-      try {
-        const response = await fetch(
-          `/api/my-analysis`,
-          { method: "GET", cache: "no-store", credentials: "include" }
-        );
-
-        const result = await response.json().catch(() => null);
-        const data = result?.requests || [];
-
-        if (!response.ok || !result?.success) return;
-
-        const replyIds = (data || [])
-          .filter((item) => item?.reply)
-          .map((item) => getAnalysisReplyKey(item));
-
-        const seenReplies = JSON.parse(localStorage.getItem("seenAnalysisReplies") || "[]");
-        const unseenCount = replyIds.filter((id) => !seenReplies.includes(id)).length;
-        setUnreadAnalysisReplies(unseenCount);
-      } catch (err) {
-        console.warn("Unread analysis replies skipped:", err?.message || err);
-      }
-    };
-
-    refreshUnreadReplies();
-  }, [currentUser, pathname]);
-
   // Automatic user subscription refresh so VIP menu items appear after admin activation without logging out.
   useEffect(() => {
     if (!currentUser?.email) return;
@@ -598,8 +404,6 @@ function RootLayoutShell({ children }) {
         (payload) => {
           if (payload?.new?.status === "مفعل") {
             refreshCurrentUserSubscription();
-            setGlobalNotice("🎉 تم تفعيل اشتراكك بنجاح");
-            setGlobalNoticeHref("/subscriptions");
           }
         }
       )
@@ -639,58 +443,20 @@ function RootLayoutShell({ children }) {
           String(prev.subscription_status || "").toLowerCase()
         );
 
-        const updatedUser = {
+        if ((wasInactive || !alreadyNotified) && !alreadyNotified) {
+          localStorage.setItem(activationNoticeKey, "yes");
+        }
+
+        return {
           ...prev,
           subscription_plan: activePlanText,
           subscription_status: result.subscription_status || "مفعل",
           hasSpot: Boolean(result.hasSpot),
           hasFutures: Boolean(result.hasFutures),
         };
-
-        if ((wasInactive || !alreadyNotified) && !alreadyNotified) {
-          const notice = {
-            id: `local-subscription-${Date.now()}`,
-            title: "تم تفعيل اشتراكك بنجاح 🎉",
-            message: `تم تفعيل ${activePlanText} ويمكنك الآن استخدام صفحات التوصيات الخاصة بك.`,
-            type: "subscription",
-            is_read: false,
-          };
-
-          localStorage.setItem(activationNoticeKey, "yes");
-          setSiteNotifications((prevNotifications) => [notice, ...prevNotifications].slice(0, 10));
-          setSiteNotificationBadgeCleared(false);
-          setGlobalNotice(notice.title);
-          setGlobalNoticeHref("/subscriptions");
-          setNotificationMenuOpen(true);
-        }
-
-        return updatedUser;
       });
     } catch (err) {
       console.warn("Subscription refresh skipped:", err?.message || err);
-    }
-  };
-
-  const markSiteNotificationsRead = async () => {
-    if (!currentUser?.email || siteNotifications.length === 0) return;
-
-    const ids = siteNotifications.map((item) => item.id).filter(Boolean);
-    setSiteNotifications([]);
-    setSiteNotificationBadgeCleared(false);
-
-    try {
-      await fetch("/api/mark-notifications-read", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          ids,
-        }),
-      });
-    } catch (err) {
-      console.warn("Mark notifications read skipped:", err?.message || err);
     }
   };
 
@@ -698,120 +464,6 @@ function RootLayoutShell({ children }) {
     await logout();
     window.location.href = "/login";
   };
-
-  const triggerReplyNotification = (coin) => {
-    const message = `📩 وصل رد الإدارة على طلب تحليل ${coin || "العملة"}`;
-    setGlobalNotice(message);
-    setGlobalNoticeHref("/my-analysis");
-    setNotificationMenuOpen(true);
-
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "granted") {
-        new Notification("HasaN CharT", {
-          body: message,
-          icon: "/logo.png",
-        });
-      }
-    }
-  };
-
-  const triggerVipSignalNotification = (signal) => {
-    const typeLabel = signal?.signal_type === "futures" ? "Futures" : "Spot";
-    const message = `🚨 تم نشر توصية VIP ${typeLabel} جديدة على ${signal?.coin || "عملة جديدة"}`;
-    setGlobalNotice(message);
-    setGlobalNoticeHref(signal?.signal_type === "futures" ? "/vip-futures" : "/vip-spot");
-    setNotificationMenuOpen(true);
-
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      const typeLabel = signal?.signal_type === "futures" ? "VIP Futures" : "VIP Spot";
-
-      new Notification(`🚨 ${typeLabel}`, {
-        body: `${signal?.coin || "عملة جديدة"} - ${message}`,
-        icon: "/logo.png",
-        requireInteraction: true,
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (authStatus !== "authenticated" || !currentUser?.email) return;
-
-    if (!hasActiveSubscriptionStatus(currentUser?.subscription_status)) return;
-
-    const { hasSpot: hasSpotPlan, hasFutures: hasFuturesPlan } = getUserPlanAccess(currentUser);
-
-    const isAllowedVipSignal = (signal) => {
-      if (!signal?.id || !signal?.signal_type) return false;
-      if (signal.signal_type === "spot" && !hasSpotPlan) return false;
-      if (signal.signal_type === "futures" && !hasFuturesPlan) return false;
-      return true;
-    };
-
-    const notifyIfAllowedVipSignal = (signal) => {
-      if (!isAllowedVipSignal(signal)) return;
-
-      const seenSignals = JSON.parse(localStorage.getItem("seenVipSignals") || "[]");
-      const signalKey = String(signal.id);
-
-      if (seenSignals.includes(signalKey)) return;
-
-      localStorage.setItem(
-        "seenVipSignals",
-        JSON.stringify([signalKey, ...seenSignals].slice(0, 100))
-      );
-
-      triggerVipSignalNotification(signal);
-    };
-
-    const checkLatestVipSignals = async () => {
-      const lastCheckKey = `vipSignalsLastCheck-${currentUser.email}`;
-      const lastCheck = localStorage.getItem(lastCheckKey);
-
-      if (!lastCheck) {
-        localStorage.setItem(lastCheckKey, new Date().toISOString());
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("vip_signals")
-        .select("*")
-        .gt("created_at", lastCheck)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      localStorage.setItem(lastCheckKey, new Date().toISOString());
-
-      if (error || !data?.length) return;
-
-      const allowedSignal = data.find((signal) => isAllowedVipSignal(signal));
-      if (allowedSignal) {
-        notifyIfAllowedVipSignal(allowedSignal);
-      }
-    };
-
-    const pollingTimer = setInterval(checkLatestVipSignals, 5000);
-
-    const channel = supabase
-      .channel(`global-vip-signals-${currentUser.email}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "vip_signals",
-        },
-        (payload) => {
-          console.log("New VIP Signal:", payload.new);
-          notifyIfAllowedVipSignal(payload.new);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(pollingTimer);
-      supabase.removeChannel(channel);
-    };
-  }, [currentUser]);
 
   if (isAuthPage) {
     return (
@@ -855,6 +507,7 @@ function RootLayoutShell({ children }) {
         )}
         {children}
         {bootstrapOverlay}
+        {bootstrapStallBanner}
       </>
     );
   }
@@ -929,46 +582,23 @@ function RootLayoutShell({ children }) {
                 </div>
 
                 <nav className="relative z-10 flex-1 space-y-2 overflow-y-auto pr-1 pl-1 customScroll">
-                  {menuItems.map((item) => {
-                    if (item.auth && !currentUser) return null;
+                  {menuItems.map((item) => (
+                    <SidebarMenuItem
+                      key={item.href}
+                      item={item}
+                      state={resolveMenuItemState(item, authResolved, currentUser)}
+                      unreadAnalysisCount={unreadAnalysisCount}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                      variant="mobile"
+                    />
+                  ))}
 
-                    const hasActiveSubscription = hasActiveSubscriptionStatus(currentUser?.subscription_status);
-                    const { hasSpot: hasSpotPlan, hasFutures: hasFuturesPlan } = getUserPlanAccess(currentUser);
-
-                    if (item.plan === "spot" && (!hasActiveSubscription || !hasSpotPlan)) return null;
-                    if (item.plan === "futures" && (!hasActiveSubscription || !hasFuturesPlan)) return null;
-
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-cyan-300/15 bg-white/[0.045] px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10"
-                      >
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">{item.icon}</span>
-                        <span className="font-bold leading-none">{item.label}</span>
-                        {item.href === "/my-analysis" && unreadAnalysisReplies > 0 && (
-                          <span className="mr-auto grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
-                            {unreadAnalysisReplies > 9 ? "9+" : unreadAnalysisReplies}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-
-                  {isAdmin && (
-                    <>
-                      <div className="my-3 border-t border-cyan-300/15" />
-                      <Link
-                        href="/admin"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-emerald-300/45 hover:bg-gradient-to-l hover:from-emerald-500/65 hover:to-cyan-400/20"
-                      >
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10">🛠</span>
-                        <span className="font-bold leading-none">لوحة الإدارة</span>
-                      </Link>
-                    </>
-                  )}
+                  <AdminMenuSection
+                    authResolved={authResolved}
+                    isAdmin={isAdmin}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                    variant="mobile"
+                  />
                 </nav>
 
                 <div className="relative z-10 mt-4 space-y-3 rounded-[24px] border border-cyan-300/10 bg-white/[0.035] p-4 backdrop-blur-xl">
@@ -1026,46 +656,17 @@ function RootLayoutShell({ children }) {
             </Link>
 
             <nav className="relative z-10 flex-1 space-y-2 overflow-y-auto pr-1 pl-1 customScroll">
-              {menuItems.map((item) => {
-                if (item.auth && !currentUser) return null;
+              {menuItems.map((item) => (
+                <SidebarMenuItem
+                  key={item.href}
+                  item={item}
+                  state={resolveMenuItemState(item, authResolved, currentUser)}
+                  unreadAnalysisCount={unreadAnalysisCount}
+                  variant="desktop"
+                />
+              ))}
 
-                const activePlan = String(currentUser?.subscription_plan || "").toLowerCase();
-                const activeStatus = String(currentUser?.subscription_status || "").toLowerCase();
-                const hasActiveSubscription =
-  activeStatus === "نشط" || activeStatus === "active" || activeStatus === "مفعل";
-
-                const hasSpotPlan = activePlan.includes("spot") || activePlan.includes("سبوت");
-                const hasFuturesPlan = activePlan.includes("futures") || activePlan.includes("فيوتشر");
-
-                if (item.plan === "spot" && (!hasActiveSubscription || !hasSpotPlan)) return null;
-                if (item.plan === "futures" && (!hasActiveSubscription || !hasFuturesPlan)) return null;
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-cyan-300/15 bg-white/[0.045] px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:-translate-x-1 hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10 hover:shadow-[0_16px_38px_rgba(0,102,255,0.28)]"
-                  >
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">{item.icon}</span>
-                    <span className="font-bold leading-none">{item.label}</span>
-                    {item.href === "/my-analysis" && unreadAnalysisReplies > 0 && (
-                      <span className="mr-auto grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
-                        {unreadAnalysisReplies > 9 ? "9+" : unreadAnalysisReplies}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-
-              {isAdmin && (
-                <>
-                  <div className="border-t border-cyan-300/15 my-3" />
-                  <Link href="/admin" className="group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:-translate-x-1 hover:border-emerald-300/45 hover:bg-gradient-to-l hover:from-emerald-500/65 hover:to-cyan-400/20">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10">🛠</span>
-                    <span className="font-bold leading-none">لوحة الإدارة</span>
-                  </Link>
-                </>
-              )}
+              <AdminMenuSection authResolved={authResolved} isAdmin={isAdmin} variant="desktop" />
 
               <details className="group/contact rounded-[18px] border border-cyan-300/15 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <summary className="flex min-h-[54px] cursor-pointer list-none items-center gap-3 rounded-[18px] px-4 py-3 text-white transition hover:-translate-x-1 hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10">
@@ -1150,119 +751,7 @@ function RootLayoutShell({ children }) {
                     : "🔔 تفعيل إشعارات المتصفح"}
                 </button>
 
-                {currentUser && (
-                  <div className="relative hidden sm:block">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const nextOpen = !notificationMenuOpen;
-
-                        if (nextOpen) {
-                          const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
-                          localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
-                          setUnreadAnalysisReplies(0);
-
-                          try {
-                            const response = await fetch("/api/my-notifications", {
-                              method: "GET",
-                              cache: "no-store",
-                              credentials: "include",
-                            });
-
-                            const result = await response.json().catch(() => null);
-
-                            if (response.ok && result?.success) {
-                              setSiteNotifications(result.notifications || []);
-                            }
-                          } catch (err) {
-                            console.warn("Open notifications refresh skipped:", err?.message || err);
-                          }
-                        }
-
-                        setNotificationMenuOpen(nextOpen);
-                      }}
-                      className="relative grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-xl text-cyan-100 shadow-[0_0_24px_rgba(0,163,255,0.18)] transition hover:bg-cyan-400/20"
-                      aria-label="الإشعارات"
-                    >
-                      🔔
-                      {unreadAnalysisReplies + (siteNotificationBadgeCleared ? 0 : siteNotifications.length) > 0 && (
-                        <span className="absolute -right-2 -top-2 grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
-                          {unreadAnalysisReplies + (siteNotificationBadgeCleared ? 0 : siteNotifications.length) > 9 ? "9+" : unreadAnalysisReplies + (siteNotificationBadgeCleared ? 0 : siteNotifications.length)}
-                        </span>
-                      )}
-                    </button>
-
-                    {notificationMenuOpen && (
-                      <div className="fixed left-5 top-20 z-[120] min-h-[130px] w-[360px] max-w-[calc(100vw-40px)] rounded-[28px] border border-cyan-200/40 bg-white p-4 text-slate-950 shadow-[0_24px_80px_rgba(0,102,255,0.22)] backdrop-blur-2xl">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <h3 className="font-black text-xl text-slate-950">
-                            الإشعارات
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={() => setNotificationMenuOpen(false)}
-                            className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 font-black text-slate-700 transition hover:bg-slate-200"
-                          >
-                            ✕
-                          </button>
-                        </div>
-
-                        {unreadAnalysisReplies > 0 || siteNotifications.length > 0 ? (
-                          <div className="space-y-3">
-                            {siteNotifications.map((notification) => (
-                              <Link
-                                key={notification.id}
-                                href={
-                                  notification.type === "subscription" || notification.type === "subscription-expired"
-                                    ? "/subscriptions"
-                                    : notification.type === "vip-futures"
-                                      ? "/vip-futures"
-                                      : notification.type === "vip-spot"
-                                        ? "/vip-spot"
-                                        : "/my-dashboard"
-                                }
-                                onClick={() => {
-                                  markSiteNotificationsRead();
-                                  setNotificationMenuOpen(false);
-                                  if (notification.type === "subscription-expired") {
-                                    setGlobalNotice("انتهت صلاحية اشتراكك ⚠️");
-                                    setGlobalNoticeHref("/subscriptions");
-                                  }
-                                }}
-                                className="block rounded-2xl border border-cyan-100 bg-cyan-50 p-4 transition hover:bg-cyan-100"
-                              >
-                                <p className="font-black text-slate-950">{notification.title}</p>
-                                <p className="mt-1 text-sm font-bold text-slate-600">{notification.message}</p>
-                              </Link>
-                            ))}
-
-                            {unreadAnalysisReplies > 0 && (
-                              <Link
-                                href="/my-analysis"
-                                onClick={() => {
-                                  const notifiedReplies = JSON.parse(localStorage.getItem("notifiedAnalysisReplies") || "[]");
-                                  localStorage.setItem("seenAnalysisReplies", JSON.stringify(notifiedReplies.slice(0, 100)));
-                                  setNotificationMenuOpen(false);
-                                  setUnreadAnalysisReplies(0);
-                                }}
-                                className="block rounded-2xl border border-emerald-100 bg-emerald-50 p-4 transition hover:bg-emerald-100"
-                              >
-                                <p className="font-black text-slate-950">📩 لديك ردود إدارة جديدة</p>
-                                <p className="mt-1 text-sm font-bold text-slate-600">
-                                  عدد الردود غير المقروءة: {unreadAnalysisReplies}
-                                </p>
-                              </Link>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-600">
-                            لا توجد إشعارات جديدة حالياً.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {currentUser ? <NotificationBell className="relative shrink-0" /> : null}
 
                 <button
                   onClick={toggleTheme}
@@ -1286,6 +775,7 @@ function RootLayoutShell({ children }) {
           </div>
         </div>
         {bootstrapOverlay}
+        {bootstrapStallBanner}
     </>
   );
 }

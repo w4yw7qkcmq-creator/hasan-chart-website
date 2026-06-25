@@ -725,3 +725,295 @@ html[data-theme="light"] .bootstrapScreen__subtitle,
 html[data-theme="light"] .bootstrapScreen__tagline {
   color: #475569 !important;
 }
+
+@keyframes notificationBellShake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(14deg);
+  }
+  30% {
+    transform: rotate(-12deg);
+  }
+  45% {
+    transform: rotate(8deg);
+  }
+  60% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+.notificationBell[data-shake] {
+  animation: notificationBellShake 0.55s ease-in-out;
+}
+
+@keyframes notificationToastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.notificationToastStack {
+  pointer-events: none;
+}
+
+.notificationToast {
+  animation: notificationToastEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 20px 70px rgba(0, 102, 255, 0.28);
+}
+
+.notificationToast--price-alert {
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(7, 20, 47, 0.94);
+}
+
+.notificationToast--price-alert .notificationToast__glow {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.32), transparent 42%),
+    radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.18), transparent 38%);
+}
+
+.notificationToast--price-alert .notificationToast__icon {
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.12);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.2);
+}
+
+.notificationToast--analysis-reply {
+  border-color: rgba(167, 139, 250, 0.32);
+  background: rgba(15, 10, 40, 0.94);
+  box-shadow: 0 20px 70px rgba(109, 40, 217, 0.24);
+}
+
+.notificationToast--analysis-reply .notificationToast__glow {
+  background:
+    radial-gradient(circle at top left, rgba(109, 40, 217, 0.28), transparent 42%),
+    radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.16), transparent 38%);
+}
+
+.notificationToast--analysis-reply .notificationToast__icon {
+  border-color: rgba(167, 139, 250, 0.35);
+  background: rgba(109, 40, 217, 0.18);
+  box-shadow: 0 0 24px rgba(167, 139, 250, 0.18);
+}
+
+.notificationToast--vip {
+  border-color: rgba(251, 191, 36, 0.34);
+  background: rgba(18, 12, 4, 0.94);
+  box-shadow: 0 20px 70px rgba(245, 158, 11, 0.22);
+}
+
+.notificationToast--vip .notificationToast__glow {
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.26), transparent 42%),
+    radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.14), transparent 38%);
+}
+
+.notificationToast--vip .notificationToast__icon {
+  border-color: rgba(251, 191, 36, 0.38);
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.18);
+}
+
+.notificationToast--subscription {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: rgba(4, 24, 20, 0.94);
+  box-shadow: 0 20px 70px rgba(16, 185, 129, 0.22);
+}
+
+.notificationToast--subscription .notificationToast__glow {
+  background:
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.24), transparent 42%),
+    radial-gradient(circle at bottom right, rgba(52, 211, 153, 0.14), transparent 38%);
+}
+
+.notificationToast--subscription .notificationToast__icon {
+  border-color: rgba(52, 211, 153, 0.34);
+  background: rgba(16, 185, 129, 0.14);
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.16);
+}
+
+.notificationToast--general {
+  border-color: rgba(251, 146, 60, 0.32);
+  background: rgba(20, 12, 8, 0.94);
+  box-shadow: 0 20px 70px rgba(249, 115, 22, 0.2);
+}
+
+.notificationToast--general .notificationToast__glow {
+  background:
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.22), transparent 42%),
+    radial-gradient(circle at bottom right, rgba(251, 146, 60, 0.12), transparent 38%);
+}
+
+.notificationToast--general .notificationToast__icon {
+  border-color: rgba(251, 146, 60, 0.34);
+  background: rgba(249, 115, 22, 0.14);
+  box-shadow: 0 0 24px rgba(251, 146, 60, 0.16);
+}
+
+.notificationToast__message {
+  color: rgb(203 213 225);
+}
+
+.notificationToast__time {
+  color: rgba(165, 243, 252, 0.72);
+}
+
+.notificationToast__action {
+  background: linear-gradient(to left, rgb(29 78 216), rgb(59 130 246), rgb(103 232 249));
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.28);
+}
+
+.notificationToast__dismiss,
+.notificationToast__close {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgb(226 232 240);
+}
+
+.notificationToast__dismiss:hover,
+.notificationToast__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.notificationToast--analysis-reply .notificationToast__action {
+  background: linear-gradient(to left, rgb(91 33 182), rgb(124 58 237), rgb(196 181 253));
+  box-shadow: 0 10px 28px rgba(109, 40, 217, 0.28);
+}
+
+.notificationToast--vip .notificationToast__action {
+  background: linear-gradient(to left, rgb(180 83 9), rgb(245 158 11), rgb(253 224 71));
+  box-shadow: 0 10px 28px rgba(245, 158, 11, 0.28);
+}
+
+.notificationToast--subscription .notificationToast__action {
+  background: linear-gradient(to left, rgb(4 120 87), rgb(16 185 129), rgb(110 231 183));
+  box-shadow: 0 10px 28px rgba(16, 185, 129, 0.28);
+}
+
+.notificationToast--general .notificationToast__action {
+  background: linear-gradient(to left, rgb(194 65 12), rgb(249 115 22), rgb(253 186 116));
+  box-shadow: 0 10px 28px rgba(249, 115, 22, 0.28);
+}
+
+.notificationDropdown {
+  transform-origin: top left;
+  transition:
+    opacity 0.24s ease,
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0.24s ease;
+}
+
+.notificationDropdown--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.notificationDropdown--closed {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.97);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.notificationDropdown__item--unread {
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.1);
+}
+
+html[data-theme="light"] .notificationDropdown__item--unread {
+  background: rgba(224, 242, 254, 0.92);
+  border-color: rgba(47, 150, 255, 0.28);
+}
+
+html[data-theme="light"] .notificationDropdown__item--read {
+  background: rgba(248, 250, 252, 0.88);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+html[data-theme="light"] .notificationDropdown {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(47, 150, 255, 0.18);
+  color: #0f172a;
+}
+
+html[data-theme="light"] .notificationDropdown h3 {
+  color: #0f172a;
+}
+
+html[data-theme="light"] .notificationDropdown p,
+html[data-theme="light"] .notificationDropdown button,
+html[data-theme="light"] .notificationDropdown a {
+  color: inherit;
+}
+
+html[data-theme="light"] .notificationToast {
+  color: #0f172a;
+}
+
+html[data-theme="light"] .notificationToast__message {
+  color: #475569;
+}
+
+html[data-theme="light"] .notificationToast__time {
+  color: #64748b;
+}
+
+html[data-theme="light"] .notificationToast--price-alert {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(47, 150, 255, 0.24);
+  box-shadow: 0 20px 70px rgba(47, 150, 255, 0.16);
+}
+
+html[data-theme="light"] .notificationToast--analysis-reply {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(124, 58, 237, 0.22);
+  box-shadow: 0 20px 70px rgba(109, 40, 217, 0.12);
+}
+
+html[data-theme="light"] .notificationToast--vip {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(245, 158, 11, 0.28);
+  box-shadow: 0 20px 70px rgba(245, 158, 11, 0.12);
+}
+
+html[data-theme="light"] .notificationToast--subscription {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(16, 185, 129, 0.24);
+  box-shadow: 0 20px 70px rgba(16, 185, 129, 0.12);
+}
+
+html[data-theme="light"] .notificationToast--general {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(249, 115, 22, 0.24);
+  box-shadow: 0 20px 70px rgba(249, 115, 22, 0.12);
+}
+
+html[data-theme="light"] .notificationToast__dismiss,
+html[data-theme="light"] .notificationToast__close {
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(248, 250, 252, 0.92);
+  color: #334155;
+}
+
+html[data-theme="light"] .bootstrapStallBanner {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(245, 158, 11, 0.28);
+  color: #0f172a;
+  box-shadow: 0 18px 60px rgba(245, 158, 11, 0.12);
+}
+
+html[data-theme="light"] .bootstrapStallBanner p {
+  color: #92400e;
+}

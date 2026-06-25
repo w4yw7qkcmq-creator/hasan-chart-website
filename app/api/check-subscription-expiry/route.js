@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyCronSecret } from "../../../lib/admin-auth";
+import { createUserNotification } from "../../../lib/create-user-notification";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 import { processEmailQueue } from "../../../lib/email-queue";
 
@@ -37,12 +38,11 @@ async function queueRenewalReminder({ email, planName, daysLeft }) {
       ? `باقي يوم واحد على انتهاء ${planName}. يمكنك التجديد من صفحة الباقات.`
       : `باقي 3 أيام على انتهاء ${planName}. يمكنك التجديد من صفحة الباقات.`;
 
-  await supabase.from("notifications").insert({
-    user_email: email,
+  await createUserNotification(supabase, {
+    userEmail: email,
     title,
     message,
     type: "subscription-renewal-reminder",
-    is_read: false,
   });
 
   return {
@@ -64,12 +64,11 @@ async function queueRenewalReminder({ email, planName, daysLeft }) {
 }
 
 async function queueExpiredNotice({ email, planName }) {
-  await supabase.from("notifications").insert({
-    user_email: email,
+  await createUserNotification(supabase, {
+    userEmail: email,
     title: "انتهى اشتراكك ⚠️",
     message: `انتهت صلاحية ${planName}. اضغط لتجديد اشتراكك من صفحة الباقات.`,
     type: "subscription-expired",
-    is_read: false,
   });
 
   return {

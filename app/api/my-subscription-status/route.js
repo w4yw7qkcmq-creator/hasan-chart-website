@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireSessionEmail } from "../../../lib/auth-session";
-
-const getPlanFlags = (planText) => {
-  const text = String(planText || "").toLowerCase();
-
-  return {
-    hasSpot: text.includes("spot") || text.includes("سبوت") || text.includes("vip spot"),
-    hasFutures: text.includes("future") || text.includes("futures") || text.includes("فيوتشر") || text.includes("vip futures"),
-  };
-};
+import { buildSubscriptionStatusResponse } from "../../../lib/subscription-mode";
 
 export async function GET() {
   try {
@@ -43,24 +35,7 @@ export async function GET() {
       );
     }
 
-    const activePlans = Array.isArray(data) ? data : [];
-    const subscriptionPlan = activePlans
-      .map((item) => item.plan_name || item.category)
-      .filter(Boolean)
-      .join(" | ");
-
-    const flags = getPlanFlags(subscriptionPlan);
-
-    return NextResponse.json({
-      success: true,
-      active: activePlans.length > 0,
-      subscription_status: activePlans.length > 0 ? "مفعل" : "غير مفعل",
-      subscription_plan: subscriptionPlan,
-      hasSpot: flags.hasSpot,
-      hasFutures: flags.hasFutures,
-      plans: activePlans,
-      current_subscription: activePlans[0] || null,
-    });
+    return NextResponse.json(buildSubscriptionStatusResponse(data));
   } catch (err) {
     return NextResponse.json(
       {

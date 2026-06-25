@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from "next/server";
 import { requireSessionEmail } from "../../../lib/auth-session";
 
@@ -14,11 +12,12 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { email, supabase } = session;
+    const markAll = body?.all === true;
     const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : [];
 
-    if (ids.length === 0) {
+    if (!markAll && ids.length === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -28,11 +27,17 @@ export async function POST(request) {
       );
     }
 
-    const { error } = await supabase
+    let query = supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("user_email", email)
-      .in("id", ids);
+      .eq("is_read", false);
+
+    if (!markAll) {
+      query = query.in("id", ids);
+    }
+
+    const { error } = await query;
 
     if (error) {
       return NextResponse.json(
@@ -44,8 +49,15 @@ export async function POST(request) {
       );
     }
 
+    const { count: unreadCount } = await supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_email", email)
+      .eq("is_read", false);
+
     return NextResponse.json({
       success: true,
+      unreadCount: unreadCount || 0,
     });
   } catch (error) {
     return NextResponse.json(

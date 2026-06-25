@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { createUserNotification } from "../../../lib/create-user-notification";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -102,12 +103,11 @@ const processExpiredSubscription = async (subscription, email) => {
     })
     .eq("id", subscription.id);
 
-  await supabase.from("notifications").insert({
-    user_email: email,
+  await createUserNotification(supabase, {
+    userEmail: email,
     title: "انتهى اشتراكك ⚠️",
     message: `انتهت صلاحية ${planName}. يمكنك التجديد من صفحة الباقات.`,
     type: "subscription-expired",
-    is_read: false,
   });
 
   await sendTemplateEmail({

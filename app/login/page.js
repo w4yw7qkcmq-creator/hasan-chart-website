@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAdminUser } from "../../lib/admin-emails";
-import { supabase } from "../../lib/supabase";
+import { supabase, supabaseUrl } from "../../lib/supabase";
 import { useAppModal } from "../components/AppModalProvider";
 import { useAuth } from "../components/AuthProvider";
 
@@ -32,6 +32,44 @@ function BrandMark({ size = "lg" }) {
 }
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+const SIGN_IN_TIMEOUT_MS = 10000;
+const SIGN_IN_TIMEOUT_MESSAGE = "تعذر الاتصال بخدمة تسجيل الدخول، أعد المحاولة";
+
+function logSupabaseClientConfig() {
+  let urlHost = null;
+
+  try {
+    urlHost = supabaseUrl ? new URL(supabaseUrl).host : null;
+  } catch {
+    urlHost = null;
+  }
+
+  console.log("[LOGIN] supabase client config", {
+    hasEnvUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    hasEnvAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    clientUrlPresent: Boolean(supabaseUrl),
+    clientUrlHost: urlHost,
+  });
+}
+
+function signInWithPasswordTimeout(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
+  let timeoutId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("SIGN_IN_TIMEOUT"));
+    }, timeoutMs);
+  });
+
+  const signInPromise = supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  return Promise.race([signInPromise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
 
 const verifyTurnstileToken = async (token) => {
   if (!TURNSTILE_SITE_KEY) return { ok: true };
@@ -71,7 +109,7 @@ const verifyTurnstileToken = async (token) => {
 export default function LoginPage() {
   const router = useRouter();
   const { showAppModal } = useAppModal();
-  const { authResolved, status: authStatus, user, establishSession } = useAuth();
+  const { authResolved, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
@@ -82,10 +120,10 @@ export default function LoginPage() {
   const turnstileWidgetId = useRef(null);
 
   useEffect(() => {
-    if (!authResolved || authStatus !== "authenticated" || !user?.email) return;
+    if (!authResolved || !user?.email) return;
 
     router.replace(isAdminUser(user) ? "/admin" : "/my-dashboard");
-  }, [authResolved, authStatus, user, router]);
+  }, [authResolved, user, router]);
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY) return;
@@ -131,7 +169,7 @@ export default function LoginPage() {
     document.body.appendChild(script);
   }, []);
 
-  const login = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     if (loading) return;
@@ -158,46 +196,15 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    const captchaCheck = await verifyTurnstileToken(turnstileToken);
-
-    if (!captchaCheck.ok) {
-      showAppModal({
-        type: "error",
-        title: "فشل التحقق الأمني",
-        message: captchaCheck.error,
-      });
-      setLoading(false);
-      setTurnstileToken("");
-      if (window.turnstile && turnstileWidgetId.current !== null) {
-        window.turnstile.reset(turnstileWidgetId.current);
-      }
-      return;
-    }
-
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          email: cleanEmail,
-          password,
-        }),
-      });
+      const captchaCheck = await verifyTurnstileToken(turnstileToken);
 
-      const payload = await response.json().catch(() => ({}));
-
-      const error = !response.ok ? payload?.error : null;
-
-      if (error || !payload?.session?.access_token || !payload?.session?.refresh_token) {
+      if (!captchaCheck.ok) {
         showAppModal({
           type: "error",
-          title: "فشل تسجيل الدخول",
-          message: error || "بيانات الدخول غير صحيحة",
+          title: "فشل التحقق الأمني",
+          message: captchaCheck.error,
         });
-        setLoading(false);
         setTurnstileToken("");
         if (window.turnstile && turnstileWidgetId.current !== null) {
           window.turnstile.reset(turnstileWidgetId.current);
@@ -205,31 +212,93 @@ export default function LoginPage() {
         return;
       }
 
-      const authResult = await establishSession(payload.session);
+      console.log("[LOGIN] before signInWithPassword", { email: cleanEmail });
+      logSupabaseClientConfig();
 
-      if (authResult.status !== "authenticated" || !authResult.user) {
+      const { data, error } = await signInWithPasswordTimeout(cleanEmail, password);
+
+      console.log("[LOGIN] after signInWithPassword", {
+        ok: !error && Boolean(data?.session),
+        email: data?.user?.email || null,
+        error: error?.message || null,
+      });
+
+      if (error || !data?.session || !data?.user?.email) {
         showAppModal({
           type: "error",
           title: "فشل تسجيل الدخول",
-          message: "تعذر حفظ جلسة الدخول. جرّب مرة ثانية.",
+          message: error?.message || "بيانات الدخول غير صحيحة",
         });
-        setLoading(false);
+        setTurnstileToken("");
+        if (window.turnstile && turnstileWidgetId.current !== null) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
         return;
       }
 
-      router.replace(isAdminUser(authResult.user) ? "/admin" : "/my-dashboard");
+      const destination = isAdminUser({ email: data.user.email })
+        ? "/admin"
+        : "/my-dashboard";
+
+      console.log("[LOGIN] before router.replace", { destination });
+
+      router.replace(destination);
+
+      console.log("[LOGIN] before sync-session (background)");
+
+      void fetch("/api/auth/sync-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+          expires_in: data.session.expires_in,
+        }),
+      })
+        .then(async (response) => {
+          if (response.ok) {
+            console.log("[LOGIN] after sync-session", { ok: true });
+            return;
+          }
+
+          const payload = await response.json().catch(() => ({}));
+          console.warn("[LOGIN] after sync-session", {
+            ok: false,
+            error: payload?.error || `HTTP ${response.status}`,
+          });
+        })
+        .catch((syncError) => {
+          console.warn("[LOGIN] after sync-session", {
+            ok: false,
+            error: syncError?.message || String(syncError),
+          });
+        });
     } catch (err) {
+      console.log("[LOGIN] catch", err);
+
+      if (err?.message === "SIGN_IN_TIMEOUT") {
+        showAppModal({
+          type: "error",
+          title: "تعذر تسجيل الدخول",
+          message: SIGN_IN_TIMEOUT_MESSAGE,
+        });
+        return;
+      }
+
       console.error("Login error:", err);
       showAppModal({
         type: "error",
         title: "فشل تسجيل الدخول",
         message: "حدث خطأ أثناء تسجيل الدخول. جرّب مرة ثانية.",
       });
-      setLoading(false);
       setTurnstileToken("");
       if (window.turnstile && turnstileWidgetId.current !== null) {
         window.turnstile.reset(turnstileWidgetId.current);
       }
+    } finally {
+      console.log("[LOGIN] finally");
+      setLoading(false);
     }
   };
 
@@ -269,14 +338,6 @@ export default function LoginPage() {
     });
   };
 
-  if (!authResolved || authStatus === "loading") {
-    return (
-      <main className="min-h-screen w-full overflow-hidden bg-[#020617] text-white">
-        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(0,102,255,0.42),transparent_30%),radial-gradient(circle_at_85%_25%,rgba(34,211,238,0.18),transparent_28%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
-      </main>
-    );
-  }
-
   return (
     <main className="min-h-screen w-full overflow-hidden bg-[#020617] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(0,102,255,0.42),transparent_30%),radial-gradient(circle_at_85%_25%,rgba(34,211,238,0.18),transparent_28%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
@@ -293,7 +354,7 @@ export default function LoginPage() {
               <p className="mt-3 text-slate-400">ادخل إلى منصة HasaN CharT World لإدارة تحليلاتك وتنبيهاتك</p>
             </div>
 
-            <form onSubmit={login} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-slate-300">البريد الإلكتروني</label>
                 <input

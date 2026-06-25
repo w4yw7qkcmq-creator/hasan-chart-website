@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "../components/AuthProvider";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRequireAuth } from "../hooks/useRequireAuth";
 import { supabase } from "../../lib/supabase";
 
 function StatusBadge({ status }) {
@@ -42,6 +42,38 @@ function StatCard({ title, value, icon, subtitle }) {
   );
 }
 
+function AnalysisCardSkeleton() {
+  return (
+    <div className="relative overflow-hidden rounded-[26px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-[0_14px_42px_rgba(0,102,255,0.12)] backdrop-blur-2xl">
+      <div className="animate-pulse space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-28 rounded-full bg-white/10" />
+          <div className="h-8 w-20 rounded-full bg-white/10" />
+        </div>
+        <div className="h-4 w-3/4 rounded-xl bg-white/10" />
+        <div className="h-20 rounded-[22px] bg-white/10" />
+      </div>
+    </div>
+  );
+}
+
+function SessionLoadingState() {
+  return (
+    <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
+      <div className="relative z-10 space-y-7 p-4 md:p-6">
+        <div className="h-40 animate-pulse rounded-[34px] border border-cyan-300/15 bg-white/[0.045]" />
+        <div className="grid gap-5 md:grid-cols-3">
+          <AnalysisCardSkeleton />
+          <AnalysisCardSkeleton />
+          <AnalysisCardSkeleton />
+        </div>
+        <p className="text-center text-sm font-bold text-slate-400">جاري التحقق من الجلسة...</p>
+      </div>
+    </main>
+  );
+}
+
 function formatArabicDateTime(value) {
   if (!value) return "";
 
@@ -59,11 +91,12 @@ function formatArabicDateTime(value) {
   }).format(date);
 }
 export default function MyAnalysisPage() {
-  const { authResolved, user: currentUser } = useAuth();
+  const { user: currentUser, sessionPending, shouldShowLogin } = useRequireAuth();
   const [requests, setRequests] = useState([]);
   const [filter, setFilter] = useState("all");
   const [dataMode, setDataMode] = useState("supabase");
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [replyNotice, setReplyNotice] = useState("");
   const [loadError, setLoadError] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
@@ -71,6 +104,8 @@ export default function MyAnalysisPage() {
   const [fullImageOpen, setFullImageOpen] = useState(false);
   const [imageLoadingId, setImageLoadingId] = useState(null);
   const selectedAnalysisRef = useRef(null);
+  const requestsRef = useRef([]);
+  const hasLoadedOnceRef = useRef(false);
   const normalizeRequest = (item) => ({
     id: item.id,
     userEmail: item.user_email || item.userEmail,
@@ -140,14 +175,28 @@ export default function MyAnalysisPage() {
     return () => clearTimeout(timer);
   }, [replyNotice]);
 
-  const loadRequests = async (user) => {
-    setLoading(true);
+  useEffect(() => {
+    requestsRef.current = requests;
+  }, [requests]);
+
+  const loadRequests = useCallback(async (user, { background = false } = {}) => {
+    const hasExistingData = requestsRef.current.length > 0 || hasLoadedOnceRef.current;
+
+    if (background || hasExistingData) {
+      setIsFetching(true);
+    } else {
+      setIsLoading(true);
+    }
+
     setLoadError("");
 
     if (!user?.email) {
-      setRequests([]);
-      setLoading(false);
-      setLoadError("لم يتم العثور على إيميل المستخدم. سجّل الدخول من جديد.");
+      if (!hasExistingData) setRequests([]);
+      setIsLoading(false);
+      setIsFetching(false);
+      if (!sessionPending) {
+        setLoadError("لم يتم العثور على إيميل المستخدم. سجّل الدخول من جديد.");
+      }
       return;
     }
 
@@ -156,17 +205,16 @@ export default function MyAnalysisPage() {
 
     try {
       const response = await fetch("/api/my-analysis", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
-          signal: controller.signal,
-        }
-      );
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+        signal: controller.signal,
+      });
 
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.success) {
-        if (requests.length === 0) setRequests([]);
+        if (!hasExistingData) setRequests([]);
         setLoadError(result?.error || "تعذر تحميل طلبات التحليل.");
         return;
       }
@@ -175,24 +223,34 @@ export default function MyAnalysisPage() {
         ? result.requests.map(normalizeRequest)
         : [];
 
-      setRequests(formattedRequests);
-      setDataMode("api");
-      setLastUpdated(new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-        timeZone: "Asia/Damascus",
-      }).format(new Date()));
-      console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
+      const previousReplyIds = new Set(
+        requestsRef.current.filter((item) => item.reply).map((item) => item.id)
+      );
+      const newReply = formattedRequests.find(
+        (item) => item.reply && item.status === "مكتمل" && !previousReplyIds.has(item.id)
+      );
 
-      const latestReply = formattedRequests.find((item) => item.reply && item.status === "مكتمل");
-      if (latestReply) {
-        setReplyNotice(`📩 وصل رد الإدارة على طلب تحليل ${latestReply.coin}`);
+      setRequests(formattedRequests);
+      hasLoadedOnceRef.current = true;
+      setDataMode("api");
+      setLastUpdated(
+        new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+          timeZone: "Asia/Damascus",
+        }).format(new Date())
+      );
+
+      if (newReply && background) {
+        setReplyNotice(`📩 وصل رد الإدارة على طلب تحليل ${newReply.coin}`);
       }
+
+      console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
     } catch (err) {
       console.error("Load requests API error:", err);
-      if (requests.length === 0) setRequests([]);
+      if (!hasExistingData) setRequests([]);
       setLoadError(
         err?.name === "AbortError"
           ? "تحميل الطلبات أخذ وقت طويل بسبب حجم صور التحليل. اضغط تحديث الطلبات مرة أخرى."
@@ -200,26 +258,45 @@ export default function MyAnalysisPage() {
       );
     } finally {
       clearTimeout(timeoutId);
-      setLoading(false);
+      setIsLoading(false);
+      setIsFetching(false);
     }
-  };
+  }, [sessionPending]);
 
   useEffect(() => {
-    if (!authResolved) return;
+    if (sessionPending) return;
+
+    if (shouldShowLogin) {
+      setIsLoading(false);
+      setIsFetching(false);
+      return;
+    }
 
     let isMounted = true;
     let channel;
     let refreshInterval;
+    let refreshIfIdle;
+    let onVisibilityChange;
 
     const start = async () => {
       const user = currentUser;
 
-      if (!isMounted) return;
+      if (!isMounted || !user?.email) return;
 
       console.log("تحميل طلبات المستخدم:", user);
       await loadRequests(user);
 
       if (!isMounted || !user?.email) return;
+
+      refreshIfIdle = () => {
+        if (!selectedAnalysisRef.current) {
+          void loadRequests(user, { background: true });
+        }
+      };
+
+      onVisibilityChange = () => {
+        if (document.visibilityState === "visible") refreshIfIdle();
+      };
 
       channel = supabase
         .channel(`my-analysis-requests-${user.email}`)
@@ -232,41 +309,37 @@ export default function MyAnalysisPage() {
             filter: `user_email=eq.${String(user.email || "").trim().toLowerCase()}`,
           },
           () => {
-  if (selectedAnalysisRef.current) {
-    setReplyNotice("📩 وصل تحديث جديد على طلبات التحليل. أغلق التحليل لتحديث القائمة.");
-    return;
-  }
+            if (selectedAnalysisRef.current) {
+              setReplyNotice("📩 وصل تحديث جديد على طلبات التحليل. أغلق التحليل لتحديث القائمة.");
+              return;
+            }
 
-  loadRequests(user);
-}
+            void loadRequests(user, { background: true });
+          }
         )
         .subscribe((status) => {
           if (status === "SUBSCRIBED") console.log("My analysis realtime connected");
         });
 
-      const refreshIfIdle = () => {
-        if (!selectedAnalysisRef.current) {
-          loadRequests(user);
-        }
-      };
-
       refreshInterval = setInterval(refreshIfIdle, 15000);
-
       window.addEventListener("focus", refreshIfIdle);
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") refreshIfIdle();
-      });
+      document.addEventListener("visibilitychange", onVisibilityChange);
     };
 
-    start();
+    void start();
 
     return () => {
       isMounted = false;
       if (refreshInterval) clearInterval(refreshInterval);
-      window.removeEventListener("focus", loadRequests);
+      if (refreshIfIdle) {
+        window.removeEventListener("focus", refreshIfIdle);
+      }
+      if (onVisibilityChange) {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
       if (channel) supabase.removeChannel(channel);
     };
-  }, [authResolved, currentUser]);
+  }, [sessionPending, shouldShowLogin, currentUser, loadRequests]);
 
   const stats = useMemo(() => {
     const completed = requests.filter((item) => item.status === "مكتمل").length;
@@ -282,22 +355,11 @@ export default function MyAnalysisPage() {
     return requests;
   }, [requests, filter]);
 
-  if (!authResolved) {
-    return (
-      <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
-        <div className="relative z-10 flex min-h-[calc(100vh-180px)] items-center justify-center text-center">
-          <div className="max-w-md rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-8 backdrop-blur-2xl">
-            <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/25 bg-cyan-400/10 text-4xl">⏳</div>
-            <h1 className="text-3xl font-black">جاري التحقق من الجلسة</h1>
-            <p className="mt-3 leading-7 text-slate-400">يرجى الانتظار حتى اكتمال فحص الجلسة...</p>
-          </div>
-        </div>
-      </main>
-    );
+  if (sessionPending) {
+    return <SessionLoadingState />;
   }
 
-  if (!currentUser) {
+  if (shouldShowLogin) {
     return (
       <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
@@ -446,35 +508,43 @@ export default function MyAnalysisPage() {
           </div>
         </section>
 
-        {loading && (
-          <section className="space-y-4 rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-5 text-center text-cyan-100 shadow-2xl backdrop-blur-2xl">
-            <p>جاري تحميل طلبات التحليل...</p>
-            <button
-              onClick={() => loadRequests(currentUser)}
-              className="rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
-            >
-              إعادة التحميل
-            </button>
+        {isFetching ? (
+          <section className="rounded-[24px] border border-cyan-300/10 bg-cyan-400/10 px-4 py-3 text-center text-xs font-bold text-cyan-100 shadow-2xl backdrop-blur-2xl">
+            جاري التحديث...
           </section>
-        )}
+        ) : null}
 
-        {!loading && loadError && (
+        {isLoading && requests.length === 0 ? (
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <AnalysisCardSkeleton />
+            <AnalysisCardSkeleton />
+            <AnalysisCardSkeleton />
+          </section>
+        ) : null}
+
+        {!isLoading && loadError && requests.length === 0 ? (
           <section className="rounded-[30px] border border-red-300/20 bg-red-500/10 p-5 text-center text-red-100 shadow-2xl backdrop-blur-2xl">
             <p className="font-black">{loadError}</p>
             <button
-              onClick={() => loadRequests(currentUser)}
+              onClick={() => void loadRequests(currentUser)}
               className="mt-4 rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
             >
               تحديث الطلبات
             </button>
           </section>
-        )}
+        ) : null}
 
-        {!loading && !loadError && lastUpdated && (
+        {loadError && requests.length > 0 ? (
+          <section className="rounded-[24px] border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-center text-xs font-bold text-amber-100">
+            {loadError}
+          </section>
+        ) : null}
+
+        {!isLoading && !loadError && lastUpdated ? (
           <section className="rounded-[24px] border border-cyan-300/10 bg-white/[0.03] p-4 text-center text-xs font-bold text-slate-400 shadow-2xl backdrop-blur-2xl">
             آخر تحديث: {lastUpdated}
           </section>
-        )}
+        ) : null}
 
         <section className="grid gap-5 md:grid-cols-3">
           <StatCard title="كل الطلبات" value={requests.length} icon="🧠" subtitle="إجمالي طلباتك" />
@@ -505,7 +575,7 @@ export default function MyAnalysisPage() {
           </div>
         </section>
 
-        {!loading && filteredRequests.length === 0 ? (
+        {!isLoading && filteredRequests.length === 0 ? (
           <section className="rounded-[30px] border border-dashed border-cyan-300/20 bg-white/[0.035] p-10 text-center shadow-2xl backdrop-blur-2xl">
             <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/20 bg-cyan-400/10 text-4xl">📭</div>
             <h2 className="text-2xl font-black">لا توجد طلبات هنا</h2>
@@ -514,7 +584,7 @@ export default function MyAnalysisPage() {
               إرسال طلب الآن
             </Link>
           </section>
-        ) : !loading ? (
+        ) : filteredRequests.length > 0 ? (
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredRequests.map((req) => (
               <article

@@ -6,14 +6,16 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { isAdminUser } from "../../lib/admin-emails";
+import { buildAppUser } from "../../lib/auth-profile";
 import {
-  applySessionAfterLogin,
-  resetAuthBootstrap,
-  runAuthBootstrap,
-} from "../../lib/auth-bootstrap";
+  buildMinimalAppUser,
+  resolveSupabaseAuthUser,
+  restoreSessionFromCookies,
+} from "../../lib/auth-session-client";
 import { supabase } from "../../lib/supabase";
 
 const AuthContext = createContext(null);
@@ -22,62 +24,149 @@ export function AuthProvider({ children }) {
   const [authResolved, setAuthResolved] = useState(false);
   const [status, setStatus] = useState("loading");
   const [user, setUser] = useState(null);
+  const [profileReady, setProfileReady] = useState(false);
+  const enrichRequestRef = useRef(0);
+
+  const enrichUserProfile = useCallback(async (authUser) => {
+    if (!authUser?.email) {
+      setProfileReady(true);
+      return;
+    }
+
+    const requestId = enrichRequestRef.current + 1;
+    enrichRequestRef.current = requestId;
+
+    try {
+      const appUser = await buildAppUser(authUser, supabase);
+
+      if (enrichRequestRef.current !== requestId) {
+        return;
+      }
+
+      if (appUser) {
+        setUser(appUser);
+      }
+    } catch (err) {
+      console.warn("Profile enrich skipped:", err?.message || err);
+    } finally {
+      if (enrichRequestRef.current === requestId) {
+        setProfileReady(true);
+      }
+    }
+  }, []);
+
+  const applyAuthenticatedUser = useCallback(
+    (authUser, { enrichProfile = true } = {}) => {
+      const minimalUser = buildMinimalAppUser(authUser);
+
+      if (!minimalUser) {
+        setUser(null);
+        setStatus("unauthenticated");
+        setProfileReady(true);
+        setAuthResolved(true);
+        return;
+      }
+
+      setUser(minimalUser);
+      setStatus("authenticated");
+      setAuthResolved(true);
+
+      if (enrichProfile) {
+        setProfileReady(false);
+        void enrichUserProfile(authUser);
+      } else {
+        setProfileReady(true);
+      }
+    },
+    [enrichUserProfile]
+  );
+
+  const clearAuthenticatedUser = useCallback(() => {
+    enrichRequestRef.current += 1;
+    setUser(null);
+    setStatus("unauthenticated");
+    setProfileReady(true);
+    setAuthResolved(true);
+  }, []);
 
   useEffect(() => {
     let active = true;
 
-    runAuthBootstrap().then((result) => {
+    async function initAuth() {
+      await restoreSessionFromCookies();
+
+      const { user: authUser, error } = await resolveSupabaseAuthUser();
+
       if (!active) return;
 
-      setUser(result.user);
-      setStatus(result.status);
-      setAuthResolved(true);
-    });
+      if (error || !authUser?.email) {
+        clearAuthenticatedUser();
+        return;
+      }
+
+      applyAuthenticatedUser(authUser);
+    }
+
+    void initAuth();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyAuthenticatedUser, clearAuthenticatedUser]);
 
   useEffect(() => {
-    if (!authResolved) return;
+    let active = true;
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "INITIAL_SESSION") return;
 
       if (event === "SIGNED_OUT") {
-        resetAuthBootstrap();
-        setUser(null);
-        setStatus("unauthenticated");
+        clearAuthenticatedUser();
         return;
       }
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        const result = await runAuthBootstrap();
-        setUser(result.user);
-        setStatus(result.status);
+        const sessionUser = session?.user ?? null;
+
+        setTimeout(() => {
+          if (!active) return;
+
+          void (async () => {
+            if (sessionUser?.email) {
+              applyAuthenticatedUser(sessionUser);
+              return;
+            }
+
+            const { user: authUser, error } = await resolveSupabaseAuthUser();
+
+            if (!active) return;
+
+            if (error || !authUser?.email) {
+              clearAuthenticatedUser();
+              return;
+            }
+
+            applyAuthenticatedUser(authUser);
+          })();
+        }, 0);
       }
     });
 
     return () => {
+      active = false;
       subscription.unsubscribe();
     };
-  }, [authResolved]);
+  }, [applyAuthenticatedUser, clearAuthenticatedUser]);
 
-  const establishSession = useCallback(async (session) => {
-    setStatus("loading");
-    setAuthResolved(false);
-
-    const result = await applySessionAfterLogin(session);
-
-    setUser(result.user);
-    setStatus(result.status);
-    setAuthResolved(true);
-
-    return result;
-  }, []);
+  const acknowledgeSignIn = useCallback(
+    (authUser) => {
+      if (!authUser?.email) return;
+      applyAuthenticatedUser(authUser);
+    },
+    [applyAuthenticatedUser]
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -95,25 +184,23 @@ export function AuthProvider({ children }) {
       console.warn("Supabase signOut skipped:", err?.message || err);
     }
 
-    resetAuthBootstrap();
-    setUser(null);
-    setStatus("unauthenticated");
-    setAuthResolved(true);
-  }, []);
+    clearAuthenticatedUser();
+  }, [clearAuthenticatedUser]);
 
   const isAdmin = useMemo(() => isAdminUser(user), [user]);
 
   const value = useMemo(
     () => ({
       authResolved,
+      profileReady,
       status,
       user,
       isAdmin,
-      establishSession,
+      acknowledgeSignIn,
       logout,
       updateUser: setUser,
     }),
-    [authResolved, status, user, isAdmin, establishSession, logout]
+    [authResolved, profileReady, status, user, isAdmin, acknowledgeSignIn, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

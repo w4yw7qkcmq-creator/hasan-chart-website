@@ -25,6 +25,7 @@ const { processEmailQueue } = require("./email-queue");
 const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications } = require("./push-sender");
 const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert-email");
+const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
 const PRICE_ALERTS_MODULE_VERSION = "2026-06-24-v7-single-sender-worker";
@@ -1084,17 +1085,15 @@ async function checkPriceAlerts() {
           condition,
         });
 
-        const { data: notificationRow, error: notificationError } = await supabase
-          .from("notifications")
-          .insert({
-            user_email: userEmail,
+        const { data: notificationRow, error: notificationError } = await createUserNotification(
+          supabase,
+          {
+            userEmail,
             title: "🔔 وصل السعر إلى هدف التنبيه",
             message: notificationMessage,
             type: "price-alert",
-            is_read: false,
-          })
-          .select("id")
-          .single();
+          }
+        );
 
         if (notificationError) {
           logWorkerEvent("ALERT_NOTIFICATION_CREATED", {

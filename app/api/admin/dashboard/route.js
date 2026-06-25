@@ -1,6 +1,9 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-dispatch";
+import { createUserNotification, createUserNotifications } from "../../../../lib/create-user-notification";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
 import { buildEmailLogoHtml } from "../../../../lib/email-branding.js";
+import { NOTIFICATION_TYPES } from "../../../../lib/notifications-shared";
 import { processEmailQueue } from "../../../../lib/email-queue";
 import {
   sendAccountManagementAcceptedPush,
@@ -469,13 +472,13 @@ async function notifyVipSubscribers(supabase, signal) {
 
     if (recipientEmails.length === 0) return;
 
-    await supabase.from("notifications").insert(
+    await createUserNotifications(
+      supabase,
       recipientEmails.map((email) => ({
-        user_email: email,
+        userEmail: email,
         title: `🚨 توصية VIP ${label} جديدة`,
         message: `تم نشر توصية جديدة على ${coin}. افتح صفحة توصيات VIP ${label} للاطلاع على التفاصيل.`,
         type: normalizedSignalType === "futures" ? "vip-futures" : "vip-spot",
-        is_read: false,
       }))
     );
 
@@ -724,13 +727,24 @@ export async function POST(request) {
         .update({
           reply,
           reply_image: replyImage || null,
-          status: "تم الرد",
+          status: "مكتمل",
+          job_status: "completed",
+          completed_at: new Date().toISOString(),
+          error_message: null,
         })
         .eq("id", requestId);
 
       if (error) {
         throw new Error(error.message || "تعذر إرسال الرد");
       }
+
+      const alertResult = await dispatchAnalysisReplyAlerts({
+        supabase,
+        userEmail: existingRequest?.user_email,
+        coin: existingRequest?.coin,
+        reply,
+        requestId,
+      });
 
       await writeAdminLog(supabase, {
         admin: adminUser,
@@ -739,6 +753,8 @@ export async function POST(request) {
         targetId: requestId,
         details: {
           hasImage: Boolean(replyImage),
+          notificationCreated: alertResult.notificationCreated,
+          emailSent: Boolean(alertResult.emailResult?.sent),
         },
       });
 
@@ -749,7 +765,11 @@ export async function POST(request) {
         requestId,
       });
 
-      return Response.json({ success: true });
+      return Response.json({
+        success: true,
+        notificationCreated: alertResult.notificationCreated,
+        emailSent: Boolean(alertResult.emailResult?.sent),
+      });
     }
 
     if (action === "update-subscription-request") {
@@ -803,12 +823,11 @@ export async function POST(request) {
           );
         }
 
-        await supabase.from("notifications").insert({
-          user_email: userEmail,
+        await createUserNotification(supabase, {
+          userEmail,
           title: "تم تفعيل اشتراكك بنجاح 🎉",
           message: `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`,
           type: "subscription",
-          is_read: false,
         });
       }
 
