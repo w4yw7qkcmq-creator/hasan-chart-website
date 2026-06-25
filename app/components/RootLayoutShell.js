@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import {
@@ -78,6 +78,9 @@ const getAnalysisReplyKey = (row) => {
   return `${id}:${signature}`;
 };
 
+const BOOTSTRAP_LOADING_DELAY_MS = 700;
+const BOOTSTRAP_LOADING_EXIT_MS = 320;
+
 function RootLayoutShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -94,6 +97,48 @@ function RootLayoutShell({ children }) {
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  const [loadingOverlayState, setLoadingOverlayState] = useState("hidden");
+  const authResolvedRef = useRef(authResolved);
+
+  useEffect(() => {
+    authResolvedRef.current = authResolved;
+  }, [authResolved]);
+
+  useEffect(() => {
+    if (authResolved) {
+      setLoadingOverlayState((current) => (current === "visible" ? "exiting" : "hidden"));
+      return;
+    }
+
+    setLoadingOverlayState("hidden");
+
+    const showTimer = window.setTimeout(() => {
+      if (!authResolvedRef.current) {
+        setLoadingOverlayState("visible");
+      }
+    }, BOOTSTRAP_LOADING_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(showTimer);
+    };
+  }, [authResolved]);
+
+  useEffect(() => {
+    if (loadingOverlayState !== "exiting") return;
+
+    const hideTimer = window.setTimeout(() => {
+      setLoadingOverlayState("hidden");
+    }, BOOTSTRAP_LOADING_EXIT_MS);
+
+    return () => {
+      window.clearTimeout(hideTimer);
+    };
+  }, [loadingOverlayState]);
+
+  const bootstrapOverlay =
+    loadingOverlayState !== "hidden" ? (
+      <BootstrapLoading exiting={loadingOverlayState === "exiting"} />
+    ) : null;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -768,10 +813,6 @@ function RootLayoutShell({ children }) {
     };
   }, [currentUser]);
 
-  if (!authResolved) {
-    return <BootstrapLoading />;
-  }
-
   if (isAuthPage) {
     return (
       <>
@@ -813,6 +854,7 @@ function RootLayoutShell({ children }) {
           </div>
         )}
         {children}
+        {bootstrapOverlay}
       </>
     );
   }
@@ -1243,6 +1285,7 @@ function RootLayoutShell({ children }) {
             <main className="w-full p-3 pt-3 md:p-4 md:pt-4">{children}</main>
           </div>
         </div>
+        {bootstrapOverlay}
     </>
   );
 }

@@ -573,6 +573,21 @@ html[data-theme="light"] .fixed:has(.sidebarUserCard) .sidebarUserCard {
   animation: bootstrapFadeScale 0.55s ease-out both;
 }
 
+.bootstrapScreen--exit {
+  animation: bootstrapFadeOut 0.32s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes bootstrapFadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
 .bootstrapScreen__bg {
   background:
     radial-gradient(circle at 18% 8%, rgba(11, 99, 255, 0.28), transparent 28%),

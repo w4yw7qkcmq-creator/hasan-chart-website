@@ -35,10 +35,10 @@ function BootstrapBrandMark() {
   );
 }
 
-export default function BootstrapLoading() {
+export default function BootstrapLoading({ exiting = false }) {
   return (
     <div
-      className="bootstrapScreen fixed inset-0 z-[9998] flex min-h-screen items-center justify-center overflow-hidden"
+      className={`bootstrapScreen fixed inset-0 z-[9998] flex min-h-screen items-center justify-center overflow-hidden${exiting ? " bootstrapScreen--exit" : ""}`}
       role="status"
       aria-live="polite"
       aria-busy="true"
