@@ -13,6 +13,7 @@ import {
 } from "../../lib/push-client";
 import { useAppModal } from "./AppModalProvider";
 import { useAuth } from "./AuthProvider";
+import BootstrapLoading from "./BootstrapLoading";
 import { useTheme } from "./ThemeProvider";
 
 const menuItems = [
@@ -81,7 +82,7 @@ function RootLayoutShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const { showAppModal } = useAppModal();
-  const { user: currentUser, status: authStatus, isAdmin, logout, updateUser } = useAuth();
+  const { user: currentUser, status: authStatus, authResolved, isAdmin, logout, updateUser } = useAuth();
   const [globalNotice, setGlobalNotice] = useState("");
   const [globalNoticeHref, setGlobalNoticeHref] = useState("");
   const [notificationPermission, setNotificationPermission] = useState("default");
@@ -766,6 +767,10 @@ function RootLayoutShell({ children }) {
       supabase.removeChannel(channel);
     };
   }, [currentUser]);
+
+  if (!authResolved) {
+    return <BootstrapLoading />;
+  }
 
   if (isAuthPage) {
     return (
