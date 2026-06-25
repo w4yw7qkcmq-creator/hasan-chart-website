@@ -1,27 +1,10 @@
 "use client";
 
 import { useCallback } from "react";
+import { adminFetch } from "../../../../lib/admin-fetch";
 
 export function useAdminFetch() {
-  return useCallback(async (url, options = {}) => {
-    let response = await fetch(url, { ...options, credentials: "same-origin" });
-
-    if (response.status !== 401) {
-      return response;
-    }
-
-    const refreshResponse = await fetch("/api/auth/refresh", {
-      method: "POST",
-      credentials: "same-origin",
-    });
-
-    if (!refreshResponse.ok) {
-      return response;
-    }
-
-    response = await fetch(url, { ...options, credentials: "same-origin" });
-    return response;
-  }, []);
+  return useCallback((url, options = {}) => adminFetch(url, options), []);
 }
 
 export function buildAnalyticsQuery(filters, { syncResend = false } = {}) {

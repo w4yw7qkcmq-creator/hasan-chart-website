@@ -20,6 +20,22 @@ export async function POST(request) {
     }
 
     const supabase = getSupabaseAdmin();
+    const eventType = String(event?.type || "").trim();
+
+    if (eventType === "email.opened" || eventType === "email.clicked") {
+      const data = event?.data || {};
+      console.log("RESEND_WEBHOOK_ENGAGEMENT", {
+        type: eventType,
+        emailId: data.email_id || data.id || null,
+        recipient: Array.isArray(data.to) ? data.to[0] : data.to || null,
+        subject: data.subject || null,
+        clickLink: data.click?.link || null,
+        clickIp: data.click?.ipAddress || null,
+        clickUserAgent: data.click?.userAgent || null,
+        createdAt: event.created_at || data.created_at || null,
+      });
+    }
+
     await recordResendWebhookEvent(supabase, event);
 
     return Response.json({ success: true });

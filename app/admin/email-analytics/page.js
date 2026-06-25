@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ActivityChart } from "./components/ActivityChart";
 import { EmailTable } from "./components/EmailTable";
 import { FilterBar } from "./components/FilterBar";
 import { DashboardSkeleton } from "./components/Skeleton";
 import { buildStatCards, StatCard } from "./components/StatCard";
 import { IconRefresh } from "./components/icons";
+import { WebhookStatusBanner } from "./components/WebhookStatusBanner";
 import { buildAnalyticsQuery, useAdminFetch } from "./lib/useAdminFetch";
 
 const EMPTY_SUMMARY = {
@@ -41,10 +41,8 @@ const DEFAULT_FILTERS = {
 };
 
 export default function EmailAnalyticsPage() {
-  const router = useRouter();
   const adminFetch = useAdminFetch();
 
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -56,11 +54,14 @@ export default function EmailAnalyticsPage() {
   const [messageTypes, setMessageTypes] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
-  const [setupInfo, setSetupInfo] = useState({
-    setupRequired: false,
-    webhookConfigured: false,
-    resendConfigured: false,
+  const [webhookHealth, setWebhookHealth] = useState({
     webhookUrl: "/api/webhooks/resend",
+    webhookSecretConfigured: false,
+    webhookConnected: false,
+    webhookStatus: "setup_required",
+    lastWebhookEventAt: null,
+    lastWebhookEventType: null,
+    lastWebhookEventLabel: null,
   });
 
   const loadAnalytics = useCallback(
@@ -77,31 +78,27 @@ export default function EmailAnalyticsPage() {
 
         const result = await response.json().catch(() => ({}));
 
-        if (response.status === 401) {
-          router.replace("/login");
-          return;
-        }
-
-        if (response.status === 403) {
-          router.replace("/403");
-          return;
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(result?.error || "تعذر تحميل تحليلات البريد");
         }
 
         if (!response.ok || !result?.success) {
           throw new Error(result?.error || "تعذر تحميل تحليلات البريد");
         }
 
-        setIsAdmin(true);
         setSummary(result.summary || EMPTY_SUMMARY);
         setTodayActivity(result.todayActivity || EMPTY_ACTIVITY);
         setChartSeries(result.chartSeries || { "24h": [], "7d": [], "30d": [] });
         setRows(result.rows || []);
         setMessageTypes(result.messageTypes || []);
-        setSetupInfo({
-          setupRequired: Boolean(result.setupRequired),
-          webhookConfigured: Boolean(result.webhookConfigured),
-          resendConfigured: Boolean(result.resendConfigured),
+        setWebhookHealth({
           webhookUrl: result.webhookUrl || "/api/webhooks/resend",
+          webhookSecretConfigured: Boolean(result.webhookSecretConfigured),
+          webhookConnected: Boolean(result.webhookConnected),
+          webhookStatus: result.webhookStatus || "setup_required",
+          lastWebhookEventAt: result.lastWebhookEventAt || null,
+          lastWebhookEventType: result.lastWebhookEventType || null,
+          lastWebhookEventLabel: result.lastWebhookEventLabel || null,
         });
         setError("");
         setLastUpdatedAt(new Date().toLocaleString("ar"));
@@ -112,7 +109,7 @@ export default function EmailAnalyticsPage() {
         setRefreshing(false);
       }
     },
-    [adminFetch, appliedFilters, router]
+    [adminFetch, appliedFilters]
   );
 
   useEffect(() => {
@@ -141,7 +138,7 @@ export default function EmailAnalyticsPage() {
     loadAnalytics({ silent: true, nextFilters: DEFAULT_FILTERS });
   };
 
-  if (!isAdmin && loading) {
+  if (loading) {
     return (
       <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-lg dark:border-cyan-300/10 dark:bg-[#020617] dark:text-white md:p-6">
         <DashboardSkeleton />
@@ -149,29 +146,12 @@ export default function EmailAnalyticsPage() {
     );
   }
 
-  if (!isAdmin && !loading && error) {
+  if (error) {
     return (
       <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-slate-200 bg-slate-50 p-6 text-slate-900 shadow-lg dark:border-cyan-300/10 dark:bg-[#020617] dark:text-white">
         <div className="flex min-h-[50vh] items-center justify-center text-center">
           <div className="max-w-md rounded-[32px] border border-slate-200 bg-white p-8 dark:border-cyan-300/15 dark:bg-white/[0.045]">
             <p className="text-xl font-black">{error}</p>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-slate-200 bg-slate-50 p-6 text-slate-900 shadow-lg dark:border-cyan-300/10 dark:bg-[#020617] dark:text-white">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.12),transparent_30%)] dark:bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
-        <div className="relative z-10 flex min-h-[calc(100vh-180px)] items-center justify-center text-center">
-          <div className="max-w-md rounded-[32px] border border-slate-200 bg-white p-8 dark:border-cyan-300/15 dark:bg-white/[0.045]">
-            <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-200 bg-cyan-50 text-4xl dark:border-cyan-300/25 dark:bg-cyan-400/10">
-              🛡
-            </div>
-            <h1 className="text-3xl font-black">جاري التحقق من الصلاحية</h1>
-            <p className="mt-3 leading-7 text-slate-600 dark:text-slate-400">هذه الصفحة مخصصة للإدارة فقط.</p>
           </div>
         </div>
       </main>
@@ -228,17 +208,7 @@ export default function EmailAnalyticsPage() {
           </div>
         </section>
 
-        {setupInfo.setupRequired && (
-          <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-amber-950 shadow-lg dark:border-amber-300/20 dark:bg-amber-400/10 dark:text-amber-100">
-            <h2 className="text-lg font-black">إعداد Webhook (جاهز للربط)</h2>
-            <p className="mt-2 text-sm leading-7">
-              اربط Resend Webhook وفعّل: sent, delivered, opened, clicked, failed, bounced, complained.
-            </p>
-            <p className="mt-3 break-all rounded-2xl border border-amber-200 bg-white px-4 py-3 font-mono text-sm text-slate-900 dark:border-amber-300/20 dark:bg-black/20 dark:text-amber-50">
-              https://www.hasanchartworld.com{setupInfo.webhookUrl}
-            </p>
-          </section>
-        )}
+        <WebhookStatusBanner webhook={webhookHealth} />
 
         {loading ? (
           <DashboardSkeleton />

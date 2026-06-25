@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { DetailSkeleton } from "../components/Skeleton";
 import { IconRefresh } from "../components/icons";
 import { useAdminFetch } from "../lib/useAdminFetch";
@@ -67,7 +66,6 @@ function EventTimeline({ events = [] }) {
 }
 
 export default function EmailMessageDetailPage({ params }) {
-  const router = useRouter();
   const adminFetch = useAdminFetch();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,14 +86,8 @@ export default function EmailMessageDetailPage({ params }) {
 
         const result = await response.json().catch(() => ({}));
 
-        if (response.status === 401) {
-          router.replace("/login");
-          return;
-        }
-
-        if (response.status === 403) {
-          router.replace("/403");
-          return;
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(result?.error || "تعذر تحميل تفاصيل الرسالة");
         }
 
         if (response.status === 404) {
@@ -117,7 +109,7 @@ export default function EmailMessageDetailPage({ params }) {
         setRefreshing(false);
       }
     },
-    [adminFetch, params.id, router]
+    [adminFetch, params.id]
   );
 
   useEffect(() => {
