@@ -431,40 +431,13 @@ export default function Home() {
             </div>
 
             <div className="lg:col-span-5">
-              <div className="rounded-[32px] bg-black/30 border border-white/10 p-6">
+              <div className="site-market-pulse-panel">
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <p
-                      className="text-sm font-bold tracking-wide"
-                      style={{
-                        color: "#ffffff",
-                        WebkitTextFillColor: "#ffffff",
-                        textShadow: "0 2px 4px rgba(0,0,0,0.75)",
-                      }}
-                    >
-                      Market Pulse
-                    </p>
-                    <h3
-                      className="text-2xl font-black tracking-wide"
-                      style={{
-                        color: "#ffffff",
-                        WebkitTextFillColor: "#ffffff",
-                        textShadow: "0 3px 6px rgba(0,0,0,0.80)",
-                      }}
-                    >
-                      BTC / ETH / SOL
-                    </h3>
+                    <p className="site-price-card__eyebrow">Market Pulse</p>
+                    <h3 className="site-price-card__title mb-0">BTC / ETH / SOL</h3>
                   </div>
-                  <span
-                    className="badgeBlue"
-                    style={{
-                      color: "#ffffff",
-                      WebkitTextFillColor: "#ffffff",
-                      textShadow: "0 2px 4px rgba(0,0,0,0.75)",
-                    }}
-                  >
-                    WebSocket
-                  </span>
+                  <span className="site-market-pulse-badge">WebSocket</span>
                 </div>
 
                 <div className="space-y-3">
@@ -750,38 +723,20 @@ function Price({ title, symbol, price, source = "Binance Live" }) {
 
 function TradingViewPrice({ title, symbol, tvSymbol }) {
   return (
-    <div className="rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
-      <p className="text-sm font-black tracking-wide !text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.85)]">{title}</p>
-      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white [text-shadow:0_3px_6px_rgba(0,0,0,0.85)]">{symbol}</h3>
+    <div className="site-price-card site-price-card--tv">
+      <p className="site-price-card__eyebrow">{title}</p>
+      <h3 className="site-price-card__title">{symbol}</h3>
       <TradingViewWidget symbol={tvSymbol} height="120" />
-      <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
+      <p className="site-price-card__status">● TradingView Live</p>
     </div>
   );
 }
 
 function MiniTicker({ symbol, price }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-blue-300/70 bg-gradient-to-r from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_8px_22px_rgba(37,99,235,0.22)]">
-      <span
-        className="font-black tracking-wide"
-        style={{
-          color: "#ffffff",
-          WebkitTextFillColor: "#ffffff",
-          textShadow: "0 2px 4px rgba(0,0,0,0.75)",
-        }}
-      >
-        {symbol}
-      </span>
-      <span
-        className="font-black tracking-wide"
-        style={{
-          color: "#ffffff",
-          WebkitTextFillColor: "#ffffff",
-          textShadow: "0 2px 4px rgba(0,0,0,0.75)",
-        }}
-      >
-        ${price}
-      </span>
+    <div className="site-price-card site-price-card--pulse">
+      <span className="site-price-card__title mb-0 text-base">{symbol}</span>
+      <span className="site-price-card__value text-base">${price}</span>
     </div>
   );
 }
@@ -838,11 +793,11 @@ function Service({ title, text, href, publicLink = false, onRequireLogin }) {
 
 function MarketWindow({ title, label, symbol }) {
   return (
-    <div className="min-h-[230px] overflow-hidden rounded-[28px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.30)] transition hover:scale-[1.02]">
-      <p className="text-sm font-black tracking-wide !text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.85)]">{label}</p>
-      <h3 className="mt-2 mb-3 text-2xl font-black tracking-wide !text-white [text-shadow:0_3px_6px_rgba(0,0,0,0.85)]">{title}</h3>
+    <div className="site-price-card site-price-card--tv">
+      <p className="site-price-card__eyebrow">{label}</p>
+      <h3 className="site-price-card__title">{title}</h3>
       <TradingViewWidget symbol={symbol} height="120" />
-      <p className="mt-3 text-xs font-bold text-cyan-300">● TradingView Live</p>
+      <p className="site-price-card__status">● TradingView Live</p>
     </div>
   );
 }

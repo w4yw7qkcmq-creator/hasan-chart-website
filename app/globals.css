@@ -1029,3 +1029,126 @@ html[data-theme="light"] .bootstrapStallBanner {
 html[data-theme="light"] .bootstrapStallBanner p {
   color: #92400e;
 }
+
+/* ===== Protected price cards (immune to theme-pending/light overrides) ===== */
+
+.site-price-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.site-price-card:hover {
+  transform: scale(1.02);
+}
+
+.site-price-card--pulse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(147, 197, 253, 0.7);
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.85) 0%,
+    rgba(59, 130, 246, 0.85) 50%,
+    rgba(34, 211, 238, 0.8) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 8px 22px rgba(37, 99, 235, 0.22);
+  padding: 1rem;
+}
+
+.site-price-card--tv {
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  background: linear-gradient(135deg, #020617 0%, #0f172a 42%, #172554 100%);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.3);
+  padding: 1.25rem;
+  min-height: 230px;
+}
+
+.site-price-card__eyebrow,
+.site-price-card__title,
+.site-price-card__value {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75);
+}
+
+.site-price-card__eyebrow {
+  font-size: 0.875rem;
+  font-weight: 900;
+  letter-spacing: 0.025em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
+}
+
+.site-price-card__title {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.025em;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.85);
+}
+
+.site-price-card__status {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #67e8f9 !important;
+  -webkit-text-fill-color: #67e8f9 !important;
+}
+
+.site-market-pulse-panel {
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+}
+
+.site-market-pulse-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75);
+}
+
+html[data-theme="light"] .site-price-card--tv,
+html[data-theme="light"] .site-market-pulse-panel {
+  background: linear-gradient(135deg, #020617 0%, #0f172a 42%, #172554 100%) !important;
+  border-color: rgba(51, 65, 85, 0.8) !important;
+}
+
+html[data-theme="light"] .site-price-card--pulse {
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.92) 0%,
+    rgba(59, 130, 246, 0.92) 50%,
+    rgba(34, 211, 238, 0.88) 100%
+  ) !important;
+  border-color: rgba(147, 197, 253, 0.75) !important;
+}
+
+html[data-theme="light"] .site-price-card__eyebrow,
+html[data-theme="light"] .site-price-card__title,
+html[data-theme="light"] .site-price-card__value,
+html[data-theme="light"] .site-price-card__status,
+html[data-theme="light"] .site-market-pulse-panel .site-price-card__eyebrow,
+html[data-theme="light"] .site-market-pulse-panel .site-price-card__title,
+html[data-theme="light"] .site-market-pulse-badge {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+html[data-theme="light"] .site-market-pulse-panel {
+  background: rgba(2, 6, 23, 0.72) !important;
+  border-color: rgba(147, 197, 253, 0.28) !important;
+}
