@@ -1807,27 +1807,7 @@ function getExternalImageByNewsTopic(title, impactLevel = "MEDIUM") {
     return null;
   }
 
-  let query = "financial markets trading floor";
-
-  if (/fomc|fed|federal reserve|powell|interest rate|rate decision|الفيدرالي|باول|قرار الفائدة/i.test(value)) {
-    query = "federal reserve building washington";
-  } else if (/cpi|ppi|pce|inflation|consumer price|producer price|التضخم|مؤشر أسعار/i.test(value)) {
-    query = "inflation economy financial markets";
-  } else if (/nfp|nonfarm|payrolls|jobless claims|unemployment|jobs|الوظائف|البطالة|طلبات إعانة البطالة/i.test(value)) {
-    query = "us jobs report labor market";
-  } else if (/gold|xau|ذهب|الذهب/i.test(value)) {
-    query = "gold bullion market";
-  } else if (/oil|crude|brent|wti|نفط|النفط|خام|برنت/i.test(value)) {
-    query = "crude oil market";
-  } else if (/bitcoin|btc|crypto|ethereum|بيتكوين|البيتكوين|كريبتو|العملات الرقمية/i.test(value)) {
-    query = "bitcoin cryptocurrency market";
-  } else if (/iran|israel|hormuz|red sea|war|missile|attack|airstrike|sanctions|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|حرب|هجوم|ضربة|عقوبات/i.test(value)) {
-    query = "middle east geopolitics oil market";
-  } else if (/nasdaq|dow|s&p|stocks|stock market|market crash|selloff|ناسداك|داو جونز|الأسهم|الاسهم|انهيار السوق/i.test(value)) {
-    query = "wall street stock market";
-  }
-
-  return `https://source.unsplash.com/1920x1080/?${encodeURIComponent(query)}`;
+  return null;
 }
 
 async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {

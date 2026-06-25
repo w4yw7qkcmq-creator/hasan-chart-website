@@ -2,6 +2,13 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import CopyArticleButton from "../../components/CopyArticleButton";
+import { NewsArticleCoverImage } from "../../components/news/NewsCoverImage";
+import {
+  detectNewsCategory,
+  getNewsCategoryVisual,
+  isBlockedNewsImageUrl,
+  resolveNewsImageUrl,
+} from "../../../lib/news-images";
 
 const SITE_URL = "https://www.hasanchartworld.com";
 
@@ -40,29 +47,11 @@ function getNewsTitle(news) {
 }
 
 function getNewsImage(news) {
-  const imageUrl =
-    news?.image_url ||
-    news?.image ||
-    news?.thumbnail_url ||
-    news?.thumbnail ||
-    news?.urlToImage ||
-    news?.url_to_image ||
-    null;
-
-  if (!imageUrl) return null;
-
-  const value = String(imageUrl).trim();
-  if (!value) return null;
-  if (value.startsWith("/app/assets/")) return null;
-  if (/default|placeholder|sprite|logo|avatar|blank|pixel|1x1/i.test(value)) return null;
-  if (value.startsWith("//")) return `https:${value}`;
-  if (value.startsWith("http://") || value.startsWith("https://")) return value;
-
-  return null;
+  return resolveNewsImageUrl(news);
 }
 
 async function isImageReachable(url) {
-  if (!url) return false;
+  if (!url || isBlockedNewsImageUrl(url)) return false;
 
   try {
     const controller = new AbortController();
@@ -84,15 +73,7 @@ async function isImageReachable(url) {
 }
 
 function detectCategory(news) {
-  const text = `${news?.title || ""} ${news?.content || ""} ${news?.topic_cluster || ""}`.toLowerCase();
-
-  if (/bitcoin|btc|crypto|ethereum/.test(text)) return "crypto";
-  if (/gold|oil|silver|commodit/.test(text)) return "commodities";
-  if (/nasdaq|dow|s&p|stock|earnings/.test(text)) return "stocks";
-  if (/fed|inflation|cpi|pmi|gdp|jobs/.test(text)) return "economy";
-  if (/iran|israel|war|ukraine|russia|gaza/.test(text)) return "geopolitics";
-
-  return "stocks";
+  return detectNewsCategory(news);
 }
 
 function getCategoryLabel(category) {
@@ -109,40 +90,7 @@ function getCategoryLabel(category) {
 
 
 function getCategoryVisual(category) {
-  const visuals = {
-    crypto: {
-      icon: "₿",
-      label: "العملات الرقمية",
-      subtitle: "بيتكوين • كريبتو • بلوكتشين",
-      gradient: "from-orange-900 via-orange-950 to-slate-950",
-    },
-    commodities: {
-      icon: "🛢️",
-      label: "النفط والطاقة",
-      subtitle: "نفط • ذهب • سلع",
-      gradient: "from-yellow-900 via-amber-950 to-slate-950",
-    },
-    stocks: {
-      icon: "📊",
-      label: "تحديثات الأسواق",
-      subtitle: "تحركات مؤثرة على التداول",
-      gradient: "from-cyan-950 via-sky-950 to-slate-950",
-    },
-    economy: {
-      icon: "🇺🇸",
-      label: "الاقتصاد الأمريكي",
-      subtitle: "فائدة • تضخم • وظائف",
-      gradient: "from-blue-950 via-indigo-950 to-slate-950",
-    },
-    geopolitics: {
-      icon: "🌍",
-      label: "أخبار جيوسياسية",
-      subtitle: "توترات • حروب • تأثيرات السوق",
-      gradient: "from-red-950 via-red-900 to-slate-950",
-    },
-  };
-
-  return visuals[category] || visuals.stocks;
+  return getNewsCategoryVisual(category);
 }
 
 
@@ -444,26 +392,22 @@ export default async function NewsDetailsPage({ params }) {
 
       <article className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/50 bg-white/85 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl">
         <div className={`relative h-[320px] overflow-hidden bg-gradient-to-br ${categoryVisual.gradient} text-center md:h-[460px]`}>
-          <div className={`absolute inset-0 ${image ? "hidden" : "flex"} items-center justify-center fallback-article-image`} style={{ zIndex: 15 }}>
-            <div>
-              <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
-                {categoryVisual.icon}
+          <NewsArticleCoverImage
+            src={image}
+            alt={title}
+            fallback={
+              <div>
+                <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
+                  {categoryVisual.icon}
+                </div>
+                <div className="text-2xl font-black text-cyan-50">{categoryVisual.label}</div>
+                <div className="mt-2 text-sm font-bold text-cyan-100/75">{categoryVisual.subtitle}</div>
+                <div className="mt-5 text-[11px] font-black uppercase tracking-[0.35em] text-cyan-200/45">
+                  HasaN CharT News
+                </div>
               </div>
-              <div className="text-2xl font-black text-cyan-50">{categoryVisual.label}</div>
-              <div className="mt-2 text-sm font-bold text-cyan-100/75">{categoryVisual.subtitle}</div>
-              <div className="mt-5 text-[11px] font-black uppercase tracking-[0.35em] text-cyan-200/45">
-                HasaN CharT News
-              </div>
-            </div>
-          </div>
-
-          {image ? (
-            <img
-              src={image}
-              alt={title}
-              className="relative z-10 h-full w-full object-cover"
-            />
-          ) : null}
+            }
+          />
 
           <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/80 via-slate-950/15 to-transparent" />
           <div className="absolute right-6 top-6 z-30 rounded-full border border-white/40 bg-white/90 px-4 py-2 text-sm font-black text-slate-800 backdrop-blur">

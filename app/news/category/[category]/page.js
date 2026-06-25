@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import { resolveNewsImageUrl } from "../../../../lib/news-images";
+import { NewsCoverImage } from "../../../components/news/NewsCoverImage";
 
 const SITE_URL = "https://www.hasanchartworld.com";
 
@@ -82,36 +84,8 @@ function shortText(text, maxLength = 260) {
   return `${cleaned.slice(0, maxLength).trim()}...`;
 }
 
-function getValidImage(...urls) {
-  const candidates = urls.flat().filter(Boolean);
-
-  for (const url of candidates) {
-    const imageUrl = String(url).trim();
-
-    if (!imageUrl) continue;
-    if (imageUrl.startsWith("/app/assets/")) continue;
-    if (/default|placeholder|sprite|logo|avatar/i.test(imageUrl)) continue;
-
-    if (imageUrl.startsWith("//")) return `https:${imageUrl}`;
-    if (imageUrl.startsWith("https://") || imageUrl.startsWith("http://")) return imageUrl;
-  }
-
-  return null;
-}
-
 function getNewsImage(item) {
-  return getValidImage(
-    item.image_url,
-    item.image,
-    item.thumbnail_url,
-    item.thumbnail,
-    item.urlToImage,
-    item.url_to_image,
-    item.media_url,
-    item.source_image_url,
-    item.og_image,
-    item.cover_image
-  );
+  return resolveNewsImageUrl(item);
 }
 
 function extractArabicTitle(item) {
@@ -287,7 +261,18 @@ export default async function CategoryPage({ params }) {
               );
               const newsImage = getNewsImage(item);
               const sourceName = getSourceName(sourceLink);
-              const hasRealImage = Boolean(newsImage);
+              const fallbackVisual = (
+                <div className="px-6">
+                  <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
+                    {config.icon}
+                  </div>
+                  <div className="text-lg font-black text-cyan-50">{config.title}</div>
+                  <div className="mt-2 line-clamp-1 text-xs font-bold text-cyan-100/75">{config.description}</div>
+                  <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
+                    HasaN CharT News
+                  </div>
+                </div>
+              );
 
               return (
                 <Link
@@ -296,26 +281,7 @@ export default async function CategoryPage({ params }) {
                   className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
                 >
                   <div className={`relative h-56 overflow-hidden bg-gradient-to-br ${config.gradient}`}>
-                    <div className={`absolute inset-0 ${hasRealImage ? "hidden" : "flex"} items-center justify-center text-center fallback-news-image`}>
-                      <div className="px-6">
-                        <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
-                          {config.icon}
-                        </div>
-                        <div className="text-lg font-black text-cyan-50">{config.title}</div>
-                        <div className="mt-2 line-clamp-1 text-xs font-bold text-cyan-100/75">{config.description}</div>
-                        <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
-                          HasaN CharT News
-                        </div>
-                      </div>
-                    </div>
-
-                    {newsImage ? (
-                      <img
-                        src={newsImage}
-                        alt={newsTitle}
-                        className="relative z-10 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                      />
-                    ) : null}
+                    <NewsCoverImage src={newsImage} alt={newsTitle} fallback={fallbackVisual} />
 
                     <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
                     <div className="absolute left-4 top-4 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">

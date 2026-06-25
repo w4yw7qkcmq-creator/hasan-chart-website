@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import {
+  detectNewsCategory,
+  getNewsCategoryVisual,
+  resolveNewsImageUrl,
+} from "../../lib/news-images";
+import { NewsCoverImage } from "../components/news/NewsCoverImage";
 
 
 const POPULAR_TAGS = [
@@ -77,17 +83,16 @@ export default function News() {
         .limit(50);
 
       if (error) {
-        console.error("News fetch error:", error);
+        console.warn("News fetch skipped:", error.message || error);
         setErrorMessage(error.message || "تعذر تحميل الأخبار من قاعدة البيانات.");
         setNews([]);
         return;
       }
 
-      console.log("Fetched news_posts count:", data?.length || 0);
       setNews(data || []);
       setLastUpdated(formatNewsDate(new Date()));
     } catch (error) {
-      console.error("Unexpected news error:", error);
+      console.warn("News fetch skipped:", error?.message || error);
       setErrorMessage(error.message || "حدث خطأ غير متوقع أثناء تحميل الأخبار.");
     } finally {
       setLoading(false);
@@ -112,45 +117,12 @@ export default function News() {
     return cleaned;
   }
 
-  function getValidImage(...urls) {
-    const candidates = urls.flat().filter(Boolean);
-
-    for (const url of candidates) {
-      const imageUrl = String(url).trim();
-
-      if (!imageUrl) continue;
-      if (imageUrl.startsWith("/app/assets/")) continue;
-      if (imageUrl.includes("default.png")) continue;
-      if (imageUrl.includes("placeholder")) continue;
-      if (imageUrl.includes("sprite")) continue;
-      if (imageUrl.includes("logo")) continue;
-      if (imageUrl.includes("avatar")) continue;
-
-      if (imageUrl.startsWith("//")) {
-        return `https:${imageUrl}`;
-      }
-
-      if (imageUrl.startsWith("https://") || imageUrl.startsWith("http://")) {
-        return imageUrl;
-      }
-    }
-
-    return null;
+  function getNewsCategory(item) {
+    return detectNewsCategory(item);
   }
 
-  function getNewsImage(item) {
-    return getValidImage(
-      item.image_url,
-      item.image,
-      item.thumbnail_url,
-      item.thumbnail,
-      item.urlToImage,
-      item.url_to_image,
-      item.media_url,
-      item.source_image_url,
-      item.og_image,
-      item.cover_image
-    );
+  function categoryVisual(category) {
+    return getNewsCategoryVisual(category);
   }
 
   function extractArabicTitle(item) {
@@ -181,75 +153,6 @@ export default function News() {
     } catch {
       return "مصدر الخبر";
     }
-  }
-
-  function getNewsCategory(item) {
-    const text = `${item.title || ""} ${item.content || ""} ${item.topic_cluster || ""}`.toLowerCase();
-
-    if (text.includes("bitcoin") || text.includes("crypto") || text.includes("btc") || text.includes("ethereum")) {
-      return "crypto";
-    }
-
-    if (text.includes("gold") || text.includes("oil") || text.includes("silver") || text.includes("commodit")) {
-      return "commodities";
-    }
-
-    if (text.includes("stock") || text.includes("nasdaq") || text.includes("s&p") || text.includes("dow") || text.includes("earnings")) {
-      return "stocks";
-    }
-
-    if (text.includes("fed") || text.includes("inflation") || text.includes("jobs") || text.includes("cpi") || text.includes("pmi") || text.includes("gdp")) {
-      return "economy";
-    }
-
-    if (text.includes("iran") || text.includes("israel") || text.includes("war") || text.includes("gaza") || text.includes("ukraine") || text.includes("russia")) {
-      return "geopolitics";
-    }
-
-    return "markets";
-  }
-
-  function categoryVisual(category) {
-    const visuals = {
-      crypto: {
-        icon: "₿",
-        label: "العملات الرقمية",
-        subtitle: "بيتكوين • كريبتو • بلوكتشين",
-        gradient: "from-orange-900 via-orange-950 to-slate-950",
-      },
-      commodities: {
-        icon: "🛢️",
-        label: "النفط والطاقة",
-        subtitle: "نفط • ذهب • سلع",
-        gradient: "from-yellow-900 via-amber-950 to-slate-950",
-      },
-      stocks: {
-        icon: "↗",
-        label: "الأسواق العالمية",
-        subtitle: "أسهم • مؤشرات • وول ستريت",
-        gradient: "from-emerald-950 via-green-900 to-slate-950",
-      },
-      economy: {
-        icon: "🇺🇸",
-        label: "الاقتصاد الأمريكي",
-        subtitle: "فائدة • تضخم • وظائف",
-        gradient: "from-blue-950 via-indigo-950 to-slate-950",
-      },
-      geopolitics: {
-        icon: "🌍",
-        label: "أخبار جيوسياسية",
-        subtitle: "توترات • حروب • تأثيرات السوق",
-        gradient: "from-red-950 via-red-900 to-slate-950",
-      },
-      markets: {
-        icon: "📊",
-        label: "تحديثات الأسواق",
-        subtitle: "تحركات مؤثرة على التداول",
-        gradient: "from-cyan-950 via-sky-950 to-slate-950",
-      },
-    };
-
-    return visuals[category] || visuals.markets;
   }
 
   function getNewsHref(item) {
@@ -374,11 +277,22 @@ export default function News() {
                 fullText(item.summary || item.description || item.ai_summary || item.content || item.normalized_title),
                 index === 0 ? 260 : 170
               );
-              const newsImage = getNewsImage(item);
+              const newsImage = resolveNewsImageUrl(item);
               const sourceName = getSourceName(sourceLink);
               const category = getNewsCategory(item);
               const visual = categoryVisual(category);
-              const hasRealImage = Boolean(newsImage);
+              const fallbackVisual = (
+                <div className="px-6">
+                  <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
+                    {visual.icon}
+                  </div>
+                  <div className="text-xl font-black text-cyan-50">{visual.label}</div>
+                  <div className="mt-2 text-xs font-bold text-cyan-100/75">{visual.subtitle}</div>
+                  <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
+                    HasaN CharT News
+                  </div>
+                </div>
+              );
 
               return (
                 <Link
@@ -387,35 +301,12 @@ export default function News() {
                   className={`group block overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
                 >
                   <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
-                    <div className={`absolute inset-0 ${hasRealImage ? "hidden" : "flex"} items-center justify-center text-center fallback-news-image`}>
-                      <div className="px-6">
-                        <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
-                          {visual.icon}
-                        </div>
-                        <div className="text-xl font-black text-cyan-50">{visual.label}</div>
-                        <div className="mt-2 text-xs font-bold text-cyan-100/75">{visual.subtitle}</div>
-                        <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
-                          HasaN CharT News
-                        </div>
-                      </div>
-                    </div>
-                    {newsImage ? (
-                      <img
-                        src={newsImage}
-                        alt={newsTitle}
-                        loading={index < 3 ? "eager" : "lazy"}
-                        decoding="async"
-                        onError={(event) => {
-                          event.currentTarget.style.display = "none";
-                          const fallback = event.currentTarget.parentElement?.querySelector(".fallback-news-image");
-                          if (fallback) {
-                            fallback.classList.remove("hidden");
-                            fallback.classList.add("flex");
-                          }
-                        }}
-                        className="relative z-10 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                      />
-                    ) : null}
+                    <NewsCoverImage
+                      src={newsImage}
+                      alt={newsTitle}
+                      loading={index < 3 ? "eager" : "lazy"}
+                      fallback={fallbackVisual}
+                    />
                     <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
                     <div className="absolute left-4 top-4 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">
                       {sourceName}
