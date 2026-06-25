@@ -85,7 +85,11 @@ export async function GET() {
     const resolved = await resolveSessionFromCookies(supabase, cookieStore);
 
     if (!resolved?.user?.email) {
-      return NextResponse.json({ authenticated: false }, { status: 401 });
+      return NextResponse.json({
+        ok: false,
+        authenticated: false,
+        user: null,
+      });
     }
 
     const normalizedEmail = normalizeEmail(resolved.user.email);
@@ -104,6 +108,7 @@ export async function GET() {
     };
 
     const response = NextResponse.json({
+      ok: true,
       authenticated: true,
       user,
       isAdmin: isAdminUser(user),
@@ -118,7 +123,9 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json(
       {
+        ok: false,
         authenticated: false,
+        user: null,
         error: error?.message || "تعذر قراءة الجلسة",
       },
       { status: 500 }

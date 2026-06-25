@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+html.theme-pending body {
+  overflow: hidden;
+}
+
+html.theme-ready body {
+  overflow-x: hidden;
+}
+
+html.theme-ready #site-root {
+  min-height: 100vh;
+}
+
 :root {
   --bg-main: #020617;
   --bg-page: #020617;

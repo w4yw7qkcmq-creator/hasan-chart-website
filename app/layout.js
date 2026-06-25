@@ -2,6 +2,7 @@ import "./globals.css";
 import { AppProviders } from "./components/AppProviders";
 import RootLayoutShell from "./components/RootLayoutShell";
 import { readThemeFromRequestCookies } from "../lib/theme-server";
+import { THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -25,8 +26,15 @@ export default async function RootLayout({ children }) {
   const theme = await readThemeFromRequestCookies();
 
   return (
-    <html lang="ar" dir="rtl" data-theme={theme} suppressHydrationWarning>
+    <html
+      lang="ar"
+      dir="rtl"
+      data-theme={theme}
+      className="theme-pending"
+      suppressHydrationWarning
+    >
       <head>
+        <style dangerouslySetInnerHTML={{ __html: THEME_CRITICAL_CSS }} />
         <title>HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول</title>
         <meta
           name="description"
@@ -75,10 +83,23 @@ export default async function RootLayout({ children }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
       </head>
-      <body className="min-h-screen bg-[#020617] text-white antialiased overflow-x-hidden">
-        <AppProviders initialTheme={theme}>
-          <RootLayoutShell>{children}</RootLayoutShell>
-        </AppProviders>
+      <body className="min-h-screen bg-[#020617] text-white antialiased overflow-x-hidden theme-pending-body">
+        <div
+          id="theme-boot-loader"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="جاري تحميل منصة HasaN CharT World"
+        >
+          <div className="theme-boot-logo">HC</div>
+          <div className="theme-boot-spinner" aria-hidden="true" />
+          <p className="theme-boot-title">HasaN CharT World</p>
+          <p className="theme-boot-subtitle">جاري تجهيز الواجهة...</p>
+        </div>
+        <div id="site-root">
+          <AppProviders initialTheme={theme}>
+            <RootLayoutShell>{children}</RootLayoutShell>
+          </AppProviders>
+        </div>
       </body>
     </html>
   );
