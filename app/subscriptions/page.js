@@ -178,8 +178,7 @@ export default function SubscriptionsPage() {
         }
 
         setCurrentSubscription(result.current_subscription || result.plans?.[0] || null);
-      } catch (error) {
-        console.error("Current subscription load error:", error);
+      } catch {
         setCurrentSubscription(null);
       } finally {
         setSubscriptionLoading(false);

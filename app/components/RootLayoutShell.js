@@ -386,7 +386,7 @@ function RootLayoutShell({ children }) {
 
   // Automatic user subscription refresh so VIP menu items appear after admin activation without logging out.
   useEffect(() => {
-    if (!currentUser?.email) return;
+    if (!authResolved || !currentUser?.email) return;
 
     refreshCurrentUserSubscription();
     const timer = setInterval(refreshCurrentUserSubscription, 10000);
@@ -413,7 +413,7 @@ function RootLayoutShell({ children }) {
       clearInterval(timer);
       supabase.removeChannel(channel);
     };
-  }, [currentUser?.email]);
+  }, [authResolved, currentUser?.email]);
 
   // Refresh user subscription info (VIP menu items appear after admin activation)
   const refreshCurrentUserSubscription = async () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "../../lib/supabase";
 import {
   detectNewsCategory,
   getNewsCategoryVisual,
@@ -66,16 +66,7 @@ export default function News() {
   async function fetchNews() {
     try {
       setErrorMessage("");
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      if (!supabaseUrl || !supabaseAnonKey) {
-        setErrorMessage("إعدادات الأخبار غير مكتملة حالياً.");
-        setNews([]);
-        return;
-      }
-
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
       const { data, error } = await supabase
         .from("news_posts")
         .select("*")
