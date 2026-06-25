@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../components/AuthProvider";
 import { supabase } from "../../lib/supabase";
 
 function StatusBadge({ status }) {
@@ -58,7 +59,7 @@ function formatArabicDateTime(value) {
   }).format(date);
 }
 export default function MyAnalysisPage() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const { authResolved, user: currentUser } = useAuth();
   const [requests, setRequests] = useState([]);
   const [filter, setFilter] = useState("all");
   const [dataMode, setDataMode] = useState("supabase");
@@ -204,27 +205,17 @@ export default function MyAnalysisPage() {
   };
 
   useEffect(() => {
+    if (!authResolved) return;
+
     let isMounted = true;
     let channel;
     let refreshInterval;
 
     const start = async () => {
-      let user = JSON.parse(localStorage.getItem("currentUser") || "null");
-
-      if (!user?.email) {
-        const session = JSON.parse(localStorage.getItem("hasan-chart-auth-session") || "null");
-        user = session?.user?.email
-          ? {
-              email: session.user.email,
-              username: session.user.user_metadata?.username || session.user.email,
-              role: session.user.user_metadata?.role || "user",
-            }
-          : null;
-      }
+      const user = currentUser;
 
       if (!isMounted) return;
 
-      setCurrentUser(user);
       console.log("تحميل طلبات المستخدم:", user);
       await loadRequests(user);
 
@@ -275,7 +266,7 @@ export default function MyAnalysisPage() {
       window.removeEventListener("focus", loadRequests);
       if (channel) supabase.removeChannel(channel);
     };
-  }, []);
+  }, [authResolved, currentUser]);
 
   const stats = useMemo(() => {
     const completed = requests.filter((item) => item.status === "مكتمل").length;
@@ -290,6 +281,21 @@ export default function MyAnalysisPage() {
     if (filter === "reply") return requests.filter((item) => item.reply);
     return requests;
   }, [requests, filter]);
+
+  if (!authResolved) {
+    return (
+      <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
+        <div className="relative z-10 flex min-h-[calc(100vh-180px)] items-center justify-center text-center">
+          <div className="max-w-md rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-8 backdrop-blur-2xl">
+            <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/25 bg-cyan-400/10 text-4xl">⏳</div>
+            <h1 className="text-3xl font-black">جاري التحقق من الجلسة</h1>
+            <p className="mt-3 leading-7 text-slate-400">يرجى الانتظار حتى اكتمال فحص الجلسة...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (!currentUser) {
     return (

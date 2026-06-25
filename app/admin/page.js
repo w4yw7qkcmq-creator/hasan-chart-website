@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { adminFetch } from "../../lib/admin-fetch";
 import { supabase } from "../../lib/supabase";
 import AppModal from "../components/AppModal";
+import { useAuth } from "../components/AuthProvider";
 
 function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
   const glow =
@@ -207,7 +210,7 @@ const upsertById = (list, item, limit) => {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { logout } = useAuth();
   const [analysisRequests, setAnalysisRequests] = useState([]);
   const [accountRequests, setAccountRequests] = useState([]);
   const [subscriptionRequests, setSubscriptionRequests] = useState([]);
@@ -371,31 +374,8 @@ export default function AdminPage() {
     };
   }, []);
 
-  // Helper for admin API calls with auto session refresh
-  const adminFetch = async (url, options = {}) => {
-    const requestOptions = {
-      ...options,
-      credentials: "same-origin",
-    };
+  // Helper for admin API calls with auto session refresh (shared lib/admin-fetch.js)
 
-    let response = await fetch(url, requestOptions);
-
-    if (response.status !== 401) {
-      return response;
-    }
-
-    const refreshResponse = await fetch("/api/auth/refresh", {
-      method: "POST",
-      credentials: "same-origin",
-    });
-
-    if (!refreshResponse.ok) {
-      return response;
-    }
-
-    response = await fetch(url, requestOptions);
-    return response;
-  };
   const loadAccountKeys = async (requestId) => {
     if (accountKeys[requestId]) {
       setAccountKeys((prev) => {
@@ -451,21 +431,13 @@ export default function AdminPage() {
 
         if (cancelled) return;
 
-        if (response.status === 401) {
-          router.replace("/login");
-          return;
-        }
-
-        if (response.status === 403) {
-          router.replace("/403");
-          return;
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(result?.error || "تعذر التحقق من صلاحية الإدارة");
         }
 
         if (!response.ok || !result?.success) {
           throw new Error(result?.error || "فشل التحقق من صلاحية الإدارة");
         }
-
-        setIsAdmin(true);
 
         if (typeof window !== "undefined" && "Notification" in window) {
           if (Notification.permission === "granted") {
@@ -484,11 +456,10 @@ export default function AdminPage() {
         if (cancelled) return;
 
         showAdminNotice(
-          error?.message || "تعذر التحقق من صلاحية الإدارة",
+          error?.message || "تعذر تحميل بيانات لوحة الإدارة",
           "error",
-          "غير مصرح"
+          "تعذر التحميل"
         );
-        router.replace("/403");
       }
     };
 
@@ -502,7 +473,7 @@ export default function AdminPage() {
       cancelled = true;
       clearInterval(backupInterval);
     };
-  }, [router]);
+  }, []);
 
   const applyAdminDashboardResult = (result) => {
     const formattedAnalysis = (result.analysis_requests || []).map(formatAnalysisRequest);
@@ -548,14 +519,8 @@ export default function AdminPage() {
 
       const result = await response.json().catch(() => ({}));
 
-      if (response.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      if (response.status === 403) {
-        router.replace("/403");
-        return;
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(result?.error || "تعذر تحميل بيانات لوحة الإدارة");
       }
 
       if (!response.ok || !result?.success) {
@@ -813,14 +778,9 @@ export default function AdminPage() {
     );
   }, [accountRequests, accountFilter, accountSearch]);
 
-  const logout = () => {
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("hasan-chart-auth-session");
-
-    supabase.auth.signOut().finally(() => {
-      window.dispatchEvent(new Event("storage"));
-      router.push("/login");
-    });
+  const logoutAdmin = async () => {
+    await logout();
+    router.replace("/login");
   };
 
   const publishVipSignal = async (signalType) => {
@@ -1062,15 +1022,15 @@ export default function AdminPage() {
     }
   };
 
-  if (!isAdmin) {
+  if (!hasLoadedAdminData) {
     return (
       <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
         <div className="relative z-10 flex min-h-[calc(100vh-180px)] items-center justify-center text-center">
           <div className="max-w-md rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-8 backdrop-blur-2xl">
-            <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/25 bg-cyan-400/10 text-4xl">🛡</div>
-            <h1 className="text-3xl font-black">جاري التحقق من الصلاحية</h1>
-            <p className="mt-3 leading-7 text-slate-700 dark:text-slate-400">هذه الصفحة مخصصة للإدارة فقط.</p>
+            <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/25 bg-cyan-400/10 text-4xl">⏳</div>
+            <h1 className="text-3xl font-black">جاري تحميل لوحة الإدارة</h1>
+            <p className="mt-3 leading-7 text-slate-400">يرجى الانتظار حتى اكتمال تحميل البيانات...</p>
           </div>
         </div>
       </main>
@@ -1246,7 +1206,7 @@ export default function AdminPage() {
               </div>
 
               <button
-                onClick={logout}
+                onClick={logoutAdmin}
                 className="rounded-2xl border border-red-400/20 bg-red-500/15 px-6 py-4 font-black text-red-100 transition hover:bg-red-500/25"
               >
                 تسجيل خروج الأدمن
@@ -1358,6 +1318,23 @@ export default function AdminPage() {
           <AdminStat title="المستخدمون" value={stats.usersCount} icon="👥" subtitle={dataMode === "secure-api" ? "من Secure API" : dataMode === "supabase" ? "من Supabase" : "محلياً للتجربة"} tone="green" />
           <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
+
+        <Link
+          href="/admin/email-analytics"
+          className="group relative block overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition duration-200 hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-400/10 opacity-80 transition group-hover:opacity-100" />
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-slate-300">Email Analytics</p>
+              <h3 className="mt-3 text-2xl font-black text-white">📧 مراقبة الإيميلات</h3>
+              <p className="mt-2 text-sm text-slate-300">تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend</p>
+            </div>
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)] transition group-hover:scale-105">
+              📧
+            </div>
+          </div>
+        </Link>
 
         <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">

@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { isAdminUser } from "../../lib/admin-emails";
 import { supabase } from "../../lib/supabase";
 import { useAppModal } from "../components/AppModalProvider";
+import { useAuth } from "../components/AuthProvider";
 
 function BrandMark({ size = "lg" }) {
   const box = size === "sm" ? "h-16 w-16" : "h-24 w-24";
@@ -28,13 +30,6 @@ function BrandMark({ size = "lg" }) {
     </div>
   );
 }
-
-const FALLBACK_ADMIN_EMAILS = [
-  "alerts@hasanchartworld.com",
-  "admin@hasanchartworld.com",
-  "hasanchartworld@gmail.com",
-  "ahmaagahmaadd@gmail.com",
-];
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
@@ -76,6 +71,7 @@ const verifyTurnstileToken = async (token) => {
 export default function LoginPage() {
   const router = useRouter();
   const { showAppModal } = useAppModal();
+  const { authResolved, status: authStatus, user, establishSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
@@ -86,25 +82,10 @@ export default function LoginPage() {
   const turnstileWidgetId = useRef(null);
 
   useEffect(() => {
-    const savedUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+    if (!authResolved || authStatus !== "authenticated" || !user?.email) return;
 
-    if (!savedUser?.email) return;
-
-    const savedEmail = String(savedUser.email || "").toLowerCase();
-    const savedRole = savedUser.role === "admin" || FALLBACK_ADMIN_EMAILS.includes(savedEmail) ? "admin" : "user";
-
-    if (savedRole === "admin" && savedUser.role !== "admin") {
-      const upgradedUser = { ...savedUser, role: "admin" };
-      localStorage.setItem("currentUser", JSON.stringify(upgradedUser));
-      sessionStorage.setItem("currentUser", JSON.stringify(upgradedUser));
-    }
-
-    setTimeout(() => {
-      window.location.href = savedRole === "admin"
-        ? "/admin"
-        : "/my-dashboard";
-    }, 150);
-  }, [router]);
+    router.replace(isAdminUser(user) ? "/admin" : "/my-dashboard");
+  }, [authResolved, authStatus, user, router]);
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY) return;
@@ -193,27 +174,24 @@ export default function LoginPage() {
       return;
     }
 
-    localStorage.removeItem("currentUser");
-    sessionStorage.removeItem("currentUser");
-
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           email: cleanEmail,
           password,
         }),
       });
 
-      const result = await response.json().catch(() => ({}));
+      const payload = await response.json().catch(() => ({}));
 
-      const error = !response.ok ? result?.error : null;
-      const user = result?.user || null;
+      const error = !response.ok ? payload?.error : null;
 
-      if (error || !user) {
+      if (error || !payload?.session?.access_token || !payload?.session?.refresh_token) {
         showAppModal({
           type: "error",
           title: "فشل تسجيل الدخول",
@@ -227,25 +205,19 @@ export default function LoginPage() {
         return;
       }
 
-      const role = FALLBACK_ADMIN_EMAILS.includes(cleanEmail) ? "admin" : "user";
+      const authResult = await establishSession(payload.session);
 
-      const userData = {
-        id: user.id,
-        email: user.email,
-        username: user.user_metadata?.username || user.email?.split("@")[0] || "مستخدم",
-        telegram: user.user_metadata?.telegram || "",
-        role,
-        subscription_plan: "بدون اشتراك",
-        subscription_status: "غير نشط",
-        loggedAt: new Date().toLocaleString("ar"),
-      };
+      if (authResult.status !== "authenticated" || !authResult.user) {
+        showAppModal({
+          type: "error",
+          title: "فشل تسجيل الدخول",
+          message: "تعذر حفظ جلسة الدخول. جرّب مرة ثانية.",
+        });
+        setLoading(false);
+        return;
+      }
 
-      localStorage.setItem("currentUser", JSON.stringify(userData));
-      sessionStorage.setItem("currentUser", JSON.stringify(userData));
-
-
-      window.dispatchEvent(new Event("storage"));
-      window.location.href = role === "admin" ? "/admin" : "/my-dashboard";
+      router.replace(isAdminUser(authResult.user) ? "/admin" : "/my-dashboard");
     } catch (err) {
       console.error("Login error:", err);
       showAppModal({
@@ -296,6 +268,14 @@ export default function LoginPage() {
       message: "تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني",
     });
   };
+
+  if (!authResolved || authStatus === "loading") {
+    return (
+      <main className="min-h-screen w-full overflow-hidden bg-[#020617] text-white">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(0,102,255,0.42),transparent_30%),radial-gradient(circle_at_85%_25%,rgba(34,211,238,0.18),transparent_28%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen w-full overflow-hidden bg-[#020617] text-white">

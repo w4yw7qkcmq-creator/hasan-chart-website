@@ -1,16 +1,7 @@
-import { redirect } from "next/navigation";
-import { verifyAdminSession } from "../../lib/admin-auth";
+"use client";
 
-export default async function AdminLayout({ children }) {
-  const adminCheck = await verifyAdminSession();
+import { AdminAccessGate } from "../components/AdminAccessGate";
 
-  if (!adminCheck.ok) {
-    if (adminCheck.status === 401) {
-      redirect("/login");
-    }
-
-    redirect("/403");
-  }
-
-  return children;
+export default function AdminLayout({ children }) {
+  return <AdminAccessGate>{children}</AdminAccessGate>;
 }

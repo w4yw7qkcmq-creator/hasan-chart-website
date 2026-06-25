@@ -46,6 +46,10 @@ body {
     radial-gradient(circle at 90% 20%, rgba(52, 211, 153, 0.13), transparent 28%),
     var(--bg-page);
   color: var(--text-main);
+  transition: none;
+}
+
+html.theme-ready body {
   transition: background 0.25s ease, color 0.25s ease;
 }
 

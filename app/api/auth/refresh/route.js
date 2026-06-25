@@ -57,7 +57,16 @@ export async function POST(request) {
       );
     }
 
-    const response = NextResponse.json({ success: true });
+    const response = NextResponse.json({
+      success: true,
+      session: {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_in: data.session.expires_in,
+        expires_at: data.session.expires_at,
+        token_type: data.session.token_type || "bearer",
+      },
+    });
 
     const isProduction = process.env.NODE_ENV === "production";
 

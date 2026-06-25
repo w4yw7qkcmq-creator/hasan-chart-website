@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-const ADMIN_PAGE_PREFIX = "/admin";
 const ADMIN_API_PREFIX = "/api/admin";
 const ADMIN_REPLY_API = "/api/admin-reply";
 
@@ -14,16 +13,7 @@ function isProtectedAdminApi(pathname) {
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
-  const isAdminPage =
-    pathname === ADMIN_PAGE_PREFIX || pathname.startsWith(`${ADMIN_PAGE_PREFIX}/`);
   const isAdminApi = isProtectedAdminApi(pathname);
-
-  if (isAdminPage && !hasAccessToken(request)) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
 
   if (isAdminApi && !hasAccessToken(request)) {
     return NextResponse.json(
