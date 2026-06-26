@@ -2,7 +2,7 @@ import "./globals.css";
 import { AppProviders } from "./components/AppProviders";
 import RootLayoutShell from "./components/RootLayoutShell";
 import { readThemeFromRequestCookies } from "../lib/theme-server";
-import { THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
+import { THEME_BOOT_SCRIPT, THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -35,6 +35,7 @@ export default async function RootLayout({ children }) {
     >
       <head>
         <style dangerouslySetInnerHTML={{ __html: THEME_CRITICAL_CSS }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <title>HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول</title>
         <meta
           name="description"

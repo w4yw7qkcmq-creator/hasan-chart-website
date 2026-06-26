@@ -4,20 +4,38 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { getSafeTheme, writeThemeCookie } from "../../lib/theme-shared";
 
 const ThemeContext = createContext(null);
+const THEME_REVEAL_TIMEOUT_MS = 1800;
 
 function markThemeReady() {
   const root = document.documentElement;
   root.classList.remove("theme-pending");
   root.classList.add("theme-ready");
+
+  const loader = document.getElementById("theme-boot-loader");
+  if (loader) {
+    loader.setAttribute("aria-busy", "false");
+  }
+}
+
+function isThemeAlreadyReady() {
+  return document.documentElement.classList.contains("theme-ready");
 }
 
 export function ThemeProvider({ children, initialTheme = "dark" }) {
   const [theme, setTheme] = useState(() => getSafeTheme(initialTheme));
-  const [themeReady, setThemeReady] = useState(false);
+  const [themeReady, setThemeReady] = useState(() =>
+    typeof document !== "undefined" ? isThemeAlreadyReady() : false
+  );
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (isThemeAlreadyReady()) {
+      setThemeReady(true);
+      return undefined;
+    }
 
     let revealed = false;
 
@@ -28,17 +46,20 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
       setThemeReady(true);
     };
 
-    const frameId = requestAnimationFrame(() => {
-      requestAnimationFrame(reveal);
-    });
+    if (document.readyState === "complete") {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(reveal);
+      });
+    } else {
+      window.addEventListener("load", reveal, { once: true });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(reveal);
+      });
+    }
 
-    // Safety net: never leave the boot loader stuck if rAF/load handlers fail.
-    const fallbackTimer = window.setTimeout(reveal, 1500);
-
-    window.addEventListener("load", reveal, { once: true });
+    const fallbackTimer = window.setTimeout(reveal, THEME_REVEAL_TIMEOUT_MS);
 
     return () => {
-      cancelAnimationFrame(frameId);
       window.clearTimeout(fallbackTimer);
       window.removeEventListener("load", reveal);
     };

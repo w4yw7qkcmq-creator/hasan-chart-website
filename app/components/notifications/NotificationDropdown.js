@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { formatNotificationTime } from "../../../lib/notifications-shared";
 import { useNotifications } from "./NotificationProvider";
 
-export function NotificationDropdown({ open, onClose }) {
+export function NotificationDropdown({ open, onClose, anchorRef }) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const panelRef = useRef(null);
 
@@ -14,6 +14,7 @@ export function NotificationDropdown({ open, onClose }) {
 
     const handlePointerDown = (event) => {
       if (panelRef.current?.contains(event.target)) return;
+      if (anchorRef?.current?.contains(event.target)) return;
       onClose();
     };
 
@@ -28,7 +29,7 @@ export function NotificationDropdown({ open, onClose }) {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [open, onClose]);
+  }, [open, onClose, anchorRef]);
 
   const visibleItems = notifications.slice(0, 8);
 
