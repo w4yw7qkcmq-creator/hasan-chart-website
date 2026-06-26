@@ -1,3 +1,4 @@
+import { startMarketStream } from "../../../lib/binance-market-stream";
 import { CACHE_NO_STORE, jsonResponse } from "../../../lib/api-response";
 import { collectHealthReport } from "../../../lib/health-check";
 import {
@@ -14,6 +15,7 @@ export async function GET(request) {
   const startedAt = Date.now();
 
   try {
+    startMarketStream("api-health");
     const report = await collectHealthReport();
     const statusCode = report.status === "down" ? 503 : 200;
 

@@ -1,3 +1,4 @@
+import { startMarketStream } from "../../../lib/binance-market-stream";
 import {
   CACHE_PUBLIC_MARKET,
   jsonError,
@@ -15,6 +16,7 @@ export async function GET(request) {
   return runApiRoute(request, {
     route: "/api/market-pulse",
     handler: async (req, logContext) => {
+      startMarketStream("api-market-pulse");
       const rateLimited = await enforceRateLimit(marketPulseLimiter, getClientIp(req));
       if (rateLimited) return rateLimited;
 

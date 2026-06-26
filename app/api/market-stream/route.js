@@ -1,9 +1,10 @@
-import { getBinanceMarketStreamHub } from "../../../lib/binance-market-stream";
+import { getBinanceMarketStreamHub, startMarketStream } from "../../../lib/binance-market-stream";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request) {
+  startMarketStream("api-market-stream");
   const hub = getBinanceMarketStreamHub();
   const encoder = new TextEncoder();
   let unsubscribe = null;
