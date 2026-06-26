@@ -199,7 +199,7 @@ function RootLayoutShell({ children }) {
   const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { unreadAnalysisCount } = useNotifications();
-  const { theme, themeReady, toggleTheme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
     useBootstrapLoadingOverlay(authResolved, { enabled: !isAuthPage });
@@ -464,10 +464,6 @@ function RootLayoutShell({ children }) {
     await logout();
     window.location.href = "/login";
   };
-
-  if (!themeReady) {
-    return null;
-  }
 
   if (isAuthPage) {
     return (

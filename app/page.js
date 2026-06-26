@@ -42,12 +42,12 @@ export default function Home() {
   const marketWindows = [
     { title: "BTC.D", label: "استحواذ البيتكوين", symbol: "CRYPTOCAP:BTC.D" },
     { title: "USDT.D", label: "استحواذ الدولار", symbol: "CRYPTOCAP:USDT.D" },
-    { title: "USDT", label: "سعر USDT", symbol: "CRYPTOCAP:USDT" },
-    { title: "OTHERS.D", label: "استحواذ OTHERS.D", symbol: "CRYPTOCAP:OTHERS.D" },
-    { title: "OTHERS", label: "قيمة OTHERS", symbol: "CRYPTOCAP:OTHERS" },
-    { title: "GOLD", label: "سعر أونصة الذهب", symbol: "OANDA:XAUUSD" },
-    { title: "SILVER", label: "سعر أونصة الفضة", symbol: "OANDA:XAGUSD" },
+    { title: "USDT", label: "Market Cap USDT", symbol: "CRYPTOCAP:USDT" },
+    { title: "OTHERS.D", label: "استحواذ العملات باستثناء التوب 10", symbol: "CRYPTOCAP:OTHERS.D" },
+    { title: "OTHERS", label: "القيمة السوقية للعملات باستثناء توب 10", symbol: "CRYPTOCAP:OTHERS" },
   ];
+
+  const marketWindowWidgetHeight = "136";
 
   const analysisFrameSuggestions = [
     { value: "4h", label: "4 ساعات", hint: "4h / 4 hours / أربع ساعات" },
@@ -427,7 +427,7 @@ export default function Home() {
       )}
 
       <div className="space-y-10 w-full">
-        <section className="glassPanel p-8 md:p-10 overflow-hidden relative">
+        <section className="glassPanel site-hero-section p-8 md:p-10 overflow-hidden relative">
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.28),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(52,211,153,0.18),transparent_30%)]" />
 
           <div className="relative grid lg:grid-cols-12 gap-8 items-center">
@@ -484,7 +484,7 @@ export default function Home() {
 
             <div className="lg:col-span-5">
               <div className="site-market-pulse-panel">
-                <div className="flex items-center justify-between mb-5">
+                <div className="site-market-pulse-header flex items-center justify-between gap-3 mb-5">
                   <div>
                     <p className="site-price-card__eyebrow">Market Pulse</p>
                     <h3 className="site-price-card__title mb-0">BTC / ETH / SOL</h3>
@@ -507,13 +507,14 @@ export default function Home() {
         <section id="market-windows" className="w-full">
           <h2 className="sectionTitle text-center lg:text-right">نوافذ السوق السريعة</h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7 gap-5 w-full">
+          <div className="market-windows-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 w-full">
             {marketWindows.map((item) => (
               <MarketWindow
                 key={item.title}
                 title={item.title}
                 label={item.label}
                 symbol={item.symbol}
+                widgetHeight={marketWindowWidgetHeight}
               />
             ))}
           </div>
@@ -846,12 +847,12 @@ function Service({ title, text, href, publicLink = false, onRequireLogin }) {
   );
 }
 
-function MarketWindow({ title, label, symbol }) {
+function MarketWindow({ title, label, symbol, widgetHeight = "120" }) {
   return (
     <div className="site-price-card site-price-card--tv">
       <p className="site-price-card__eyebrow">{label}</p>
       <h3 className="site-price-card__title">{title}</h3>
-      <TradingViewWidget symbol={symbol} height="120" />
+      <TradingViewWidget symbol={symbol} height={widgetHeight} />
     </div>
   );
 }

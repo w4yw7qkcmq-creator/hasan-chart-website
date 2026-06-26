@@ -19,29 +19,28 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
     const root = document.documentElement;
     root.setAttribute("data-theme", theme);
 
-    let cancelled = false;
+    let revealed = false;
 
     const reveal = () => {
-      if (cancelled) return;
+      if (revealed) return;
+      revealed = true;
       markThemeReady();
       setThemeReady(true);
     };
 
-    const scheduleReveal = () => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(reveal);
-      });
-    };
+    const frameId = requestAnimationFrame(() => {
+      requestAnimationFrame(reveal);
+    });
 
-    if (document.readyState === "complete") {
-      scheduleReveal();
-    } else {
-      window.addEventListener("load", scheduleReveal, { once: true });
-      scheduleReveal();
-    }
+    // Safety net: never leave the boot loader stuck if rAF/load handlers fail.
+    const fallbackTimer = window.setTimeout(reveal, 1500);
+
+    window.addEventListener("load", reveal, { once: true });
 
     return () => {
-      cancelled = true;
+      cancelAnimationFrame(frameId);
+      window.clearTimeout(fallbackTimer);
+      window.removeEventListener("load", reveal);
     };
   }, []);
 
