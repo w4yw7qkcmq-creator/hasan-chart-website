@@ -5,6 +5,12 @@ const nextConfig = {
   experimental: {
     instrumentationHook: true,
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), "ws"];
+    }
+    return config;
+  },
   async headers() {
     return [
       {

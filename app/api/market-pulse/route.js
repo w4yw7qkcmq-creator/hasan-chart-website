@@ -1,4 +1,4 @@
-import { startMarketStream } from "../../../lib/binance-market-stream";
+import { startMarketStream } from "../../../lib/okx-market-stream";
 import {
   CACHE_PUBLIC_MARKET,
   jsonError,

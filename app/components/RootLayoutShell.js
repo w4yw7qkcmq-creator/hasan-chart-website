@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
@@ -399,54 +399,10 @@ function RootLayoutShell({ children }) {
     };
   }, [currentUser?.email]);
 
-  // Automatic user subscription refresh so VIP menu items appear after admin activation without logging out.
-  useEffect(() => {
-    if (!authResolved || !currentUser?.email) return undefined;
-
-    let active = true;
-    let intervalTimer = null;
-    let channel = null;
-
-    const cancelDeferred = scheduleAfterPaint(() => {
-      if (!active) return;
-
-      refreshCurrentUserSubscription();
-      intervalTimer = window.setInterval(refreshCurrentUserSubscription, 10000);
-
-      channel = supabase
-        .channel(`global-subscription-refresh-${currentUser.email}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "subscription_requests",
-            filter: `user_email=eq.${currentUser.email}`,
-          },
-          (payload) => {
-            if (payload?.new?.status === "مفعل") {
-              refreshCurrentUserSubscription();
-            }
-          }
-        )
-        .subscribe();
-    }, 2500);
-
-    return () => {
-      active = false;
-      cancelDeferred();
-      if (intervalTimer) {
-        clearInterval(intervalTimer);
-      }
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, [authResolved, currentUser?.email]);
-
-  // Refresh user subscription info (VIP menu items appear after admin activation)
-  const refreshCurrentUserSubscription = async () => {
-    if (!currentUser?.email) return;
+  const refreshCurrentUserSubscription = useCallback(async () => {
+    if (!currentUser?.email || (typeof document !== "undefined" && document.hidden)) {
+      return;
+    }
 
     try {
       const response = await fetchWithTimeout(
@@ -491,7 +447,61 @@ function RootLayoutShell({ children }) {
     } catch (err) {
       console.warn("Subscription refresh skipped:", err?.message || err);
     }
-  };
+  }, [currentUser?.email, updateUser]);
+
+  // Refresh subscription on login, tab focus, or realtime admin activation — no fast polling loop.
+  useEffect(() => {
+    if (!authResolved || !currentUser?.email) return undefined;
+
+    let active = true;
+    let channel = null;
+
+    const runRefresh = () => {
+      if (!active || document.hidden) return;
+      void refreshCurrentUserSubscription();
+    };
+
+    const cancelDeferred = scheduleAfterPaint(() => {
+      if (!active) return;
+
+      runRefresh();
+
+      channel = supabase
+        .channel(`global-subscription-refresh-${currentUser.email}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "subscription_requests",
+            filter: `user_email=eq.${currentUser.email}`,
+          },
+          (payload) => {
+            if (payload?.new?.status === "مفعل") {
+              runRefresh();
+            }
+          }
+        )
+        .subscribe();
+    }, 2500);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        runRefresh();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      active = false;
+      cancelDeferred();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [authResolved, currentUser?.email, refreshCurrentUserSubscription]);
 
   const logoutAndRedirect = async () => {
     await logout();

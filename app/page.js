@@ -458,7 +458,7 @@ export default function Home() {
                   </div>
                   <span className="site-market-pulse-badge">
                     {liveFeedStatus === "live"
-                      ? "Binance Live"
+                      ? "OKX Live"
                       : hasKnownMarketPrice(prices)
                         ? "آخر سعر معروف"
                         : liveFeedStatus === "offline"

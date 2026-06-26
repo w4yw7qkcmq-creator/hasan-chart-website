@@ -7,7 +7,7 @@ import { normalizeNotification } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../components/AuthProvider";
 
-const FALLBACK_POLL_MS = 45000;
+const FALLBACK_POLL_MS = 60000;
 const TOAST_TTL_MS = 6500;
 const TOAST_GAP_MS = 450;
 const INITIAL_SYNC_DELAY_MS = 2000;
@@ -34,6 +34,7 @@ export function useSiteNotifications() {
   const initialSyncCompleteRef = useRef(false);
   const syncGenerationRef = useRef(0);
   const pollTimerRef = useRef(null);
+  const realtimeConnectedRef = useRef(false);
   const channelRef = useRef(null);
   const toastQueueRef = useRef([]);
   const toastHideTimerRef = useRef(null);
@@ -245,12 +246,13 @@ export function useSiteNotifications() {
   );
 
   const startFallbackPolling = useCallback(() => {
-    if (pollTimerRef.current) return;
+    if (pollTimerRef.current || !userEmail || document.hidden) return;
 
     pollTimerRef.current = window.setInterval(() => {
+      if (document.hidden || !userEmail) return;
       void syncFromServer({ announceNew: true });
     }, FALLBACK_POLL_MS);
-  }, [syncFromServer]);
+  }, [syncFromServer, userEmail]);
 
   const markAsRead = useCallback(
     async (notificationId) => {
@@ -363,6 +365,7 @@ export function useSiteNotifications() {
           if (!active) return;
 
           if (status === "SUBSCRIBED") {
+            realtimeConnectedRef.current = true;
             setRealtimeConnected(true);
             stopFallbackPolling();
             return;
@@ -373,15 +376,37 @@ export function useSiteNotifications() {
             status === "CHANNEL_ERROR" ||
             status === "TIMED_OUT"
           ) {
+            realtimeConnectedRef.current = false;
             setRealtimeConnected(false);
-            startFallbackPolling();
+            if (!document.hidden) {
+              startFallbackPolling();
+            }
           }
         });
     }, INITIAL_SYNC_DELAY_MS);
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopFallbackPolling();
+        return;
+      }
+
+      void syncFromServer({
+        announceNew: true,
+        generation: syncGenerationRef.current,
+      });
+
+      if (!realtimeConnectedRef.current) {
+        startFallbackPolling();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       active = false;
       cancelDeferred();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       syncGenerationRef.current += 1;
       stopFallbackPolling();
       clearToastTimers();
@@ -392,6 +417,7 @@ export function useSiteNotifications() {
         channelRef.current = null;
       }
       setRealtimeConnected(false);
+      realtimeConnectedRef.current = false;
     };
   }, [
     authResolved,

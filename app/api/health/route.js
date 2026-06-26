@@ -1,4 +1,4 @@
-import { startMarketStream } from "../../../lib/binance-market-stream";
+import { startMarketStream } from "../../../lib/okx-market-stream";
 import { CACHE_NO_STORE, jsonResponse } from "../../../lib/api-response";
 import { collectHealthReport } from "../../../lib/health-check";
 import {
