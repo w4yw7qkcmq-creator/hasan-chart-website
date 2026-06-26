@@ -10,16 +10,16 @@ import {
 } from "../../lib/news-images";
 import { NewsCoverImage } from "../components/news/NewsCoverImage";
 
+const SOURCE_LABEL = "HasaN CharT World";
 
-const POPULAR_TAGS = [
-  { label: "بيتكوين", href: "/news/tag/bitcoin" },
-  { label: "كريبتو", href: "/news/tag/crypto" },
-  { label: "الذهب", href: "/news/tag/gold" },
-  { label: "النفط", href: "/news/tag/oil" },
-  { label: "الفيدرالي", href: "/news/tag/fed" },
-  { label: "التضخم", href: "/news/tag/inflation" },
-  { label: "فوركس", href: "/news/tag/forex" },
-  { label: "الأسهم", href: "/news/tag/stocks" },
+const NEWS_CATEGORIES = [
+  { key: "all", label: "الكل", href: "/news", filterOnPage: true },
+  { key: "crypto", label: "العملات الرقمية", href: "/news/category/crypto" },
+  { key: "stocks", label: "الأسواق العالمية", href: "/news/category/stocks" },
+  { key: "economy", label: "الاقتصاد الأمريكي", href: "/news/category/economy" },
+  { key: "commodities", label: "النفط والطاقة", href: "/news/category/commodities" },
+  { key: "metals", label: "المعادن", href: null, filterOnPage: true },
+  { key: "geopolitics", label: "الجيوسياسية", href: "/news/category/geopolitics" },
 ];
 
 function formatNewsDate(value) {
@@ -39,16 +39,182 @@ function formatNewsDate(value) {
   }).format(date);
 }
 
-function makeExcerpt(text, maxLength = 180) {
-  const value = String(text || "").trim();
+function cleanNewsText(text) {
+  if (!text) return "";
+
+  return String(text)
+    .replace(/https?:\/\/t\.me\/[^\s]+/gi, "")
+    .replace(/قناة الأخبار الرسمية\s*:*/gi, "")
+    .replace(/🔊|📢/g, "")
+    .replace(/\b(Reuters|CNBC|Investing\.com|MarketWatch|CoinDesk|Telegram)\b\s*[-–—:]?\s*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function makeExcerpt(text, maxLength = 210) {
+  const value = cleanNewsText(text);
   if (!value) return "تفاصيل الخبر غير متاحة حالياً.";
   if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength).trim()}...`;
+
+  const trimmed = value.slice(0, maxLength).trim();
+  const lastSpace = trimmed.lastIndexOf(" ");
+  const safeCut = lastSpace > maxLength * 0.65 ? trimmed.slice(0, lastSpace) : trimmed;
+
+  return `${safeCut}…`;
+}
+
+function extractArabicTitle(item) {
+  const content = cleanNewsText(item.content || "");
+  const title = cleanNewsText(item.title || item.normalized_title || "");
+  const arabicSentences = content
+    .split(/[.!؟\n]/)
+    .map((part) => part.trim())
+    .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
+
+  if (arabicSentences.length > 0) {
+    return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "");
+  }
+
+  return title || "خبر اقتصادي عاجل";
+}
+
+function isMetalsNews(item) {
+  const text = `${item?.title || ""} ${item?.content || ""} ${item?.topic_cluster || ""}`.toLowerCase();
+  return /gold|silver|xau|xag|platinum|copper|metal|precious|ذهب|فضة|معادن|نحاس/.test(text);
+}
+
+function matchesCategoryFilter(item, categoryKey) {
+  if (categoryKey === "all") return true;
+  if (categoryKey === "metals") return isMetalsNews(item);
+  return detectNewsCategory(item) === categoryKey;
+}
+
+function getNewsHref(item) {
+  return `/news/${item?.slug || item?.id}`;
+}
+
+function NewsSkeletonGrid() {
+  return (
+    <div className="news-page-grid" aria-hidden="true">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="news-card news-card--skeleton">
+          <div className="news-card__media news-card__media--skeleton" />
+          <div className="news-card__body">
+            <div className="news-skeleton-line news-skeleton-line--sm" />
+            <div className="news-skeleton-line news-skeleton-line--lg" />
+            <div className="news-skeleton-line news-skeleton-line--md" />
+            <div className="news-skeleton-line news-skeleton-line--full" />
+            <div className="news-skeleton-line news-skeleton-line--btn" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NewsCategoryNav({ selectedCategory, onSelectCategory }) {
+  return (
+    <nav className="news-page-categories" aria-label="تصنيفات الأخبار">
+      {NEWS_CATEGORIES.map((category) => {
+        const isActive = selectedCategory === category.key;
+
+        if (category.filterOnPage) {
+          return (
+            <button
+              key={category.key}
+              type="button"
+              onClick={() => onSelectCategory(category.key)}
+              className={`news-page-category ${isActive ? "news-page-category--active" : ""}`}
+              aria-pressed={isActive}
+            >
+              {category.label}
+            </button>
+          );
+        }
+
+        return (
+          <Link
+            key={category.key}
+            href={category.href}
+            className="news-page-category"
+          >
+            {category.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function NewsCard({ item, index }) {
+  const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
+  const isHighImpact = newsImpact === "HIGH";
+  const newsTitle = extractArabicTitle(item);
+  const newsContent = makeExcerpt(
+    item.summary || item.description || item.ai_summary || item.content || item.normalized_title
+  );
+  const newsImage = resolveNewsImageUrl(item);
+  const category = detectNewsCategory(item);
+  const visual = getNewsCategoryVisual(category);
+  const categoryLabel =
+    category === "commodities" && isMetalsNews(item) ? "المعادن" : visual.label;
+
+  const fallbackVisual = (
+    <div className="news-card__fallback-inner">
+      <span className="news-card__fallback-icon" aria-hidden="true">
+        {visual.icon}
+      </span>
+      <span className="news-card__fallback-label">{categoryLabel}</span>
+      <span className="news-card__fallback-sub">{visual.subtitle}</span>
+    </div>
+  );
+
+  return (
+    <article className="news-card">
+      <div className={`news-card__media news-card__media--${category}`}>
+        <NewsCoverImage
+          src={newsImage}
+          alt={newsTitle}
+          loading={index < 3 ? "eager" : "lazy"}
+          fallback={fallbackVisual}
+        />
+        <div className="news-card__media-overlay" aria-hidden="true" />
+        <div className="news-card__badges">
+          <span className="news-card__badge news-card__badge--source">{SOURCE_LABEL}</span>
+          <span
+            className={`news-card__badge ${
+              isHighImpact ? "news-card__badge--urgent" : "news-card__badge--important"
+            }`}
+          >
+            {isHighImpact ? "عاجل" : "مهم"}
+          </span>
+        </div>
+      </div>
+
+      <div className="news-card__body">
+        <div className="news-card__meta">
+          <time className="news-card__date" dateTime={item.created_at || undefined}>
+            {formatNewsDate(item.created_at)}
+          </time>
+          <span className="news-card__category">{categoryLabel}</span>
+        </div>
+
+        <h2 className="news-card__title">{newsTitle}</h2>
+
+        <p className="news-card__excerpt">{newsContent}</p>
+
+        <Link href={getNewsHref(item)} className="news-card__cta">
+          قراءة التفاصيل
+        </Link>
+      </div>
+    </article>
+  );
 }
 
 export default function News() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [lastUpdated, setLastUpdated] = useState("");
@@ -57,14 +223,20 @@ export default function News() {
     fetchNews();
 
     const interval = setInterval(() => {
-      fetchNews();
+      fetchNews({ silent: true });
     }, 60000);
 
     return () => clearInterval(interval);
   }, []);
 
-  async function fetchNews() {
+  async function fetchNews({ silent = false } = {}) {
     try {
+      if (!silent) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
       setErrorMessage("");
 
       const { data, error } = await supabase
@@ -84,252 +256,94 @@ export default function News() {
       setLastUpdated(formatNewsDate(new Date()));
     } catch (error) {
       console.warn("News fetch skipped:", error?.message || error);
-      setErrorMessage(error.message || "حدث خطأ غير متوقع أثناء تحميل الأخبار.");
+      setErrorMessage(error?.message || "حدث خطأ غير متوقع أثناء تحميل الأخبار.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
-
-  function cleanNewsText(text) {
-    if (!text) return "";
-
-    return String(text)
-      .replace(/https?:\/\/t\.me\/EconomicNewsi/gi, "")
-      .replace(/قناة الأخبار الرسمية\s*:*/gi, "")
-      .replace(/🔊|📢/g, "")
-      .replace(/\b(Reuters|CNBC|Investing\.com|MarketWatch|CoinDesk)\b\s*[-–—:]?\s*/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function fullText(text) {
-    const cleaned = cleanNewsText(text);
-    if (!cleaned) return "تفاصيل الخبر غير متاحة حالياً.";
-    return cleaned;
-  }
-
-  function getNewsCategory(item) {
-    return detectNewsCategory(item);
-  }
-
-  function categoryVisual(category) {
-    return getNewsCategoryVisual(category);
-  }
-
-  function extractArabicTitle(item) {
-    const content = cleanNewsText(item.content || "");
-    const title = cleanNewsText(item.title || item.normalized_title || "");
-    const arabicSentences = content
-      .split(/[.!؟\n]/)
-      .map((part) => part.trim())
-      .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
-
-    if (arabicSentences.length > 0) {
-      return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "");
-    }
-
-    return title || "خبر اقتصادي عاجل";
-  }
-
-  function getSourceName(url) {
-    if (!url) return "مصدر الخبر";
-    try {
-      const host = new URL(url).hostname.replace("www.", "");
-      if (host.includes("investing")) return "Investing";
-      if (host.includes("cnbc")) return "CNBC";
-      if (host.includes("marketwatch")) return "MarketWatch";
-      if (host.includes("coindesk")) return "CoinDesk";
-      if (host.includes("t.me")) return "HasaN CharT News";
-      return host;
-    } catch {
-      return "مصدر الخبر";
-    }
-  }
-
-  function getNewsHref(item) {
-    return `/news/${item?.slug || item?.id}`;
-  }
-
-  const categories = [
-    { key: "all", label: "الكل" },
-    { key: "geopolitics", label: "أخبار جيوسياسية" },
-    { key: "economy", label: "الاقتصاد الأمريكي" },
-    { key: "stocks", label: "الأسواق العالمية" },
-    { key: "crypto", label: "العملات الرقمية" },
-    { key: "commodities", label: "النفط والطاقة" },
-  ];
 
   const filteredNews = useMemo(() => {
-    return news.filter((item) => {
-      if (selectedCategory === "all") return true;
-      return getNewsCategory(item) === selectedCategory;
-    });
+    return news.filter((item) => matchesCategoryFilter(item, selectedCategory));
   }, [news, selectedCategory]);
 
   return (
-    <main className="min-h-screen px-4 py-10 text-slate-950">
-      <div className="mx-auto max-w-7xl">
-        <section className="mb-10 overflow-hidden rounded-[2rem] border border-white/40 bg-white/55 p-8 text-center shadow-[0_20px_80px_rgba(14,165,233,0.12)] backdrop-blur-xl md:p-12">
-          <div className="mx-auto mb-4 inline-flex rounded-full border border-cyan-300/40 bg-cyan-100/70 px-5 py-2 text-sm font-black text-cyan-800">
-            أخبار اقتصادية مباشرة
-          </div>
-          <h1 className="mb-4 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">
-            الأخبار الاقتصادية العاجلة
-          </h1>
-          <p className="mx-auto max-w-2xl text-lg leading-8 text-slate-600">
-            تغطية مباشرة لأهم أخبار الاقتصاد، الأسواق العالمية، الأسهم، العملات الرقمية، والبيانات المؤثرة على حركة السوق.
+    <main className="news-page">
+      <div className="news-page__bg" aria-hidden="true" />
+
+      <div className="news-page__inner">
+        <header className="news-page-hero">
+          <span className="news-page-hero__eyebrow">تغطية مالية مباشرة</span>
+          <h1 className="news-page-hero__title">الأخبار الاقتصادية العاجلة</h1>
+          <p className="news-page-hero__text">
+            تغطية يومية لأهم تحركات الأسواق العالمية، العملات الرقمية، النفط والمعادن،
+            والبيانات الاقتصادية المؤثرة على قرارات التداول.
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+
+          <div className="news-page-hero__actions">
             <button
               type="button"
-              onClick={fetchNews}
-              className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black !text-white shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-700"
+              onClick={() => fetchNews()}
+              disabled={loading || refreshing}
+              className="news-page-hero__refresh"
             >
-              تحديث الأخبار الآن
+              {loading || refreshing ? "جاري التحديث…" : "تحديث الأخبار الآن"}
             </button>
-            {lastUpdated && (
-              <span className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-sm font-bold text-slate-600">
-                آخر تحديث: {lastUpdated}
-              </span>
-            )}
+            {lastUpdated ? (
+              <span className="news-page-hero__updated">آخر تحديث: {lastUpdated}</span>
+            ) : null}
           </div>
-        </section>
+        </header>
 
-        <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
-          {categories.map((category) => {
-            const isActive = selectedCategory === category.key;
-
-            return (
-              <button
-                key={category.key}
-                type="button"
-                onClick={() => setSelectedCategory(category.key)}
-                className={`rounded-2xl border px-5 py-3 text-sm font-black transition-all ${
-                  isActive
-                    ? "border-cyan-300 bg-cyan-500 text-white shadow-lg shadow-cyan-500/25"
-                    : "border-white/50 bg-white/65 text-slate-600 hover:border-cyan-300 hover:bg-white/90"
-                }`}
-              >
-                {category.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mb-8 rounded-[1.75rem] border border-white/50 bg-white/75 p-5 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="mb-4 text-center text-lg font-black text-slate-950">
-            الوسوم الشائعة
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            {POPULAR_TAGS.map((tag) => (
-              <Link
-                key={tag.href}
-                href={tag.href}
-                className="rounded-full bg-cyan-600 px-4 py-2 text-sm font-black !text-white no-underline shadow-lg transition hover:scale-105 hover:bg-cyan-700"
-              >
-                #{tag.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <NewsCategoryNav
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+        />
 
         {loading ? (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-[420px] animate-pulse rounded-[1.75rem] border border-white/50 bg-white/70 shadow-[0_18px_60px_rgba(15,23,42,0.08)]"
-              />
-            ))}
-          </div>
+          <NewsSkeletonGrid />
         ) : errorMessage ? (
-          <div className="bg-red-500/10 border border-red-400/20 rounded-3xl p-10 text-center text-red-200 leading-8">
-            تعذر تحميل الأخبار حالياً.
-            <br />
-            <span className="text-sm text-red-100/80">{errorMessage}</span>
+          <div className="news-page-state news-page-state--error" role="alert">
+            <span className="news-page-state__icon" aria-hidden="true">
+              ⚠️
+            </span>
+            <h2 className="news-page-state__title">تعذر تحميل الأخبار حالياً</h2>
+            <p className="news-page-state__text">{errorMessage}</p>
+            <button type="button" onClick={() => fetchNews()} className="news-page-state__action">
+              إعادة المحاولة
+            </button>
           </div>
         ) : filteredNews.length === 0 ? (
-          <div className="rounded-3xl border border-white/40 bg-white/70 p-10 text-center text-slate-500 shadow-xl backdrop-blur-xl">
-            لا توجد أخبار متاحة حالياً ضمن هذا التصنيف.
+          <div className="news-page-state">
+            <span className="news-page-state__icon" aria-hidden="true">
+              📰
+            </span>
+            <h2 className="news-page-state__title">لا توجد أخبار حالياً</h2>
+            <p className="news-page-state__text">
+              {selectedCategory === "all"
+                ? "لم يتم نشر أخبار جديدة بعد. حاول التحديث لاحقاً."
+                : "لا توجد أخبار ضمن هذا التصنيف حالياً."}
+            </p>
+            {selectedCategory !== "all" ? (
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("all")}
+                className="news-page-state__action"
+              >
+                عرض كل الأخبار
+              </button>
+            ) : (
+              <button type="button" onClick={() => fetchNews()} className="news-page-state__action">
+                تحديث الأخبار
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {filteredNews.map((item, index) => {
-              const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
-              const isHighImpact = newsImpact === "HIGH";
-              const impactColor = isHighImpact
-                ? "bg-red-500/15 text-red-300 border-red-400/30"
-                : "bg-amber-500/15 text-amber-300 border-amber-400/30";
-
-              const sourceLink = item.source_link || item.link || null;
-              const newsTitle = extractArabicTitle(item);
-              const newsContent = makeExcerpt(
-                fullText(item.summary || item.description || item.ai_summary || item.content || item.normalized_title),
-                index === 0 ? 260 : 170
-              );
-              const newsImage = resolveNewsImageUrl(item);
-              const sourceName = getSourceName(sourceLink);
-              const category = getNewsCategory(item);
-              const visual = categoryVisual(category);
-              const fallbackVisual = (
-                <div className="px-6">
-                  <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-cyan-300/25 bg-cyan-400/15 text-5xl shadow-[0_0_48px_rgba(34,211,238,0.22)]">
-                    {visual.icon}
-                  </div>
-                  <div className="text-xl font-black text-cyan-50">{visual.label}</div>
-                  <div className="mt-2 text-xs font-bold text-cyan-100/75">{visual.subtitle}</div>
-                  <div className="mt-4 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200/45">
-                    HasaN CharT News
-                  </div>
-                </div>
-              );
-
-              return (
-                <Link
-                  key={item.id}
-                  href={getNewsHref(item)}
-                  className={`group block overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)] ${index === 0 ? "md:col-span-2 xl:col-span-2" : ""}`}
-                >
-                  <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${index === 0 ? "h-72" : "h-56"}`}>
-                    <NewsCoverImage
-                      src={newsImage}
-                      alt={newsTitle}
-                      loading={index < 3 ? "eager" : "lazy"}
-                      fallback={fallbackVisual}
-                    />
-                    <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
-                    <div className="absolute left-4 top-4 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">
-                      {sourceName}
-                    </div>
-                    <div className={`absolute right-4 top-4 z-30 rounded-full border px-3 py-1 text-xs font-black backdrop-blur ${impactColor}`}>
-                      {isHighImpact ? "🔴 عاجل" : "🟡 مهم"}
-                    </div>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="mb-4 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
-                      {formatNewsDate(item.created_at)}
-                    </div>
-
-                    <h2 className={`${index === 0 ? "text-2xl md:text-3xl" : "text-xl"} mb-4 font-black leading-relaxed text-slate-950`}>
-                      {newsTitle}
-                    </h2>
-
-                    <p className="line-clamp-4 text-[15px] leading-7 text-slate-600">
-                      {newsContent}
-                    </p>
-
-                    <div className="mt-6 border-t border-slate-200 pt-5 text-center">
-                      <span className="text-xs font-bold text-slate-400">
-                        تحديث مباشر • HasaN CharT News
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <section className="news-page-grid" aria-label="قائمة الأخبار">
+            {filteredNews.map((item, index) => (
+              <NewsCard key={item.id} item={item} index={index} />
+            ))}
+          </section>
         )}
       </div>
     </main>
