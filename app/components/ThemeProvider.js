@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { getSafeTheme, writeThemeCookie } from "../../lib/theme-shared";
 
 const ThemeContext = createContext(null);
-const THEME_REVEAL_TIMEOUT_MS = 1800;
+const THEME_REVEAL_TIMEOUT_MS = 2500;
 
 function markThemeReady() {
   const root = document.documentElement;

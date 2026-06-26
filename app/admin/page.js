@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -8,6 +9,19 @@ import { adminFetch } from "../../lib/admin-fetch";
 import { supabase } from "../../lib/supabase";
 import AppModal from "../components/AppModal";
 import { useAuth } from "../components/AuthProvider";
+
+const DailyAnalysisPublishPanel = dynamic(
+  () =>
+    import("./DailyAnalysisPublishPanel").then((mod) => mod.DailyAnalysisPublishPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-8 text-center text-sm text-slate-300">
+        جاري تحميل لوحة النشر...
+      </div>
+    ),
+  }
+);
 
 function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
   const glow =
@@ -62,6 +76,7 @@ const ADMIN_STATUS_FILTERS = [
 const ADMIN_TABS = [
   { id: "overview", label: "نظرة عامة", icon: "📊" },
   { id: "analysis", label: "طلبات التحليل", icon: "🧠" },
+  { id: "daily-publish", label: "نشر تحليل يومي", icon: "📝" },
   { id: "accounts", label: "إدارة الحسابات", icon: "📂" },
   { id: "subscriptions", label: "الاشتراكات", icon: "💳" },
   { id: "vip", label: "نشر VIP", icon: "⭐" },
@@ -1449,6 +1464,8 @@ export default function AdminPage() {
           </div>
         </section>
         )}
+
+        {activeAdminTab === "daily-publish" && <DailyAnalysisPublishPanel />}
 
         {activeAdminTab === "analysis" && (
           <>

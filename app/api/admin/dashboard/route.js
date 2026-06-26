@@ -1,10 +1,17 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { CACHE_NO_STORE } from "../../../../lib/api-response";
 import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-dispatch";
 import { createUserNotification, createUserNotifications } from "../../../../lib/create-user-notification";
+import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
 import { buildEmailLogoHtml } from "../../../../lib/email-branding.js";
 import { NOTIFICATION_TYPES } from "../../../../lib/notifications-shared";
 import { processEmailQueue } from "../../../../lib/email-queue";
+import {
+  adminMutationLimiter,
+  adminReadLimiter,
+} from "../../../../lib/rate-limit";
+import { invalidateReadCache, withReadCache } from "../../../../lib/server-read-cache";
 import {
   sendAccountManagementAcceptedPush,
   sendAnalysisReadyPush,
@@ -80,9 +87,20 @@ export async function GET() {
       );
     }
 
-    const supabase = adminCheck.supabase;
+    const rateLimited = await enforceRateLimit(
+      adminReadLimiter,
+      String(adminCheck.user?.email || "admin").toLowerCase()
+    );
+    if (rateLimited) return rateLimited;
 
-    const [analysis, accounts, subscriptions, profiles] = await Promise.all([
+    const adminEmail = String(adminCheck.user?.email || "admin").toLowerCase();
+    const { data: dashboardPayload } = await withReadCache(
+      `admin-dashboard:${adminEmail}`,
+      12_000,
+      async () => {
+        const supabase = adminCheck.supabase;
+
+        const [analysis, accounts, subscriptions, profiles] = await Promise.all([
       supabase
         .from("analysis_requests")
         .select(
@@ -135,17 +153,26 @@ export async function GET() {
       accounts: accounts.error ? [] : accounts.data || [],
     });
 
-    return Response.json({
-      success: true,
-      analysis_requests: analysis.error ? [] : analysis.data || [],
-      account_management_requests: accounts.error
-        ? []
-        : (accounts.data || []).map(sanitizeAccountRequest),
-      subscription_requests: subscriptions.error ? [] : subscriptions.data || [],
-      profiles: profiles.error ? [] : profiles.data || [],
-      table_errors: tableErrors,
-      admin_notifications: adminNotifications,
-      admin_notifications_count: adminNotifications.length,
+        return {
+          success: true,
+          analysis_requests: analysis.error ? [] : analysis.data || [],
+          account_management_requests: accounts.error
+            ? []
+            : (accounts.data || []).map(sanitizeAccountRequest),
+          subscription_requests: subscriptions.error ? [] : subscriptions.data || [],
+          profiles: profiles.error ? [] : profiles.data || [],
+          table_errors: tableErrors,
+          admin_notifications: adminNotifications,
+          admin_notifications_count: adminNotifications.length,
+        };
+      }
+    );
+
+    return Response.json(dashboardPayload, {
+      headers: {
+        "Cache-Control": CACHE_NO_STORE,
+        Vary: "Accept-Encoding",
+      },
     });
   } catch (error) {
     console.error("Admin dashboard API error:", error);
@@ -556,8 +583,19 @@ export async function POST(request) {
       );
     }
 
+    const rateLimited = await enforceRateLimit(
+      adminMutationLimiter,
+      String(adminCheck.user?.email || "admin").toLowerCase()
+    );
+    if (rateLimited) return rateLimited;
+
     const supabase = adminCheck.supabase;
     const adminUser = adminCheck.user;
+    const invalidateDashboardCache = () => {
+      invalidateReadCache(
+        `admin-dashboard:${String(adminUser?.email || "admin").toLowerCase()}`
+      );
+    };
 
     const payload = await request.json();
     const { action, requestId } = payload;
@@ -641,6 +679,7 @@ export async function POST(request) {
         });
       }
 
+      invalidateDashboardCache();
       return Response.json({ success: true });
     }
 
@@ -698,6 +737,7 @@ export async function POST(request) {
         signalId: data?.id || null,
       });
 
+      invalidateDashboardCache();
       return Response.json({ success: true, id: data?.id || null });
     }
 
@@ -844,6 +884,7 @@ export async function POST(request) {
         },
       });
 
+      invalidateDashboardCache();
       return Response.json({ success: true });
     }
 
@@ -864,6 +905,7 @@ export async function POST(request) {
         targetId: requestId,
       });
 
+      invalidateDashboardCache();
       return Response.json({ success: true });
     }
 
@@ -884,6 +926,7 @@ export async function POST(request) {
         targetId: requestId,
       });
 
+      invalidateDashboardCache();
       return Response.json({ success: true });
     }
 
@@ -904,6 +947,7 @@ export async function POST(request) {
         targetId: requestId,
       });
 
+      invalidateDashboardCache();
       return Response.json({ success: true });
     }
 

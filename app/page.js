@@ -1,8 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+import { fetchWithTimeout } from "../lib/fetch-with-timeout";
+import { scheduleAfterPaint } from "../lib/schedule-after-paint";
 import { supabase } from "../lib/supabase";
+import { MiniTicker } from "./components/market/MiniTicker";
 import { useAppModal } from "./components/AppModalProvider";
+import {
+  hasKnownMarketPrice,
+  useMarketPulseStream,
+} from "./hooks/useMarketPulseStream";
+
+const LiveChartSection = dynamic(
+  () => import("./components/market/LiveChartSection").then((mod) => mod.LiveChartSection),
+  {
+    ssr: false,
+    loading: () => (
+      <section id="chart" className="site-live-chart-section w-full">
+        <div className="site-live-chart-panel glassPanel p-8 text-center text-sm text-slate-300">
+          جاري تحميل الشارت...
+        </div>
+      </section>
+    ),
+  }
+);
+
+const TradingViewPrice = dynamic(
+  () => import("./components/market/TradingViewWidgets").then((mod) => mod.TradingViewPrice),
+  { ssr: false }
+);
+
+const MarketWindow = dynamic(
+  () => import("./components/market/TradingViewWidgets").then((mod) => mod.MarketWindow),
+  { ssr: false }
+);
 
 const withTimeout = (promise, ms, message = "REQUEST_TIMEOUT") => {
   let timeoutId;
@@ -19,12 +51,7 @@ const withTimeout = (promise, ms, message = "REQUEST_TIMEOUT") => {
 export default function Home() {
   const { showAppModal } = useAppModal();
   const [activeNotice, setActiveNotice] = useState("");
-  const [prices, setPrices] = useState({
-    BTCUSDT: "0",
-    ETHUSDT: "0",
-    SOLUSDT: "0",
-  });
-  const [liveFeedStatus, setLiveFeedStatus] = useState("connecting");
+  const { prices, liveFeedStatus } = useMarketPulseStream();
 
   const [analysisCoin, setAnalysisCoin] = useState("");
   const [analysisFrame, setAnalysisFrame] = useState("");
@@ -89,10 +116,14 @@ export default function Home() {
     setCanRequestAnalysis(false);
 
     try {
-      const response = await fetch(`/api/analysis-request?email=${encodeURIComponent(user.email)}`, {
-        method: "GET",
-        cache: "no-store",
-      });
+      const response = await fetchWithTimeout(
+        `/api/analysis-request?email=${encodeURIComponent(user.email)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        },
+        5000
+      );
 
       const result = await response.json().catch(() => null);
 
@@ -104,94 +135,30 @@ export default function Home() {
       setAnalysisCooldownText(result.text || "");
     } catch (err) {
       console.error("Cooldown check failed:", err);
-      setCanRequestAnalysis(false);
-      setAnalysisCooldownText("جاري التحقق من إمكانية إرسال طلب تحليل جديد...");
+      setCanRequestAnalysis(true);
+      setAnalysisCooldownText("");
     }
   };
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof WebSocket === "undefined") {
-      setLiveFeedStatus("offline");
-      return undefined;
-    }
+    let interval;
 
-    let ws;
-    let closedByCleanup = false;
-    let reconnectTimer;
+    const cancelDeferred = scheduleAfterPaint(() => {
+      const user = JSON.parse(localStorage.getItem("currentUser") || "null");
+      void refreshAnalysisCooldown(user);
 
-    const connect = () => {
-      if (closedByCleanup) return;
-
-      setLiveFeedStatus((current) => (current === "live" ? "live" : "connecting"));
-
-      try {
-        ws = new WebSocket(
-          "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade"
-        );
-      } catch {
-        setLiveFeedStatus("retrying");
-        reconnectTimer = window.setTimeout(connect, 5000);
-        return;
-      }
-
-      ws.onopen = () => {
-        setLiveFeedStatus("live");
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          const d = msg.data;
-
-          if (d?.s && d?.p) {
-            const livePrice = Number(d.p);
-            setPrices((prev) => ({
-              ...prev,
-              [d.s]: livePrice.toLocaleString(),
-            }));
-          }
-        } catch {
-          // Ignore malformed websocket payloads.
-        }
-      };
-
-      ws.onerror = () => {
-        if (!closedByCleanup) {
-          setLiveFeedStatus((current) => (current === "live" ? "live" : "retrying"));
-        }
-      };
-
-      ws.onclose = () => {
-        if (closedByCleanup) return;
-
-        setLiveFeedStatus("retrying");
-        reconnectTimer = window.setTimeout(connect, 5000);
-      };
-    };
-
-    connect();
+      interval = window.setInterval(() => {
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+        void refreshAnalysisCooldown(currentUser);
+      }, 60000);
+    }, 2000);
 
     return () => {
-      closedByCleanup = true;
-      clearTimeout(reconnectTimer);
-
-      if (ws && ws.readyState <= WebSocket.OPEN) {
-        ws.close();
+      cancelDeferred();
+      if (interval) {
+        clearInterval(interval);
       }
     };
-  }, []);
-
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("currentUser") || "null");
-
-    refreshAnalysisCooldown(user);
-
-    const interval = setInterval(() => {
-      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-      refreshAnalysisCooldown(currentUser);
-    }, 60000);
-
-    return () => clearInterval(interval);
   }, []);
 
   const checkUserAlerts = () => {
@@ -490,14 +457,32 @@ export default function Home() {
                     <h3 className="site-price-card__title mb-0">BTC / ETH / SOL</h3>
                   </div>
                   <span className="site-market-pulse-badge">
-                    {liveFeedStatus === "live" ? "Binance Live" : "جاري التحديث..."}
+                    {liveFeedStatus === "live"
+                      ? "Binance Live"
+                      : hasKnownMarketPrice(prices)
+                        ? "آخر سعر معروف"
+                        : liveFeedStatus === "offline"
+                          ? "غير متاح مؤقتاً"
+                          : "جاري التحديث..."}
                   </span>
                 </div>
 
                 <div className="space-y-3">
-                  <MiniTicker symbol="BTC" price={prices.BTCUSDT} live={liveFeedStatus === "live"} />
-                  <MiniTicker symbol="ETH" price={prices.ETHUSDT} live={liveFeedStatus === "live"} />
-                  <MiniTicker symbol="SOL" price={prices.SOLUSDT} live={liveFeedStatus === "live"} />
+                  <MiniTicker
+                    symbol="BTC"
+                    price={prices.BTCUSDT}
+                    feedStatus={liveFeedStatus}
+                  />
+                  <MiniTicker
+                    symbol="ETH"
+                    price={prices.ETHUSDT}
+                    feedStatus={liveFeedStatus}
+                  />
+                  <MiniTicker
+                    symbol="SOL"
+                    price={prices.SOLUSDT}
+                    feedStatus={liveFeedStatus}
+                  />
                 </div>
               </div>
             </div>
@@ -711,148 +696,6 @@ export default function Home() {
   );
 }
 
-function Price({ title, symbol, price, source = "Binance Live" }) {
-  return (
-    <div className="box">
-      <p className="text-slate-400">{title}</p>
-      <h3 className="text-2xl font-black">{symbol}</h3>
-      <p className="text-3xl font-black mt-4 text-emerald-400">${price}</p>
-      <p className="text-xs text-emerald-400 mt-3">● {source}</p>
-    </div>
-  );
-}
-
-function LiveChartSection({
-  chartSearch,
-  setChartSearch,
-  chartInterval,
-  setChartInterval,
-  chartSymbol,
-  chartSearchError,
-  onApplySearch,
-}) {
-  const [chartLoading, setChartLoading] = useState(true);
-
-  useEffect(() => {
-    setChartLoading(true);
-  }, [chartSymbol, chartInterval]);
-
-  const chartIntervals = [
-    { value: "1", label: "1 دقيقة" },
-    { value: "5", label: "5 دقائق" },
-    { value: "15", label: "15 دقيقة" },
-    { value: "60", label: "1 ساعة" },
-    { value: "240", label: "4 ساعات" },
-    { value: "D", label: "يومي" },
-    { value: "W", label: "أسبوعي" },
-  ];
-
-  return (
-    <section id="chart" className="site-live-chart-section w-full">
-      <div className="site-live-chart-panel glassPanel">
-        <header className="site-live-chart-header">
-          <h2 className="sectionTitle site-live-chart-title">الشارت الحي</h2>
-          <p className="site-live-chart-desc">
-            اختر العملة والفريم الزمني لمتابعة الرسم البياني المباشر.
-          </p>
-        </header>
-
-        <div className="site-live-chart-controls">
-          <div className="site-live-chart-symbol-row">
-            <input
-              value={chartSearch}
-              onChange={(e) => setChartSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onApplySearch();
-              }}
-              placeholder="ابحث عن أي عملة مثل BTC أو PEPE أو BTCUSDT"
-              className="site-live-chart-input"
-              aria-label="رمز العملة"
-            />
-
-            <button type="button" onClick={onApplySearch} className="site-live-chart-btn">
-              عرض الشارت
-            </button>
-          </div>
-
-          <div className="site-live-chart-intervals" role="group" aria-label="الفريم الزمني">
-            <span className="site-live-chart-intervals-label">الفريم الزمني</span>
-            <div className="site-live-chart-intervals-list">
-              {chartIntervals.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setChartInterval(item.value)}
-                  className={`site-live-chart-interval-btn${
-                    chartInterval === item.value ? " is-active" : ""
-                  }`}
-                  aria-pressed={chartInterval === item.value}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {chartSearchError ? (
-            <div className="site-live-chart-error" role="alert">
-              {chartSearchError}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="site-live-chart-frame" aria-busy={chartLoading}>
-          {chartLoading ? (
-            <div className="site-live-chart-skeleton" aria-live="polite">
-              <div className="site-live-chart-skeleton-bars">
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-              </div>
-              <p className="site-live-chart-skeleton-text">جاري تحميل الشارت...</p>
-            </div>
-          ) : null}
-
-          <iframe
-            key={`${chartSymbol}-${chartInterval}`}
-            src={`https://s.tradingview.com/widgetembed/?symbol=BINANCE:${chartSymbol}&interval=${chartInterval}&theme=dark&style=1&locale=ar`}
-            className={`site-live-chart-iframe${chartLoading ? " is-loading" : ""}`}
-            title={`TradingView chart ${chartSymbol}`}
-            loading="lazy"
-            onLoad={() => setChartLoading(false)}
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TradingViewPrice({ title, symbol, tvSymbol }) {
-  return (
-    <div className="site-price-card site-price-card--tv">
-      <p className="site-price-card__eyebrow">{title}</p>
-      <h3 className="site-price-card__title">{symbol}</h3>
-      <TradingViewWidget symbol={tvSymbol} height="120" />
-    </div>
-  );
-}
-
-function MiniTicker({ symbol, price, live = false }) {
-  const displayPrice = live && price !== "0" ? `$${price}` : "جاري التحديث...";
-
-  return (
-    <div className="site-price-card site-price-card--pulse">
-      <span className="site-price-card__title mb-0 text-base">{symbol}</span>
-      <span className="site-price-card__value text-base">{displayPrice}</span>
-    </div>
-  );
-}
-
 function Service({ title, text, href, publicLink = false, onRequireLogin }) {
   return (
     <button
@@ -900,80 +743,5 @@ function Service({ title, text, href, publicLink = false, onRequireLogin }) {
         اطلب الخدمة
       </span>
     </button>
-  );
-}
-
-function MarketWindow({ title, label, symbol, widgetHeight = "120" }) {
-  return (
-    <div className="site-price-card site-price-card--tv">
-      <p className="site-price-card__eyebrow">{label}</p>
-      <h3 className="site-price-card__title">{title}</h3>
-      <TradingViewWidget symbol={symbol} height={widgetHeight} />
-    </div>
-  );
-}
-
-function TradingViewWidget({ symbol, height = "120" }) {
-  const containerRef = useRef(null);
-  const [feedStatus, setFeedStatus] = useState("loading");
-
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-
-    setFeedStatus("loading");
-    containerRef.current.innerHTML = "";
-
-    const widgetBox = document.createElement("div");
-    widgetBox.className = "tradingview-widget-container__widget";
-    containerRef.current.appendChild(widgetBox);
-
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      symbol,
-      width: "100%",
-      isTransparent: false,
-      colorTheme: "dark",
-      locale: "ar",
-    });
-
-    script.onload = () => {
-      setFeedStatus("live");
-    };
-
-    script.onerror = () => {
-      setFeedStatus("updating");
-    };
-
-    containerRef.current.appendChild(script);
-
-    const fallbackTimer = window.setTimeout(() => {
-      setFeedStatus((current) => (current === "loading" ? "updating" : current));
-    }, 8000);
-
-    return () => {
-      clearTimeout(fallbackTimer);
-    };
-  }, [symbol]);
-
-  const statusLabel = feedStatus === "live" ? "TradingView Live" : "جاري التحديث...";
-
-  return (
-    <div>
-      <div className="relative">
-        <div
-          ref={containerRef}
-          className="tradingview-widget-container overflow-hidden rounded-2xl border border-slate-800 bg-black shadow-[inset_0_0_30px_rgba(0,0,0,0.65)]"
-          style={{ height }}
-        />
-        {feedStatus !== "live" ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-950/70 text-xs font-bold text-cyan-200">
-            جاري التحديث...
-          </div>
-        ) : null}
-      </div>
-      <p className="site-price-card__status">● {statusLabel}</p>
-    </div>
   );
 }

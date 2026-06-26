@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
+import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../components/AuthProvider";
@@ -8,6 +10,8 @@ import { useAuth } from "../components/AuthProvider";
 const FALLBACK_POLL_MS = 45000;
 const TOAST_TTL_MS = 6500;
 const TOAST_GAP_MS = 450;
+const INITIAL_SYNC_DELAY_MS = 2000;
+const FETCH_TIMEOUT_MS = 5000;
 
 function createToastId() {
   return `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -170,11 +174,15 @@ export function useSiteNotifications() {
       if (!userEmail) return;
 
       try {
-        const response = await fetch("/api/my-notifications?include_read=1&limit=30", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
-        });
+        const response = await fetchWithTimeout(
+          "/api/my-notifications?include_read=1&limit=30",
+          {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          },
+          FETCH_TIMEOUT_MS
+        );
 
         const result = await response.json().catch(() => null);
 
@@ -325,52 +333,55 @@ export function useSiteNotifications() {
     syncGenerationRef.current = generation;
     setLoading(true);
 
-    void syncFromServer({ generation }).finally(() => {
-      if (active) setLoading(false);
-    });
+    const cancelDeferred = scheduleAfterPaint(() => {
+      if (!active) return;
 
-    const channel = supabase
-      .channel(`site-notifications-${userEmail}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_email=eq.${userEmail}`,
-        },
-        (payload) => {
-          if (!initialSyncCompleteRef.current) return;
-
-          registerIncomingNotification(payload.new, {
-            announce: true,
-            bumpUnread: true,
-          });
-        }
-      )
-      .subscribe((status) => {
-        if (!active) return;
-
-        if (status === "SUBSCRIBED") {
-          setRealtimeConnected(true);
-          stopFallbackPolling();
-          return;
-        }
-
-        if (
-          status === "CLOSED" ||
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT"
-        ) {
-          setRealtimeConnected(false);
-          startFallbackPolling();
-        }
+      void syncFromServer({ generation }).finally(() => {
+        if (active) setLoading(false);
       });
 
-    channelRef.current = channel;
+      channelRef.current = supabase
+        .channel(`site-notifications-${userEmail}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_email=eq.${userEmail}`,
+          },
+          (payload) => {
+            if (!initialSyncCompleteRef.current) return;
+
+            registerIncomingNotification(payload.new, {
+              announce: true,
+              bumpUnread: true,
+            });
+          }
+        )
+        .subscribe((status) => {
+          if (!active) return;
+
+          if (status === "SUBSCRIBED") {
+            setRealtimeConnected(true);
+            stopFallbackPolling();
+            return;
+          }
+
+          if (
+            status === "CLOSED" ||
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT"
+          ) {
+            setRealtimeConnected(false);
+            startFallbackPolling();
+          }
+        });
+    }, INITIAL_SYNC_DELAY_MS);
 
     return () => {
       active = false;
+      cancelDeferred();
       syncGenerationRef.current += 1;
       stopFallbackPolling();
       clearToastTimers();

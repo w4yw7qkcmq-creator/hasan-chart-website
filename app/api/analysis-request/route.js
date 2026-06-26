@@ -1,6 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { analysisRequestLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
+import {
+  analysisReadLimiter,
+  analysisRequestLimiter,
+  getClientIp,
+  RATE_LIMIT_ERROR,
+} from "../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +125,9 @@ const getCooldownText = (remainingMs) => {
 
 export async function GET(req) {
   try {
+    const rateLimited = await enforceRateLimit(analysisReadLimiter, getClientIp(req));
+    if (rateLimited) return rateLimited;
+
     const supabase = getSupabaseAdmin();
 
     const cookieStore = await cookies();

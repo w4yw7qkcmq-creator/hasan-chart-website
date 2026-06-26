@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
+import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 import { supabase } from "../../lib/supabase";
 import {
   ensureServiceWorkerRegistration,
@@ -368,50 +370,77 @@ function RootLayoutShell({ children }) {
   };
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (typeof window === "undefined") return undefined;
+    if (!("Notification" in window) || Notification.permission !== "granted") return undefined;
 
-    savePushSubscription()
-      .then((saved) => {
-        if (saved?.apiCalled && saved?.subscription?.id) {
-          setWebPushEnabled(true);
-        }
-      })
-      .catch((err) => {
-        setWebPushEnabled(false);
-        setStoredPushEndpoint("");
-        console.warn("Push subscription sync skipped:", err?.message || err);
-      });
+    let active = true;
+
+    const cancelDeferred = scheduleAfterPaint(() => {
+      if (!active) return;
+
+      savePushSubscription()
+        .then((saved) => {
+          if (!active) return;
+          if (saved?.apiCalled && saved?.subscription?.id) {
+            setWebPushEnabled(true);
+          }
+        })
+        .catch((err) => {
+          if (!active) return;
+          setWebPushEnabled(false);
+          setStoredPushEndpoint("");
+          console.warn("Push subscription sync skipped:", err?.message || err);
+        });
+    }, 3000);
+
+    return () => {
+      active = false;
+      cancelDeferred();
+    };
   }, [currentUser?.email]);
 
   // Automatic user subscription refresh so VIP menu items appear after admin activation without logging out.
   useEffect(() => {
-    if (!authResolved || !currentUser?.email) return;
+    if (!authResolved || !currentUser?.email) return undefined;
 
-    refreshCurrentUserSubscription();
-    const timer = setInterval(refreshCurrentUserSubscription, 10000);
+    let active = true;
+    let intervalTimer = null;
+    let channel = null;
 
-    const channel = supabase
-      .channel(`global-subscription-refresh-${currentUser.email}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "subscription_requests",
-          filter: `user_email=eq.${currentUser.email}`,
-        },
-        (payload) => {
-          if (payload?.new?.status === "مفعل") {
-            refreshCurrentUserSubscription();
+    const cancelDeferred = scheduleAfterPaint(() => {
+      if (!active) return;
+
+      refreshCurrentUserSubscription();
+      intervalTimer = window.setInterval(refreshCurrentUserSubscription, 10000);
+
+      channel = supabase
+        .channel(`global-subscription-refresh-${currentUser.email}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "subscription_requests",
+            filter: `user_email=eq.${currentUser.email}`,
+          },
+          (payload) => {
+            if (payload?.new?.status === "مفعل") {
+              refreshCurrentUserSubscription();
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    }, 2500);
 
     return () => {
-      clearInterval(timer);
-      supabase.removeChannel(channel);
+      active = false;
+      cancelDeferred();
+      if (intervalTimer) {
+        clearInterval(intervalTimer);
+      }
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [authResolved, currentUser?.email]);
 
@@ -420,11 +449,15 @@ function RootLayoutShell({ children }) {
     if (!currentUser?.email) return;
 
     try {
-      const response = await fetch("/api/my-subscription-status", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "include",
-      });
+      const response = await fetchWithTimeout(
+        "/api/my-subscription-status",
+        {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+        },
+        5000
+      );
 
       const result = await response.json().catch(() => null);
 

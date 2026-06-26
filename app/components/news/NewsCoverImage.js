@@ -1,14 +1,61 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { getNewsImageSources } from "../../../lib/news-images";
 
 const BLOCKED_SRC_PATTERN =
   /source\.unsplash\.com|images\.unsplash\.com|unsplash\.com\/photo|coindesk\.com/i;
+
+const FALLBACK_IMAGE_SRC = "/favicon.png";
 
 function getSafeImageSrc(src) {
   const value = String(src || "").trim();
   if (!value || BLOCKED_SRC_PATTERN.test(value)) return null;
   return value;
+}
+
+function NewsImageCore({
+  src,
+  webpSrc,
+  alt,
+  loading = "lazy",
+  className,
+  hiddenClassName,
+  showImage,
+  onError,
+}) {
+  if (!src) return null;
+
+  if (webpSrc) {
+    return (
+      <picture>
+        <source srcSet={webpSrc} type="image/webp" />
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          decoding="async"
+          fetchPriority="low"
+          referrerPolicy="no-referrer"
+          onError={onError}
+          className={showImage ? className : hiddenClassName}
+        />
+      </picture>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading={loading}
+      decoding="async"
+      fetchPriority="low"
+      referrerPolicy="no-referrer"
+      onError={onError}
+      className={showImage ? className : hiddenClassName}
+    />
+  );
 }
 
 export function NewsCoverImage({
@@ -20,22 +67,33 @@ export function NewsCoverImage({
   fallback,
 }) {
   const safeSrc = useMemo(() => getSafeImageSrc(src), [src]);
+  const imageSources = useMemo(() => getNewsImageSources(safeSrc), [safeSrc]);
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(safeSrc) && !failed;
+  const showImage = Boolean(imageSources.src) && !failed;
 
   return (
     <>
       <div className={`${fallbackClassName} ${showImage ? "news-card__fallback--hidden" : ""}`}>
         {fallback}
       </div>
-      {safeSrc ? (
+      <NewsImageCore
+        src={imageSources.src}
+        webpSrc={imageSources.webpSrc}
+        alt={alt}
+        loading={loading}
+        className={className}
+        hiddenClassName={`${className} news-card__image--hidden`}
+        showImage={showImage}
+        onError={() => setFailed(true)}
+      />
+      {failed && safeSrc ? (
         <img
-          src={safeSrc}
-          alt={alt}
-          loading={loading}
+          src={FALLBACK_IMAGE_SRC}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
           decoding="async"
-          onError={() => setFailed(true)}
-          className={showImage ? className : "news-card__image news-card__image--hidden"}
+          className={`${className} news-card__image--fallback`}
         />
       ) : null}
     </>
@@ -50,8 +108,9 @@ export function NewsArticleCoverImage({
   fallback,
 }) {
   const safeSrc = useMemo(() => getSafeImageSrc(src), [src]);
+  const imageSources = useMemo(() => getNewsImageSources(safeSrc), [safeSrc]);
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(safeSrc) && !failed;
+  const showImage = Boolean(imageSources.src) && !failed;
 
   return (
     <>
@@ -61,12 +120,24 @@ export function NewsArticleCoverImage({
       >
         {fallback}
       </div>
-      {safeSrc ? (
+      <NewsImageCore
+        src={imageSources.src}
+        webpSrc={imageSources.webpSrc}
+        alt={alt}
+        loading="lazy"
+        className={className}
+        hiddenClassName="hidden"
+        showImage={showImage}
+        onError={() => setFailed(true)}
+      />
+      {failed && safeSrc ? (
         <img
-          src={safeSrc}
-          alt={alt}
-          onError={() => setFailed(true)}
-          className={showImage ? className : "hidden"}
+          src={FALLBACK_IMAGE_SRC}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className={`${className} opacity-40`}
         />
       ) : null}
     </>

@@ -1,6 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSession } from "../../../lib/admin-auth";
 import { dispatchAnalysisReplyAlerts } from "../../../lib/analysis-reply-dispatch";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
+import { adminMutationLimiter } from "../../../lib/rate-limit";
+import { invalidateReadCache } from "../../../lib/server-read-cache";
 import { sendAnalysisReadyPush } from "../../../lib/push-notifications";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +41,12 @@ export async function POST(req) {
         { status: adminCheck.status }
       );
     }
+
+    const rateLimited = await enforceRateLimit(
+      adminMutationLimiter,
+      String(adminCheck.user?.email || "admin").toLowerCase()
+    );
+    if (rateLimited) return rateLimited;
 
     const body = await req.json().catch(() => null);
 
@@ -107,6 +116,8 @@ export async function POST(req) {
       coin: coinTarget,
       requestId,
     });
+
+    invalidateReadCache("admin-dashboard:");
 
     return Response.json({
       success: true,

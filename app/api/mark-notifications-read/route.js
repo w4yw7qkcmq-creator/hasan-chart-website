@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireSessionEmail } from "../../../lib/auth-session";
+import { invalidateReadCache } from "../../../lib/server-read-cache";
 
 export async function POST(request) {
   try {
@@ -54,6 +55,8 @@ export async function POST(request) {
       .select("*", { count: "exact", head: true })
       .eq("user_email", email)
       .eq("is_read", false);
+
+    invalidateReadCache(`notifications:${email}`);
 
     return NextResponse.json({
       success: true,
