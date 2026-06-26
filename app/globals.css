@@ -1328,3 +1328,264 @@ html[data-theme="light"] #prices .site-price-card--tv .tradingview-widget-contai
     max-width: none;
   }
 }
+
+/* ===== Live chart section ===== */
+
+.site-live-chart-section {
+  width: 100%;
+}
+
+.site-live-chart-panel {
+  direction: rtl;
+  padding: 1.75rem 1.25rem;
+  border-radius: 32px;
+  box-shadow: 0 18px 55px var(--shadow-main);
+}
+
+@media (min-width: 768px) {
+  .site-live-chart-panel {
+    padding: 2rem 2.25rem;
+  }
+}
+
+.site-live-chart-header {
+  margin-bottom: 1.5rem;
+}
+
+.site-live-chart-title {
+  margin-bottom: 0.5rem;
+  text-align: right;
+}
+
+.site-live-chart-desc {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.65;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.site-live-chart-controls {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.site-live-chart-symbol-row {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .site-live-chart-symbol-row {
+    grid-template-columns: 1fr auto;
+    align-items: stretch;
+  }
+}
+
+.site-live-chart-input {
+  width: 100%;
+  margin: 0;
+  padding: 0.95rem 1.125rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-weight: 700;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.site-live-chart-input:focus {
+  border-color: rgba(59, 130, 246, 0.85);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
+}
+
+.site-live-chart-input::placeholder {
+  color: rgba(148, 163, 184, 0.85);
+  font-weight: 600;
+}
+
+.site-live-chart-btn {
+  min-height: 3.25rem;
+  padding: 0.95rem 1.5rem;
+  border-radius: 1rem;
+  border: none;
+  background: linear-gradient(to left, #1d4ed8, #3b82f6, #67e8f9);
+  color: #ffffff;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.site-live-chart-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 44px rgba(37, 99, 235, 0.32);
+}
+
+.site-live-chart-intervals {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border-radius: 1.125rem;
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme="light"] .site-live-chart-intervals {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.site-live-chart-intervals-label {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.site-live-chart-intervals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.site-live-chart-interval-btn {
+  padding: 0.5rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+html[data-theme="light"] .site-live-chart-interval-btn {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.site-live-chart-interval-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.site-live-chart-interval-btn.is-active {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: linear-gradient(to left, #1d4ed8, #3b82f6, #67e8f9);
+  color: #ffffff;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.22);
+}
+
+.site-live-chart-error {
+  border-radius: 1rem;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(239, 68, 68, 0.12);
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fecaca;
+}
+
+html[data-theme="light"] .site-live-chart-error {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+.site-live-chart-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #020617;
+  height: 360px;
+  min-height: 360px;
+}
+
+@media (min-width: 768px) {
+  .site-live-chart-frame {
+    height: 520px;
+    min-height: 520px;
+  }
+}
+
+html[data-theme="light"] .site-live-chart-frame {
+  border-color: rgba(37, 99, 235, 0.16);
+  background: #0f172a;
+}
+
+.site-live-chart-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
+.site-live-chart-iframe.is-loading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.site-live-chart-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.98));
+}
+
+.site-live-chart-skeleton-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.625rem;
+  width: min(100%, 420px);
+  height: 140px;
+}
+
+.site-live-chart-skeleton-bars span {
+  flex: 1;
+  max-width: 2.25rem;
+  border-radius: 0.5rem 0.5rem 0.25rem 0.25rem;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.35), rgba(37, 99, 235, 0.12));
+  animation: liveChartSkeletonPulse 1.4s ease-in-out infinite;
+}
+
+.site-live-chart-skeleton-bars span:nth-child(1) { height: 42%; animation-delay: 0s; }
+.site-live-chart-skeleton-bars span:nth-child(2) { height: 68%; animation-delay: 0.1s; }
+.site-live-chart-skeleton-bars span:nth-child(3) { height: 54%; animation-delay: 0.2s; }
+.site-live-chart-skeleton-bars span:nth-child(4) { height: 88%; animation-delay: 0.3s; }
+.site-live-chart-skeleton-bars span:nth-child(5) { height: 62%; animation-delay: 0.4s; }
+.site-live-chart-skeleton-bars span:nth-child(6) { height: 76%; animation-delay: 0.5s; }
+.site-live-chart-skeleton-bars span:nth-child(7) { height: 48%; animation-delay: 0.6s; }
+.site-live-chart-skeleton-bars span:nth-child(8) { height: 70%; animation-delay: 0.7s; }
+
+.site-live-chart-skeleton-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #cbd5e1;
+  animation: liveChartSkeletonPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes liveChartSkeletonPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}

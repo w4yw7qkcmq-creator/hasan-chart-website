@@ -532,69 +532,15 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="chart">
-          <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-            <div>
-              <h2 className="sectionTitle text-center lg:text-right">الشارت الحي</h2>
-              <p className="mt-2 text-center text-sm text-slate-400 lg:text-right">
-                اختر العملة والفريم الزمني لعرض الشارت المباشر.
-              </p>
-            </div>
-
-            <div className="grid gap-3 lg:min-w-[640px]">
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                <input
-                  value={chartSearch}
-                  onChange={(e) => setChartSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") applyChartSearch();
-                  }}
-                  placeholder="ابحث عن أي عملة مثل BTC أو PEPE أو BTCUSDT"
-                  className="input"
-                />
-
-                <button
-                  onClick={applyChartSearch}
-                  className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-6 py-3 font-black text-white shadow-[0_16px_40px_rgba(37,99,235,0.25)]"
-                >
-                  عرض الشارت
-                </button>
-              </div>
-
-              <select
-                value={chartInterval}
-                onChange={(e) => setChartInterval(e.target.value)}
-                className="input"
-              >
-                <option value="1">1 دقيقة</option>
-                <option value="5">5 دقائق</option>
-                <option value="15">15 دقيقة</option>
-                <option value="60">1 ساعة</option>
-                <option value="240">4 ساعات</option>
-                <option value="D">يومي</option>
-                <option value="W">أسبوعي</option>
-              </select>
-
-              {chartSearchError && (
-                <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-sm font-bold text-red-100">
-                  {chartSearchError}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-3xl overflow-hidden border border-white/10 bg-white/5">
-            <iframe
-              key={`${chartSymbol}-${chartInterval}`}
-              src={`https://s.tradingview.com/widgetembed/?symbol=BINANCE:${chartSymbol}&interval=${chartInterval}&theme=dark&style=1&locale=ar`}
-              width="100%"
-              height="520"
-              frameBorder="0"
-              scrolling="no"
-              title={`TradingView chart ${chartSymbol}`}
-            />
-          </div>
-        </section>
+        <LiveChartSection
+          chartSearch={chartSearch}
+          setChartSearch={setChartSearch}
+          chartInterval={chartInterval}
+          setChartInterval={setChartInterval}
+          chartSymbol={chartSymbol}
+          chartSearchError={chartSearchError}
+          onApplySearch={applyChartSearch}
+        />
 
         <section id="services">
           <h2 className="sectionTitle text-center lg:text-right">الخدمات</h2>
@@ -773,6 +719,116 @@ function Price({ title, symbol, price, source = "Binance Live" }) {
       <p className="text-3xl font-black mt-4 text-emerald-400">${price}</p>
       <p className="text-xs text-emerald-400 mt-3">● {source}</p>
     </div>
+  );
+}
+
+function LiveChartSection({
+  chartSearch,
+  setChartSearch,
+  chartInterval,
+  setChartInterval,
+  chartSymbol,
+  chartSearchError,
+  onApplySearch,
+}) {
+  const [chartLoading, setChartLoading] = useState(true);
+
+  useEffect(() => {
+    setChartLoading(true);
+  }, [chartSymbol, chartInterval]);
+
+  const chartIntervals = [
+    { value: "1", label: "1 دقيقة" },
+    { value: "5", label: "5 دقائق" },
+    { value: "15", label: "15 دقيقة" },
+    { value: "60", label: "1 ساعة" },
+    { value: "240", label: "4 ساعات" },
+    { value: "D", label: "يومي" },
+    { value: "W", label: "أسبوعي" },
+  ];
+
+  return (
+    <section id="chart" className="site-live-chart-section w-full">
+      <div className="site-live-chart-panel glassPanel">
+        <header className="site-live-chart-header">
+          <h2 className="sectionTitle site-live-chart-title">الشارت الحي</h2>
+          <p className="site-live-chart-desc">
+            اختر العملة والفريم الزمني لمتابعة الرسم البياني المباشر.
+          </p>
+        </header>
+
+        <div className="site-live-chart-controls">
+          <div className="site-live-chart-symbol-row">
+            <input
+              value={chartSearch}
+              onChange={(e) => setChartSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onApplySearch();
+              }}
+              placeholder="ابحث عن أي عملة مثل BTC أو PEPE أو BTCUSDT"
+              className="site-live-chart-input"
+              aria-label="رمز العملة"
+            />
+
+            <button type="button" onClick={onApplySearch} className="site-live-chart-btn">
+              عرض الشارت
+            </button>
+          </div>
+
+          <div className="site-live-chart-intervals" role="group" aria-label="الفريم الزمني">
+            <span className="site-live-chart-intervals-label">الفريم الزمني</span>
+            <div className="site-live-chart-intervals-list">
+              {chartIntervals.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setChartInterval(item.value)}
+                  className={`site-live-chart-interval-btn${
+                    chartInterval === item.value ? " is-active" : ""
+                  }`}
+                  aria-pressed={chartInterval === item.value}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {chartSearchError ? (
+            <div className="site-live-chart-error" role="alert">
+              {chartSearchError}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="site-live-chart-frame" aria-busy={chartLoading}>
+          {chartLoading ? (
+            <div className="site-live-chart-skeleton" aria-live="polite">
+              <div className="site-live-chart-skeleton-bars">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <p className="site-live-chart-skeleton-text">جاري تحميل الشارت...</p>
+            </div>
+          ) : null}
+
+          <iframe
+            key={`${chartSymbol}-${chartInterval}`}
+            src={`https://s.tradingview.com/widgetembed/?symbol=BINANCE:${chartSymbol}&interval=${chartInterval}&theme=dark&style=1&locale=ar`}
+            className={`site-live-chart-iframe${chartLoading ? " is-loading" : ""}`}
+            title={`TradingView chart ${chartSymbol}`}
+            loading="lazy"
+            onLoad={() => setChartLoading(false)}
+          />
+        </div>
+      </div>
+    </section>
   );
 }
 
