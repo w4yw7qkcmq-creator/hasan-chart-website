@@ -9,6 +9,10 @@ import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { getClientIp, marketPulseLimiter } from "../../../lib/rate-limit";
 import { getCachedMarketPulse } from "../../../lib/server-market-cache";
 
+function isAuthenticatedRequest(request) {
+  return Boolean(request.cookies.get("hc_access_token")?.value);
+}
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -17,8 +21,14 @@ export async function GET(request) {
     route: "/api/market-pulse",
     handler: async (req, logContext) => {
       startMarketStream("api-market-pulse");
-      const rateLimited = await enforceRateLimit(marketPulseLimiter, getClientIp(req));
-      if (rateLimited) return rateLimited;
+
+      if (isAuthenticatedRequest(req)) {
+        const rateLimited = await enforceRateLimit(
+          marketPulseLimiter,
+          getClientIp(req)
+        );
+        if (rateLimited) return rateLimited;
+      }
 
       try {
         const snapshot = await getCachedMarketPulse();

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 const ADMIN_API_PREFIX = "/api/admin";
 const ADMIN_REPLY_API = "/api/admin-reply";
+const PUBLIC_API_ROUTES = new Set(["/api/market-pulse", "/api/market-stream"]);
 
 function hasAccessToken(request) {
   return Boolean(request.cookies.get("hc_access_token")?.value);
@@ -46,6 +47,10 @@ export function middleware(request) {
     requestHeaders.set("x-request-id", requestId);
     requestHeaders.set("x-request-start", String(Date.now()));
     requestHeaders.set("x-hc-api-route", pathname);
+
+    if (PUBLIC_API_ROUTES.has(pathname)) {
+      requestHeaders.set("x-hc-public-api", "1");
+    }
 
     const response = NextResponse.next({
       request: {
