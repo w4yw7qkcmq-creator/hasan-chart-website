@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase";
 import { useAppModal } from "../components/AppModalProvider";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -185,23 +184,24 @@ export default function RegisterPage() {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            username: cleanUsername,
-            telegram: cleanTelegram,
-            role: "user",
-          },
-        },
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+          username: cleanUsername,
+          telegram: cleanTelegram,
+        }),
       });
 
-      if (error) {
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
         showAppModal({
           type: "error",
           title: "تعذر إنشاء الحساب",
-          message: error.message || "حدث خطأ أثناء إنشاء الحساب",
+          message: result?.error || "حدث خطأ أثناء إنشاء الحساب",
         });
         setLoading(false);
         resetTurnstile();

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAdminUser } from "../../lib/admin-emails";
-import { supabase, supabaseUrl } from "../../lib/supabase";
 import { useAppModal } from "../components/AppModalProvider";
 import { useAuth } from "../components/AuthProvider";
 
@@ -35,40 +34,44 @@ const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 const SIGN_IN_TIMEOUT_MS = 10000;
 const SIGN_IN_TIMEOUT_MESSAGE = "تعذر الاتصال بخدمة تسجيل الدخول، أعد المحاولة";
 
-function logSupabaseClientConfig() {
-  let urlHost = null;
+async function loginWithApi(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    urlHost = supabaseUrl ? new URL(supabaseUrl).host : null;
-  } catch {
-    urlHost = null;
-  }
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal,
+    });
 
-  console.log("[LOGIN] supabase client config", {
-    hasEnvUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    hasEnvAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-    clientUrlPresent: Boolean(supabaseUrl),
-    clientUrlHost: urlHost,
-  });
-}
+    const payload = await response.json().catch(() => ({}));
 
-function signInWithPasswordTimeout(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
-  let timeoutId;
+    if (!response.ok) {
+      return {
+        data: null,
+        error: { message: payload?.error || "بيانات الدخول غير صحيحة" },
+      };
+    }
 
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error("SIGN_IN_TIMEOUT"));
-    }, timeoutMs);
-  });
+    return {
+      data: {
+        user: payload.user,
+        session: payload.session,
+      },
+      error: null,
+    };
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new Error("SIGN_IN_TIMEOUT");
+    }
 
-  const signInPromise = supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  return Promise.race([signInPromise, timeoutPromise]).finally(() => {
+    throw err;
+  } finally {
     clearTimeout(timeoutId);
-  });
+  }
 }
 
 const verifyTurnstileToken = async (token) => {
@@ -212,12 +215,11 @@ export default function LoginPage() {
         return;
       }
 
-      console.log("[LOGIN] before signInWithPassword", { email: cleanEmail });
-      logSupabaseClientConfig();
+      console.log("[LOGIN] before login API", { email: cleanEmail });
 
-      const { data, error } = await signInWithPasswordTimeout(cleanEmail, password);
+      const { data, error } = await loginWithApi(cleanEmail, password);
 
-      console.log("[LOGIN] after signInWithPassword", {
+      console.log("[LOGIN] after login API", {
         ok: !error && Boolean(data?.session),
         email: data?.user?.email || null,
         error: error?.message || null,
@@ -316,26 +318,41 @@ export default function LoginPage() {
 
     setResetLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: window.location.origin + "/login",
-    });
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: cleanEmail,
+          redirectTo: `${window.location.origin}/login`,
+        }),
+      });
 
-    setResetLoading(false);
+      const payload = await response.json().catch(() => ({}));
 
-    if (error) {
+      if (!response.ok) {
+        showAppModal({
+          type: "error",
+          title: "تعذر إرسال الرابط",
+          message: payload?.error || "حدث خطأ أثناء إرسال رابط تغيير كلمة المرور",
+        });
+        return;
+      }
+
+      showAppModal({
+        type: "success",
+        title: "تم إرسال الرابط",
+        message: "تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني",
+      });
+    } catch {
       showAppModal({
         type: "error",
         title: "تعذر إرسال الرابط",
         message: "حدث خطأ أثناء إرسال رابط تغيير كلمة المرور",
       });
-      return;
+    } finally {
+      setResetLoading(false);
     }
-
-    showAppModal({
-      type: "success",
-      title: "تم إرسال الرابط",
-      message: "تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني",
-    });
   };
 
   return (
