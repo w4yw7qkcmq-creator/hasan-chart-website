@@ -45,6 +45,7 @@ export function middleware(request) {
 
     requestHeaders.set("x-request-id", requestId);
     requestHeaders.set("x-request-start", String(Date.now()));
+    requestHeaders.set("x-hc-api-route", pathname);
 
     const response = NextResponse.next({
       request: {

@@ -1,3 +1,4 @@
+import { runWithRedisRoute } from "../../../lib/redis-instrumentation";
 import { startMarketStream } from "../../../lib/okx-market-stream";
 import { CACHE_NO_STORE, jsonResponse } from "../../../lib/api-response";
 import { collectHealthReport } from "../../../lib/health-check";
@@ -16,7 +17,7 @@ export async function GET(request) {
 
   try {
     startMarketStream("api-health");
-    const report = await collectHealthReport();
+    const report = await runWithRedisRoute("/api/health", () => collectHealthReport());
     const statusCode = report.status === "down" ? 503 : 200;
 
     logApiRequest({
