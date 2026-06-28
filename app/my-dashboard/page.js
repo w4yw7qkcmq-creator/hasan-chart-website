@@ -237,7 +237,7 @@ function RealCandlestickChart({ result }) {
 }
 
 export default function MyDashboard() {
-  const { user, sessionPending, shouldShowLogin } = useRequireAuth();
+  const { user, sessionPending, shouldShowLogin, profileReady } = useRequireAuth();
   const [myAlerts, setMyAlerts] = useState([]);
   const [myAnalysis, setMyAnalysis] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -286,7 +286,7 @@ export default function MyDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [sessionPending, shouldShowLogin, user?.email]);
+  }, [sessionPending, shouldShowLogin, user?.email, profileReady]);
 
   const stats = useMemo(() => {
     const activeAlerts = myAlerts.filter((item) => item.status === "active").length;

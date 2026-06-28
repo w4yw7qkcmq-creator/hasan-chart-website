@@ -22,10 +22,9 @@ function isThemeAlreadyReady() {
 }
 
 export function ThemeProvider({ children, initialTheme = "dark" }) {
-  const [theme, setTheme] = useState(() => getSafeTheme(initialTheme));
-  const [themeReady, setThemeReady] = useState(() =>
-    typeof document !== "undefined" ? isThemeAlreadyReady() : false
-  );
+  const resolvedInitialTheme = getSafeTheme(initialTheme);
+  const [theme, setTheme] = useState(() => resolvedInitialTheme);
+  const [themeReady, setThemeReady] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -80,7 +79,9 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, themeReady, toggleTheme }}>
+    <ThemeContext.Provider
+      value={{ theme, initialTheme: resolvedInitialTheme, themeReady, toggleTheme }}
+    >
       {children}
     </ThemeContext.Provider>
   );

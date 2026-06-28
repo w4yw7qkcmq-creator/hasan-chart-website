@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "../components/AuthProvider";
 
 const SIGNAL_ACTIVE_MS = 10 * 60 * 1000;
 
@@ -81,6 +82,7 @@ function SignalCard({ signal }) {
 }
 
 export default function VipFuturesPage() {
+  const { authResolved, user } = useAuth();
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -126,6 +128,8 @@ export default function VipFuturesPage() {
   };
 
   useEffect(() => {
+    if (!authResolved) return undefined;
+
     loadSignals();
 
     const refreshTimer = setInterval(() => {
@@ -140,7 +144,7 @@ export default function VipFuturesPage() {
       clearInterval(refreshTimer);
       clearInterval(statusTimer);
     };
-  }, []);
+  }, [authResolved, user?.email]);
 
   if (subscriptionExpired) {
     return (

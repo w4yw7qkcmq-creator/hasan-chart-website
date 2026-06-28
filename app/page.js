@@ -3,11 +3,13 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { fetchWithTimeout } from "../lib/fetch-with-timeout";
-import { scheduleAfterPaint } from "../lib/schedule-after-paint";
 import { supabase } from "../lib/supabase";
 import { MiniTicker } from "./components/market/MiniTicker";
 import { useAppModal } from "./components/AppModalProvider";
+import { useAuth } from "./components/AuthProvider";
+import { useClientMounted } from "./hooks/useClientMounted";
 import {
+  DEFAULT_MARKET_PRICES,
   hasKnownMarketPrice,
   useMarketPulseStream,
 } from "./hooks/useMarketPulseStream";
@@ -50,8 +52,22 @@ const withTimeout = (promise, ms, message = "REQUEST_TIMEOUT") => {
 
 export default function Home() {
   const { showAppModal } = useAppModal();
+  const { authResolved, user } = useAuth();
   const [activeNotice, setActiveNotice] = useState("");
   const { prices, liveFeedStatus } = useMarketPulseStream();
+  const mounted = useClientMounted();
+
+  const pulsePrices = mounted ? prices : DEFAULT_MARKET_PRICES;
+  const pulseFeedStatus = mounted ? liveFeedStatus : "connecting";
+  const pulseBadge = mounted
+    ? liveFeedStatus === "live"
+      ? "OKX Live"
+      : hasKnownMarketPrice(prices)
+        ? "آخر سعر معروف"
+        : liveFeedStatus === "offline"
+          ? "غير متاح مؤقتاً"
+          : "جاري التحديث..."
+    : "جاري التحديث...";
 
   const [analysisCoin, setAnalysisCoin] = useState("");
   const [analysisFrame, setAnalysisFrame] = useState("");
@@ -141,25 +157,22 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (!authResolved) return undefined;
+
     let interval;
 
-    const cancelDeferred = scheduleAfterPaint(() => {
-      const user = JSON.parse(localStorage.getItem("currentUser") || "null");
-      void refreshAnalysisCooldown(user);
+    void refreshAnalysisCooldown(user);
 
-      interval = window.setInterval(() => {
-        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-        void refreshAnalysisCooldown(currentUser);
-      }, 60000);
-    }, 2000);
+    interval = window.setInterval(() => {
+      void refreshAnalysisCooldown(user);
+    }, 60000);
 
     return () => {
-      cancelDeferred();
       if (interval) {
         clearInterval(interval);
       }
     };
-  }, []);
+  }, [authResolved, user?.email]);
 
   const checkUserAlerts = () => {
     return;
@@ -456,32 +469,24 @@ export default function Home() {
                     <p className="site-price-card__eyebrow">Market Pulse</p>
                     <h3 className="site-price-card__title mb-0">BTC / ETH / SOL</h3>
                   </div>
-                  <span className="site-market-pulse-badge">
-                    {liveFeedStatus === "live"
-                      ? "OKX Live"
-                      : hasKnownMarketPrice(prices)
-                        ? "آخر سعر معروف"
-                        : liveFeedStatus === "offline"
-                          ? "غير متاح مؤقتاً"
-                          : "جاري التحديث..."}
-                  </span>
+                  <span className="site-market-pulse-badge">{pulseBadge}</span>
                 </div>
 
                 <div className="space-y-3">
                   <MiniTicker
                     symbol="BTC"
-                    price={prices.BTCUSDT}
-                    feedStatus={liveFeedStatus}
+                    price={pulsePrices.BTCUSDT}
+                    feedStatus={pulseFeedStatus}
                   />
                   <MiniTicker
                     symbol="ETH"
-                    price={prices.ETHUSDT}
-                    feedStatus={liveFeedStatus}
+                    price={pulsePrices.ETHUSDT}
+                    feedStatus={pulseFeedStatus}
                   />
                   <MiniTicker
                     symbol="SOL"
-                    price={prices.SOLUSDT}
-                    feedStatus={liveFeedStatus}
+                    price={pulsePrices.SOLUSDT}
+                    feedStatus={pulseFeedStatus}
                   />
                 </div>
               </div>

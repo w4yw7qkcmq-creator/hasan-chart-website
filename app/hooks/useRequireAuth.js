@@ -3,7 +3,7 @@
 import { useAuth } from "../components/AuthProvider";
 
 export function useRequireAuth() {
-  const { authResolved, status, user } = useAuth();
+  const { authResolved, profileReady, status, user } = useAuth();
 
   const sessionPending = !authResolved || status === "loading";
   const isAuthenticated =
@@ -13,6 +13,7 @@ export function useRequireAuth() {
 
   return {
     authResolved,
+    profileReady,
     status,
     user,
     sessionPending,

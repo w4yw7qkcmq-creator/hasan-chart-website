@@ -225,7 +225,7 @@ const upsertById = (list, item, limit) => {
 
 export default function AdminPage() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, authResolved, profileReady, user, isAdmin } = useAuth();
   const [analysisRequests, setAnalysisRequests] = useState([]);
   const [accountRequests, setAccountRequests] = useState([]);
   const [subscriptionRequests, setSubscriptionRequests] = useState([]);
@@ -433,6 +433,10 @@ export default function AdminPage() {
 
 
   useEffect(() => {
+    if (!authResolved || !profileReady || !user?.email || !isAdmin) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     const initAdmin = async () => {
@@ -488,7 +492,7 @@ export default function AdminPage() {
       cancelled = true;
       clearInterval(backupInterval);
     };
-  }, []);
+  }, [authResolved, profileReady, user?.email, isAdmin]);
 
   const applyAdminDashboardResult = (result) => {
     const formattedAnalysis = (result.analysis_requests || []).map(formatAnalysisRequest);

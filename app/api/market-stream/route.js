@@ -1,7 +1,38 @@
-import { getMarketStreamHub, startMarketStream } from "../../../lib/okx-market-stream";
+import {
+  getMarketStreamHub,
+  getSharedMarketPrices,
+  startMarketStream,
+} from "../../../lib/okx-market-stream";
+import { getCachedMarketPulse } from "../../../lib/server-market-cache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+function hasKnownPrice(prices) {
+  return Object.values(prices || {}).some((value) => value && value !== "0");
+}
+
+function snapshotToPayload(snapshot) {
+  return {
+    success: true,
+    prices: snapshot.prices,
+    status: snapshot.status,
+    stale: Boolean(snapshot.stale),
+    updatedAt: snapshot.updatedAt || null,
+    source: snapshot.source || "shared-memory",
+  };
+}
+
+function cachedPulseToPayload(cached) {
+  return {
+    success: true,
+    prices: cached.prices,
+    status: cached.stale ? "stale" : "live",
+    stale: Boolean(cached.stale),
+    updatedAt: cached.cachedAt || Date.now(),
+    source: cached.source || "okx-rest-fallback",
+  };
+}
 
 export async function GET(request) {
   startMarketStream("api-market-stream");
@@ -34,24 +65,37 @@ export async function GET(request) {
 
   const stream = new ReadableStream({
     start(controller) {
-      const push = (snapshot) => {
-        if (request.signal.aborted) return;
+      const pushPayload = (payload) => {
+        if (request.signal.aborted || !payload?.prices) return;
 
         controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              success: true,
-              prices: snapshot.prices,
-              status: snapshot.status,
-              stale: snapshot.stale,
-              updatedAt: snapshot.updatedAt,
-              source: snapshot.source,
-            })}\n\n`
-          )
+          encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
         );
       };
 
-      unsubscribe = hub.subscribe(push);
+      const pushSnapshot = (snapshot) => {
+        pushPayload(snapshotToPayload(snapshot));
+      };
+
+      // Flush headers and open the SSE channel immediately.
+      controller.enqueue(encoder.encode(": connected\n\n"));
+
+      pushSnapshot(getSharedMarketPrices());
+
+      unsubscribe = hub.subscribe((snapshot) => {
+        pushSnapshot(snapshot);
+      });
+
+      if (!hasKnownPrice(hub.getSnapshot().prices)) {
+        void getCachedMarketPulse()
+          .then((cached) => {
+            if (request.signal.aborted || !cached?.prices) return;
+            pushPayload(cachedPulseToPayload(cached));
+          })
+          .catch(() => {
+            // Hub updates or client polling will recover.
+          });
+      }
 
       heartbeatTimer = setInterval(() => {
         if (request.signal.aborted) return;

@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { isAdminUser } from "../../lib/admin-emails";
 import { buildAppUser } from "../../lib/auth-profile";
 import {
@@ -163,7 +164,18 @@ export function AuthProvider({ children }) {
   const acknowledgeSignIn = useCallback(
     (authUser) => {
       if (!authUser?.email) return;
-      applyAuthenticatedUser(authUser);
+
+      flushSync(() => {
+        applyAuthenticatedUser(authUser);
+      });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("hc:session-ready", {
+            detail: { email: authUser.email },
+          })
+        );
+      }
     },
     [applyAuthenticatedUser]
   );

@@ -4,33 +4,10 @@ import { memo, useEffect, useRef, useState } from "react";
 
 function TradingViewWidgetComponent({ symbol, height = "120" }) {
   const containerRef = useRef(null);
-  const hostRef = useRef(null);
-  const [feedStatus, setFeedStatus] = useState("idle");
-  const [isVisible, setIsVisible] = useState(false);
+  const [feedStatus, setFeedStatus] = useState("loading");
 
   useEffect(() => {
-    if (!hostRef.current || typeof IntersectionObserver === "undefined") {
-      setIsVisible(true);
-      return undefined;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "240px 0px" }
-    );
-
-    observer.observe(hostRef.current);
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!isVisible || !containerRef.current) return undefined;
+    if (!containerRef.current) return undefined;
 
     const container = containerRef.current;
     setFeedStatus("loading");
@@ -69,19 +46,17 @@ function TradingViewWidgetComponent({ symbol, height = "120" }) {
       window.clearTimeout(fallbackTimer);
       container.innerHTML = "";
     };
-  }, [isVisible, symbol]);
+  }, [symbol]);
 
   const statusLabel =
     feedStatus === "live"
       ? "TradingView Live"
       : feedStatus === "unavailable"
         ? "غير متاح مؤقتاً"
-        : feedStatus === "idle"
-          ? "..."
-          : "جاري التحديث...";
+        : "جاري التحديث...";
 
   return (
-    <div ref={hostRef}>
+    <div>
       <div className="relative">
         <div
           ref={containerRef}

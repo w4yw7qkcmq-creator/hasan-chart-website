@@ -1,13 +1,12 @@
 "use client";
 
-import { memo } from "react";
-
 function MiniTickerComponent({ symbol, price, feedStatus = "connecting" }) {
-  const hasPrice = price && price !== "0";
+  const normalized = price == null || price === "" ? "0" : String(price);
+  const hasPrice = normalized !== "0";
 
   let displayPrice = "جاري التحديث...";
   if (hasPrice) {
-    displayPrice = `$${price}`;
+    displayPrice = `$${normalized}`;
   } else if (feedStatus === "offline" || feedStatus === "retrying") {
     displayPrice = "غير متاح مؤقتاً";
   }
@@ -20,4 +19,4 @@ function MiniTickerComponent({ symbol, price, feedStatus = "connecting" }) {
   );
 }
 
-export const MiniTicker = memo(MiniTickerComponent);
+export const MiniTicker = MiniTickerComponent;

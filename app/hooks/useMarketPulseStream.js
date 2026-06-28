@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 
 export const MARKET_PULSE_STORAGE_KEY = "hasan-chart-market-pulse-v1";
@@ -9,6 +10,11 @@ export const DEFAULT_MARKET_PRICES = {
   ETHUSDT: "0",
   SOLUSDT: "0",
 };
+
+const SSE_CONNECT_TIMEOUT_MS = 2500;
+const SSE_RETRY_MS = 3000;
+const POLL_FALLBACK_MS = 12000;
+const BOOTSTRAP_RETRY_MS = 3000;
 
 export function readStoredMarketPulse() {
   if (typeof window === "undefined") return null;
@@ -42,41 +48,75 @@ export function writeStoredMarketPulse(prices) {
   }
 }
 
+function normalizePriceValue(value) {
+  if (value == null || value === "" || value === 0 || value === "0") {
+    return "0";
+  }
+
+  return String(value);
+}
+
+export function normalizeMarketPrices(raw) {
+  return {
+    BTCUSDT: normalizePriceValue(raw?.BTCUSDT),
+    ETHUSDT: normalizePriceValue(raw?.ETHUSDT),
+    SOLUSDT: normalizePriceValue(raw?.SOLUSDT),
+  };
+}
+
 export function hasKnownMarketPrice(prices) {
-  return Object.values(prices || {}).some((value) => value && value !== "0");
+  return Object.values(prices || {}).some((value) => {
+    const normalized = normalizePriceValue(value);
+    return normalized !== "0";
+  });
 }
 
 function mapSnapshotToStatus(snapshot, prices) {
-  if (snapshot?.status === "live") return "live";
-  if (hasKnownMarketPrice(prices)) return "stale";
+  if (snapshot?.status === "live" && hasKnownMarketPrice(prices)) return "live";
+  if (hasKnownMarketPrice(prices)) return snapshot?.stale ? "stale" : "live";
   if (snapshot?.status === "offline") return "offline";
   if (snapshot?.status === "retrying") return "retrying";
   return "connecting";
 }
 
+function scheduleAfterPageLoad(callback) {
+  const run = () => {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(callback, { timeout: 2000 });
+      return;
+    }
+
+    window.setTimeout(callback, 0);
+  };
+
+  if (typeof document !== "undefined" && document.readyState === "complete") {
+    run();
+    return () => {};
+  }
+
+  window.addEventListener("load", run, { once: true });
+  return () => window.removeEventListener("load", run);
+}
+
 export function useMarketPulseStream() {
-  const [prices, setPrices] = useState(DEFAULT_MARKET_PRICES);
+  const [prices, setPrices] = useState(() => ({ ...DEFAULT_MARKET_PRICES }));
   const [liveFeedStatus, setLiveFeedStatus] = useState("connecting");
-  const pricesRef = useRef(DEFAULT_MARKET_PRICES);
-  const reconnectAttemptRef = useRef(0);
+  const pricesRef = useRef(prices);
+  const mountedRef = useRef(true);
   const pollTimerRef = useRef(null);
-  const reconnectTimerRef = useRef(null);
+  const retryTimerRef = useRef(null);
+  const streamRetryTimerRef = useRef(null);
   const eventSourceRef = useRef(null);
+  const sseConnectTimerRef = useRef(null);
+  const sseLiveRef = useRef(false);
+  const applySnapshotRef = useRef(() => false);
 
   useEffect(() => {
     pricesRef.current = prices;
   }, [prices]);
 
   useEffect(() => {
-    const storedPrices = readStoredMarketPulse();
-    if (storedPrices) {
-      setPrices((current) => ({ ...current, ...storedPrices }));
-      setLiveFeedStatus(hasKnownMarketPrice(storedPrices) ? "stale" : "connecting");
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
+    mountedRef.current = true;
 
     const clearPollTimer = () => {
       if (pollTimerRef.current) {
@@ -85,14 +125,29 @@ export function useMarketPulseStream() {
       }
     };
 
-    const clearReconnectTimer = () => {
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
+    const clearRetryTimer = () => {
+      if (retryTimerRef.current) {
+        window.clearInterval(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+
+    const clearStreamRetryTimer = () => {
+      if (streamRetryTimerRef.current) {
+        window.clearTimeout(streamRetryTimerRef.current);
+        streamRetryTimerRef.current = null;
+      }
+    };
+
+    const clearSseConnectTimer = () => {
+      if (sseConnectTimerRef.current) {
+        window.clearTimeout(sseConnectTimerRef.current);
+        sseConnectTimerRef.current = null;
       }
     };
 
     const closeEventSource = () => {
+      clearSseConnectTimer();
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -100,66 +155,103 @@ export function useMarketPulseStream() {
     };
 
     const applySnapshot = (snapshot) => {
-      if (cancelled || !snapshot?.prices) return;
+      if (!mountedRef.current || !snapshot?.prices) return false;
 
-      setPrices((current) => {
-        const next = { ...current, ...snapshot.prices };
-        writeStoredMarketPulse(next);
-        pricesRef.current = next;
-        return next;
+      const next = normalizeMarketPrices(snapshot.prices);
+      const nextStatus = mapSnapshotToStatus(snapshot, next);
+
+      flushSync(() => {
+        setPrices(next);
+        setLiveFeedStatus(nextStatus);
       });
 
-      setLiveFeedStatus(mapSnapshotToStatus(snapshot, snapshot.prices));
+      pricesRef.current = next;
+      writeStoredMarketPulse(next);
+      return hasKnownMarketPrice(next);
     };
+
+    applySnapshotRef.current = applySnapshot;
+
+    const stored = readStoredMarketPulse();
+    if (stored) {
+      const next = normalizeMarketPrices(stored);
+      flushSync(() => {
+        setPrices(next);
+        setLiveFeedStatus(hasKnownMarketPrice(next) ? "stale" : "connecting");
+      });
+      pricesRef.current = next;
+    }
 
     const bootstrapFromApi = async () => {
       try {
-        const response = await fetchWithTimeout("/api/market-pulse", { cache: "no-store" }, 5000);
+        const response = await fetchWithTimeout(
+          `/api/market-pulse?_=${Date.now()}`,
+          { cache: "no-store", credentials: "omit" },
+          5000
+        );
         const result = await response.json().catch(() => null);
 
-        if (cancelled || !response.ok || !result?.success || !result?.prices) return;
+        if (!mountedRef.current || !response.ok || !result?.success || !result?.prices) {
+          return false;
+        }
 
-        applySnapshot({
+        return applySnapshot({
           prices: result.prices,
           status: result.stale ? "stale" : "live",
+          stale: Boolean(result.stale),
         });
       } catch {
-        // Silent fallback; stream or cached values remain available.
+        return false;
       }
     };
 
     const startPollFallback = () => {
-      if (pollTimerRef.current || cancelled) return;
+      if (pollTimerRef.current || !mountedRef.current) return;
 
       pollTimerRef.current = window.setInterval(() => {
         void bootstrapFromApi();
-      }, 8000);
+      }, POLL_FALLBACK_MS);
     };
 
-    const scheduleReconnect = () => {
-      if (cancelled) return;
+    const markSseLive = () => {
+      sseLiveRef.current = true;
+      clearSseConnectTimer();
+      clearStreamRetryTimer();
+      clearPollTimer();
 
-      clearReconnectTimer();
+      if (hasKnownMarketPrice(pricesRef.current)) {
+        flushSync(() => {
+          setLiveFeedStatus("live");
+        });
+      }
+    };
 
-      const delays = [1000, 3000, 5000, 10000];
-      const delay = delays[Math.min(reconnectAttemptRef.current, delays.length - 1)];
-      reconnectAttemptRef.current += 1;
+    const scheduleStreamRetry = () => {
+      clearStreamRetryTimer();
+      if (!mountedRef.current || sseLiveRef.current) return;
 
-      setLiveFeedStatus(
-        hasKnownMarketPrice(pricesRef.current)
-          ? "stale"
-          : reconnectAttemptRef.current >= delays.length
-            ? "offline"
-            : "retrying"
-      );
+      streamRetryTimerRef.current = window.setTimeout(() => {
+        if (mountedRef.current && !sseLiveRef.current) {
+          connectStream();
+        }
+      }, SSE_RETRY_MS);
+    };
 
-      reconnectTimerRef.current = window.setTimeout(() => {
-        connectStream();
-      }, delay);
+    const handleSseFailure = () => {
+      closeEventSource();
+      sseLiveRef.current = false;
+
+      if (hasKnownMarketPrice(pricesRef.current)) {
+        flushSync(() => {
+          setLiveFeedStatus("stale");
+        });
+      }
+
+      scheduleStreamRetry();
     };
 
     const connectStream = () => {
-      if (cancelled) return;
+      if (!mountedRef.current) return;
 
       if (typeof EventSource === "undefined") {
         startPollFallback();
@@ -167,45 +259,78 @@ export function useMarketPulseStream() {
       }
 
       closeEventSource();
+      sseLiveRef.current = false;
 
       const source = new EventSource("/api/market-stream");
       eventSourceRef.current = source;
+      let receivedData = false;
 
-      source.onopen = () => {
-        reconnectAttemptRef.current = 0;
-        clearPollTimer();
-        setLiveFeedStatus((current) =>
-          hasKnownMarketPrice(pricesRef.current) ? "live" : current
-        );
-      };
+      sseConnectTimerRef.current = window.setTimeout(() => {
+        if (!mountedRef.current || receivedData) return;
+        handleSseFailure();
+      }, SSE_CONNECT_TIMEOUT_MS);
 
       source.onmessage = (event) => {
+        if (!mountedRef.current || !event?.data) return;
+
         try {
           const payload = JSON.parse(event.data);
-          applySnapshot(payload);
+          if (!payload?.prices) return;
+
+          receivedData = true;
+          const hasPrices = applySnapshotRef.current(payload);
+
+          if (hasPrices) {
+            markSseLive();
+          }
         } catch {
           // Ignore malformed SSE payloads.
         }
       };
 
       source.onerror = () => {
-        closeEventSource();
-        startPollFallback();
-        scheduleReconnect();
+        if (!mountedRef.current) return;
+        handleSseFailure();
       };
     };
 
-    void bootstrapFromApi().finally(() => {
-      if (!cancelled) {
-        connectStream();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible" || !mountedRef.current) return;
+      void bootstrapFromApi();
+    };
+
+    const handleSessionReady = () => {
+      void bootstrapFromApi();
+    };
+
+    void bootstrapFromApi();
+
+    retryTimerRef.current = window.setInterval(() => {
+      if (!mountedRef.current || hasKnownMarketPrice(pricesRef.current)) {
+        clearRetryTimer();
+        return;
       }
+
+      void bootstrapFromApi();
+    }, BOOTSTRAP_RETRY_MS);
+
+    const cancelPageLoadSchedule = scheduleAfterPageLoad(() => {
+      if (!mountedRef.current) return;
+      connectStream();
     });
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("hc:session-ready", handleSessionReady);
+
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
+      cancelPageLoadSchedule();
       clearPollTimer();
-      clearReconnectTimer();
+      clearRetryTimer();
+      clearStreamRetryTimer();
       closeEventSource();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("hc:session-ready", handleSessionReady);
     };
   }, []);
 

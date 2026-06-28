@@ -10,7 +10,7 @@ import { useAuth } from "../components/AuthProvider";
 const FALLBACK_POLL_MS = 60000;
 const TOAST_TTL_MS = 6500;
 const TOAST_GAP_MS = 450;
-const INITIAL_SYNC_DELAY_MS = 2000;
+const INITIAL_SYNC_DELAY_MS = 0;
 const FETCH_TIMEOUT_MS = 5000;
 
 function createToastId() {
@@ -326,6 +326,7 @@ export function useSiteNotifications() {
     }
 
     if (!userEmail) {
+      setLoading(false);
       stopFallbackPolling();
       return;
     }

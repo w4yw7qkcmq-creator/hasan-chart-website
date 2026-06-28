@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAdminUser } from "../../lib/admin-emails";
+import { applyClientSession } from "../../lib/auth-session-client";
 import { useAppModal } from "../components/AppModalProvider";
 import { useAuth } from "../components/AuthProvider";
 
@@ -112,7 +113,7 @@ const verifyTurnstileToken = async (token) => {
 export default function LoginPage() {
   const router = useRouter();
   const { showAppModal } = useAppModal();
-  const { authResolved, user } = useAuth();
+  const { authResolved, user, acknowledgeSignIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
@@ -242,40 +243,25 @@ export default function LoginPage() {
         ? "/admin"
         : "/my-dashboard";
 
-      console.log("[LOGIN] before router.replace", { destination });
+      const applied = await applyClientSession(data.session);
 
-      router.replace(destination);
-
-      console.log("[LOGIN] before sync-session (background)");
-
-      void fetch("/api/auth/sync-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-          expires_in: data.session.expires_in,
-        }),
-      })
-        .then(async (response) => {
-          if (response.ok) {
-            console.log("[LOGIN] after sync-session", { ok: true });
-            return;
-          }
-
-          const payload = await response.json().catch(() => ({}));
-          console.warn("[LOGIN] after sync-session", {
-            ok: false,
-            error: payload?.error || `HTTP ${response.status}`,
-          });
-        })
-        .catch((syncError) => {
-          console.warn("[LOGIN] after sync-session", {
-            ok: false,
-            error: syncError?.message || String(syncError),
-          });
+      if (!applied.ok || !applied.user) {
+        showAppModal({
+          type: "error",
+          title: "فشل تسجيل الدخول",
+          message: "تعذر تفعيل الجلسة بعد تسجيل الدخول. جرّب مرة ثانية.",
         });
+        setTurnstileToken("");
+        if (window.turnstile && turnstileWidgetId.current !== null) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+        return;
+      }
+
+      acknowledgeSignIn(applied.user);
+
+      router.refresh();
+      router.replace(destination);
     } catch (err) {
       console.log("[LOGIN] catch", err);
 

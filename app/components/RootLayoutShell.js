@@ -16,6 +16,7 @@ import {
 import { useAppModal } from "./AppModalProvider";
 import { useAuth } from "./AuthProvider";
 import { useBootstrapLoadingOverlay } from "../hooks/useBootstrapLoadingOverlay";
+import { useClientMounted } from "../hooks/useClientMounted";
 import { NotificationBell } from "./notifications/NotificationBell";
 import { useNotifications } from "./notifications/NotificationProvider";
 import { useTheme } from "./ThemeProvider";
@@ -190,6 +191,20 @@ function AdminMenuSection({ authResolved, isAdmin, onNavigate, variant = "deskto
   );
 }
 
+function resolveThemeToggleLabel(theme, { compact = false, mobile = false } = {}) {
+  const isLight = theme === "light";
+
+  if (mobile) {
+    return isLight ? "🌙 تفعيل الوضع الليلي" : "☀️ تفعيل الوضع النهاري";
+  }
+
+  if (compact) {
+    return isLight ? "🌙 ليلي" : "☀️ نهاري";
+  }
+
+  return isLight ? "🌙 الوضع الليلي" : "☀️ الوضع النهاري";
+}
+
 function RootLayoutShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -201,7 +216,22 @@ function RootLayoutShell({ children }) {
   const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { unreadAnalysisCount } = useNotifications();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, initialTheme, toggleTheme } = useTheme();
+  const mounted = useClientMounted();
+  const shellUser = mounted ? currentUser : null;
+  const shellAuthResolved = mounted ? authResolved : false;
+  const shellNotificationPermission = mounted ? notificationPermission : "default";
+  const shellWebPushEnabled = mounted ? webPushEnabled : false;
+  const shellIsAdmin = mounted ? isAdmin : false;
+  const shellUnreadAnalysisCount = mounted ? unreadAnalysisCount : 0;
+  const shellThemeLabelSource = mounted ? theme : initialTheme;
+  const mobileThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { mobile: true });
+  const sidebarThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource);
+  const headerThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { compact: true });
+  const browserNotificationLabel =
+    shellNotificationPermission === "granted" && shellWebPushEnabled
+      ? "🔔 إشعارات المتصفح مفعلة"
+      : "🔔 تفعيل إشعارات المتصفح";
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
     useBootstrapLoadingOverlay(authResolved, { enabled: !isAuthPage });
@@ -483,7 +513,7 @@ function RootLayoutShell({ children }) {
           }
         )
         .subscribe();
-    }, 2500);
+    }, 0);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -629,16 +659,16 @@ function RootLayoutShell({ children }) {
                     <SidebarMenuItem
                       key={item.href}
                       item={item}
-                      state={resolveMenuItemState(item, authResolved, currentUser)}
-                      unreadAnalysisCount={unreadAnalysisCount}
+                      state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                      unreadAnalysisCount={shellUnreadAnalysisCount}
                       onNavigate={() => setMobileMenuOpen(false)}
                       variant="mobile"
                     />
                   ))}
 
                   <AdminMenuSection
-                    authResolved={authResolved}
-                    isAdmin={isAdmin}
+                    authResolved={shellAuthResolved}
+                    isAdmin={shellIsAdmin}
                     onNavigate={() => setMobileMenuOpen(false)}
                     variant="mobile"
                   />
@@ -649,7 +679,7 @@ function RootLayoutShell({ children }) {
                     onClick={toggleTheme}
                     className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
                   >
-                    {theme === "light" ? "🌙 تفعيل الوضع الليلي" : "☀️ تفعيل الوضع النهاري"}
+                    {mobileThemeLabel}
                   </button>
 
                   <button
@@ -659,20 +689,18 @@ function RootLayoutShell({ children }) {
                     }}
                     className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
                   >
-                    {notificationPermission === "granted" && webPushEnabled
-                      ? "🔔 إشعارات المتصفح مفعلة"
-                      : "🔔 تفعيل إشعارات المتصفح"}
+                    {browserNotificationLabel}
                   </button>
 
-                  {currentUser ? (
+                  {shellUser ? (
                     <>
                       <Link href="/my-dashboard" onClick={() => setMobileMenuOpen(false)} className="mb-4 flex items-center gap-3">
                         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-300 font-black shadow-[0_0_25px_rgba(0,163,255,0.35)]">
-                          {(currentUser.username || currentUser.email || "U").slice(0, 2).toUpperCase()}
+                          {(shellUser.username || shellUser.email || "U").slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate font-bold">{currentUser.username || "حسابي"}</p>
-                          <p className="truncate text-xs text-cyan-100/50">{currentUser.email}</p>
+                          <p className="truncate font-bold">{shellUser.username || "حسابي"}</p>
+                          <p className="truncate text-xs text-cyan-100/50">{shellUser.email}</p>
                         </div>
                       </Link>
                       <button onClick={logoutAndRedirect} className="w-full rounded-2xl border border-red-400/20 bg-red-500/15 px-4 py-3 font-black text-red-100 transition hover:bg-red-500/25">تسجيل الخروج</button>
@@ -703,13 +731,13 @@ function RootLayoutShell({ children }) {
                 <SidebarMenuItem
                   key={item.href}
                   item={item}
-                  state={resolveMenuItemState(item, authResolved, currentUser)}
-                  unreadAnalysisCount={unreadAnalysisCount}
+                  state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                  unreadAnalysisCount={shellUnreadAnalysisCount}
                   variant="desktop"
                 />
               ))}
 
-              <AdminMenuSection authResolved={authResolved} isAdmin={isAdmin} variant="desktop" />
+              <AdminMenuSection authResolved={shellAuthResolved} isAdmin={shellIsAdmin} variant="desktop" />
 
               <details className="group/contact rounded-[18px] border border-cyan-300/15 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <summary className="flex min-h-[54px] cursor-pointer list-none items-center gap-3 rounded-[18px] px-4 py-3 text-white transition hover:-translate-x-1 hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10">
@@ -740,18 +768,18 @@ function RootLayoutShell({ children }) {
                 onClick={toggleTheme}
                 className="mb-3 w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
               >
-                {theme === "light" ? "🌙 الوضع الليلي" : "☀️ الوضع النهاري"}
+                {sidebarThemeLabel}
               </button>
 
-              {currentUser ? (
+              {shellUser ? (
                 <>
                   <Link href="/my-dashboard" className="flex items-center gap-3 mb-4">
                     <div className="h-11 w-11 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-600 to-cyan-300 font-black shadow-[0_0_25px_rgba(0,163,255,0.35)]">
-                      {(currentUser.username || currentUser.email || "U").slice(0, 2).toUpperCase()}
+                      {(shellUser.username || shellUser.email || "U").slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold truncate">{currentUser.username || "حسابي"}</p>
-                      <p className="text-xs text-cyan-100/50 truncate">{currentUser.email}</p>
+                      <p className="font-bold truncate">{shellUser.username || "حسابي"}</p>
+                      <p className="text-xs text-cyan-100/50 truncate">{shellUser.email}</p>
                     </div>
                   </Link>
                   <button onClick={logoutAndRedirect} className="w-full rounded-2xl bg-red-500/15 border border-red-400/20 px-4 py-3 text-red-100 font-black hover:bg-red-500/25 transition">تسجيل الخروج</button>
@@ -784,28 +812,26 @@ function RootLayoutShell({ children }) {
                     void enableBrowserNotifications();
                   }}
                   className={`inline-flex rounded-2xl px-4 py-2 text-sm font-black transition ${
-                    notificationPermission === "granted" && webPushEnabled
+                    shellNotificationPermission === "granted" && shellWebPushEnabled
                       ? "border border-cyan-200/60 bg-gradient-to-l from-cyan-500/90 to-blue-600/90 text-white shadow-[0_0_24px_rgba(34,211,238,0.22)] hover:brightness-110"
                       : "border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
                   }`}
                 >
-                  {notificationPermission === "granted" && webPushEnabled
-                    ? "🔔 إشعارات المتصفح مفعلة"
-                    : "🔔 تفعيل إشعارات المتصفح"}
+                  {browserNotificationLabel}
                 </button>
 
-                {currentUser ? <NotificationBell className="relative shrink-0" /> : null}
+                {shellUser ? <NotificationBell className="relative shrink-0" /> : null}
 
                 <button
                   onClick={toggleTheme}
                   className="hidden rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20 md:inline-flex"
                 >
-                  {theme === "light" ? "🌙 ليلي" : "☀️ نهاري"}
+                  {headerThemeLabel}
                 </button>
 
-                {currentUser ? (
+                {shellUser ? (
                   <div className="hidden sm:flex items-center gap-3">
-                    <Link href="/my-dashboard" className="topUserChip">{currentUser.username || currentUser.email || "حسابي"}</Link>
+                    <Link href="/my-dashboard" className="topUserChip">{shellUser.username || shellUser.email || "حسابي"}</Link>
                     <button onClick={logoutAndRedirect} className="topLogoutBtn">تسجيل الخروج</button>
                   </div>
                 ) : (
