@@ -28,9 +28,27 @@ const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-24-v7-single-sender-worker";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-28-v8-thirty-second-check";
+const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
+const PRICE_ALERT_CHECK_CLAMP_ABOVE_MS = 60_000;
 
-const CHECK_INTERVAL_MS = 12000;
+function resolvePriceAlertCheckIntervalMs(rawValue) {
+  let intervalMs = Number(rawValue);
+
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+    intervalMs = MIN_PRICE_ALERT_CHECK_INTERVAL_MS;
+  }
+
+  if (intervalMs > PRICE_ALERT_CHECK_CLAMP_ABOVE_MS) {
+    intervalMs = MIN_PRICE_ALERT_CHECK_INTERVAL_MS;
+  }
+
+  return Math.max(intervalMs, MIN_PRICE_ALERT_CHECK_INTERVAL_MS);
+}
+
+const CHECK_INTERVAL_MS = resolvePriceAlertCheckIntervalMs(
+  process.env.PRICE_ALERT_CHECK_INTERVAL_MS
+);
 const MAX_ALERTS_PER_RUN = 20;
 
 const app = express();
