@@ -191,10 +191,22 @@ async function sendPriceAlertPushNotifications({
       error: "MISSING_ALERT_RECIPIENT",
     });
 
-    return { sent: 0, failed: 1, skipped: 0 };
+    return { sent: 0, failed: 0, skipped: 1, skipReason: "MISSING_ALERT_RECIPIENT" };
   }
 
   if (!configureWebPush()) {
+    console.log("alert:push:skipped", {
+      alertId,
+      email: normalizedEmail || null,
+      userId: resolvedUserId,
+      reason: "WEB_PUSH_NOT_CONFIGURED",
+      missingEnv: {
+        hasPublicKey: Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()),
+        hasPrivateKey: Boolean(process.env.VAPID_PRIVATE_KEY?.trim()),
+        hasSubject: Boolean(process.env.VAPID_SUBJECT?.trim()),
+      },
+    });
+
     logPriceAlertPushFailed(workerEntry, {
       alertId,
       email: normalizedEmail || null,
@@ -210,7 +222,7 @@ async function sendPriceAlertPushNotifications({
       },
     });
 
-    return { sent: 0, failed: 1, skipped: 0 };
+    return { sent: 0, failed: 0, skipped: 1, skipReason: "WEB_PUSH_NOT_CONFIGURED" };
   }
 
   if (!resolvedUserId && normalizedEmail) {
@@ -265,6 +277,13 @@ async function sendPriceAlertPushNotifications({
   });
 
   if (subscriptionList.length === 0) {
+    console.log("alert:push:skipped", {
+      alertId,
+      email: normalizedEmail || null,
+      userId: resolvedUserId,
+      reason: "NO_PUSH_SUBSCRIPTIONS",
+    });
+
     logPriceAlertPushFailed(workerEntry, {
       alertId,
       email: normalizedEmail || null,
@@ -275,7 +294,7 @@ async function sendPriceAlertPushNotifications({
       error: "NO_PUSH_SUBSCRIPTIONS",
     });
 
-    return { sent: 0, failed: 0, skipped: 1 };
+    return { sent: 0, failed: 0, skipped: 1, skipReason: "NO_PUSH_SUBSCRIPTIONS" };
   }
 
   const payload = {
@@ -341,7 +360,7 @@ async function sendPriceAlertPushNotifications({
     }
   }
 
-  return { sent, failed, skipped: 0 };
+  return { sent, failed, skipped: 0, skipReason: failed > 0 ? "WEB_PUSH_SEND_FAILED" : null };
 }
 
 module.exports = {

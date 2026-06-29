@@ -1,3 +1,4 @@
+require("dotenv").config({ path: require("path").join(__dirname, "../.env.local") });
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -28,7 +29,7 @@ const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-28-v8-thirty-second-check";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v9-post-email-notifications";
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
 const PRICE_ALERT_CHECK_CLAMP_ABOVE_MS = 60_000;
 
@@ -106,6 +107,47 @@ const buildPriceAlertPushBody = ({ coin, targetPrice, currentPrice }) => {
   ].join(" | ");
 };
 
+function logAlertDispatch(event, payload = {}) {
+  console.log(event, {
+    worker: WORKER_ENTRY,
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    ts: new Date().toISOString(),
+    ...payload,
+  });
+}
+
+async function createSiteNotificationAfterEmail({ alertId, email, notificationMessage }) {
+  const { data: notificationRow, error: notificationError } = await createUserNotification(
+    supabase,
+    {
+      userEmail: email,
+      title: "🔔 وصل السعر إلى هدف التنبيه",
+      message: notificationMessage,
+      type: "price-alert",
+    }
+  );
+
+  if (notificationError) {
+    logAlertDispatch("alert:notification:error", {
+      phase: "site-notification",
+      alertId,
+      email,
+      error: notificationError.message,
+    });
+
+    return { success: false, error: notificationError };
+  }
+
+  logAlertDispatch("alert:site-notification:created", {
+    alertId,
+    email,
+    notificationId: notificationRow?.id || null,
+    type: "price-alert",
+  });
+
+  return { success: true, data: notificationRow };
+}
+
 async function doPushForAlertOwner({
   alertId,
   email,
@@ -137,28 +179,48 @@ async function doPushForAlertOwner({
     });
 
     if ((stats?.sent || 0) > 0) {
-      console.log("PRICE_ALERT_PUSH_SENT", {
+      logAlertDispatch("alert:push:sent", {
         alertId,
         email,
         userId: userId || null,
         source,
-        stats,
+        sent: stats.sent,
+        failed: stats.failed || 0,
+        skipped: stats.skipped || 0,
+      });
+    } else if ((stats?.skipped || 0) > 0) {
+      logAlertDispatch("alert:push:skipped", {
+        alertId,
+        email,
+        userId: userId || null,
+        source,
+        reason: stats.skipReason || "PUSH_SKIPPED",
+        sent: stats.sent || 0,
+        failed: stats.failed || 0,
+        skipped: stats.skipped || 0,
+      });
+    } else if ((stats?.failed || 0) > 0) {
+      logAlertDispatch("alert:notification:error", {
+        phase: "web-push",
+        alertId,
+        email,
+        userId: userId || null,
+        source,
+        reason: stats.skipReason || "WEB_PUSH_SEND_FAILED",
+        sent: stats.sent || 0,
+        failed: stats.failed || 0,
+        skipped: stats.skipped || 0,
       });
     }
 
     return stats;
   } catch (pushError) {
-    console.log("PRICE_ALERT_PUSH_FAILED", pushError);
-    logWorkerEvent("PRICE_ALERT_PUSH_FAILED", {
-      worker: WORKER_ENTRY,
-      success: false,
+    logAlertDispatch("alert:notification:error", {
+      phase: "web-push",
       alertId,
       email,
       userId: userId || null,
       source,
-      message: pushError?.message || String(pushError),
-      statusCode: pushError?.statusCode || null,
-      body: pushError?.body || null,
       error: pushError?.message || String(pushError),
     });
 
@@ -808,6 +870,7 @@ const sendTriggeredAlertEmail = async ({
   currentPrice,
   alertId = null,
   userId = null,
+  notificationMessage = "",
 }) => {
   const coinLabel = formatCoinPair(coin);
 
@@ -922,7 +985,31 @@ const sendTriggeredAlertEmail = async ({
     resendId: data?.id || null,
   });
 
-  await doPushForAlertOwner({
+  logAlertDispatch("alert:email:sent", {
+    alertId,
+    email,
+    userId: userId || null,
+    coin: coinLabel,
+    targetPrice,
+    currentPrice,
+    resendId: data?.id || null,
+    from: PRICE_ALERT_FROM,
+  });
+
+  const siteNotification = await createSiteNotificationAfterEmail({
+    alertId,
+    email,
+    notificationMessage:
+      notificationMessage ||
+      buildPriceAlertNotificationMessage({
+        coin,
+        targetPrice,
+        currentPrice,
+        condition,
+      }),
+  });
+
+  const pushStats = await doPushForAlertOwner({
     alertId,
     email,
     userId,
@@ -938,6 +1025,8 @@ const sendTriggeredAlertEmail = async ({
     status: response.status,
     id: data?.id || null,
     data,
+    siteNotification,
+    pushStats,
   };
 };
 
@@ -1103,35 +1192,6 @@ async function checkPriceAlerts() {
           condition,
         });
 
-        const { data: notificationRow, error: notificationError } = await createUserNotification(
-          supabase,
-          {
-            userEmail,
-            title: "🔔 وصل السعر إلى هدف التنبيه",
-            message: notificationMessage,
-            type: "price-alert",
-          }
-        );
-
-        if (notificationError) {
-          logWorkerEvent("ALERT_NOTIFICATION_CREATED", {
-            worker: WORKER_ENTRY,
-            alertId: alert.id,
-            email: userEmail,
-            success: false,
-            error: notificationError.message,
-          });
-        } else {
-          summary.notificationsCreated += 1;
-          logWorkerEvent("ALERT_NOTIFICATION_CREATED", {
-            worker: WORKER_ENTRY,
-            alertId: alert.id,
-            email: userEmail,
-            notificationId: notificationRow?.id || null,
-            success: true,
-          });
-        }
-
         emailJobs.push({
           to: userEmail,
           alertId: alert.id,
@@ -1144,6 +1204,7 @@ async function checkPriceAlerts() {
               currentPrice,
               alertId: alert.id,
               userId: alert.user_id || null,
+              notificationMessage,
             }),
         });
 
