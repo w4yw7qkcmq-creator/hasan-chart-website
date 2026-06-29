@@ -1,30 +1,37 @@
 const webpush = require("web-push");
 const { logWorkerEvent } = require("./alert-logger");
+const { getVapidEnv, getVapidEnvStatus } = require("./push-vapid-env");
 
 let configured = false;
 
 const SUBSCRIPTION_COLUMNS =
-  "id, endpoint, p256dh, auth, email, anonymous_id, user_id";
+  "id, endpoint, p256dh, auth, email, anonymous_id, user_id, created_at, updated_at";
 
 function isWebPushConfigured() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() &&
-      process.env.VAPID_PRIVATE_KEY?.trim() &&
-      process.env.VAPID_SUBJECT?.trim()
-  );
+  return getVapidEnvStatus().configured;
+}
+
+function logPushEvent(event, payload = {}) {
+  console.log(event, {
+    ts: new Date().toISOString(),
+    ...payload,
+  });
 }
 
 function configureWebPush() {
-  if (configured || !isWebPushConfigured()) {
-    return configured;
+  if (configured) {
+    return true;
   }
 
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT.trim(),
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY.trim(),
-    process.env.VAPID_PRIVATE_KEY.trim()
-  );
+  if (!isWebPushConfigured()) {
+    const status = getVapidEnvStatus();
+    logPushEvent("push:vapid:missing", status);
+    return false;
+  }
 
+  const { publicKey, privateKey, subject } = getVapidEnv();
+
+  webpush.setVapidDetails(subject, publicKey, privateKey);
   configured = true;
   return true;
 }
@@ -59,11 +66,24 @@ async function sendWebPushNotification(subscriptionRow, payload) {
     };
   }
 
+  logPushEvent("push:send:start", {
+    subscriptionId: subscriptionRow.id,
+    endpointPrefix: String(subscriptionRow.endpoint || "").slice(0, 72),
+    title: payload?.title || null,
+    tag: payload?.tag || null,
+  });
+
   try {
     const response = await webpush.sendNotification(
       toWebPushSubscription(subscriptionRow),
       JSON.stringify(payload)
     );
+
+    logPushEvent("push:send:success", {
+      subscriptionId: subscriptionRow.id,
+      endpointPrefix: String(subscriptionRow.endpoint || "").slice(0, 72),
+      statusCode: response?.statusCode || 201,
+    });
 
     return {
       success: true,
@@ -73,6 +93,13 @@ async function sendWebPushNotification(subscriptionRow, payload) {
     };
   } catch (error) {
     const formatted = formatPushError(error);
+
+    logPushEvent("push:send:error", {
+      subscriptionId: subscriptionRow.id,
+      endpointPrefix: String(subscriptionRow.endpoint || "").slice(0, 72),
+      statusCode: formatted.statusCode || null,
+      message: formatted.message || formatted.body || "WEB_PUSH_SEND_FAILED",
+    });
 
     return {
       success: false,
@@ -108,26 +135,6 @@ async function findPushSubscriptionsForRecipient(
 ) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedUserId = String(userId || "").trim();
-  const seenIds = new Set();
-  const rows = [];
-
-  const collectRows = (data) => {
-    for (const row of data || []) {
-      if (!row?.id || seenIds.has(row.id)) continue;
-      seenIds.add(row.id);
-      rows.push(row);
-    }
-  };
-
-  if (normalizedEmail) {
-    const { data, error } = await supabase
-      .from("push_subscriptions")
-      .select(SUBSCRIPTION_COLUMNS)
-      .ilike("email", normalizedEmail);
-
-    if (error) throw error;
-    collectRows(data);
-  }
 
   if (normalizedUserId) {
     const { data, error } = await supabase
@@ -136,10 +143,37 @@ async function findPushSubscriptionsForRecipient(
       .eq("user_id", normalizedUserId);
 
     if (error) throw error;
-    collectRows(data);
+
+    if ((data || []).length > 0) {
+      return { rows: data, foundBy: "user_id" };
+    }
   }
 
-  return rows;
+  if (normalizedEmail) {
+    const { data, error } = await supabase
+      .from("push_subscriptions")
+      .select(SUBSCRIPTION_COLUMNS)
+      .eq("email", normalizedEmail);
+
+    if (error) throw error;
+
+    if ((data || []).length > 0) {
+      return { rows: data, foundBy: "email" };
+    }
+
+    const { data: ilikeRows, error: ilikeError } = await supabase
+      .from("push_subscriptions")
+      .select(SUBSCRIPTION_COLUMNS)
+      .ilike("email", normalizedEmail);
+
+    if (ilikeError) throw ilikeError;
+
+    if ((ilikeRows || []).length > 0) {
+      return { rows: ilikeRows, foundBy: "email" };
+    }
+  }
+
+  return { rows: [], foundBy: null };
 }
 
 function logPriceAlertPushFailed(workerEntry, payload) {
@@ -163,63 +197,34 @@ async function sendPriceAlertPushNotifications({
   const normalizedEmail = String(email || "").trim().toLowerCase();
   let resolvedUserId = String(userId || "").trim() || null;
 
-  console.log("PRICE_ALERT_PUSH_START", {
-    alertId,
-    email: normalizedEmail || null,
-    userId: resolvedUserId,
-    worker: workerEntry,
-  });
-
   logWorkerEvent("PRICE_ALERT_PUSH_START", {
     worker: workerEntry,
     alertId,
     email: normalizedEmail || null,
     userId: resolvedUserId,
     webPushConfigured: isWebPushConfigured(),
+    vapidStatus: getVapidEnvStatus(),
     title,
     bodyPreview: String(body || "").slice(0, 180),
   });
 
   if (!normalizedEmail && !resolvedUserId) {
-    logPriceAlertPushFailed(workerEntry, {
+    logPushEvent("push:subscription:not_found", {
       alertId,
       email: null,
       userId: null,
-      message: "MISSING_ALERT_RECIPIENT",
-      statusCode: null,
-      body: null,
-      error: "MISSING_ALERT_RECIPIENT",
+      reason: "MISSING_ALERT_RECIPIENT",
     });
 
     return { sent: 0, failed: 0, skipped: 1, skipReason: "MISSING_ALERT_RECIPIENT" };
   }
 
   if (!configureWebPush()) {
-    console.log("alert:push:skipped", {
+    logPushEvent("push:vapid:missing", {
       alertId,
       email: normalizedEmail || null,
       userId: resolvedUserId,
-      reason: "WEB_PUSH_NOT_CONFIGURED",
-      missingEnv: {
-        hasPublicKey: Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()),
-        hasPrivateKey: Boolean(process.env.VAPID_PRIVATE_KEY?.trim()),
-        hasSubject: Boolean(process.env.VAPID_SUBJECT?.trim()),
-      },
-    });
-
-    logPriceAlertPushFailed(workerEntry, {
-      alertId,
-      email: normalizedEmail || null,
-      userId: resolvedUserId,
-      message: "WEB_PUSH_NOT_CONFIGURED",
-      statusCode: null,
-      body: null,
-      error: "WEB_PUSH_NOT_CONFIGURED",
-      missingEnv: {
-        hasPublicKey: Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()),
-        hasPrivateKey: Boolean(process.env.VAPID_PRIVATE_KEY?.trim()),
-        hasSubject: Boolean(process.env.VAPID_SUBJECT?.trim()),
-      },
+      ...getVapidEnvStatus(),
     });
 
     return { sent: 0, failed: 0, skipped: 1, skipReason: "WEB_PUSH_NOT_CONFIGURED" };
@@ -229,72 +234,68 @@ async function sendPriceAlertPushNotifications({
     try {
       resolvedUserId = await resolveUserIdForEmail(supabase, normalizedEmail);
     } catch (error) {
-      logPriceAlertPushFailed(workerEntry, {
+      logPushEvent("push:send:error", {
         alertId,
         email: normalizedEmail,
-        userId: null,
         phase: "resolve_user_id",
         message: error?.message || "PROFILE_LOOKUP_FAILED",
-        statusCode: error?.statusCode || null,
-        body: error?.details || error?.hint || null,
-        error: error?.message || "PROFILE_LOOKUP_FAILED",
       });
 
-      return { sent: 0, failed: 1, skipped: 0 };
+      return { sent: 0, failed: 1, skipped: 0, skipReason: "PROFILE_LOOKUP_FAILED" };
     }
   }
 
-  let subscriptionList = [];
+  let subscriptionLookup = { rows: [], foundBy: null };
 
   try {
-    subscriptionList = await findPushSubscriptionsForRecipient(supabase, {
+    subscriptionLookup = await findPushSubscriptionsForRecipient(supabase, {
       email: normalizedEmail,
       userId: resolvedUserId,
     });
   } catch (error) {
-    logPriceAlertPushFailed(workerEntry, {
+    logPushEvent("push:send:error", {
       alertId,
       email: normalizedEmail || null,
       userId: resolvedUserId,
       phase: "subscription_lookup",
       message: error?.message || "SUBSCRIPTION_LOOKUP_FAILED",
-      statusCode: error?.statusCode || null,
-      body: error?.details || error?.hint || null,
-      error: error?.message || "SUBSCRIPTION_LOOKUP_FAILED",
     });
 
-    return { sent: 0, failed: 1, skipped: 0 };
+    return { sent: 0, failed: 1, skipped: 0, skipReason: "SUBSCRIPTION_LOOKUP_FAILED" };
   }
 
-  logWorkerEvent("PRICE_ALERT_PUSH_START", {
-    worker: workerEntry,
-    alertId,
-    email: normalizedEmail || null,
-    userId: resolvedUserId,
-    subscriptionCount: subscriptionList.length,
-    subscriptionIds: subscriptionList.map((row) => row.id),
-    phase: "subscriptions_loaded",
-  });
+  const subscriptionList = subscriptionLookup.rows || [];
 
   if (subscriptionList.length === 0) {
-    console.log("alert:push:skipped", {
+    logPushEvent("push:subscription:not_found", {
       alertId,
       email: normalizedEmail || null,
-      userId: resolvedUserId,
+      userId: resolvedUserId || null,
       reason: "NO_PUSH_SUBSCRIPTIONS",
-    });
-
-    logPriceAlertPushFailed(workerEntry, {
-      alertId,
-      email: normalizedEmail || null,
-      userId: resolvedUserId,
-      message: "NO_PUSH_SUBSCRIPTIONS",
-      statusCode: null,
-      body: null,
-      error: "NO_PUSH_SUBSCRIPTIONS",
+      hint: "User must click enable browser notifications while logged in so email/user_id are saved in push_subscriptions",
     });
 
     return { sent: 0, failed: 0, skipped: 1, skipReason: "NO_PUSH_SUBSCRIPTIONS" };
+  }
+
+  if (subscriptionLookup.foundBy === "user_id") {
+    logPushEvent("push:subscription:found_by_user_id", {
+      alertId,
+      email: normalizedEmail || null,
+      userId: resolvedUserId || null,
+      count: subscriptionList.length,
+      subscriptionIds: subscriptionList.map((row) => row.id),
+      endpoints: subscriptionList.map((row) => String(row.endpoint || "").slice(0, 72)),
+    });
+  } else {
+    logPushEvent("push:subscription:found_by_email", {
+      alertId,
+      email: normalizedEmail || null,
+      userId: resolvedUserId || null,
+      count: subscriptionList.length,
+      subscriptionIds: subscriptionList.map((row) => row.id),
+      endpoints: subscriptionList.map((row) => String(row.endpoint || "").slice(0, 72)),
+    });
   }
 
   const payload = {
@@ -314,12 +315,6 @@ async function sendPriceAlertPushNotifications({
 
     if (outcome.success) {
       sent += 1;
-      console.log("PRICE_ALERT_PUSH_SENT", {
-        alertId,
-        email: normalizedEmail || subscriptionRow.email || null,
-        subscriptionId: subscriptionRow.id,
-        worker: workerEntry,
-      });
       logWorkerEvent("PRICE_ALERT_PUSH_SENT", {
         worker: workerEntry,
         success: true,
@@ -333,15 +328,11 @@ async function sendPriceAlertPushNotifications({
       continue;
     }
 
-    failed += 1;
+    if (outcome.skipped) {
+      continue;
+    }
 
-    console.log("PRICE_ALERT_PUSH_FAILED", {
-      alertId,
-      email: normalizedEmail || subscriptionRow.email || null,
-      message: outcome.message || outcome.error || "WEB_PUSH_SEND_FAILED",
-      statusCode: outcome.statusCode || null,
-      body: outcome.body || null,
-    });
+    failed += 1;
 
     logPriceAlertPushFailed(workerEntry, {
       alertId,
@@ -360,10 +351,16 @@ async function sendPriceAlertPushNotifications({
     }
   }
 
-  return { sent, failed, skipped: 0, skipReason: failed > 0 ? "WEB_PUSH_SEND_FAILED" : null };
+  return {
+    sent,
+    failed,
+    skipped: 0,
+    skipReason: failed > 0 ? "WEB_PUSH_SEND_FAILED" : null,
+  };
 }
 
 module.exports = {
   isWebPushConfigured,
+  getVapidEnvStatus,
   sendPriceAlertPushNotifications,
 };

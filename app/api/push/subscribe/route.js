@@ -26,6 +26,16 @@ function sanitizeRequestBody(body) {
   };
 }
 
+function logPushSubscriptionEvent(event, payload = {}) {
+  console.log(
+    event,
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      ...payload,
+    })
+  );
+}
+
 function normalizeSubscription(body) {
   const subscription = body?.subscription || body;
 
@@ -120,8 +130,14 @@ export async function POST(request) {
 
     const session = await getOptionalSessionUser();
     const anonymousId = String(body?.anonymousId || "").trim() || null;
-    const userId = session?.id || null;
-    const email = session?.email || null;
+    const bodyUserEmail = String(body?.userEmail || body?.user_email || "")
+      .trim()
+      .toLowerCase();
+    const bodyUserId = String(body?.userId || body?.user_id || "").trim() || null;
+    const userId = session?.id || bodyUserId || null;
+    const email = session?.email
+      ? String(session.email).trim().toLowerCase()
+      : bodyUserEmail || null;
 
     if (!userId && !email && !anonymousId) {
       console.error(
@@ -146,23 +162,42 @@ export async function POST(request) {
     const supabase = getSupabaseAdmin();
     const now = new Date().toISOString();
 
+    let resolvedUserId = userId;
+
+    if (email) {
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("email", email)
+        .maybeSingle();
+
+      if (profileRow?.id) {
+        resolvedUserId = profileRow.id;
+      }
+    }
+
     const row = {
       endpoint: subscription.endpoint,
       p256dh: subscription.p256dh,
       auth: subscription.auth,
-      user_id: userId,
-      email,
-      anonymous_id: anonymousId,
       updated_at: now,
     };
 
-    const { data: existingRow, error: existingError } = await supabase
+    if (resolvedUserId) row.user_id = resolvedUserId;
+    if (email) row.email = email;
+    if (anonymousId) row.anonymous_id = anonymousId;
+
+    let existingRow = null;
+    let existingLookup = "none";
+
+    const { data: existingByEndpoint, error: existingError } = await supabase
       .from("push_subscriptions")
-      .select("id")
+      .select("id, email, user_id, anonymous_id, endpoint")
       .eq("endpoint", subscription.endpoint)
       .maybeSingle();
 
     if (existingError) {
+
       console.error(
         `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
           ts: new Date().toISOString(),
@@ -189,6 +224,47 @@ export async function POST(request) {
       );
     }
 
+    if (existingByEndpoint?.id) {
+      existingRow = existingByEndpoint;
+      existingLookup = "endpoint";
+    } else if (anonymousId && (email || resolvedUserId)) {
+      const { data: existingByAnonymous, error: anonymousLookupError } =
+        await supabase
+          .from("push_subscriptions")
+          .select("id, email, user_id, anonymous_id, endpoint")
+          .eq("anonymous_id", anonymousId)
+          .or("email.is.null,user_id.is.null")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+      if (anonymousLookupError) {
+        console.error(
+          `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
+            ts: new Date().toISOString(),
+            phase: "anonymous_lookup",
+            message: anonymousLookupError.message || null,
+            details: anonymousLookupError.details || null,
+            hint: anonymousLookupError.hint || null,
+            code: anonymousLookupError.code || null,
+          })}`
+        );
+
+        return Response.json(
+          {
+            success: false,
+            error: anonymousLookupError.message || "تعذر البحث عن الاشتراك المجهول",
+          },
+          { status: 500 }
+        );
+      }
+
+      if (existingByAnonymous?.id) {
+        existingRow = existingByAnonymous;
+        existingLookup = "anonymous_id";
+      }
+    }
+
     const savePhase = existingRow?.id ? "update" : "insert";
 
     console.log(
@@ -198,6 +274,7 @@ export async function POST(request) {
         authMode: "service_role",
         supabaseHost: supabaseUrl.replace(/^https?:\/\//, "").split(".")[0] || "unknown",
         existingId: existingRow?.id || null,
+        existingLookup,
         row: {
           endpoint: maskValue(row.endpoint),
           user_id: row.user_id,
@@ -275,6 +352,20 @@ export async function POST(request) {
       );
     }
 
+    if (savePhase === "update") {
+      logPushSubscriptionEvent("push:subscription:updated", {
+        subscriptionId: savedRow.id,
+        existingLookup,
+        email: savedRow.email || null,
+        userId: savedRow.user_id || null,
+        anonymousId: savedRow.anonymous_id || null,
+        endpoint: maskValue(savedRow.endpoint),
+        sessionAttached: Boolean(session?.email),
+        bodyUserEmail: bodyUserEmail || null,
+        bodyUserId: bodyUserId || null,
+      });
+    }
+
     console.log(
       `PUSH_SUBSCRIBE_SUPABASE_INSERT_SUCCESS ${JSON.stringify({
         ts: new Date().toISOString(),
@@ -286,8 +377,43 @@ export async function POST(request) {
         anonymousId: savedRow.anonymous_id || null,
         createdAt: savedRow.created_at || null,
         updatedAt: savedRow.updated_at || null,
+        sessionAttached: Boolean(session?.email),
+        bodyUserEmail: bodyUserEmail || null,
       })}`
     );
+
+    if (anonymousId && email && resolvedUserId) {
+      const { data: linkedRows, error: backfillError } = await supabase
+        .from("push_subscriptions")
+        .update({
+          email,
+          user_id: resolvedUserId,
+          updated_at: now,
+        })
+        .eq("anonymous_id", anonymousId)
+        .or("email.is.null,user_id.is.null")
+        .select("id, endpoint, email, user_id, anonymous_id");
+
+      if (backfillError) {
+        console.warn(
+          `PUSH_SUBSCRIBE_ANONYMOUS_BACKFILL_FAILED ${JSON.stringify({
+            ts: new Date().toISOString(),
+            message: backfillError.message,
+            email,
+            anonymousId,
+          })}`
+        );
+      } else if ((linkedRows || []).length > 0) {
+        logPushSubscriptionEvent("push:subscription:linked", {
+          count: linkedRows.length,
+          email,
+          userId: resolvedUserId,
+          anonymousId,
+          subscriptionIds: linkedRows.map((item) => item.id),
+          endpoints: linkedRows.map((item) => maskValue(item.endpoint)),
+        });
+      }
+    }
 
     return Response.json({
       success: true,

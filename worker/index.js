@@ -24,12 +24,12 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const { processEmailQueue } = require("./email-queue");
 const { logWorkerEvent } = require("./alert-logger");
-const { sendPriceAlertPushNotifications } = require("./push-sender");
+const { sendPriceAlertPushNotifications, getVapidEnvStatus } = require("./push-sender");
 const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v9-post-email-notifications";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v10-web-push-diagnostics";
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
 const PRICE_ALERT_CHECK_CLAMP_ABOVE_MS = 60_000;
 
@@ -1251,6 +1251,8 @@ async function checkPriceAlerts() {
 }
 
 app.get("/health", async (_req, res) => {
+  const vapidStatus = getVapidEnvStatus();
+
   res.json({
     success: true,
     status: "online",
@@ -1259,6 +1261,8 @@ app.get("/health", async (_req, res) => {
     priceAlertsModuleVersion: PRICE_ALERTS_MODULE_VERSION,
     alertsWorker: true,
     checkIntervalMs: CHECK_INTERVAL_MS,
+    webPushConfigured: vapidStatus.configured,
+    vapidStatus,
     timestamp: new Date().toISOString(),
   });
 });
@@ -1345,6 +1349,24 @@ app.get("/api/instant-analysis/:jobId", async (req, res) => {
 });
 
 app.listen(PORT, () => {
+  const vapidStatus = getVapidEnvStatus();
+
+  if (!vapidStatus.configured) {
+    console.log("push:vapid:missing", {
+      worker: WORKER_ENTRY,
+      ...vapidStatus,
+      hint: "Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT on Railway worker",
+    });
+  } else {
+    console.log("push:vapid:ready", {
+      worker: WORKER_ENTRY,
+      hasPublicKey: vapidStatus.hasPublicKey,
+      hasPrivateKey: vapidStatus.hasPrivateKey,
+      hasSubject: vapidStatus.hasSubject,
+      subjectPreview: vapidStatus.subjectPreview,
+    });
+  }
+
   logWorkerEvent("PRICE_ALERT_WORKER_STARTED", {
     worker: WORKER_ENTRY,
     service: "hasan-chart-price-alerts-worker",
@@ -1352,11 +1374,8 @@ app.listen(PORT, () => {
     port: PORT,
     checkIntervalMs: CHECK_INTERVAL_MS,
     priceAlertsEnabled: true,
-    webPushConfigured: Boolean(
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY &&
-        process.env.VAPID_PRIVATE_KEY &&
-        process.env.VAPID_SUBJECT
-    ),
+    webPushConfigured: vapidStatus.configured,
+    vapidStatus,
     note: "Price alert email + Web Push are sent from worker/index.js sendTriggeredAlertEmail",
   });
 

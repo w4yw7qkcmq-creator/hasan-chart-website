@@ -280,6 +280,8 @@ function RootLayoutShell({ children }) {
     const requestBody = {
       subscription: payload,
       anonymousId,
+      userEmail: currentUser?.email ? String(currentUser.email).trim().toLowerCase() : null,
+      userId: currentUser?.id ? String(currentUser.id).trim() : null,
     };
 
     console.log("PUSH_SUBSCRIBE_CLIENT_FETCH_START");
@@ -402,17 +404,28 @@ function RootLayoutShell({ children }) {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     if (!("Notification" in window) || Notification.permission !== "granted") return undefined;
+    if (!authResolved || !currentUser?.email || !currentUser?.id) return undefined;
 
     let active = true;
 
     const cancelDeferred = scheduleAfterPaint(() => {
       if (!active) return;
 
+      console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN", {
+        email: currentUser.email,
+        userId: currentUser.id,
+      });
+
       savePushSubscription()
         .then((saved) => {
           if (!active) return;
           if (saved?.apiCalled && saved?.subscription?.id) {
             setWebPushEnabled(true);
+            console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN_DONE", {
+              subscriptionId: saved.subscription.id,
+              email: saved.subscription.email || currentUser.email,
+              userId: saved.subscription.user_id || currentUser.id,
+            });
           }
         })
         .catch((err) => {
@@ -427,7 +440,7 @@ function RootLayoutShell({ children }) {
       active = false;
       cancelDeferred();
     };
-  }, [currentUser?.email]);
+  }, [authResolved, currentUser?.email, currentUser?.id]);
 
   const refreshCurrentUserSubscription = useCallback(async () => {
     if (!currentUser?.email || (typeof document !== "undefined" && document.hidden)) {
