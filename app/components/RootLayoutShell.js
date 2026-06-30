@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
+import { resolveSupabaseAuthUser } from "../../lib/auth-session-client";
 import { supabase } from "../../lib/supabase";
 import {
   ensureServiceWorkerRegistration,
@@ -253,7 +254,26 @@ function RootLayoutShell({ children }) {
   }, []);
 
   const savePushSubscription = async () => {
-    console.log("PUSH_SAVE_SUBSCRIPTION_START");
+    console.log(
+      "push:client:start",
+      JSON.stringify({
+        phase: "savePushSubscription",
+      })
+    );
+
+    const { user: authUser, error: authError } = await resolveSupabaseAuthUser();
+
+    if (authError || !authUser?.id || !authUser?.email) {
+      console.error(
+        "push:api:error",
+        JSON.stringify({
+          phase: "client",
+          reason: "MISSING_AUTH_USER",
+          authError: authError?.message || null,
+        })
+      );
+      throw new Error("يجب تسجيل الدخول قبل حفظ اشتراك الإشعارات");
+    }
 
     let subscription;
 
@@ -261,8 +281,11 @@ function RootLayoutShell({ children }) {
       subscription = await subscribeToWebPush();
     } catch (error) {
       console.error(
-        "PUSH_SUBSCRIBE_WEB_PUSH_FAILED",
-        error?.message || String(error)
+        "push:api:error",
+        JSON.stringify({
+          phase: "web_push_subscribe",
+          message: error?.message || String(error),
+        })
       );
       throw new Error(
         error?.message || "تعذر إنشاء اشتراك Web Push من المتصفح"
@@ -279,8 +302,8 @@ function RootLayoutShell({ children }) {
     const result = await savePushSubscriptionViaApi({
       subscription: payload,
       anonymousId,
-      userEmail: currentUser?.email ? String(currentUser.email).trim().toLowerCase() : null,
-      userId: currentUser?.id ? String(currentUser.id).trim() : null,
+      userEmail: String(authUser.email).trim().toLowerCase(),
+      userId: String(authUser.id).trim(),
     });
 
     setStoredPushEndpoint(payload.endpoint);
@@ -304,9 +327,23 @@ function RootLayoutShell({ children }) {
   }, [globalNotice]);
 
   const enableBrowserNotifications = async () => {
-    console.log("PUSH_ENABLE_BUTTON_CLICKED");
+    console.log(
+      "push:client:start",
+      JSON.stringify({
+        phase: "enableBrowserNotifications",
+      })
+    );
 
     if (typeof window === "undefined") return;
+
+    if (!authResolved || !currentUser?.email || !currentUser?.id) {
+      showAppModal({
+        type: "warning",
+        title: "تسجيل الدخول مطلوب",
+        message: "يجب تسجيل الدخول قبل تفعيل إشعارات المتصفح.",
+      });
+      return;
+    }
 
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
       showAppModal({
