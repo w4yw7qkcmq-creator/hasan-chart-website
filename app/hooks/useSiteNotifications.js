@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 import { playNotificationSound, setupNotificationSoundUnlock } from "../../lib/notification-sound";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
-import { normalizeNotification } from "../../lib/notifications-shared";
+import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../components/AuthProvider";
 
@@ -42,6 +42,14 @@ async function waitForSupabaseSession(maxWaitMs = REALTIME_SESSION_WAIT_MS) {
   return false;
 }
 
+function logNotificationMetrics(label, list) {
+  console.log("notifications:count", { label, count: list.length });
+  console.log("notifications:unread-count", {
+    label,
+    unreadCount: countUnreadNotifications(list),
+  });
+}
+
 export function useSiteNotifications() {
   const { authResolved, user } = useAuth();
   const userEmail = String(user?.email || "").trim().toLowerCase();
@@ -71,9 +79,21 @@ export function useSiteNotifications() {
   const listEnterTimersRef = useRef(new Map());
   const mutationEpochRef = useRef(0);
   const mutationInFlightRef = useRef(false);
+  const clearedAllNotificationsRef = useRef(false);
 
   const applyServerSnapshot = useCallback((serverNotifications) => {
     const list = (serverNotifications || []).filter(Boolean);
+
+    if (clearedAllNotificationsRef.current && list.length > 0) {
+      setNotifications([]);
+      knownIdsRef.current = new Set();
+      return [];
+    }
+
+    if (clearedAllNotificationsRef.current && list.length === 0) {
+      clearedAllNotificationsRef.current = false;
+    }
+
     knownIdsRef.current = new Set(list.map((item) => item.id).filter(Boolean));
     setNotifications(list);
     return list;
@@ -238,6 +258,10 @@ export function useSiteNotifications() {
 
   const registerIncomingNotification = useCallback(
     (rawNotification, { announce = false, bumpUnread = false, animateList = false } = {}) => {
+      if (mutationInFlightRef.current || clearedAllNotificationsRef.current) {
+        return null;
+      }
+
       const normalized = normalizeNotification(rawNotification);
       if (!normalized?.id) return null;
 
@@ -279,8 +303,12 @@ export function useSiteNotifications() {
   );
 
   const syncFromServer = useCallback(
-    async ({ announceNew = false, generation = 0, mutationEpoch = 0 } = {}) => {
+    async ({ announceNew = false, generation = 0, mutationEpoch = 0, fresh = false } = {}) => {
       if (!userEmail) return null;
+
+      if (mutationInFlightRef.current && !mutationEpoch) {
+        return null;
+      }
 
       if (mutationEpoch && mutationEpoch !== mutationEpochRef.current) {
         return null;
@@ -288,7 +316,7 @@ export function useSiteNotifications() {
 
       try {
         const response = await fetchWithTimeout(
-          `/api/my-notifications?include_read=1&limit=50&_=${Date.now()}`,
+          `/api/my-notifications?include_read=1&limit=50&fresh=${fresh ? "1" : "0"}&_=${Date.now()}`,
           {
             method: "GET",
             cache: "no-store",
@@ -349,20 +377,22 @@ export function useSiteNotifications() {
   );
 
   const refetchNotifications = useCallback(async () => {
-    return syncFromServer({ mutationEpoch: mutationEpochRef.current });
+    return syncFromServer({ mutationEpoch: mutationEpochRef.current, fresh: true });
   }, [syncFromServer]);
 
   const startFallbackPolling = useCallback(() => {
     if (pollTimerRef.current || !userEmail || document.hidden) return;
 
     pollTimerRef.current = window.setInterval(() => {
-      if (document.hidden || !userEmail) return;
+      if (document.hidden || !userEmail || mutationInFlightRef.current) return;
       void syncFromServer({ announceNew: true });
     }, FALLBACK_POLL_MS);
   }, [syncFromServer, userEmail]);
 
   const handleRealtimeUpdate = useCallback((payload) => {
-    if (!initialSyncCompleteRef.current) return;
+    if (!initialSyncCompleteRef.current || mutationInFlightRef.current || clearedAllNotificationsRef.current) {
+      return;
+    }
 
     const updated = normalizeNotification(payload.new);
     if (!updated?.id) return;
@@ -381,7 +411,7 @@ export function useSiteNotifications() {
   }, []);
 
   const handleRealtimeDelete = useCallback((payload) => {
-    if (!initialSyncCompleteRef.current) return;
+    if (!initialSyncCompleteRef.current || clearedAllNotificationsRef.current) return;
 
     const deletedId = payload.old?.id;
     if (!deletedId) return;
@@ -402,7 +432,7 @@ export function useSiteNotifications() {
         await mutator(epoch);
       } finally {
         mutationInFlightRef.current = false;
-        await syncFromServer({ mutationEpoch: epoch });
+        await syncFromServer({ mutationEpoch: epoch, fresh: true });
       }
     },
     [syncFromServer]
@@ -439,7 +469,12 @@ export function useSiteNotifications() {
   );
 
   const markAllAsRead = useCallback(async () => {
-    setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+    setNotifications((current) => {
+      const next = current.map((item) => ({ ...item, isRead: true }));
+      logNotificationMetrics("after-mark-read-local", next);
+      console.log("notifications:after-mark-read");
+      return next;
+    });
 
     await runNotificationMutation(async () => {
       try {
@@ -488,9 +523,12 @@ export function useSiteNotifications() {
   );
 
   const deleteAllNotifications = useCallback(async () => {
+    clearedAllNotificationsRef.current = true;
     setNotifications([]);
     knownIdsRef.current = new Set();
     toastedIdsRef.current = new Set();
+    logNotificationMetrics("after-delete-all-local", []);
+    console.log("notifications:after-delete-all");
 
     await runNotificationMutation(async () => {
       try {
@@ -526,6 +564,7 @@ export function useSiteNotifications() {
       toastedIdsRef.current = new Set();
       mutationEpochRef.current = 0;
       mutationInFlightRef.current = false;
+      clearedAllNotificationsRef.current = false;
       initializedRef.current = false;
       initialSyncCompleteRef.current = false;
       setRealtimeConnected(false);
@@ -574,6 +613,7 @@ export function useSiteNotifications() {
             },
             (payload) => {
               if (!initialSyncCompleteRef.current) return;
+              if (mutationInFlightRef.current || clearedAllNotificationsRef.current) return;
 
               registerIncomingNotification(payload.new, {
                 announce: true,
@@ -687,12 +727,19 @@ export function useSiteNotifications() {
   );
 
   const unreadCount = useMemo(
-    () => sortedNotifications.filter((item) => !item.isRead).length,
+    () => countUnreadNotifications(sortedNotifications),
     [sortedNotifications]
   );
 
+  useEffect(() => {
+    logNotificationMetrics("state", notifications);
+  }, [notifications]);
+
   const unreadAnalysisCount = useMemo(
-    () => sortedNotifications.filter((item) => !item.isRead && item.type === "analysis-reply").length,
+    () =>
+      sortedNotifications.filter(
+        (item) => isNotificationUnread(item) && item.type === "analysis-reply"
+      ).length,
     [sortedNotifications]
   );
 

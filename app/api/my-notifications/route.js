@@ -26,10 +26,11 @@ export async function GET(request) {
 
         const { searchParams } = new URL(req.url);
         const includeRead = searchParams.get("include_read") === "1";
+        const fresh = searchParams.get("fresh") === "1";
         const limit = Math.min(Math.max(Number(searchParams.get("limit") || 20), 1), 50);
         const cacheKey = `notifications:${email}:${includeRead ? "all" : "unread"}:${limit}`;
 
-        const { data } = await withReadCache(cacheKey, 8_000, async () => {
+        const fetchNotifications = async () => {
           let query = supabase
             .from("notifications")
             .select("*")
@@ -61,7 +62,11 @@ export async function GET(request) {
             notifications: (rows || []).map(normalizeNotification).filter(Boolean),
             unreadCount: unreadCount || 0,
           };
-        });
+        };
+
+        const { data } = fresh
+          ? { data: await fetchNotifications() }
+          : await withReadCache(cacheKey, 8_000, fetchNotifications);
 
         return jsonOk(data, {
           cacheControl: CACHE_PRIVATE_USER,

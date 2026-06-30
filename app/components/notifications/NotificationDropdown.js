@@ -10,14 +10,21 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
   const {
     notifications,
     unreadCount,
+    loading,
     markAsRead,
     markAllAsRead,
     deleteNotification,
     deleteAllNotifications,
     recentlyAddedIds,
+    refreshNotifications,
   } = useNotifications();
   const { showAppConfirm } = useAppModal();
   const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    void refreshNotifications();
+  }, [open, refreshNotifications]);
 
   useEffect(() => {
     if (!open) return;
@@ -86,7 +93,11 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
         </button>
       </div>
 
-      {visibleItems.length ? (
+      {loading && !visibleItems.length ? (
+        <div className="notificationDropdown__empty relative z-10 rounded-[20px] border p-4 text-sm font-bold">
+          جاري تحميل الإشعارات...
+        </div>
+      ) : visibleItems.length ? (
         <div className="relative z-10 max-h-[22rem] space-y-2 overflow-y-auto customScroll">
           {visibleItems.map((notification) => (
             <NotificationListItem
@@ -102,7 +113,7 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
         </div>
       ) : (
         <div className="notificationDropdown__empty relative z-10 rounded-[20px] border p-4 text-sm font-bold">
-          لا توجد إشعارات جديدة حالياً.
+          لا توجد إشعارات حالياً.
         </div>
       )}
 
