@@ -2,19 +2,44 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
+import { playNotificationSound } from "../../lib/notification-sound";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../components/AuthProvider";
 
 const FALLBACK_POLL_MS = 60000;
-const TOAST_TTL_MS = 6500;
-const TOAST_GAP_MS = 450;
+const TOAST_TTL_MS = 5000;
+const TOAST_EXIT_MS = 280;
+const TOAST_GROUP_WINDOW_MS = 1500;
+const TOAST_SINGLE_DELAY_MS = 450;
+const LIST_ENTER_MS = 650;
 const INITIAL_SYNC_DELAY_MS = 0;
 const FETCH_TIMEOUT_MS = 5000;
+const REALTIME_SESSION_WAIT_MS = 2500;
 
 function createToastId() {
   return `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function waitForSupabaseSession(maxWaitMs = REALTIME_SESSION_WAIT_MS) {
+  const started = Date.now();
+
+  while (Date.now() - started < maxWaitMs) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.access_token) {
+      return true;
+    }
+
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 150);
+    });
+  }
+
+  return false;
 }
 
 export function useSiteNotifications() {
@@ -27,6 +52,7 @@ export function useSiteNotifications() {
   const [bellShakeKey, setBellShakeKey] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [recentlyAddedIds, setRecentlyAddedIds] = useState([]);
 
   const knownIdsRef = useRef(new Set());
   const toastedIdsRef = useRef(new Set());
@@ -36,11 +62,18 @@ export function useSiteNotifications() {
   const pollTimerRef = useRef(null);
   const realtimeConnectedRef = useRef(false);
   const channelRef = useRef(null);
-  const toastQueueRef = useRef([]);
   const toastHideTimerRef = useRef(null);
-  const toastGapTimerRef = useRef(null);
+  const toastBatchTimerRef = useRef(null);
   const toastShowingRef = useRef(false);
   const activeToastRef = useRef(null);
+  const notificationPanelOpenRef = useRef(false);
+  const pendingToastBatchRef = useRef([]);
+  const deferredToastBatchRef = useRef([]);
+  const listEnterTimersRef = useRef(new Map());
+
+  const setNotificationPanelOpen = useCallback((open) => {
+    notificationPanelOpenRef.current = Boolean(open);
+  }, []);
 
   useEffect(() => {
     activeToastRef.current = activeToast;
@@ -51,79 +84,140 @@ export function useSiteNotifications() {
       window.clearTimeout(toastHideTimerRef.current);
       toastHideTimerRef.current = null;
     }
-    if (toastGapTimerRef.current) {
-      window.clearTimeout(toastGapTimerRef.current);
-      toastGapTimerRef.current = null;
+    if (toastBatchTimerRef.current) {
+      window.clearTimeout(toastBatchTimerRef.current);
+      toastBatchTimerRef.current = null;
     }
   }, []);
 
-  const showNextToast = useCallback(() => {
-    if (toastShowingRef.current) return;
+  const markNotificationAsRecentlyAdded = useCallback((notificationId) => {
+    if (!notificationId) return;
 
-    const next = toastQueueRef.current.shift();
-    if (!next) {
+    setRecentlyAddedIds((current) =>
+      current.includes(notificationId) ? current : [...current, notificationId]
+    );
+
+    const existingTimer = listEnterTimersRef.current.get(notificationId);
+    if (existingTimer) {
+      window.clearTimeout(existingTimer);
+    }
+
+    const timerId = window.setTimeout(() => {
+      listEnterTimersRef.current.delete(notificationId);
+      setRecentlyAddedIds((current) => current.filter((item) => item !== notificationId));
+    }, LIST_ENTER_MS);
+
+    listEnterTimersRef.current.set(notificationId, timerId);
+  }, []);
+
+  const finalizeDismissToast = useCallback(
+    (toastId) => {
+      if (activeToastRef.current?.id !== toastId) return;
+
       toastShowingRef.current = false;
       setActiveToast(null);
+
+      if (deferredToastBatchRef.current.length > 0) {
+        pendingToastBatchRef.current = [...deferredToastBatchRef.current];
+        deferredToastBatchRef.current = [];
+
+        toastBatchTimerRef.current = window.setTimeout(() => {
+          toastBatchTimerRef.current = null;
+          flushToastBatchRef.current?.();
+        }, TOAST_SINGLE_DELAY_MS);
+      }
+    },
+    []
+  );
+
+  const beginDismissToast = useCallback(
+    (toastId) => {
+      if (activeToastRef.current?.id !== toastId || activeToastRef.current?.exiting) return;
+
+      clearToastTimers();
+      setActiveToast((current) => (current?.id === toastId ? { ...current, exiting: true } : current));
+
+      window.setTimeout(() => {
+        finalizeDismissToast(toastId);
+      }, TOAST_EXIT_MS);
+    },
+    [clearToastTimers, finalizeDismissToast]
+  );
+
+  const flushToastBatchRef = useRef(null);
+
+  const flushToastBatch = useCallback(() => {
+    toastBatchTimerRef.current = null;
+
+    const batch = pendingToastBatchRef.current;
+    pendingToastBatchRef.current = [];
+
+    if (!batch.length || notificationPanelOpenRef.current || toastShowingRef.current) {
+      if (batch.length) {
+        deferredToastBatchRef.current.push(...batch);
+      }
       return;
     }
 
+    const toastPayload =
+      batch.length > 1
+        ? {
+            id: createToastId(),
+            kind: "grouped",
+            count: batch.length,
+            exiting: false,
+          }
+        : {
+            id: createToastId(),
+            kind: "single",
+            notification: batch[0],
+            exiting: false,
+          };
+
     toastShowingRef.current = true;
-    setActiveToast(next);
+    setActiveToast(toastPayload);
+    playNotificationSound();
 
     toastHideTimerRef.current = window.setTimeout(() => {
       toastHideTimerRef.current = null;
-      toastShowingRef.current = false;
-      setActiveToast(null);
-
-      if (toastQueueRef.current.length > 0) {
-        toastGapTimerRef.current = window.setTimeout(() => {
-          toastGapTimerRef.current = null;
-          showNextToast();
-        }, TOAST_GAP_MS);
-      }
+      beginDismissToast(toastPayload.id);
     }, TOAST_TTL_MS);
-  }, []);
+  }, [beginDismissToast]);
 
-  const isToastCycleActive = useCallback(() => {
-    return (
-      toastShowingRef.current ||
-      Boolean(toastHideTimerRef.current) ||
-      Boolean(toastGapTimerRef.current)
-    );
-  }, []);
+  flushToastBatchRef.current = flushToastBatch;
 
-  const enqueueToast = useCallback(
+  const scheduleToastForNotification = useCallback(
     (notification) => {
-      toastQueueRef.current.push({
-        id: createToastId(),
-        notification,
-      });
+      if (notificationPanelOpenRef.current) return;
 
-      if (!isToastCycleActive()) {
-        showNextToast();
+      if (toastShowingRef.current) {
+        deferredToastBatchRef.current.push(notification);
+        return;
       }
+
+      pendingToastBatchRef.current.push(notification);
+
+      if (toastBatchTimerRef.current) {
+        window.clearTimeout(toastBatchTimerRef.current);
+      }
+
+      const delay =
+        pendingToastBatchRef.current.length > 1
+          ? TOAST_GROUP_WINDOW_MS
+          : TOAST_SINGLE_DELAY_MS;
+
+      toastBatchTimerRef.current = window.setTimeout(() => {
+        flushToastBatch();
+      }, delay);
     },
-    [isToastCycleActive, showNextToast]
+    [flushToastBatch]
   );
 
   const dismissToast = useCallback(
     (toastId) => {
-      toastQueueRef.current = toastQueueRef.current.filter((item) => item.id !== toastId);
-
-      if (activeToastRef.current?.id !== toastId) return;
-
-      clearToastTimers();
-      toastShowingRef.current = false;
-      setActiveToast(null);
-
-      if (toastQueueRef.current.length > 0) {
-        toastGapTimerRef.current = window.setTimeout(() => {
-          toastGapTimerRef.current = null;
-          showNextToast();
-        }, TOAST_GAP_MS);
-      }
+      beginDismissToast(toastId);
     },
-    [clearToastTimers, showNextToast]
+    [beginDismissToast]
   );
 
   const stopFallbackPolling = useCallback(() => {
@@ -133,10 +227,10 @@ export function useSiteNotifications() {
     }
   }, []);
 
-  const pushToast = enqueueToast;
+  const pushToast = scheduleToastForNotification;
 
   const registerIncomingNotification = useCallback(
-    (rawNotification, { announce = false, bumpUnread = false } = {}) => {
+    (rawNotification, { announce = false, bumpUnread = false, animateList = false } = {}) => {
       const normalized = normalizeNotification(rawNotification);
       if (!normalized?.id) return null;
 
@@ -151,6 +245,10 @@ export function useSiteNotifications() {
         return [normalized, ...withoutDuplicate].slice(0, 50);
       });
 
+      if (animateList || (announce && bumpUnread)) {
+        markNotificationAsRecentlyAdded(normalized.id);
+      }
+
       if (!normalized.isRead && bumpUnread) {
         setUnreadCount((count) => count + 1);
       }
@@ -161,13 +259,17 @@ export function useSiteNotifications() {
         }
 
         toastedIdsRef.current.add(normalized.id);
-        pushToast(normalized);
+
+        if (!notificationPanelOpenRef.current) {
+          pushToast(normalized);
+        }
+
         setBellShakeKey((value) => value + 1);
       }
 
       return normalized;
     },
-    [pushToast]
+    [markNotificationAsRecentlyAdded, pushToast]
   );
 
   const syncFromServer = useCallback(
@@ -176,7 +278,7 @@ export function useSiteNotifications() {
 
       try {
         const response = await fetchWithTimeout(
-          "/api/my-notifications?include_read=1&limit=30",
+          "/api/my-notifications?include_read=1&limit=50",
           {
             method: "GET",
             cache: "no-store",
@@ -254,6 +356,50 @@ export function useSiteNotifications() {
     }, FALLBACK_POLL_MS);
   }, [syncFromServer, userEmail]);
 
+  const handleRealtimeUpdate = useCallback((payload) => {
+    if (!initialSyncCompleteRef.current) return;
+
+    const updated = normalizeNotification(payload.new);
+    if (!updated?.id) return;
+
+    knownIdsRef.current.add(updated.id);
+
+    setNotifications((current) => {
+      const exists = current.some((item) => item.id === updated.id);
+
+      if (!exists) {
+        return [updated, ...current].slice(0, 50);
+      }
+
+      return current.map((item) => (item.id === updated.id ? updated : item));
+    });
+
+    const wasRead = Boolean(payload.old?.is_read);
+    const isRead = Boolean(payload.new?.is_read);
+
+    if (!wasRead && isRead) {
+      setUnreadCount((count) => Math.max(0, count - 1));
+    } else if (wasRead && !isRead) {
+      setUnreadCount((count) => count + 1);
+    }
+  }, []);
+
+  const handleRealtimeDelete = useCallback((payload) => {
+    if (!initialSyncCompleteRef.current) return;
+
+    const deletedId = payload.old?.id;
+    if (!deletedId) return;
+
+    knownIdsRef.current.delete(deletedId);
+    toastedIdsRef.current.delete(deletedId);
+
+    setNotifications((current) => current.filter((item) => item.id !== deletedId));
+
+    if (!payload.old?.is_read) {
+      setUnreadCount((count) => Math.max(0, count - 1));
+    }
+  }, []);
+
   const markAsRead = useCallback(
     async (notificationId) => {
       if (!notificationId) return;
@@ -307,15 +453,83 @@ export function useSiteNotifications() {
     }
   }, []);
 
+  const deleteNotification = useCallback(
+    async (notificationId) => {
+      if (!notificationId) return;
+
+      const target = notifications.find((item) => item.id === notificationId);
+
+      setNotifications((current) => current.filter((item) => item.id !== notificationId));
+      knownIdsRef.current.delete(notificationId);
+
+      if (target && !target.isRead) {
+        setUnreadCount((count) => Math.max(0, count - 1));
+      }
+
+      try {
+        const response = await fetch("/api/delete-notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ ids: [notificationId] }),
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (response.ok && result?.success) {
+          setUnreadCount(Number(result.unreadCount || 0));
+          return;
+        }
+
+        await syncFromServer();
+      } catch (err) {
+        console.warn("Delete notification skipped:", err?.message || err);
+        await syncFromServer();
+      }
+    },
+    [notifications, syncFromServer]
+  );
+
+  const deleteAllNotifications = useCallback(async () => {
+    setNotifications([]);
+    setUnreadCount(0);
+    knownIdsRef.current = new Set();
+
+    try {
+      const response = await fetch("/api/delete-notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ all: true }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (response.ok && result?.success) {
+        setUnreadCount(Number(result.unreadCount || 0));
+        return;
+      }
+
+      await syncFromServer();
+    } catch (err) {
+      console.warn("Delete all notifications skipped:", err?.message || err);
+      await syncFromServer();
+    }
+  }, [syncFromServer]);
+
   useEffect(() => {
     if (!authResolved) {
       syncGenerationRef.current += 1;
       setNotifications([]);
       setUnreadCount(0);
       setActiveToast(null);
-      toastQueueRef.current = [];
+      pendingToastBatchRef.current = [];
+      deferredToastBatchRef.current = [];
       toastShowingRef.current = false;
       clearToastTimers();
+      listEnterTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      listEnterTimersRef.current.clear();
+      setRecentlyAddedIds([]);
       knownIdsRef.current = new Set();
       toastedIdsRef.current = new Set();
       initializedRef.current = false;
@@ -343,47 +557,78 @@ export function useSiteNotifications() {
         if (active) setLoading(false);
       });
 
-      channelRef.current = supabase
-        .channel(`site-notifications-${userEmail}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "notifications",
-            filter: `user_email=eq.${userEmail}`,
-          },
-          (payload) => {
-            if (!initialSyncCompleteRef.current) return;
+      void (async () => {
+        const sessionReady = await waitForSupabaseSession();
+        if (!active) return;
 
-            registerIncomingNotification(payload.new, {
-              announce: true,
-              bumpUnread: true,
-            });
-          }
-        )
-        .subscribe((status) => {
-          if (!active) return;
+        if (!sessionReady) {
+          console.warn("Notification realtime waiting for Supabase session; using fallback polling.");
+          startFallbackPolling();
+        }
 
-          if (status === "SUBSCRIBED") {
-            realtimeConnectedRef.current = true;
-            setRealtimeConnected(true);
-            stopFallbackPolling();
-            return;
-          }
+        channelRef.current = supabase
+          .channel(`site-notifications-${userEmail}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "notifications",
+              filter: `user_email=eq.${userEmail}`,
+            },
+            (payload) => {
+              if (!initialSyncCompleteRef.current) return;
 
-          if (
-            status === "CLOSED" ||
-            status === "CHANNEL_ERROR" ||
-            status === "TIMED_OUT"
-          ) {
-            realtimeConnectedRef.current = false;
-            setRealtimeConnected(false);
-            if (!document.hidden) {
-              startFallbackPolling();
+              registerIncomingNotification(payload.new, {
+                announce: true,
+                bumpUnread: true,
+                animateList: true,
+              });
             }
-          }
-        });
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "notifications",
+              filter: `user_email=eq.${userEmail}`,
+            },
+            handleRealtimeUpdate
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "DELETE",
+              schema: "public",
+              table: "notifications",
+              filter: `user_email=eq.${userEmail}`,
+            },
+            handleRealtimeDelete
+          )
+          .subscribe((status) => {
+            if (!active) return;
+
+            if (status === "SUBSCRIBED") {
+              realtimeConnectedRef.current = true;
+              setRealtimeConnected(true);
+              stopFallbackPolling();
+              return;
+            }
+
+            if (
+              status === "CLOSED" ||
+              status === "CHANNEL_ERROR" ||
+              status === "TIMED_OUT"
+            ) {
+              realtimeConnectedRef.current = false;
+              setRealtimeConnected(false);
+              if (!document.hidden) {
+                startFallbackPolling();
+              }
+            }
+          });
+      })();
     }, INITIAL_SYNC_DELAY_MS);
 
     const handleVisibilityChange = () => {
@@ -411,8 +656,11 @@ export function useSiteNotifications() {
       syncGenerationRef.current += 1;
       stopFallbackPolling();
       clearToastTimers();
-      toastQueueRef.current = [];
+      pendingToastBatchRef.current = [];
+      deferredToastBatchRef.current = [];
       toastShowingRef.current = false;
+      listEnterTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      listEnterTimersRef.current.clear();
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -424,28 +672,43 @@ export function useSiteNotifications() {
     authResolved,
     userEmail,
     clearToastTimers,
+    handleRealtimeDelete,
+    handleRealtimeUpdate,
     registerIncomingNotification,
     startFallbackPolling,
     stopFallbackPolling,
     syncFromServer,
   ]);
 
-  const unreadAnalysisCount = useMemo(
-    () => notifications.filter((item) => !item.isRead && item.type === "analysis-reply").length,
+  const sortedNotifications = useMemo(
+    () =>
+      [...notifications].sort(
+        (left, right) =>
+          new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
+      ),
     [notifications]
   );
 
+  const unreadAnalysisCount = useMemo(
+    () => sortedNotifications.filter((item) => !item.isRead && item.type === "analysis-reply").length,
+    [sortedNotifications]
+  );
+
   return {
-    notifications,
+    notifications: sortedNotifications,
     unreadCount,
     unreadAnalysisCount,
     activeToast,
     bellShakeKey,
     realtimeConnected,
     loading,
+    recentlyAddedIds,
     dismissToast,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    deleteAllNotifications,
     refreshNotifications: () => syncFromServer(),
+    setNotificationPanelOpen,
   };
 }
