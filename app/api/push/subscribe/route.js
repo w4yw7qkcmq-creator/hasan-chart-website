@@ -26,6 +26,26 @@ function sanitizeRequestBody(body) {
   };
 }
 
+function logPushSubscribe(event, payload = {}) {
+  console.log(
+    event,
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      ...payload,
+    })
+  );
+}
+
+function logPushSubscribeError(event, payload = {}) {
+  console.error(
+    event,
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      ...payload,
+    })
+  );
+}
+
 function logPushSubscriptionEvent(event, payload = {}) {
   console.log(
     event,
@@ -62,30 +82,25 @@ function normalizeSubscription(body) {
 }
 
 export async function POST(request) {
-  console.log(
-    `PUSH_SUBSCRIBE_ROUTE_HIT ${JSON.stringify({
-      ts: new Date().toISOString(),
-      route: "/api/push/subscribe",
-      method: "POST",
-    })}`
-  );
-
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
+
+    logPushSubscribe("push:subscribe:api_called", {
+      route: "/api/push/subscribe",
+      method: "POST",
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      hasServiceRoleKey: Boolean(serviceRoleKey),
+    });
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error(
-        `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
-          ts: new Date().toISOString(),
-          phase: "env",
-          message: "MISSING_SUPABASE_ENV",
-          details: null,
-          hint: null,
-          hasSupabaseUrl: Boolean(supabaseUrl),
-          hasServiceRoleKey: Boolean(serviceRoleKey),
-        })}`
-      );
+      logPushSubscribeError("push:subscribe:error", {
+        phase: "env",
+        reason: "MISSING_SUPABASE_ENV",
+        hasSupabaseUrl: Boolean(supabaseUrl),
+        hasServiceRoleKey: Boolean(serviceRoleKey),
+      });
 
       return Response.json(
         {
@@ -96,28 +111,38 @@ export async function POST(request) {
       );
     }
 
+    if (anonKey && serviceRoleKey === anonKey) {
+      logPushSubscribeError("push:subscribe:error", {
+        phase: "env",
+        reason: "SERVICE_ROLE_KEY_MATCHES_ANON_KEY",
+        hint: "Set SUPABASE_SERVICE_ROLE_KEY to the service role secret, not the anon/publishable key",
+      });
+
+      return Response.json(
+        {
+          success: false,
+          error: "إعدادات Supabase غير صحيحة على السيرفر (service role)",
+        },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json().catch(() => null);
 
-    console.log(
-      `PUSH_SUBSCRIBE_REQUEST_BODY ${JSON.stringify({
-        ts: new Date().toISOString(),
-        hasBody: Boolean(body),
-        body: sanitizeRequestBody(body),
-      })}`
-    );
+    logPushSubscribe("push:subscribe:api_called", {
+      phase: "payload",
+      hasBody: Boolean(body),
+      body: sanitizeRequestBody(body),
+    });
 
     const subscription = normalizeSubscription(body);
 
     if (subscription.error) {
-      console.error(
-        `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
-          ts: new Date().toISOString(),
-          phase: "validation",
-          message: subscription.error,
-          details: subscription.details,
-          hint: null,
-        })}`
-      );
+      logPushSubscribeError("push:subscribe:error", {
+        phase: "validation",
+        reason: subscription.error,
+        details: subscription.details,
+      });
 
       return Response.json(
         {
@@ -140,15 +165,11 @@ export async function POST(request) {
       : bodyUserEmail || null;
 
     if (!userId && !email && !anonymousId) {
-      console.error(
-        `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
-          ts: new Date().toISOString(),
-          phase: "validation",
-          message: "MISSING_SUBSCRIPTION_OWNER",
-          details: null,
-          hint: "Provide anonymousId or login session",
-        })}`
-      );
+      logPushSubscribeError("push:subscribe:error", {
+        phase: "validation",
+        reason: "MISSING_SUBSCRIPTION_OWNER",
+        hint: "Provide anonymousId or login session",
+      });
 
       return Response.json(
         {
@@ -197,17 +218,13 @@ export async function POST(request) {
       .maybeSingle();
 
     if (existingError) {
-
-      console.error(
-        `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
-          ts: new Date().toISOString(),
-          phase: "lookup",
-          message: existingError.message || null,
-          details: existingError.details || null,
-          hint: existingError.hint || null,
-          code: existingError.code || null,
-        })}`
-      );
+      logPushSubscribeError("push:subscribe:error", {
+        phase: "lookup",
+        message: existingError.message || null,
+        details: existingError.details || null,
+        hint: existingError.hint || null,
+        code: existingError.code || null,
+      });
 
       return Response.json(
         {
@@ -239,16 +256,13 @@ export async function POST(request) {
           .maybeSingle();
 
       if (anonymousLookupError) {
-        console.error(
-          `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
-            ts: new Date().toISOString(),
-            phase: "anonymous_lookup",
-            message: anonymousLookupError.message || null,
-            details: anonymousLookupError.details || null,
-            hint: anonymousLookupError.hint || null,
-            code: anonymousLookupError.code || null,
-          })}`
-        );
+        logPushSubscribeError("push:subscribe:error", {
+          phase: "anonymous_lookup",
+          message: anonymousLookupError.message || null,
+          details: anonymousLookupError.details || null,
+          hint: anonymousLookupError.hint || null,
+          code: anonymousLookupError.code || null,
+        });
 
         return Response.json(
           {
@@ -316,26 +330,19 @@ export async function POST(request) {
     }
 
     if (saveError || !savedRow?.id) {
-      console.error(
-        `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
-          ts: new Date().toISOString(),
-          phase: savePhase,
-          message: saveError?.message || "NO_ROW_RETURNED_FROM_SUPABASE",
-          details: saveError?.details ?? null,
-          hint: saveError?.hint ?? null,
-          code: saveError?.code ?? null,
-          saveErrorMessage: saveError?.message ?? null,
-          saveErrorDetails: saveError?.details ?? null,
-          saveErrorHint: saveError?.hint ?? null,
-          savedRow: savedRow ?? null,
-          row: {
-            endpoint: maskValue(row.endpoint),
-            user_id: row.user_id,
-            email: row.email,
-            anonymous_id: row.anonymous_id,
-          },
-        })}`
-      );
+      logPushSubscribeError("push:subscribe:error", {
+        phase: savePhase,
+        message: saveError?.message || "NO_ROW_RETURNED_FROM_SUPABASE",
+        details: saveError?.details ?? null,
+        hint: saveError?.hint ?? null,
+        code: saveError?.code ?? null,
+        row: {
+          endpoint: maskValue(row.endpoint),
+          user_id: row.user_id,
+          email: row.email,
+          anonymous_id: row.anonymous_id,
+        },
+      });
 
       return Response.json(
         {
@@ -352,6 +359,19 @@ export async function POST(request) {
       );
     }
 
+    logPushSubscribe("push:subscribe:saved", {
+      phase: savePhase,
+      authMode: "service_role",
+      subscriptionId: savedRow.id,
+      endpoint: maskValue(savedRow.endpoint),
+      email: savedRow.email || null,
+      userId: savedRow.user_id || null,
+      anonymousId: savedRow.anonymous_id || null,
+      sessionAttached: Boolean(session?.email),
+      bodyUserEmail: bodyUserEmail || null,
+      bodyUserId: bodyUserId || null,
+    });
+
     if (savePhase === "update") {
       logPushSubscriptionEvent("push:subscription:updated", {
         subscriptionId: savedRow.id,
@@ -365,22 +385,6 @@ export async function POST(request) {
         bodyUserId: bodyUserId || null,
       });
     }
-
-    console.log(
-      `PUSH_SUBSCRIBE_SUPABASE_INSERT_SUCCESS ${JSON.stringify({
-        ts: new Date().toISOString(),
-        phase: savePhase,
-        subscriptionId: savedRow.id,
-        endpoint: maskValue(savedRow.endpoint),
-        email: savedRow.email || null,
-        userId: savedRow.user_id || null,
-        anonymousId: savedRow.anonymous_id || null,
-        createdAt: savedRow.created_at || null,
-        updatedAt: savedRow.updated_at || null,
-        sessionAttached: Boolean(session?.email),
-        bodyUserEmail: bodyUserEmail || null,
-      })}`
-    );
 
     if (anonymousId && email && resolvedUserId) {
       const { data: linkedRows, error: backfillError } = await supabase
@@ -420,15 +424,10 @@ export async function POST(request) {
       subscription: savedRow,
     });
   } catch (error) {
-    console.error(
-      `PUSH_SUBSCRIBE_SUPABASE_INSERT_FAILED_FULL ${JSON.stringify({
-        ts: new Date().toISOString(),
-        phase: "exception",
-        message: error?.message || String(error),
-        details: null,
-        hint: null,
-      })}`
-    );
+    logPushSubscribeError("push:subscribe:error", {
+      phase: "exception",
+      message: error?.message || String(error),
+    });
 
     return Response.json(
       {

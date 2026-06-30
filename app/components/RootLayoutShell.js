@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 import {
   ensureServiceWorkerRegistration,
   getAnonymousPushId,
+  savePushSubscriptionViaApi,
   serializePushSubscription,
   setStoredPushEndpoint,
   subscribeToWebPush,
@@ -252,8 +253,6 @@ function RootLayoutShell({ children }) {
   }, []);
 
   const savePushSubscription = async () => {
-    let fetchAttempted = false;
-
     console.log("PUSH_SAVE_SUBSCRIPTION_START");
 
     let subscription;
@@ -277,52 +276,18 @@ function RootLayoutShell({ children }) {
     }
 
     const anonymousId = getAnonymousPushId();
-    const requestBody = {
+    const result = await savePushSubscriptionViaApi({
       subscription: payload,
       anonymousId,
       userEmail: currentUser?.email ? String(currentUser.email).trim().toLowerCase() : null,
       userId: currentUser?.id ? String(currentUser.id).trim() : null,
-    };
-
-    console.log("PUSH_SUBSCRIBE_CLIENT_FETCH_START");
-
-    fetchAttempted = true;
-
-    const response = await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(requestBody),
     });
-
-    const result = await response.json().catch(() => null);
-
-    console.log(
-      "PUSH_SUBSCRIBE_CLIENT_FETCH_DONE",
-      JSON.stringify({
-        status: response.status,
-        ok: response.ok,
-        success: Boolean(result?.success),
-        subscriptionId: result?.subscription?.id || null,
-        error: result?.error || null,
-      })
-    );
-
-    if (!response.ok || !result?.success || !result?.subscription?.id) {
-      const apiError =
-        result?.error ||
-        (response.ok ? "لم يتم حفظ الاشتراك في قاعدة البيانات" : `HTTP ${response.status}`);
-
-      throw new Error(apiError);
-    }
 
     setStoredPushEndpoint(payload.endpoint);
     setWebPushEnabled(true);
 
     return {
-      apiCalled: fetchAttempted,
+      apiCalled: true,
       subscription: result.subscription,
     };
   };
