@@ -67,7 +67,26 @@ class EmailRateLimiter {
 }
 
 async function sendWithRetry(sendFn, { to, label, attempt = 0 }) {
-  const result = await sendFn();
+  let result = null;
+
+  try {
+    result = await sendFn();
+  } catch (error) {
+    logWorkerEvent("EMAIL_SEND_FAILED", {
+      to,
+      label,
+      attempt,
+      status: null,
+      error: error?.message || String(error),
+      threw: true,
+    });
+
+    return {
+      status: "failed",
+      error: error?.message || String(error),
+      result: null,
+    };
+  }
 
   if (result?.skipped) {
     return { status: "skipped", result };

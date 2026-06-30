@@ -22,14 +22,15 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 });
 
-const { processEmailQueue } = require("./email-queue");
 const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications, getVapidEnvStatus } = require("./push-sender");
 const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v11-web-push-dispatch-logs";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v12-inline-alert-dispatch";
+
+let priceAlertCheckInProgress = false;
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
 const PRICE_ALERT_CHECK_CLAMP_ABOVE_MS = 60_000;
 
@@ -896,7 +897,7 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
   };
 };
 
-const sendTriggeredAlertEmail = async ({
+async function sendAlertEmailOnly({
   email,
   coin,
   condition,
@@ -904,14 +905,24 @@ const sendTriggeredAlertEmail = async ({
   currentPrice,
   alertId = null,
   userId = null,
-  notificationMessage = "",
-}) => {
+}) {
   const coinLabel = formatCoinPair(coin);
+
+  console.log("alert:email:start", {
+    ts: new Date().toISOString(),
+    alertId,
+    email,
+    userId: userId || null,
+    coin: coinLabel,
+    targetPrice,
+    currentPrice,
+    condition,
+  });
 
   logWorkerEvent("PRICE_ALERT_EMAIL_REAL_PATH_FOUND", {
     worker: WORKER_ENTRY,
     file: "worker/index.js",
-    function: "sendTriggeredAlertEmail",
+    function: "sendAlertEmailOnly",
     alertId,
     email,
     userId: userId || null,
@@ -957,7 +968,7 @@ const sendTriggeredAlertEmail = async ({
 
   console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
     file: "worker/index.js",
-    function: "sendTriggeredAlertEmail",
+    function: "sendAlertEmailOnly",
     from: PRICE_ALERT_FROM,
     alertId,
     email,
@@ -1019,6 +1030,15 @@ const sendTriggeredAlertEmail = async ({
     resendId: data?.id || null,
   });
 
+  console.log("alert:email:sent", {
+    ts: new Date().toISOString(),
+    alertId,
+    email,
+    userId: userId || null,
+    resendId: data?.id || null,
+    from: PRICE_ALERT_FROM,
+  });
+
   logAlertDispatch("alert:email:sent", {
     alertId,
     email,
@@ -1030,47 +1050,144 @@ const sendTriggeredAlertEmail = async ({
     from: PRICE_ALERT_FROM,
   });
 
-  const siteNotification = await createSiteNotificationAfterEmail({
-    alertId,
-    email,
-    notificationMessage:
-      notificationMessage ||
-      buildPriceAlertNotificationMessage({
-        coin,
-        targetPrice,
-        currentPrice,
-        condition,
-      }),
-  });
-
-  console.log("push:dispatch:queued-after-site-notification", {
-    ts: new Date().toISOString(),
-    alertId,
-    email,
-    userId: userId || null,
-    siteNotificationCreated: Boolean(siteNotification?.success),
-  });
-
-  const pushStats = await sendTriggeredAlertWebPush({
-    alertId,
-    email,
-    userId,
-    coin,
-    targetPrice,
-    currentPrice,
-    source: "worker/index.js::sendTriggeredAlertEmail",
-  });
-
   return {
     success: true,
     sent: true,
     status: response.status,
     id: data?.id || null,
     data,
+  };
+}
+
+async function deliverTriggeredAlertAfterClaim({
+  summary,
+  alertId,
+  userEmail,
+  userId,
+  coin,
+  condition,
+  targetPrice,
+  currentPrice,
+  notificationMessage,
+}) {
+  summary.emailsQueued += 1;
+
+  let emailResult = {
+    success: false,
+    sent: false,
+    skipped: true,
+    reason: "EMAIL_NOT_ATTEMPTED",
+  };
+
+  try {
+    emailResult = await sendAlertEmailOnly({
+      email: userEmail,
+      coin,
+      condition,
+      targetPrice,
+      currentPrice,
+      alertId,
+      userId,
+    });
+  } catch (error) {
+    emailResult = {
+      success: false,
+      sent: false,
+      error: error?.message || String(error),
+    };
+
+    console.log("alert:email:error", {
+      ts: new Date().toISOString(),
+      alertId,
+      email: userEmail,
+      userId: userId || null,
+      message: emailResult.error,
+    });
+  }
+
+  console.log("alert:site-notification:start", {
+    ts: new Date().toISOString(),
+    alertId,
+    email: userEmail,
+    userId: userId || null,
+    emailSent: Boolean(emailResult?.sent),
+  });
+
+  let siteNotification = { success: false };
+
+  try {
+    siteNotification = await createSiteNotificationAfterEmail({
+      alertId,
+      email: userEmail,
+      notificationMessage,
+    });
+
+    if (siteNotification?.success) {
+      summary.notificationsCreated += 1;
+
+      console.log("alert:site-notification:created", {
+        ts: new Date().toISOString(),
+        alertId,
+        email: userEmail,
+        userId: userId || null,
+        notificationId: siteNotification?.data?.id || null,
+      });
+    }
+  } catch (error) {
+    console.log("alert:site-notification:error", {
+      ts: new Date().toISOString(),
+      alertId,
+      email: userEmail,
+      userId: userId || null,
+      message: error?.message || String(error),
+    });
+
+    logAlertDispatch("alert:notification:error", {
+      phase: "site-notification",
+      alertId,
+      email: userEmail,
+      error: error?.message || String(error),
+    });
+  }
+
+  let pushStats = { sent: 0, failed: 0, skipped: 0 };
+
+  try {
+    pushStats = await sendTriggeredAlertWebPush({
+      alertId,
+      email: userEmail,
+      userId,
+      coin,
+      targetPrice,
+      currentPrice,
+      source: "worker/index.js::deliverTriggeredAlertAfterClaim",
+    });
+  } catch (error) {
+    pushStats = {
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      skipReason: "WEB_PUSH_DISPATCH_FAILED",
+    };
+
+    console.log("push:send:error", {
+      ts: new Date().toISOString(),
+      alertId,
+      email: userEmail,
+      userId: userId || null,
+      phase: "deliverTriggeredAlertAfterClaim",
+      message: error?.message || String(error),
+    });
+  }
+
+  aggregatePushStats(summary, pushStats);
+
+  return {
+    emailResult,
     siteNotification,
     pushStats,
   };
-};
+}
 
 const shouldTriggerAlert = ({ condition, targetPrice, currentPrice }) => {
   const cleanCondition = normalizeCondition(condition);
@@ -1087,6 +1204,18 @@ const shouldTriggerAlert = ({ condition, targetPrice, currentPrice }) => {
 };
 
 async function checkPriceAlerts() {
+  if (priceAlertCheckInProgress) {
+    logWorkerEvent("ALERT_CHECK_SKIPPED", {
+      worker: WORKER_ENTRY,
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+      reason: "PREVIOUS_CHECK_IN_PROGRESS",
+    });
+    return;
+  }
+
+  priceAlertCheckInProgress = true;
+
+  try {
   const startedAt = new Date().toISOString();
 
   logWorkerEvent("ALERT_CHECK_STARTED", {
@@ -1155,7 +1284,6 @@ async function checkPriceAlerts() {
   summary.uniqueCoins = alertsByCoin.size;
 
   const triggeredItems = [];
-  const emailJobs = [];
 
   for (const [coin, coinAlerts] of alertsByCoin.entries()) {
     try {
@@ -1182,6 +1310,17 @@ async function checkPriceAlerts() {
         }
 
         const conditionLabel = getConditionLabel(condition);
+
+        console.log("PRICE_ALERT_TRIGGERED", {
+          ts: new Date().toISOString(),
+          alertId: alert.id,
+          email: userEmail,
+          coin: formatCoinPair(coin),
+          targetPrice,
+          currentPrice,
+          condition,
+          conditionLabel,
+        });
 
         logWorkerEvent("PRICE_ALERT_TRIGGERED", {
           worker: WORKER_ENTRY,
@@ -1234,23 +1373,6 @@ async function checkPriceAlerts() {
           condition,
         });
 
-        emailJobs.push({
-          to: userEmail,
-          alertId: alert.id,
-          send: () =>
-            sendTriggeredAlertEmail({
-              email: userEmail,
-              coin,
-              condition,
-              targetPrice,
-              currentPrice,
-              alertId: alert.id,
-              userId: alert.user_id || null,
-              notificationMessage,
-            }),
-        });
-
-        summary.emailsQueued += 1;
         summary.triggered += 1;
 
         logWorkerEvent("ALERT_EMAIL_QUEUED", {
@@ -1260,6 +1382,18 @@ async function checkPriceAlerts() {
           coin: formatCoinPair(coin),
           targetPrice,
           currentPrice,
+        });
+
+        await deliverTriggeredAlertAfterClaim({
+          summary,
+          alertId: alert.id,
+          userEmail,
+          userId: alert.user_id || null,
+          coin,
+          condition,
+          targetPrice,
+          currentPrice,
+          notificationMessage,
         });
 
         triggeredItems.push({
@@ -1277,23 +1411,15 @@ async function checkPriceAlerts() {
     }
   }
 
-  if (emailJobs.length > 0) {
-    summary.emailStats = await processEmailQueue(emailJobs, {
-      label: "price-alerts",
-      worker: WORKER_ENTRY,
-    });
-
-    if (summary.emailStats?.pushStats) {
-      aggregatePushStats(summary, summary.emailStats.pushStats);
-    }
-  }
-
   logWorkerEvent("ALERT_CHECK_FINISHED", {
     ...summary,
     worker: WORKER_ENTRY,
     triggeredItems,
     finishedAt: new Date().toISOString(),
   });
+  } finally {
+    priceAlertCheckInProgress = false;
+  }
 }
 
 app.get("/health", async (_req, res) => {
@@ -1422,7 +1548,7 @@ app.listen(PORT, () => {
     priceAlertsEnabled: true,
     webPushConfigured: vapidStatus.configured,
     vapidStatus,
-    note: "Price alert email + Web Push are sent from worker/index.js sendTriggeredAlertEmail",
+    note: "Price alert email + site notification + Web Push run inline from worker/index.js deliverTriggeredAlertAfterClaim",
   });
 
   logWorkerEvent("WORKER_BOOT", {
@@ -1432,7 +1558,7 @@ app.listen(PORT, () => {
     port: PORT,
     checkIntervalMs: CHECK_INTERVAL_MS,
     priceAlertsEnabled: true,
-    note: "Price alert email + Web Push are sent from worker/index.js sendTriggeredAlertEmail",
+    note: "Price alert email + site notification + Web Push run inline from worker/index.js deliverTriggeredAlertAfterClaim",
   });
 
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
@@ -1446,14 +1572,14 @@ console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
   action: "PRICE_ALERTS_SCHEDULER_STARTED",
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
   intervalMs: CHECK_INTERVAL_MS,
-  realEmailPath: "worker/index.js::sendTriggeredAlertEmail",
+  realEmailPath: "worker/index.js::deliverTriggeredAlertAfterClaim",
 });
 
 logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
   worker: WORKER_ENTRY,
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
   intervalMs: CHECK_INTERVAL_MS,
-  realEmailPath: "worker/index.js::sendTriggeredAlertEmail",
+  realEmailPath: "worker/index.js::deliverTriggeredAlertAfterClaim",
 });
 
 checkPriceAlerts();
