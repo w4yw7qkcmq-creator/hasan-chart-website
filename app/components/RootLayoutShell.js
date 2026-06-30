@@ -10,6 +10,8 @@ import { supabase } from "../../lib/supabase";
 import {
   ensureServiceWorkerRegistration,
   getAnonymousPushId,
+  getExistingPushSubscription,
+  resolveBrowserPushState,
   savePushSubscriptionViaApi,
   serializePushSubscription,
   setStoredPushEndpoint,
@@ -230,19 +232,47 @@ function RootLayoutShell({ children }) {
   const mobileThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { mobile: true });
   const sidebarThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource);
   const headerThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { compact: true });
-  const browserNotificationLabel =
-    shellNotificationPermission === "granted" && shellWebPushEnabled
-      ? "🔔 إشعارات المتصفح مفعلة"
-      : "🔔 تفعيل إشعارات المتصفح";
+  const browserNotificationsActive =
+    shellNotificationPermission === "granted" && shellWebPushEnabled;
+  const browserNotificationLabel = browserNotificationsActive
+    ? "🔔 إشعارات المتصفح مفعّلة ✅"
+    : "🔔 تفعيل إشعارات المتصفح";
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
     useBootstrapLoadingOverlay(authResolved, { enabled: !isAuthPage });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) return;
+    if (typeof window === "undefined") return undefined;
 
-    setNotificationPermission(Notification.permission);
+    let active = true;
+
+    void (async () => {
+      const browserState = await resolveBrowserPushState();
+      if (!active) return;
+
+      setNotificationPermission(browserState.permission);
+
+      if (browserState.permission === "granted" && browserState.hasSubscription) {
+        setWebPushEnabled(true);
+
+        const endpoint = browserState.subscription?.endpoint;
+        if (endpoint) {
+          setStoredPushEndpoint(endpoint);
+        }
+
+        console.log(
+          "push:ui:enabled",
+          JSON.stringify({
+            source: "browser_subscription",
+            hasEndpoint: Boolean(endpoint),
+          })
+        );
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -253,7 +283,7 @@ function RootLayoutShell({ children }) {
     });
   }, []);
 
-  const savePushSubscription = async () => {
+  const savePushSubscription = async ({ existingSubscription = null } = {}) => {
     console.log(
       "push:client:start",
       JSON.stringify({
@@ -275,21 +305,27 @@ function RootLayoutShell({ children }) {
       throw new Error("يجب تسجيل الدخول قبل حفظ اشتراك الإشعارات");
     }
 
-    let subscription;
+    let subscription = existingSubscription;
 
-    try {
-      subscription = await subscribeToWebPush();
-    } catch (error) {
-      console.error(
-        "push:api:error",
-        JSON.stringify({
-          phase: "web_push_subscribe",
-          message: error?.message || String(error),
-        })
-      );
-      throw new Error(
-        error?.message || "تعذر إنشاء اشتراك Web Push من المتصفح"
-      );
+    if (!subscription) {
+      subscription = await getExistingPushSubscription();
+    }
+
+    if (!subscription) {
+      try {
+        subscription = await subscribeToWebPush();
+      } catch (error) {
+        console.error(
+          "push:api:error",
+          JSON.stringify({
+            phase: "web_push_subscribe",
+            message: error?.message || String(error),
+          })
+        );
+        throw new Error(
+          error?.message || "تعذر إنشاء اشتراك Web Push من المتصفح"
+        );
+      }
     }
 
     const payload = serializePushSubscription(subscription);
@@ -364,6 +400,44 @@ function RootLayoutShell({ children }) {
     }
 
     try {
+      const browserState = await resolveBrowserPushState();
+      setNotificationPermission(browserState.permission);
+
+      if (browserState.permission === "granted" && browserState.hasSubscription) {
+        setWebPushEnabled(true);
+
+        if (browserState.subscription?.endpoint) {
+          setStoredPushEndpoint(browserState.subscription.endpoint);
+        }
+
+        console.log(
+          "push:ui:enabled",
+          JSON.stringify({
+            source: "button_existing_subscription",
+          })
+        );
+
+        if (authResolved && currentUser?.email && currentUser?.id) {
+          try {
+            await savePushSubscription({
+              existingSubscription: browserState.subscription,
+            });
+          } catch (syncError) {
+            console.warn(
+              "Push subscription sync skipped:",
+              syncError?.message || syncError
+            );
+          }
+        }
+
+        showAppModal({
+          type: "success",
+          title: "إشعارات المتصفح",
+          message: "الإشعارات مفعّلة مسبقًا.",
+        });
+        return;
+      }
+
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
 
@@ -391,6 +465,13 @@ function RootLayoutShell({ children }) {
 
       setGlobalNotice("🔔 تم حفظ اشتراك إشعارات المتصفح بنجاح");
       setGlobalNoticeHref("");
+
+      console.log(
+        "push:ui:enabled",
+        JSON.stringify({
+          source: "button_new_subscription",
+        })
+      );
     } catch (error) {
       setWebPushEnabled(false);
       setStoredPushEndpoint("");
@@ -405,7 +486,6 @@ function RootLayoutShell({ children }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    if (!("Notification" in window) || Notification.permission !== "granted") return undefined;
     if (!authResolved || !currentUser?.email || !currentUser?.id) return undefined;
 
     let active = true;
@@ -413,29 +493,50 @@ function RootLayoutShell({ children }) {
     const cancelDeferred = scheduleAfterPaint(() => {
       if (!active) return;
 
-      console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN", {
-        email: currentUser.email,
-        userId: currentUser.id,
-      });
+      void (async () => {
+        const browserState = await resolveBrowserPushState();
+        if (!active) return;
 
-      savePushSubscription()
-        .then((saved) => {
+        setNotificationPermission(browserState.permission);
+
+        if (browserState.permission !== "granted" || !browserState.hasSubscription) {
+          return;
+        }
+
+        setWebPushEnabled(true);
+
+        if (browserState.subscription?.endpoint) {
+          setStoredPushEndpoint(browserState.subscription.endpoint);
+        }
+
+        console.log(
+          "push:ui:enabled",
+          JSON.stringify({
+            source: "login_sync",
+            email: currentUser.email,
+            userId: currentUser.id,
+          })
+        );
+
+        try {
+          const saved = await savePushSubscription({
+            existingSubscription: browserState.subscription,
+          });
+
           if (!active) return;
+
           if (saved?.apiCalled && saved?.subscription?.id) {
-            setWebPushEnabled(true);
             console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN_DONE", {
               subscriptionId: saved.subscription.id,
               email: saved.subscription.email || currentUser.email,
               userId: saved.subscription.user_id || currentUser.id,
             });
           }
-        })
-        .catch((err) => {
+        } catch (err) {
           if (!active) return;
-          setWebPushEnabled(false);
-          setStoredPushEndpoint("");
           console.warn("Push subscription sync skipped:", err?.message || err);
-        });
+        }
+      })();
     }, 3000);
 
     return () => {
@@ -702,7 +803,11 @@ function RootLayoutShell({ children }) {
                     onClick={() => {
                       void enableBrowserNotifications();
                     }}
-                    className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                      browserNotificationsActive
+                        ? "border-emerald-300/30 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
+                        : "border-cyan-300/20 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
+                    }`}
                   >
                     {browserNotificationLabel}
                   </button>
@@ -827,8 +932,8 @@ function RootLayoutShell({ children }) {
                     void enableBrowserNotifications();
                   }}
                   className={`inline-flex rounded-2xl px-4 py-2 text-sm font-black transition ${
-                    shellNotificationPermission === "granted" && shellWebPushEnabled
-                      ? "border border-cyan-200/60 bg-gradient-to-l from-cyan-500/90 to-blue-600/90 text-white shadow-[0_0_24px_rgba(34,211,238,0.22)] hover:brightness-110"
+                    browserNotificationsActive
+                      ? "border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
                       : "border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
                   }`}
                 >
