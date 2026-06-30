@@ -29,7 +29,7 @@ const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v10-web-push-diagnostics";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v11-web-push-dispatch-logs";
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
 const PRICE_ALERT_CHECK_CLAMP_ABOVE_MS = 60_000;
 
@@ -148,22 +148,34 @@ async function createSiteNotificationAfterEmail({ alertId, email, notificationMe
   return { success: true, data: notificationRow };
 }
 
-async function doPushForAlertOwner({
+function aggregatePushStats(summary, pushStats) {
+  if (!pushStats) return;
+
+  summary.pushesSent += pushStats.sent || 0;
+  summary.pushesFailed += pushStats.failed || 0;
+  summary.pushesSkipped += pushStats.skipped || 0;
+}
+
+async function sendTriggeredAlertWebPush({
   alertId,
   email,
   userId,
   coin,
   targetPrice,
   currentPrice,
-  source = "worker/index.js",
+  source = "worker/index.js::sendTriggeredAlertWebPush",
 }) {
   const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
 
-  console.log("PRICE_ALERT_PUSH_START", {
+  console.log("push:dispatch:start", {
+    ts: new Date().toISOString(),
     alertId,
     email,
     userId: userId || null,
     source,
+    coin: formatCoinPair(coin),
+    targetPrice,
+    currentPrice,
   });
 
   try {
@@ -176,6 +188,18 @@ async function doPushForAlertOwner({
       title: "🔔 وصل السعر إلى هدف التنبيه",
       body: pushBody,
       url: "https://www.hasanchartworld.com/alerts",
+    });
+
+    console.log("push:dispatch:finished", {
+      ts: new Date().toISOString(),
+      alertId,
+      email,
+      userId: userId || null,
+      source,
+      sent: stats?.sent || 0,
+      failed: stats?.failed || 0,
+      skipped: stats?.skipped || 0,
+      skipReason: stats?.skipReason || null,
     });
 
     if ((stats?.sent || 0) > 0) {
@@ -215,6 +239,16 @@ async function doPushForAlertOwner({
 
     return stats;
   } catch (pushError) {
+    console.log("push:send:error", {
+      ts: new Date().toISOString(),
+      alertId,
+      email,
+      userId: userId || null,
+      source,
+      phase: "dispatch",
+      message: pushError?.message || String(pushError),
+    });
+
     logAlertDispatch("alert:notification:error", {
       phase: "web-push",
       alertId,
@@ -224,7 +258,7 @@ async function doPushForAlertOwner({
       error: pushError?.message || String(pushError),
     });
 
-    return { sent: 0, failed: 1, skipped: 0 };
+    return { sent: 0, failed: 1, skipped: 0, skipReason: "WEB_PUSH_DISPATCH_FAILED" };
   }
 }
 
@@ -1009,7 +1043,15 @@ const sendTriggeredAlertEmail = async ({
       }),
   });
 
-  const pushStats = await doPushForAlertOwner({
+  console.log("push:dispatch:queued-after-site-notification", {
+    ts: new Date().toISOString(),
+    alertId,
+    email,
+    userId: userId || null,
+    siteNotificationCreated: Boolean(siteNotification?.success),
+  });
+
+  const pushStats = await sendTriggeredAlertWebPush({
     alertId,
     email,
     userId,
@@ -1240,6 +1282,10 @@ async function checkPriceAlerts() {
       label: "price-alerts",
       worker: WORKER_ENTRY,
     });
+
+    if (summary.emailStats?.pushStats) {
+      aggregatePushStats(summary, summary.emailStats.pushStats);
+    }
   }
 
   logWorkerEvent("ALERT_CHECK_FINISHED", {

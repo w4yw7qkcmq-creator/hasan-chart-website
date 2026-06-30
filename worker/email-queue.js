@@ -137,6 +137,11 @@ async function processEmailQueue(items, options = {}) {
     failedCount: 0,
     skippedCount: 0,
     failedEmails: [],
+    pushStats: {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+    },
   };
 
   logWorkerEvent("EMAIL_QUEUE_STARTED", {
@@ -173,6 +178,14 @@ async function processEmailQueue(items, options = {}) {
 
     if (outcome.status === "sent") {
       stats.sentCount += 1;
+
+      const pushStats = outcome.result?.pushStats;
+      if (pushStats) {
+        stats.pushStats.sent += pushStats.sent || 0;
+        stats.pushStats.failed += pushStats.failed || 0;
+        stats.pushStats.skipped += pushStats.skipped || 0;
+      }
+
       continue;
     }
 

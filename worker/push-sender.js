@@ -197,17 +197,6 @@ async function sendPriceAlertPushNotifications({
   const normalizedEmail = String(email || "").trim().toLowerCase();
   let resolvedUserId = String(userId || "").trim() || null;
 
-  logWorkerEvent("PRICE_ALERT_PUSH_START", {
-    worker: workerEntry,
-    alertId,
-    email: normalizedEmail || null,
-    userId: resolvedUserId,
-    webPushConfigured: isWebPushConfigured(),
-    vapidStatus: getVapidEnvStatus(),
-    title,
-    bodyPreview: String(body || "").slice(0, 180),
-  });
-
   if (!normalizedEmail && !resolvedUserId) {
     logPushEvent("push:subscription:not_found", {
       alertId,
@@ -247,6 +236,12 @@ async function sendPriceAlertPushNotifications({
 
   let subscriptionLookup = { rows: [], foundBy: null };
 
+  logPushEvent("push:subscription:lookup", {
+    alertId,
+    email: normalizedEmail || null,
+    userId: resolvedUserId || null,
+  });
+
   try {
     subscriptionLookup = await findPushSubscriptionsForRecipient(supabase, {
       email: normalizedEmail,
@@ -277,6 +272,16 @@ async function sendPriceAlertPushNotifications({
 
     return { sent: 0, failed: 0, skipped: 1, skipReason: "NO_PUSH_SUBSCRIPTIONS" };
   }
+
+  logPushEvent("push:subscription:found", {
+    alertId,
+    email: normalizedEmail || null,
+    userId: resolvedUserId || null,
+    foundBy: subscriptionLookup.foundBy || null,
+    count: subscriptionList.length,
+    subscriptionIds: subscriptionList.map((row) => row.id),
+    endpoints: subscriptionList.map((row) => String(row.endpoint || "").slice(0, 72)),
+  });
 
   if (subscriptionLookup.foundBy === "user_id") {
     logPushEvent("push:subscription:found_by_user_id", {
