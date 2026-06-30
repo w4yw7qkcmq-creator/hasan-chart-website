@@ -7,7 +7,7 @@ import { useNotifications } from "./NotificationProvider";
 
 export function NotificationBell({ className = "" }) {
   const { user } = useAuth();
-  const { unreadCount, bellShakeKey, setNotificationPanelOpen } = useNotifications();
+  const { unreadCount, bellShakeKey, setNotificationPanelOpen, markAllAsRead } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const bellRef = useRef(null);
 
@@ -22,7 +22,13 @@ export function NotificationBell({ className = "" }) {
   if (!user?.email) return null;
 
   const handleBellClick = () => {
-    setIsNotificationsOpen((current) => !current);
+    const opening = !isNotificationsOpen;
+
+    if (opening) {
+      markAllAsRead();
+    }
+
+    setIsNotificationsOpen(opening);
   };
 
   return (

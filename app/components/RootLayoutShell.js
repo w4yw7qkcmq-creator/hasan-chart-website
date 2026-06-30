@@ -803,10 +803,8 @@ function RootLayoutShell({ children }) {
                     onClick={() => {
                       void enableBrowserNotifications();
                     }}
-                    className={`w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
-                      browserNotificationsActive
-                        ? "border-emerald-300/30 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
-                        : "border-cyan-300/20 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
+                    className={`browserPushBtn w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                      browserNotificationsActive ? "browserPushBtn--active" : ""
                     }`}
                   >
                     {browserNotificationLabel}
@@ -931,10 +929,8 @@ function RootLayoutShell({ children }) {
                   onClick={() => {
                     void enableBrowserNotifications();
                   }}
-                  className={`inline-flex rounded-2xl px-4 py-2 text-sm font-black transition ${
-                    browserNotificationsActive
-                      ? "border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
-                      : "border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
+                  className={`browserPushBtn inline-flex rounded-2xl px-4 py-2 text-sm font-black transition ${
+                    browserNotificationsActive ? "browserPushBtn--active" : ""
                   }`}
                 >
                   {browserNotificationLabel}

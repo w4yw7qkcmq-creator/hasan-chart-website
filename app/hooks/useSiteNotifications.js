@@ -80,9 +80,10 @@ export function useSiteNotifications() {
   const mutationEpochRef = useRef(0);
   const mutationInFlightRef = useRef(false);
   const clearedAllNotificationsRef = useRef(false);
+  const markedAllReadAtRef = useRef(0);
 
   const applyServerSnapshot = useCallback((serverNotifications) => {
-    const list = (serverNotifications || []).filter(Boolean);
+    let list = (serverNotifications || []).filter(Boolean);
 
     if (clearedAllNotificationsRef.current && list.length > 0) {
       setNotifications([]);
@@ -92,6 +93,10 @@ export function useSiteNotifications() {
 
     if (clearedAllNotificationsRef.current && list.length === 0) {
       clearedAllNotificationsRef.current = false;
+    }
+
+    if (Date.now() - markedAllReadAtRef.current < 8000) {
+      list = list.map((item) => ({ ...item, isRead: true }));
     }
 
     knownIdsRef.current = new Set(list.map((item) => item.id).filter(Boolean));
@@ -468,7 +473,9 @@ export function useSiteNotifications() {
     [runNotificationMutation]
   );
 
-  const markAllAsRead = useCallback(async () => {
+  const markAllAsRead = useCallback(() => {
+    markedAllReadAtRef.current = Date.now();
+
     setNotifications((current) => {
       const next = current.map((item) => ({ ...item, isRead: true }));
       logNotificationMetrics("after-mark-read-local", next);
@@ -476,7 +483,7 @@ export function useSiteNotifications() {
       return next;
     });
 
-    await runNotificationMutation(async () => {
+    void (async () => {
       try {
         const response = await fetch("/api/mark-notifications-read", {
           method: "POST",
@@ -487,12 +494,15 @@ export function useSiteNotifications() {
 
         if (!response.ok) {
           console.warn("Mark all notifications read failed:", response.status);
+          return;
         }
+
+        void syncFromServer({ fresh: true });
       } catch (err) {
         console.warn("Mark all notifications read skipped:", err?.message || err);
       }
-    });
-  }, [runNotificationMutation]);
+    })();
+  }, [syncFromServer]);
 
   const deleteNotification = useCallback(
     async (notificationId) => {
