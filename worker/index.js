@@ -30,11 +30,11 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications, getVapidEnvStatus } = require("./push-sender");
-const { buildPriceAlertEmailPayload } = require("./price-alert-email");
+const { sendPriceAlertEmail } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v20-single-path-final";
+const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v21-single-email-worker";
 const PRICE_ALERT_SINGLE_PATH = "worker/index.js::deliverRealPriceAlert";
 
 function logPriceAlertDeliveryError({ alertId, email, userId, phase, message, details = {} }) {
@@ -846,86 +846,6 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
   };
 };
 
-async function sendAlertEmailOnly({
-  email,
-  coin,
-  condition,
-  targetPrice,
-  currentPrice,
-  alertId = null,
-  userId = null,
-}) {
-  const coinLabel = formatCoinPair(coin);
-
-  if (!resendApiKey || !email) {
-    const skipReason = !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email";
-
-    return {
-      success: false,
-      skipped: true,
-      sent: false,
-      reason: skipReason,
-    };
-  }
-
-  const safeCoin = escapeHtml(coinLabel);
-  const conditionLabel = getConditionLabel(condition);
-  const safeConditionLabel = escapeHtml(conditionLabel);
-  const safeTargetPrice = escapeHtml(formatNumber(targetPrice));
-  const safeCurrentPrice = escapeHtml(formatNumber(currentPrice));
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${resendApiKey}`,
-    },
-    body: JSON.stringify(
-      buildPriceAlertEmailPayload({
-        email,
-        coinLabel: safeCoin,
-        conditionLabel: safeConditionLabel,
-        targetPrice: safeTargetPrice,
-        currentPrice: safeCurrentPrice,
-        alertId,
-      })
-    ),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    return {
-      success: false,
-      sent: false,
-      status: response.status,
-      error: data?.message || response.statusText || "Email provider error",
-      result: data,
-    };
-  }
-
-  console.log(
-    "PRICE_ALERT_EMAIL_SENT",
-    JSON.stringify({
-      path: PRICE_ALERT_SINGLE_PATH,
-      alertId,
-      email,
-      userId: userId || null,
-      resendId: data?.id || null,
-      template: "dark-compact-v1",
-      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    })
-  );
-
-  return {
-    success: true,
-    sent: true,
-    status: response.status,
-    id: data?.id || null,
-    data,
-  };
-}
-
 async function deliverRealPriceAlert({
   summary,
   alertId,
@@ -1051,12 +971,14 @@ async function deliverRealPriceAlert({
   summary.emailsQueued += 1;
 
   try {
-    emailResult = await sendAlertEmailOnly({
+    emailResult = await sendPriceAlertEmail({
+      supabase,
+      resendApiKey,
       email: normalizedEmail,
-      coin,
-      condition,
-      targetPrice,
-      currentPrice,
+      coinLabel: escapeHtml(formatCoinPair(coin)),
+      conditionLabel: escapeHtml(getConditionLabel(condition)),
+      targetPrice: escapeHtml(formatNumber(targetPrice)),
+      currentPrice: escapeHtml(formatNumber(currentPrice)),
       alertId,
       userId: normalizedUserId,
     });

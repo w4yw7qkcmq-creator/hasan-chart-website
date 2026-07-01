@@ -1,6 +1,9 @@
 const PRICE_ALERT_FROM = "HasaN CharT Alerts <alerts@hasanchartworld.com>";
 const PRICE_ALERT_CTA_URL = "https://www.hasanchartworld.com/alerts";
 const PRICE_ALERT_EMAIL_TEMPLATE = "dark-compact-v1";
+const PRICE_ALERT_MESSAGE_TYPE = "price-alert";
+
+const sentPriceAlertEmailIds = new Set();
 
 function buildPriceAlertEmailHtml({
   coinLabel,
@@ -80,16 +83,23 @@ function buildPriceAlertEmailPayload({
 }) {
   const safeCoin = String(coinLabel || "");
   const subject = `🔔 وصل السعر إلى هدف التنبيه - ${safeCoin}`;
+  const normalizedAlertId = String(alertId || "").trim();
+
+  const tags = [
+    { name: "message_type", value: PRICE_ALERT_MESSAGE_TYPE },
+    { name: "category", value: PRICE_ALERT_MESSAGE_TYPE },
+    { name: "template", value: PRICE_ALERT_EMAIL_TEMPLATE },
+  ];
+
+  if (normalizedAlertId) {
+    tags.push({ name: "alert_id", value: normalizedAlertId });
+  }
 
   return {
     from: PRICE_ALERT_FROM,
     to: email,
     subject,
-    tags: [
-      { name: "message_type", value: "price-alert" },
-      { name: "category", value: "price-alert" },
-      { name: "template", value: PRICE_ALERT_EMAIL_TEMPLATE },
-    ],
+    tags,
     html: buildPriceAlertEmailHtml({
       coinLabel,
       conditionLabel,
@@ -102,7 +112,239 @@ function buildPriceAlertEmailPayload({
       targetPrice,
       currentPrice,
     }),
-    alertId,
+  };
+}
+
+async function hasPriceAlertEmailAlreadySent(supabase, alertId) {
+  const normalizedAlertId = String(alertId || "").trim();
+  if (!normalizedAlertId) return false;
+
+  if (sentPriceAlertEmailIds.has(normalizedAlertId)) {
+    return true;
+  }
+
+  const { data: alertRow, error: alertError } = await supabase
+    .from("price_alerts")
+    .select("email_sent_at, email_resend_id")
+    .eq("id", normalizedAlertId)
+    .maybeSingle();
+
+  if (alertError) {
+    if (/email_sent_at|email_resend_id/.test(String(alertError.message || ""))) {
+      return sentPriceAlertEmailIds.has(normalizedAlertId);
+    }
+
+    throw alertError;
+  }
+
+  if (alertRow?.email_sent_at || alertRow?.email_resend_id) {
+    sentPriceAlertEmailIds.add(normalizedAlertId);
+    return true;
+  }
+
+  return false;
+}
+
+async function claimPriceAlertEmailSend(supabase, alertId) {
+  const normalizedAlertId = String(alertId || "").trim();
+  if (!normalizedAlertId) return false;
+
+  if (sentPriceAlertEmailIds.has(normalizedAlertId)) {
+    return false;
+  }
+
+  const { data, error } = await supabase
+    .from("price_alerts")
+    .update({ email_sent_at: new Date().toISOString() })
+    .eq("id", normalizedAlertId)
+    .is("email_sent_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (/email_sent_at/.test(String(error.message || ""))) {
+      if (sentPriceAlertEmailIds.has(normalizedAlertId)) return false;
+      sentPriceAlertEmailIds.add(normalizedAlertId);
+      return true;
+    }
+
+    throw error;
+  }
+
+  if (!data?.id) {
+    return false;
+  }
+
+  sentPriceAlertEmailIds.add(normalizedAlertId);
+  return true;
+}
+
+async function recordPriceAlertEmailMessage(supabase, { alertId, email, resendId, subject }) {
+  if (!resendId) return;
+
+  const row = {
+    resend_id: resendId,
+    recipient_email: String(email || "").trim().toLowerCase(),
+    subject: subject || null,
+    message_type: PRICE_ALERT_MESSAGE_TYPE,
+    status: "sent",
+    sent_at: new Date().toISOString(),
+    last_event_at: new Date().toISOString(),
+  };
+
+  const { error: messageError } = await supabase.from("email_messages").upsert(row, {
+    onConflict: "resend_id",
+  });
+
+  if (messageError) {
+    console.error(
+      "PRICE_ALERT_EMAIL_SENT_SINGLE",
+      JSON.stringify({
+        phase: "email_messages_upsert_failed",
+        alertId,
+        email,
+        resendId,
+        message: messageError.message || String(messageError),
+      })
+    );
+  }
+
+  const { error: alertUpdateError } = await supabase
+    .from("price_alerts")
+    .update({ email_resend_id: resendId })
+    .eq("id", alertId);
+
+  if (alertUpdateError && !/email_resend_id/.test(String(alertUpdateError.message || ""))) {
+    console.error(
+      "PRICE_ALERT_EMAIL_SENT_SINGLE",
+      JSON.stringify({
+        phase: "price_alerts_resend_id_update_failed",
+        alertId,
+        resendId,
+        message: alertUpdateError.message || String(alertUpdateError),
+      })
+    );
+  }
+}
+
+async function sendPriceAlertEmail({
+  supabase,
+  resendApiKey,
+  email,
+  coinLabel,
+  conditionLabel,
+  targetPrice,
+  currentPrice,
+  alertId,
+  userId = null,
+}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedAlertId = String(alertId || "").trim();
+
+  if (!resendApiKey || !normalizedEmail) {
+    return {
+      success: false,
+      skipped: true,
+      sent: false,
+      reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
+    };
+  }
+
+  if (!normalizedAlertId) {
+    return {
+      success: false,
+      skipped: true,
+      sent: false,
+      reason: "Missing alertId",
+    };
+  }
+
+  if (await hasPriceAlertEmailAlreadySent(supabase, normalizedAlertId)) {
+    return {
+      success: true,
+      skipped: true,
+      sent: false,
+      reason: "EMAIL_ALREADY_SENT_FOR_ALERT",
+      alertId: normalizedAlertId,
+    };
+  }
+
+  const claimed = await claimPriceAlertEmailSend(supabase, normalizedAlertId);
+  if (!claimed) {
+    return {
+      success: true,
+      skipped: true,
+      sent: false,
+      reason: "EMAIL_ALREADY_SENT_FOR_ALERT",
+      alertId: normalizedAlertId,
+    };
+  }
+
+  const payload = buildPriceAlertEmailPayload({
+    email: normalizedEmail,
+    coinLabel,
+    conditionLabel,
+    targetPrice,
+    currentPrice,
+    alertId: normalizedAlertId,
+  });
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${resendApiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    sentPriceAlertEmailIds.delete(normalizedAlertId);
+
+    await supabase
+      .from("price_alerts")
+      .update({ email_sent_at: null })
+      .eq("id", normalizedAlertId)
+      .catch(() => null);
+
+    return {
+      success: false,
+      sent: false,
+      status: response.status,
+      error: data?.message || response.statusText || "Email provider error",
+      result: data,
+    };
+  }
+
+  const resendId = data?.id || null;
+
+  await recordPriceAlertEmailMessage(supabase, {
+    alertId: normalizedAlertId,
+    email: normalizedEmail,
+    resendId,
+    subject: payload.subject,
+  });
+
+  console.log(
+    "PRICE_ALERT_EMAIL_SENT_SINGLE",
+    JSON.stringify({
+      path: "worker/price-alert-email.js::sendPriceAlertEmail",
+      alertId: normalizedAlertId,
+      email: normalizedEmail,
+      userId: userId || null,
+      resendId,
+      template: PRICE_ALERT_EMAIL_TEMPLATE,
+    })
+  );
+
+  return {
+    success: true,
+    sent: true,
+    status: response.status,
+    id: resendId,
+    data,
   };
 }
 
@@ -110,5 +352,7 @@ module.exports = {
   PRICE_ALERT_FROM,
   PRICE_ALERT_CTA_URL,
   PRICE_ALERT_EMAIL_TEMPLATE,
+  PRICE_ALERT_MESSAGE_TYPE,
   buildPriceAlertEmailPayload,
+  sendPriceAlertEmail,
 };
