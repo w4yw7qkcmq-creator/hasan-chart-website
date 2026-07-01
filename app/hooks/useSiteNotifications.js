@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
-import { playNotificationSound, setupNotificationSoundUnlock } from "../../lib/notification-sound";
+import { playNotificationSound, setupNotificationSoundUnlock, installNotificationSoundTestHook } from "../../lib/notification-sound";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
@@ -589,6 +589,7 @@ export function useSiteNotifications() {
     }
 
     setupNotificationSoundUnlock();
+    const removeSoundTestHook = installNotificationSoundTestHook();
 
     let active = true;
     const generation = syncGenerationRef.current + 1;
@@ -687,6 +688,7 @@ export function useSiteNotifications() {
 
       void syncFromServer({
         generation: syncGenerationRef.current,
+        announceNew: true,
       });
 
       if (!realtimeConnectedRef.current) {
@@ -714,6 +716,7 @@ export function useSiteNotifications() {
       }
       setRealtimeConnected(false);
       realtimeConnectedRef.current = false;
+      removeSoundTestHook();
     };
   }, [
     authResolved,
