@@ -28,7 +28,7 @@ const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-29-v12-inline-alert-dispatch";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v13-independent-alert-dispatch";
 
 let priceAlertCheckInProgress = false;
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
@@ -117,7 +117,15 @@ function logAlertDispatch(event, payload = {}) {
   });
 }
 
-async function createSiteNotificationAfterEmail({ alertId, email, notificationMessage }) {
+async function createSiteNotificationForAlert({ alertId, email, notificationMessage }) {
+  console.log(
+    "alert:notification:create:start",
+    JSON.stringify({
+      alertId,
+      email,
+    })
+  );
+
   const { data: notificationRow, error: notificationError } = await createUserNotification(
     supabase,
     {
@@ -129,22 +137,27 @@ async function createSiteNotificationAfterEmail({ alertId, email, notificationMe
   );
 
   if (notificationError) {
-    logAlertDispatch("alert:notification:error", {
-      phase: "site-notification",
-      alertId,
-      email,
-      error: notificationError.message,
-    });
+    console.error(
+      "alert:notification:create:error",
+      JSON.stringify({
+        alertId,
+        email,
+        message: notificationError.message || String(notificationError),
+      })
+    );
 
     return { success: false, error: notificationError };
   }
 
-  logAlertDispatch("alert:site-notification:created", {
-    alertId,
-    email,
-    notificationId: notificationRow?.id || null,
-    type: "price-alert",
-  });
+  console.log(
+    "alert:notification:create:success",
+    JSON.stringify({
+      alertId,
+      email,
+      notificationId: notificationRow?.id || null,
+      type: "price-alert",
+    })
+  );
 
   return { success: true, data: notificationRow };
 }
@@ -168,16 +181,18 @@ async function sendTriggeredAlertWebPush({
 }) {
   const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
 
-  console.log("push:dispatch:start", {
-    ts: new Date().toISOString(),
-    alertId,
-    email,
-    userId: userId || null,
-    source,
-    coin: formatCoinPair(coin),
-    targetPrice,
-    currentPrice,
-  });
+  console.log(
+    "alert:push:send:start",
+    JSON.stringify({
+      alertId,
+      email,
+      userId: userId || null,
+      source,
+      coin: formatCoinPair(coin),
+      targetPrice,
+      currentPrice,
+    })
+  );
 
   try {
     const stats = await sendPriceAlertPushNotifications({
@@ -204,6 +219,19 @@ async function sendTriggeredAlertWebPush({
     });
 
     if ((stats?.sent || 0) > 0) {
+      console.log(
+        "alert:push:send:success",
+        JSON.stringify({
+          alertId,
+          email,
+          userId: userId || null,
+          source,
+          sent: stats.sent,
+          failed: stats.failed || 0,
+          skipped: stats.skipped || 0,
+        })
+      );
+
       logAlertDispatch("alert:push:sent", {
         alertId,
         email,
@@ -908,16 +936,18 @@ async function sendAlertEmailOnly({
 }) {
   const coinLabel = formatCoinPair(coin);
 
-  console.log("alert:email:start", {
-    ts: new Date().toISOString(),
-    alertId,
-    email,
-    userId: userId || null,
-    coin: coinLabel,
-    targetPrice,
-    currentPrice,
-    condition,
-  });
+  console.log(
+    "alert:email:send:start",
+    JSON.stringify({
+      alertId,
+      email,
+      userId: userId || null,
+      coin: coinLabel,
+      targetPrice,
+      currentPrice,
+      condition,
+    })
+  );
 
   logWorkerEvent("PRICE_ALERT_EMAIL_REAL_PATH_FOUND", {
     worker: WORKER_ENTRY,
@@ -1000,6 +1030,16 @@ async function sendAlertEmailOnly({
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    console.error(
+      "alert:email:send:error",
+      JSON.stringify({
+        alertId,
+        email,
+        status: response.status,
+        error: data?.message || response.statusText || "Email provider error",
+      })
+    );
+
     logWorkerEvent("ALERT_EMAIL_SEND_FAILED", {
       worker: WORKER_ENTRY,
       alertId,
@@ -1030,14 +1070,16 @@ async function sendAlertEmailOnly({
     resendId: data?.id || null,
   });
 
-  console.log("alert:email:sent", {
-    ts: new Date().toISOString(),
-    alertId,
-    email,
-    userId: userId || null,
-    resendId: data?.id || null,
-    from: PRICE_ALERT_FROM,
-  });
+  console.log(
+    "alert:email:send:success",
+    JSON.stringify({
+      alertId,
+      email,
+      userId: userId || null,
+      resendId: data?.id || null,
+      from: PRICE_ALERT_FROM,
+    })
+  );
 
   logAlertDispatch("alert:email:sent", {
     alertId,
@@ -1072,15 +1114,29 @@ async function deliverTriggeredAlertAfterClaim({
 }) {
   summary.emailsQueued += 1;
 
-  let emailResult = {
-    success: false,
-    sent: false,
-    skipped: true,
-    reason: "EMAIL_NOT_ATTEMPTED",
-  };
+  console.log(
+    "alert:triggered",
+    JSON.stringify({
+      alertId,
+      email: userEmail,
+      userId: userId || null,
+      coin: formatCoinPair(coin),
+      targetPrice,
+      currentPrice,
+      condition,
+    })
+  );
 
-  try {
-    emailResult = await sendAlertEmailOnly({
+  const [siteNotification, emailResult, pushStats] = await Promise.all([
+    createSiteNotificationForAlert({
+      alertId,
+      email: userEmail,
+      notificationMessage,
+    }).catch((error) => ({
+      success: false,
+      error: { message: error?.message || String(error) },
+    })),
+    sendAlertEmailOnly({
       email: userEmail,
       coin,
       condition,
@@ -1088,72 +1144,12 @@ async function deliverTriggeredAlertAfterClaim({
       currentPrice,
       alertId,
       userId,
-    });
-  } catch (error) {
-    emailResult = {
+    }).catch((error) => ({
       success: false,
       sent: false,
       error: error?.message || String(error),
-    };
-
-    console.log("alert:email:error", {
-      ts: new Date().toISOString(),
-      alertId,
-      email: userEmail,
-      userId: userId || null,
-      message: emailResult.error,
-    });
-  }
-
-  console.log("alert:site-notification:start", {
-    ts: new Date().toISOString(),
-    alertId,
-    email: userEmail,
-    userId: userId || null,
-    emailSent: Boolean(emailResult?.sent),
-  });
-
-  let siteNotification = { success: false };
-
-  try {
-    siteNotification = await createSiteNotificationAfterEmail({
-      alertId,
-      email: userEmail,
-      notificationMessage,
-    });
-
-    if (siteNotification?.success) {
-      summary.notificationsCreated += 1;
-
-      console.log("alert:site-notification:created", {
-        ts: new Date().toISOString(),
-        alertId,
-        email: userEmail,
-        userId: userId || null,
-        notificationId: siteNotification?.data?.id || null,
-      });
-    }
-  } catch (error) {
-    console.log("alert:site-notification:error", {
-      ts: new Date().toISOString(),
-      alertId,
-      email: userEmail,
-      userId: userId || null,
-      message: error?.message || String(error),
-    });
-
-    logAlertDispatch("alert:notification:error", {
-      phase: "site-notification",
-      alertId,
-      email: userEmail,
-      error: error?.message || String(error),
-    });
-  }
-
-  let pushStats = { sent: 0, failed: 0, skipped: 0 };
-
-  try {
-    pushStats = await sendTriggeredAlertWebPush({
+    })),
+    sendTriggeredAlertWebPush({
       alertId,
       email: userEmail,
       userId,
@@ -1161,23 +1157,16 @@ async function deliverTriggeredAlertAfterClaim({
       targetPrice,
       currentPrice,
       source: "worker/index.js::deliverTriggeredAlertAfterClaim",
-    });
-  } catch (error) {
-    pushStats = {
+    }).catch((error) => ({
       sent: 0,
       failed: 1,
       skipped: 0,
-      skipReason: "WEB_PUSH_DISPATCH_FAILED",
-    };
+      skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
+    })),
+  ]);
 
-    console.log("push:send:error", {
-      ts: new Date().toISOString(),
-      alertId,
-      email: userEmail,
-      userId: userId || null,
-      phase: "deliverTriggeredAlertAfterClaim",
-      message: error?.message || String(error),
-    });
+  if (siteNotification?.success) {
+    summary.notificationsCreated += 1;
   }
 
   aggregatePushStats(summary, pushStats);
