@@ -1,4 +1,11 @@
-require("dotenv").config({ path: require("path").join(__dirname, "../.env.local") });
+const path = require("path");
+
+console.log("WORKER_VERSION_REAL_V16");
+console.log("WORKER_ENTRY_FILE", __filename);
+console.log("WORKER_ENTRY_REALPATH", path.resolve(__filename));
+console.log("WORKER_PROCESS_CWD", process.cwd());
+
+require("dotenv").config({ path: path.join(__dirname, "../.env.local") });
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -28,7 +35,19 @@ const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v15-push-email-guarantee";
+const REAL_ALERT_DELIVERY_PATH = "worker/index.js::checkPriceAlerts->deliverRealPriceAlert->sendAlertEmailOnly";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v16-real-delivery-path";
+
+console.log(
+  "REAL_ALERT_DELIVERY_PATH",
+  JSON.stringify({
+    path: REAL_ALERT_DELIVERY_PATH,
+    worker: WORKER_ENTRY,
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    phase: "module-load",
+    ts: new Date().toISOString(),
+  })
+);
 
 let priceAlertCheckInProgress = false;
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
@@ -159,6 +178,17 @@ async function createSiteNotificationForAlert({ alertId, email, notificationMess
     })
   );
 
+  console.log(
+    "REAL_ALERT_NOTIFICATION_CREATED",
+    JSON.stringify({
+      path: REAL_ALERT_DELIVERY_PATH,
+      alertId,
+      email,
+      notificationId: notificationRow?.id || null,
+      type: "price-alert",
+    })
+  );
+
   return { success: true, data: notificationRow };
 }
 
@@ -243,6 +273,19 @@ async function sendTriggeredAlertWebPush({
           sent: stats.sent,
           failed: stats.failed || 0,
           skipped: stats.skipped || 0,
+          foundBy: stats.foundBy || null,
+          subscriptionCount: stats.subscriptionCount || null,
+        })
+      );
+
+      console.log(
+        "REAL_ALERT_PUSH_SENT",
+        JSON.stringify({
+          path: REAL_ALERT_DELIVERY_PATH,
+          alertId,
+          email: normalizedEmail || null,
+          userId: normalizedUserId,
+          sent: stats.sent,
           foundBy: stats.foundBy || null,
           subscriptionCount: stats.subscriptionCount || null,
         })
@@ -1027,6 +1070,7 @@ async function sendAlertEmailOnly({
   console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
     file: "worker/index.js",
     function: "sendAlertEmailOnly",
+    realPath: REAL_ALERT_DELIVERY_PATH,
     from: PRICE_ALERT_FROM,
     alertId,
     email,
@@ -1109,6 +1153,18 @@ async function sendAlertEmailOnly({
     })
   );
 
+  console.log(
+    "REAL_ALERT_EMAIL_SENT",
+    JSON.stringify({
+      path: REAL_ALERT_DELIVERY_PATH,
+      alertId,
+      email,
+      userId: userId || null,
+      resendId: data?.id || null,
+      from: PRICE_ALERT_FROM,
+    })
+  );
+
   logAlertDispatch("alert:email:sent", {
     alertId,
     email,
@@ -1129,7 +1185,7 @@ async function sendAlertEmailOnly({
   };
 }
 
-async function deliverTriggeredAlertAfterClaim({
+async function deliverRealPriceAlert({
   summary,
   alertId,
   userEmail,
@@ -1146,15 +1202,13 @@ async function deliverTriggeredAlertAfterClaim({
   summary.emailsQueued += 1;
 
   console.log(
-    "alert:triggered",
+    "REAL_ALERT_DELIVERY_PATH",
     JSON.stringify({
+      path: REAL_ALERT_DELIVERY_PATH,
+      phase: "dispatch-start",
       alertId,
       email: normalizedEmail || null,
       userId: normalizedUserId,
-      coin: formatCoinPair(coin),
-      targetPrice,
-      currentPrice,
-      condition,
       moduleVersion: PRICE_ALERTS_MODULE_VERSION,
     })
   );
@@ -1208,7 +1262,7 @@ async function deliverTriggeredAlertAfterClaim({
       coin,
       targetPrice,
       currentPrice,
-      source: "worker/index.js::deliverTriggeredAlertAfterClaim",
+      source: "worker/index.js::deliverRealPriceAlert",
     });
   } catch (error) {
     console.error(
@@ -1457,6 +1511,35 @@ async function checkPriceAlerts() {
 
         summary.alertsUpdated += 1;
 
+        console.log(
+          "REAL_ALERT_DELIVERY_PATH",
+          JSON.stringify({
+            path: REAL_ALERT_DELIVERY_PATH,
+            phase: "trigger-claimed",
+            alertId: alert.id,
+            email: userEmail,
+            userId: alert.user_id || null,
+            coin: formatCoinPair(coin),
+            targetPrice,
+            currentPrice,
+            moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+          })
+        );
+
+        console.log(
+          "alert:triggered",
+          JSON.stringify({
+            alertId: alert.id,
+            email: userEmail,
+            userId: alert.user_id || null,
+            coin: formatCoinPair(coin),
+            targetPrice,
+            currentPrice,
+            condition,
+            moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+          })
+        );
+
         const notificationMessage = buildPriceAlertNotificationMessage({
           coin,
           targetPrice,
@@ -1476,7 +1559,7 @@ async function checkPriceAlerts() {
         });
 
         try {
-          await deliverTriggeredAlertAfterClaim({
+          await deliverRealPriceAlert({
             summary,
             alertId: alert.id,
             userEmail,
@@ -1521,6 +1604,18 @@ async function checkPriceAlerts() {
   }
 
   console.log(
+    "REAL_ALERT_SUMMARY",
+    JSON.stringify({
+      path: REAL_ALERT_DELIVERY_PATH,
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+      triggered: summary.triggered,
+      notificationsCreated: summary.notificationsCreated,
+      pushesSent: summary.pushesSent,
+      emailsQueued: summary.emailsQueued,
+    })
+  );
+
+  console.log(
     "alert:check:summary",
     JSON.stringify({
       triggered: summary.triggered,
@@ -1550,6 +1645,7 @@ app.get("/health", async (_req, res) => {
     service: "hasan-chart-worker",
     workerEntry: WORKER_ENTRY,
     priceAlertsModuleVersion: PRICE_ALERTS_MODULE_VERSION,
+    realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
     alertsWorker: true,
     checkIntervalMs: CHECK_INTERVAL_MS,
     webPushConfigured: vapidStatus.configured,
@@ -1667,7 +1763,7 @@ app.listen(PORT, () => {
     priceAlertsEnabled: true,
     webPushConfigured: vapidStatus.configured,
     vapidStatus,
-    note: "Price alert email + site notification + Web Push run inline from worker/index.js deliverTriggeredAlertAfterClaim",
+    note: "Price alert delivery: worker/index.js deliverRealPriceAlert (notification + push + email)",
   });
 
   logWorkerEvent("WORKER_BOOT", {
@@ -1677,7 +1773,8 @@ app.listen(PORT, () => {
     port: PORT,
     checkIntervalMs: CHECK_INTERVAL_MS,
     priceAlertsEnabled: true,
-    note: "Price alert email + site notification + Web Push run inline from worker/index.js deliverTriggeredAlertAfterClaim",
+    realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
+    note: "Price alert delivery: worker/index.js deliverRealPriceAlert (notification + push + email)",
   });
 
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
@@ -1691,14 +1788,16 @@ console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
   action: "PRICE_ALERTS_SCHEDULER_STARTED",
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
   intervalMs: CHECK_INTERVAL_MS,
-  realEmailPath: "worker/index.js::deliverTriggeredAlertAfterClaim",
+  realEmailPath: REAL_ALERT_DELIVERY_PATH,
+  realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
 });
 
 logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
   worker: WORKER_ENTRY,
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
   intervalMs: CHECK_INTERVAL_MS,
-  realEmailPath: "worker/index.js::deliverTriggeredAlertAfterClaim",
+  realEmailPath: REAL_ALERT_DELIVERY_PATH,
+  realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
 });
 
 checkPriceAlerts();
