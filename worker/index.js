@@ -1,6 +1,5 @@
 const path = require("path");
 
-console.log("WORKER_VERSION_REAL_V16");
 console.log("WORKER_ENTRY_FILE", __filename);
 console.log("WORKER_ENTRY_REALPATH", path.resolve(__filename));
 console.log("WORKER_PROCESS_CWD", process.cwd());
@@ -31,21 +30,37 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications, getVapidEnvStatus } = require("./push-sender");
-const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert-email");
+const { buildPriceAlertEmailPayload } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const REAL_ALERT_DELIVERY_PATH = "worker/index.js::checkPriceAlerts->deliverRealPriceAlert->sendAlertEmailOnly";
-const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v18-push-lookup-worker";
+const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v20-single-path-final";
+const PRICE_ALERT_SINGLE_PATH = "worker/index.js::deliverRealPriceAlert";
+
+function logPriceAlertDeliveryError({ alertId, email, userId, phase, message, details = {} }) {
+  console.error(
+    "PRICE_ALERT_DELIVERY_ERROR",
+    JSON.stringify({
+      path: PRICE_ALERT_SINGLE_PATH,
+      alertId,
+      email: email || null,
+      userId: userId || null,
+      phase,
+      message: message || "DELIVERY_FAILED",
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+      ...details,
+    })
+  );
+}
 
 console.log(
-  "REAL_ALERT_DELIVERY_PATH",
+  "PRICE_ALERT_SINGLE_PATH",
   JSON.stringify({
-    path: REAL_ALERT_DELIVERY_PATH,
+    phase: "worker-boot",
+    path: PRICE_ALERT_SINGLE_PATH,
     worker: WORKER_ENTRY,
     moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    phase: "module-load",
-    ts: new Date().toISOString(),
+    scheduler: "checkPriceAlerts",
   })
 );
 
@@ -127,24 +142,7 @@ const buildPriceAlertPushBody = ({ coin, targetPrice, currentPrice }) => {
   ].join(" | ");
 };
 
-function logAlertDispatch(event, payload = {}) {
-  console.log(event, {
-    worker: WORKER_ENTRY,
-    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    ts: new Date().toISOString(),
-    ...payload,
-  });
-}
-
 async function createSiteNotificationForAlert({ alertId, email, notificationMessage }) {
-  console.log(
-    "alert:notification:create:start",
-    JSON.stringify({
-      alertId,
-      email,
-    })
-  );
-
   const { data: notificationRow, error: notificationError } = await createUserNotification(
     supabase,
     {
@@ -156,32 +154,13 @@ async function createSiteNotificationForAlert({ alertId, email, notificationMess
   );
 
   if (notificationError) {
-    console.error(
-      "alert:notification:create:error",
-      JSON.stringify({
-        alertId,
-        email,
-        message: notificationError.message || String(notificationError),
-      })
-    );
-
     return { success: false, error: notificationError };
   }
 
   console.log(
-    "alert:notification:create:success",
+    "SITE_NOTIFICATION_CREATED",
     JSON.stringify({
-      alertId,
-      email,
-      notificationId: notificationRow?.id || null,
-      type: "price-alert",
-    })
-  );
-
-  console.log(
-    "REAL_ALERT_NOTIFICATION_CREATED",
-    JSON.stringify({
-      path: REAL_ALERT_DELIVERY_PATH,
+      path: PRICE_ALERT_SINGLE_PATH,
       alertId,
       email,
       notificationId: notificationRow?.id || null,
@@ -207,56 +186,13 @@ async function sendTriggeredAlertWebPush({
   coin,
   targetPrice,
   currentPrice,
-  source = "worker/index.js::sendTriggeredAlertWebPush",
 }) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedUserId = String(userId || "").trim() || null;
   const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
-  const lookupByUserId = Boolean(normalizedUserId);
-  const lookupByEmail = Boolean(normalizedEmail);
-
-  console.log(
-    "REAL_ALERT_PUSH_LOOKUP",
-    JSON.stringify({
-      path: REAL_ALERT_DELIVERY_PATH,
-      alertId,
-      userId: normalizedUserId,
-      email: normalizedEmail || null,
-      lookupOrder: lookupByUserId
-        ? ["user_id", "email"]
-        : lookupByEmail
-          ? ["email"]
-          : [],
-      source,
-    })
-  );
-
-  console.log(
-    "alert:push:lookup:start",
-    JSON.stringify({
-      alertId,
-      email: normalizedEmail || null,
-      userId: normalizedUserId,
-      lookupOrder: lookupByUserId ? ["user_id", "email"] : ["email"],
-      source,
-    })
-  );
-
-  console.log(
-    "alert:push:send:start",
-    JSON.stringify({
-      alertId,
-      email: normalizedEmail || null,
-      userId: normalizedUserId,
-      source,
-      coin: formatCoinPair(coin),
-      targetPrice,
-      currentPrice,
-    })
-  );
 
   try {
-    const stats = await sendPriceAlertPushNotifications({
+    return await sendPriceAlertPushNotifications({
       supabase,
       workerEntry: WORKER_ENTRY,
       alertId,
@@ -266,153 +202,13 @@ async function sendTriggeredAlertWebPush({
       body: pushBody,
       url: "https://www.hasanchartworld.com/alerts",
     });
-
-    console.log("push:dispatch:finished", {
-      ts: new Date().toISOString(),
-      alertId,
-      email: normalizedEmail || null,
-      userId: normalizedUserId,
-      source,
-      sent: stats?.sent || 0,
-      failed: stats?.failed || 0,
-      skipped: stats?.skipped || 0,
-      skipReason: stats?.skipReason || null,
-      foundBy: stats?.foundBy || null,
-    });
-
-    if ((stats?.subscriptionCount || 0) > 0 || stats?.foundBy) {
-      console.log(
-        "REAL_ALERT_PUSH_SUBSCRIPTIONS_FOUND",
-        JSON.stringify({
-          path: REAL_ALERT_DELIVERY_PATH,
-          alertId,
-          userId: normalizedUserId,
-          email: normalizedEmail || null,
-          foundBy: stats.foundBy || null,
-          subscriptionCount: stats.subscriptionCount || 0,
-          source,
-        })
-      );
-    }
-
-    if ((stats?.sent || 0) > 0) {
-      console.log(
-        "alert:push:send:success",
-        JSON.stringify({
-          alertId,
-          email: normalizedEmail || null,
-          userId: normalizedUserId,
-          source,
-          sent: stats.sent,
-          failed: stats.failed || 0,
-          skipped: stats.skipped || 0,
-          foundBy: stats.foundBy || null,
-          subscriptionCount: stats.subscriptionCount || null,
-        })
-      );
-
-      console.log(
-        "REAL_ALERT_PUSH_SENT",
-        JSON.stringify({
-          path: REAL_ALERT_DELIVERY_PATH,
-          alertId,
-          email: normalizedEmail || null,
-          userId: normalizedUserId,
-          sent: stats.sent,
-          failed: stats.failed || 0,
-          foundBy: stats.foundBy || null,
-          subscriptionCount: stats.subscriptionCount || null,
-          source,
-        })
-      );
-
-      logAlertDispatch("alert:push:sent", {
-        alertId,
-        email: normalizedEmail || null,
-        userId: normalizedUserId,
-        source,
-        sent: stats.sent,
-        failed: stats.failed || 0,
-        skipped: stats.skipped || 0,
-        foundBy: stats.foundBy || null,
-      });
-
-      return stats;
-    }
-
-    console.error(
-      "REAL_ALERT_PUSH_ERROR",
-      JSON.stringify({
-        path: REAL_ALERT_DELIVERY_PATH,
-        alertId,
-        email: normalizedEmail || null,
-        userId: normalizedUserId,
-        reason: stats?.skipReason || "WEB_PUSH_SEND_FAILED",
-        sent: stats?.sent || 0,
-        failed: stats?.failed || 0,
-        skipped: stats?.skipped || 0,
-        foundBy: stats?.foundBy || null,
-        subscriptionCount: stats?.subscriptionCount || 0,
-        source,
-      })
-    );
-
-    console.error(
-      "alert:push:send:error",
-      JSON.stringify({
-        alertId,
-        email: normalizedEmail || null,
-        userId: normalizedUserId,
-        source,
-        reason: stats?.skipReason || "WEB_PUSH_SEND_FAILED",
-        sent: stats?.sent || 0,
-        failed: stats?.failed || 0,
-        skipped: stats?.skipped || 0,
-        foundBy: stats?.foundBy || null,
-      })
-    );
-
-    if ((stats?.skipped || 0) > 0) {
-      logAlertDispatch("alert:push:skipped", {
-        alertId,
-        email: normalizedEmail || null,
-        userId: normalizedUserId,
-        source,
-        reason: stats.skipReason || "PUSH_SKIPPED",
-        sent: stats.sent || 0,
-        failed: stats.failed || 0,
-        skipped: stats.skipped || 0,
-      });
-    }
-
-    return stats;
   } catch (pushError) {
-    console.error(
-      "REAL_ALERT_PUSH_ERROR",
-      JSON.stringify({
-        path: REAL_ALERT_DELIVERY_PATH,
-        alertId,
-        email: normalizedEmail || null,
-        userId: normalizedUserId,
-        phase: "dispatch",
-        message: pushError?.message || String(pushError),
-        source,
-      })
-    );
-
-    console.error(
-      "alert:push:send:error",
-      JSON.stringify({
-        alertId,
-        email: normalizedEmail || null,
-        userId: normalizedUserId,
-        source,
-        phase: "dispatch",
-        message: pushError?.message || String(pushError),
-      })
-    );
-
-    return { sent: 0, failed: 1, skipped: 0, skipReason: "WEB_PUSH_DISPATCH_FAILED" };
+    return {
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      skipReason: pushError?.message || "WEB_PUSH_DISPATCH_FAILED",
+    };
   }
 }
 
@@ -1061,62 +857,8 @@ async function sendAlertEmailOnly({
 }) {
   const coinLabel = formatCoinPair(coin);
 
-  console.log(
-    "alert:email:send:start",
-    JSON.stringify({
-      alertId,
-      email,
-      userId: userId || null,
-      coin: coinLabel,
-      targetPrice,
-      currentPrice,
-      condition,
-    })
-  );
-
-  logWorkerEvent("PRICE_ALERT_EMAIL_REAL_PATH_FOUND", {
-    worker: WORKER_ENTRY,
-    file: "worker/index.js",
-    function: "sendAlertEmailOnly",
-    alertId,
-    email,
-    userId: userId || null,
-    coin: coinLabel,
-    targetPrice,
-    currentPrice,
-    condition,
-  });
-
-  logWorkerEvent("ALERT_EMAIL_SEND_START", {
-    worker: WORKER_ENTRY,
-    alertId,
-    email,
-    coin: coinLabel,
-    targetPrice,
-    requestedPrice: targetPrice,
-    currentPrice,
-    condition,
-    conditionLabel: getConditionLabel(condition),
-  });
-
   if (!resendApiKey || !email) {
     const skipReason = !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email";
-
-    logWorkerEvent("ALERT_EMAIL_SEND_SKIPPED", {
-      worker: WORKER_ENTRY,
-      alertId,
-      email,
-      reason: skipReason,
-    });
-
-    console.error(
-      "alert:email:send:error",
-      JSON.stringify({
-        alertId,
-        email,
-        reason: skipReason,
-      })
-    );
 
     return {
       success: false,
@@ -1131,34 +873,6 @@ async function sendAlertEmailOnly({
   const safeConditionLabel = escapeHtml(conditionLabel);
   const safeTargetPrice = escapeHtml(formatNumber(targetPrice));
   const safeCurrentPrice = escapeHtml(formatNumber(currentPrice));
-
-  console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
-    file: "worker/index.js",
-    function: "sendAlertEmailOnly",
-    realPath: REAL_ALERT_DELIVERY_PATH,
-    from: PRICE_ALERT_FROM,
-    alertId,
-    email,
-    userId: userId || null,
-    coin: coinLabel,
-    targetPrice,
-    currentPrice,
-    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-  });
-
-  console.log(
-    "PRICE_ALERT_EMAIL_PATH_A",
-    JSON.stringify({
-      path: "worker/index.js::sendAlertEmailOnly",
-      alertId,
-      email,
-      userId: userId || null,
-      coin: coinLabel,
-      targetPrice,
-      currentPrice,
-      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    })
-  );
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -1181,27 +895,6 @@ async function sendAlertEmailOnly({
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    console.error(
-      "alert:email:send:error",
-      JSON.stringify({
-        alertId,
-        email,
-        status: response.status,
-        error: data?.message || response.statusText || "Email provider error",
-      })
-    );
-
-    logWorkerEvent("ALERT_EMAIL_SEND_FAILED", {
-      worker: WORKER_ENTRY,
-      alertId,
-      email,
-      coin: coinLabel,
-      targetPrice,
-      currentPrice,
-      status: response.status,
-      error: data?.message || response.statusText || "Email provider error",
-    });
-
     return {
       success: false,
       sent: false,
@@ -1211,49 +904,18 @@ async function sendAlertEmailOnly({
     };
   }
 
-  logWorkerEvent("ALERT_EMAIL_SENT", {
-    worker: WORKER_ENTRY,
-    alertId,
-    email,
-    coin: coinLabel,
-    targetPrice,
-    currentPrice,
-    resendId: data?.id || null,
-  });
-
   console.log(
-    "alert:email:send:success",
+    "PRICE_ALERT_EMAIL_SENT",
     JSON.stringify({
+      path: PRICE_ALERT_SINGLE_PATH,
       alertId,
       email,
       userId: userId || null,
       resendId: data?.id || null,
-      from: PRICE_ALERT_FROM,
+      template: "dark-compact-v1",
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
     })
   );
-
-  console.log(
-    "REAL_ALERT_EMAIL_SENT",
-    JSON.stringify({
-      path: REAL_ALERT_DELIVERY_PATH,
-      alertId,
-      email,
-      userId: userId || null,
-      resendId: data?.id || null,
-      from: PRICE_ALERT_FROM,
-    })
-  );
-
-  logAlertDispatch("alert:email:sent", {
-    alertId,
-    email,
-    userId: userId || null,
-    coin: coinLabel,
-    targetPrice,
-    currentPrice,
-    resendId: data?.id || null,
-    from: PRICE_ALERT_FROM,
-  });
 
   return {
     success: true,
@@ -1278,27 +940,16 @@ async function deliverRealPriceAlert({
   const normalizedEmail = String(userEmail || "").trim().toLowerCase();
   const normalizedUserId = String(userId || "").trim() || null;
 
-  summary.emailsQueued += 1;
-
   console.log(
-    "REAL_ALERT_DELIVERY_PATH",
+    "PRICE_ALERT_SINGLE_PATH",
     JSON.stringify({
-      path: REAL_ALERT_DELIVERY_PATH,
+      path: PRICE_ALERT_SINGLE_PATH,
       phase: "dispatch-start",
       alertId,
       email: normalizedEmail || null,
       userId: normalizedUserId,
+      order: ["site-notification", "web-push", "email"],
       moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    })
-  );
-
-  console.log(
-    "alert:delivery:start",
-    JSON.stringify({
-      alertId,
-      email: normalizedEmail || null,
-      userId: normalizedUserId,
-      channels: ["site-notification", "web-push", "email"],
     })
   );
 
@@ -1311,15 +962,13 @@ async function deliverRealPriceAlert({
       notificationMessage,
     });
   } catch (error) {
-    console.error(
-      "alert:notification:create:error",
-      JSON.stringify({
-        alertId,
-        email: normalizedEmail || null,
-        phase: "unhandled",
-        message: error?.message || String(error),
-      })
-    );
+    logPriceAlertDeliveryError({
+      alertId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      phase: "site-notification",
+      message: error?.message || String(error),
+    });
 
     siteNotification = {
       success: false,
@@ -1327,7 +976,15 @@ async function deliverRealPriceAlert({
     };
   }
 
-  if (siteNotification?.success) {
+  if (!siteNotification?.success) {
+    logPriceAlertDeliveryError({
+      alertId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      phase: "site-notification",
+      message: siteNotification?.error?.message || "SITE_NOTIFICATION_FAILED",
+    });
+  } else {
     summary.notificationsCreated += 1;
   }
 
@@ -1341,19 +998,15 @@ async function deliverRealPriceAlert({
       coin,
       targetPrice,
       currentPrice,
-      source: "worker/index.js::deliverRealPriceAlert",
     });
   } catch (error) {
-    console.error(
-      "alert:push:send:error",
-      JSON.stringify({
-        alertId,
-        email: normalizedEmail || null,
-        userId: normalizedUserId,
-        phase: "unhandled",
-        message: error?.message || String(error),
-      })
-    );
+    logPriceAlertDeliveryError({
+      alertId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      phase: "web-push",
+      message: error?.message || String(error),
+    });
 
     pushStats = {
       sent: 0,
@@ -1365,7 +1018,37 @@ async function deliverRealPriceAlert({
 
   aggregatePushStats(summary, pushStats);
 
+  if ((pushStats?.sent || 0) > 0) {
+    console.log(
+      "WEB_PUSH_SENT",
+      JSON.stringify({
+        path: PRICE_ALERT_SINGLE_PATH,
+        alertId,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
+        sent: pushStats.sent,
+        failed: pushStats.failed || 0,
+        foundBy: pushStats.foundBy || null,
+      })
+    );
+  } else if ((pushStats?.failed || 0) > 0) {
+    logPriceAlertDeliveryError({
+      alertId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      phase: "web-push",
+      message: pushStats?.skipReason || "WEB_PUSH_SEND_FAILED",
+      details: {
+        sent: pushStats.sent || 0,
+        failed: pushStats.failed || 0,
+        skipped: pushStats.skipped || 0,
+      },
+    });
+  }
+
   let emailResult = { success: false, sent: false, error: "EMAIL_NOT_ATTEMPTED" };
+
+  summary.emailsQueued += 1;
 
   try {
     emailResult = await sendAlertEmailOnly({
@@ -1378,15 +1061,13 @@ async function deliverRealPriceAlert({
       userId: normalizedUserId,
     });
   } catch (error) {
-    console.error(
-      "alert:email:send:error",
-      JSON.stringify({
-        alertId,
-        email: normalizedEmail || null,
-        phase: "unhandled",
-        message: error?.message || String(error),
-      })
-    );
+    logPriceAlertDeliveryError({
+      alertId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      phase: "email",
+      message: error?.message || String(error),
+    });
 
     emailResult = {
       success: false,
@@ -1396,14 +1077,16 @@ async function deliverRealPriceAlert({
   }
 
   if (!emailResult?.sent && !emailResult?.skipped) {
-    console.error(
-      "alert:email:send:error",
-      JSON.stringify({
-        alertId,
-        email: normalizedEmail || null,
-        reason: emailResult?.error || emailResult?.reason || "EMAIL_SEND_FAILED",
-      })
-    );
+    logPriceAlertDeliveryError({
+      alertId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      phase: "email",
+      message: emailResult?.error || emailResult?.reason || "EMAIL_SEND_FAILED",
+      details: {
+        status: emailResult?.status || null,
+      },
+    });
   }
 
   return {
@@ -1589,52 +1272,13 @@ async function checkPriceAlerts() {
         }
 
         summary.alertsUpdated += 1;
-
-        console.log(
-          "REAL_ALERT_DELIVERY_PATH",
-          JSON.stringify({
-            path: REAL_ALERT_DELIVERY_PATH,
-            phase: "trigger-claimed",
-            alertId: alert.id,
-            email: userEmail,
-            userId: alert.user_id || null,
-            coin: formatCoinPair(coin),
-            targetPrice,
-            currentPrice,
-            moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-          })
-        );
-
-        console.log(
-          "alert:triggered",
-          JSON.stringify({
-            alertId: alert.id,
-            email: userEmail,
-            userId: alert.user_id || null,
-            coin: formatCoinPair(coin),
-            targetPrice,
-            currentPrice,
-            condition,
-            moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-          })
-        );
+        summary.triggered += 1;
 
         const notificationMessage = buildPriceAlertNotificationMessage({
           coin,
           targetPrice,
           currentPrice,
           condition,
-        });
-
-        summary.triggered += 1;
-
-        logWorkerEvent("ALERT_EMAIL_QUEUED", {
-          worker: WORKER_ENTRY,
-          alertId: alert.id,
-          email: userEmail,
-          coin: formatCoinPair(coin),
-          targetPrice,
-          currentPrice,
         });
 
         try {
@@ -1650,21 +1294,20 @@ async function checkPriceAlerts() {
             notificationMessage,
           });
         } catch (dispatchError) {
+          logPriceAlertDeliveryError({
+            alertId: alert.id,
+            email: userEmail,
+            userId: alert.user_id || null,
+            phase: "deliverRealPriceAlert",
+            message: dispatchError?.message || String(dispatchError),
+          });
+
           logWorkerEvent("ALERT_DISPATCH_FAILED", {
             worker: WORKER_ENTRY,
             alertId: alert.id,
             email: userEmail,
             error: dispatchError?.message || String(dispatchError),
           });
-
-          console.error(
-            "alert:dispatch:error",
-            JSON.stringify({
-              alertId: alert.id,
-              email: userEmail,
-              message: dispatchError?.message || String(dispatchError),
-            })
-          );
         }
 
         triggeredItems.push({
@@ -1681,28 +1324,6 @@ async function checkPriceAlerts() {
       });
     }
   }
-
-  console.log(
-    "REAL_ALERT_SUMMARY",
-    JSON.stringify({
-      path: REAL_ALERT_DELIVERY_PATH,
-      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-      triggered: summary.triggered,
-      notificationsCreated: summary.notificationsCreated,
-      pushesSent: summary.pushesSent,
-      emailsQueued: summary.emailsQueued,
-    })
-  );
-
-  console.log(
-    "alert:check:summary",
-    JSON.stringify({
-      triggered: summary.triggered,
-      notificationsCreated: summary.notificationsCreated,
-      pushesSent: summary.pushesSent,
-      emailsQueued: summary.emailsQueued,
-    })
-  );
 
   logWorkerEvent("ALERT_CHECK_FINISHED", {
     ...summary,
@@ -1724,7 +1345,7 @@ app.get("/health", async (_req, res) => {
     service: "hasan-chart-worker",
     workerEntry: WORKER_ENTRY,
     priceAlertsModuleVersion: PRICE_ALERTS_MODULE_VERSION,
-    realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
+    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
     alertsWorker: true,
     checkIntervalMs: CHECK_INTERVAL_MS,
     webPushConfigured: vapidStatus.configured,
@@ -1852,31 +1473,41 @@ app.listen(PORT, () => {
     port: PORT,
     checkIntervalMs: CHECK_INTERVAL_MS,
     priceAlertsEnabled: true,
-    realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
-    note: "Price alert delivery: worker/index.js deliverRealPriceAlert (notification + push + email)",
+    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
+    note: "Price alerts: worker/index.js deliverRealPriceAlert only",
   });
+
+  console.log(
+    "PRICE_ALERT_SINGLE_PATH",
+    JSON.stringify({
+      phase: "worker-listening",
+      path: PRICE_ALERT_SINGLE_PATH,
+      port: PORT,
+      checkIntervalMs: CHECK_INTERVAL_MS,
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    })
+  );
 
   console.log(`🚀 Railway Worker API listening on port ${PORT}`);
 });
 
 setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
 
-console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
-  file: "worker/index.js",
-  function: "module_init",
-  action: "PRICE_ALERTS_SCHEDULER_STARTED",
-  moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-  intervalMs: CHECK_INTERVAL_MS,
-  realEmailPath: REAL_ALERT_DELIVERY_PATH,
-  realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
-});
+console.log(
+  "PRICE_ALERT_SINGLE_PATH",
+  JSON.stringify({
+    phase: "scheduler-started",
+    path: PRICE_ALERT_SINGLE_PATH,
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    intervalMs: CHECK_INTERVAL_MS,
+  })
+);
 
 logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
   worker: WORKER_ENTRY,
   moduleVersion: PRICE_ALERTS_MODULE_VERSION,
   intervalMs: CHECK_INTERVAL_MS,
-  realEmailPath: REAL_ALERT_DELIVERY_PATH,
-  realAlertDeliveryPath: REAL_ALERT_DELIVERY_PATH,
+  priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
 });
 
 checkPriceAlerts();
