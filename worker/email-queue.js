@@ -189,6 +189,16 @@ async function processEmailQueue(items, options = {}) {
         to,
         alertId: item?.alertId || null,
       });
+
+      console.log(
+        "PRICE_ALERT_EMAIL_PATH_C",
+        JSON.stringify({
+          path: "worker/email-queue.js::processEmailQueue",
+          label,
+          to,
+          alertId: item?.alertId || null,
+        })
+      );
     }
 
     const outcome = await sendWithRetry(item.send, { to, label });

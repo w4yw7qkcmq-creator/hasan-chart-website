@@ -36,7 +36,7 @@ const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
 const REAL_ALERT_DELIVERY_PATH = "worker/index.js::checkPriceAlerts->deliverRealPriceAlert->sendAlertEmailOnly";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v16-real-delivery-path";
+const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v17-path-markers-worker";
 
 console.log(
   "REAL_ALERT_DELIVERY_PATH",
@@ -1080,6 +1080,20 @@ async function sendAlertEmailOnly({
     currentPrice,
     moduleVersion: PRICE_ALERTS_MODULE_VERSION,
   });
+
+  console.log(
+    "PRICE_ALERT_EMAIL_PATH_A",
+    JSON.stringify({
+      path: "worker/index.js::sendAlertEmailOnly",
+      alertId,
+      email,
+      userId: userId || null,
+      coin: coinLabel,
+      targetPrice,
+      currentPrice,
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    })
+  );
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",

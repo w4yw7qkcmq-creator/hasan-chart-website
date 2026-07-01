@@ -4,12 +4,16 @@ export async function register() {
     startMarketStream("instrumentation-register");
   }
 
-  // Price alert emails run from worker/index.js (separate Railway worker service).
-  // Next.js path disabled here to avoid duplicate emails.
+  // Price alert emails: worker/index.js (PATH_A) or /api/check-price-alerts cron (PATH_B).
   console.log("REAL_PRICE_ALERT_EMAIL_SENDER_FOUND", {
     file: "instrumentation.js",
     function: "register",
-    action: "nextjs_price_alerts_disabled",
-    note: "Use worker/index.js Railway service for price alert emails and push",
+    action: "nextjs_price_alerts_via_cron_or_worker",
+    paths: {
+      A: "worker/index.js::sendAlertEmailOnly",
+      B: "lib/price-alerts-runner.js::sendTriggeredAlertEmail",
+      C: "lib/email-queue.js::processEmailQueue",
+    },
+    note: "Search Railway/Vercel logs for PRICE_ALERT_EMAIL_PATH_A/B/C",
   });
 }
