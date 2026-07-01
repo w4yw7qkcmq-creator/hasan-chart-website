@@ -36,7 +36,7 @@ const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
 const REAL_ALERT_DELIVERY_PATH = "worker/index.js::checkPriceAlerts->deliverRealPriceAlert->sendAlertEmailOnly";
-const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v17-path-markers-worker";
+const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v18-push-lookup-worker";
 
 console.log(
   "REAL_ALERT_DELIVERY_PATH",
@@ -212,6 +212,24 @@ async function sendTriggeredAlertWebPush({
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedUserId = String(userId || "").trim() || null;
   const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
+  const lookupByUserId = Boolean(normalizedUserId);
+  const lookupByEmail = Boolean(normalizedEmail);
+
+  console.log(
+    "REAL_ALERT_PUSH_LOOKUP",
+    JSON.stringify({
+      path: REAL_ALERT_DELIVERY_PATH,
+      alertId,
+      userId: normalizedUserId,
+      email: normalizedEmail || null,
+      lookupOrder: lookupByUserId
+        ? ["user_id", "email"]
+        : lookupByEmail
+          ? ["email"]
+          : [],
+      source,
+    })
+  );
 
   console.log(
     "alert:push:lookup:start",
@@ -219,7 +237,7 @@ async function sendTriggeredAlertWebPush({
       alertId,
       email: normalizedEmail || null,
       userId: normalizedUserId,
-      lookupOrder: ["user_id", "email"],
+      lookupOrder: lookupByUserId ? ["user_id", "email"] : ["email"],
       source,
     })
   );
@@ -262,6 +280,21 @@ async function sendTriggeredAlertWebPush({
       foundBy: stats?.foundBy || null,
     });
 
+    if ((stats?.subscriptionCount || 0) > 0 || stats?.foundBy) {
+      console.log(
+        "REAL_ALERT_PUSH_SUBSCRIPTIONS_FOUND",
+        JSON.stringify({
+          path: REAL_ALERT_DELIVERY_PATH,
+          alertId,
+          userId: normalizedUserId,
+          email: normalizedEmail || null,
+          foundBy: stats.foundBy || null,
+          subscriptionCount: stats.subscriptionCount || 0,
+          source,
+        })
+      );
+    }
+
     if ((stats?.sent || 0) > 0) {
       console.log(
         "alert:push:send:success",
@@ -286,8 +319,10 @@ async function sendTriggeredAlertWebPush({
           email: normalizedEmail || null,
           userId: normalizedUserId,
           sent: stats.sent,
+          failed: stats.failed || 0,
           foundBy: stats.foundBy || null,
           subscriptionCount: stats.subscriptionCount || null,
+          source,
         })
       );
 
@@ -304,6 +339,23 @@ async function sendTriggeredAlertWebPush({
 
       return stats;
     }
+
+    console.error(
+      "REAL_ALERT_PUSH_ERROR",
+      JSON.stringify({
+        path: REAL_ALERT_DELIVERY_PATH,
+        alertId,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
+        reason: stats?.skipReason || "WEB_PUSH_SEND_FAILED",
+        sent: stats?.sent || 0,
+        failed: stats?.failed || 0,
+        skipped: stats?.skipped || 0,
+        foundBy: stats?.foundBy || null,
+        subscriptionCount: stats?.subscriptionCount || 0,
+        source,
+      })
+    );
 
     console.error(
       "alert:push:send:error",
@@ -335,6 +387,19 @@ async function sendTriggeredAlertWebPush({
 
     return stats;
   } catch (pushError) {
+    console.error(
+      "REAL_ALERT_PUSH_ERROR",
+      JSON.stringify({
+        path: REAL_ALERT_DELIVERY_PATH,
+        alertId,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
+        phase: "dispatch",
+        message: pushError?.message || String(pushError),
+        source,
+      })
+    );
+
     console.error(
       "alert:push:send:error",
       JSON.stringify({
