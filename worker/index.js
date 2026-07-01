@@ -28,7 +28,7 @@ const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v14-notification-first-dispatch";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v15-push-email-guarantee";
 
 let priceAlertCheckInProgress = false;
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
@@ -179,14 +179,27 @@ async function sendTriggeredAlertWebPush({
   currentPrice,
   source = "worker/index.js::sendTriggeredAlertWebPush",
 }) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedUserId = String(userId || "").trim() || null;
   const pushBody = buildPriceAlertPushBody({ coin, targetPrice, currentPrice });
+
+  console.log(
+    "alert:push:lookup:start",
+    JSON.stringify({
+      alertId,
+      email: normalizedEmail || null,
+      userId: normalizedUserId,
+      lookupOrder: ["user_id", "email"],
+      source,
+    })
+  );
 
   console.log(
     "alert:push:send:start",
     JSON.stringify({
       alertId,
-      email,
-      userId: userId || null,
+      email: normalizedEmail || null,
+      userId: normalizedUserId,
       source,
       coin: formatCoinPair(coin),
       targetPrice,
@@ -199,8 +212,8 @@ async function sendTriggeredAlertWebPush({
       supabase,
       workerEntry: WORKER_ENTRY,
       alertId,
-      email,
-      userId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
       title: "🔔 وصل السعر إلى هدف التنبيه",
       body: pushBody,
       url: "https://www.hasanchartworld.com/alerts",
@@ -209,13 +222,14 @@ async function sendTriggeredAlertWebPush({
     console.log("push:dispatch:finished", {
       ts: new Date().toISOString(),
       alertId,
-      email,
-      userId: userId || null,
+      email: normalizedEmail || null,
+      userId: normalizedUserId,
       source,
       sent: stats?.sent || 0,
       failed: stats?.failed || 0,
       skipped: stats?.skipped || 0,
       skipReason: stats?.skipReason || null,
+      foundBy: stats?.foundBy || null,
     });
 
     if ((stats?.sent || 0) > 0) {
@@ -223,43 +237,53 @@ async function sendTriggeredAlertWebPush({
         "alert:push:send:success",
         JSON.stringify({
           alertId,
-          email,
-          userId: userId || null,
+          email: normalizedEmail || null,
+          userId: normalizedUserId,
           source,
           sent: stats.sent,
           failed: stats.failed || 0,
           skipped: stats.skipped || 0,
+          foundBy: stats.foundBy || null,
+          subscriptionCount: stats.subscriptionCount || null,
         })
       );
 
       logAlertDispatch("alert:push:sent", {
         alertId,
-        email,
-        userId: userId || null,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
         source,
         sent: stats.sent,
         failed: stats.failed || 0,
         skipped: stats.skipped || 0,
+        foundBy: stats.foundBy || null,
       });
-    } else if ((stats?.skipped || 0) > 0) {
+
+      return stats;
+    }
+
+    console.error(
+      "alert:push:send:error",
+      JSON.stringify({
+        alertId,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
+        source,
+        reason: stats?.skipReason || "WEB_PUSH_SEND_FAILED",
+        sent: stats?.sent || 0,
+        failed: stats?.failed || 0,
+        skipped: stats?.skipped || 0,
+        foundBy: stats?.foundBy || null,
+      })
+    );
+
+    if ((stats?.skipped || 0) > 0) {
       logAlertDispatch("alert:push:skipped", {
         alertId,
-        email,
-        userId: userId || null,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
         source,
         reason: stats.skipReason || "PUSH_SKIPPED",
-        sent: stats.sent || 0,
-        failed: stats.failed || 0,
-        skipped: stats.skipped || 0,
-      });
-    } else if ((stats?.failed || 0) > 0) {
-      logAlertDispatch("alert:notification:error", {
-        phase: "web-push",
-        alertId,
-        email,
-        userId: userId || null,
-        source,
-        reason: stats.skipReason || "WEB_PUSH_SEND_FAILED",
         sent: stats.sent || 0,
         failed: stats.failed || 0,
         skipped: stats.skipped || 0,
@@ -268,24 +292,17 @@ async function sendTriggeredAlertWebPush({
 
     return stats;
   } catch (pushError) {
-    console.log("push:send:error", {
-      ts: new Date().toISOString(),
-      alertId,
-      email,
-      userId: userId || null,
-      source,
-      phase: "dispatch",
-      message: pushError?.message || String(pushError),
-    });
-
-    logAlertDispatch("alert:notification:error", {
-      phase: "web-push",
-      alertId,
-      email,
-      userId: userId || null,
-      source,
-      error: pushError?.message || String(pushError),
-    });
+    console.error(
+      "alert:push:send:error",
+      JSON.stringify({
+        alertId,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
+        source,
+        phase: "dispatch",
+        message: pushError?.message || String(pushError),
+      })
+    );
 
     return { sent: 0, failed: 1, skipped: 0, skipReason: "WEB_PUSH_DISPATCH_FAILED" };
   }
@@ -975,18 +992,29 @@ async function sendAlertEmailOnly({
   });
 
   if (!resendApiKey || !email) {
+    const skipReason = !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email";
+
     logWorkerEvent("ALERT_EMAIL_SEND_SKIPPED", {
       worker: WORKER_ENTRY,
       alertId,
       email,
-      reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
+      reason: skipReason,
     });
+
+    console.error(
+      "alert:email:send:error",
+      JSON.stringify({
+        alertId,
+        email,
+        reason: skipReason,
+      })
+    );
 
     return {
       success: false,
       skipped: true,
       sent: false,
-      reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
+      reason: skipReason,
     };
   }
 
@@ -1112,14 +1140,17 @@ async function deliverTriggeredAlertAfterClaim({
   currentPrice,
   notificationMessage,
 }) {
+  const normalizedEmail = String(userEmail || "").trim().toLowerCase();
+  const normalizedUserId = String(userId || "").trim() || null;
+
   summary.emailsQueued += 1;
 
   console.log(
     "alert:triggered",
     JSON.stringify({
       alertId,
-      email: userEmail,
-      userId: userId || null,
+      email: normalizedEmail || null,
+      userId: normalizedUserId,
       coin: formatCoinPair(coin),
       targetPrice,
       currentPrice,
@@ -1128,12 +1159,22 @@ async function deliverTriggeredAlertAfterClaim({
     })
   );
 
+  console.log(
+    "alert:delivery:start",
+    JSON.stringify({
+      alertId,
+      email: normalizedEmail || null,
+      userId: normalizedUserId,
+      channels: ["site-notification", "web-push", "email"],
+    })
+  );
+
   let siteNotification = { success: false };
 
   try {
     siteNotification = await createSiteNotificationForAlert({
       alertId,
-      email: userEmail,
+      email: normalizedEmail,
       notificationMessage,
     });
   } catch (error) {
@@ -1141,7 +1182,7 @@ async function deliverTriggeredAlertAfterClaim({
       "alert:notification:create:error",
       JSON.stringify({
         alertId,
-        email: userEmail,
+        email: normalizedEmail || null,
         phase: "unhandled",
         message: error?.message || String(error),
       })
@@ -1157,37 +1198,80 @@ async function deliverTriggeredAlertAfterClaim({
     summary.notificationsCreated += 1;
   }
 
-  const [emailResult, pushStats] = await Promise.all([
-    sendAlertEmailOnly({
-      email: userEmail,
+  let pushStats = { sent: 0, failed: 0, skipped: 0, skipReason: "PUSH_NOT_ATTEMPTED" };
+
+  try {
+    pushStats = await sendTriggeredAlertWebPush({
+      alertId,
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      coin,
+      targetPrice,
+      currentPrice,
+      source: "worker/index.js::deliverTriggeredAlertAfterClaim",
+    });
+  } catch (error) {
+    console.error(
+      "alert:push:send:error",
+      JSON.stringify({
+        alertId,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
+        phase: "unhandled",
+        message: error?.message || String(error),
+      })
+    );
+
+    pushStats = {
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
+    };
+  }
+
+  aggregatePushStats(summary, pushStats);
+
+  let emailResult = { success: false, sent: false, error: "EMAIL_NOT_ATTEMPTED" };
+
+  try {
+    emailResult = await sendAlertEmailOnly({
+      email: normalizedEmail,
       coin,
       condition,
       targetPrice,
       currentPrice,
       alertId,
-      userId,
-    }).catch((error) => ({
+      userId: normalizedUserId,
+    });
+  } catch (error) {
+    console.error(
+      "alert:email:send:error",
+      JSON.stringify({
+        alertId,
+        email: normalizedEmail || null,
+        phase: "unhandled",
+        message: error?.message || String(error),
+      })
+    );
+
+    emailResult = {
       success: false,
       sent: false,
       error: error?.message || String(error),
-    })),
-    sendTriggeredAlertWebPush({
-      alertId,
-      email: userEmail,
-      userId,
-      coin,
-      targetPrice,
-      currentPrice,
-      source: "worker/index.js::deliverTriggeredAlertAfterClaim",
-    }).catch((error) => ({
-      sent: 0,
-      failed: 1,
-      skipped: 0,
-      skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
-    })),
-  ]);
+    };
+  }
 
-  aggregatePushStats(summary, pushStats);
+  if (!emailResult?.sent && !emailResult?.skipped) {
+    console.error(
+      "alert:email:send:error",
+      JSON.stringify({
+        alertId,
+        email: normalizedEmail || null,
+        reason: emailResult?.error || emailResult?.reason || "EMAIL_SEND_FAILED",
+      })
+    );
+  }
 
   return {
     emailResult,
@@ -1435,6 +1519,16 @@ async function checkPriceAlerts() {
       });
     }
   }
+
+  console.log(
+    "alert:check:summary",
+    JSON.stringify({
+      triggered: summary.triggered,
+      notificationsCreated: summary.notificationsCreated,
+      pushesSent: summary.pushesSent,
+      emailsQueued: summary.emailsQueued,
+    })
+  );
 
   logWorkerEvent("ALERT_CHECK_FINISHED", {
     ...summary,

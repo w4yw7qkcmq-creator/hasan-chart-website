@@ -150,15 +150,15 @@ async function findPushSubscriptionsForRecipient(
   }
 
   if (normalizedEmail) {
-    const { data, error } = await supabase
+    const { data: exactRows, error: exactError } = await supabase
       .from("push_subscriptions")
       .select(SUBSCRIPTION_COLUMNS)
       .eq("email", normalizedEmail);
 
-    if (error) throw error;
+    if (exactError) throw exactError;
 
-    if ((data || []).length > 0) {
-      return { rows: data, foundBy: "email" };
+    if ((exactRows || []).length > 0) {
+      return { rows: exactRows, foundBy: "email" };
     }
 
     const { data: ilikeRows, error: ilikeError } = await supabase
@@ -228,18 +228,18 @@ async function sendPriceAlertPushNotifications({
         email: normalizedEmail,
         phase: "resolve_user_id",
         message: error?.message || "PROFILE_LOOKUP_FAILED",
+        note: "Continuing with email-only push subscription lookup",
       });
-
-      return { sent: 0, failed: 1, skipped: 0, skipReason: "PROFILE_LOOKUP_FAILED" };
     }
   }
 
   let subscriptionLookup = { rows: [], foundBy: null };
 
-  logPushEvent("push:subscription:lookup", {
+  logPushEvent("alert:push:lookup:start", {
     alertId,
     email: normalizedEmail || null,
     userId: resolvedUserId || null,
+    lookupOrder: ["user_id", "email"],
   });
 
   try {
@@ -270,8 +270,25 @@ async function sendPriceAlertPushNotifications({
       hint: "User must click enable browser notifications while logged in so email/user_id are saved in push_subscriptions",
     });
 
-    return { sent: 0, failed: 0, skipped: 1, skipReason: "NO_PUSH_SUBSCRIPTIONS" };
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: 1,
+      skipReason: "NO_PUSH_SUBSCRIPTIONS",
+      foundBy: null,
+      subscriptionCount: 0,
+    };
   }
+
+  logPushEvent("alert:push:subscriptions:found", {
+    alertId,
+    email: normalizedEmail || null,
+    userId: resolvedUserId || null,
+    foundBy: subscriptionLookup.foundBy || null,
+    count: subscriptionList.length,
+    subscriptionIds: subscriptionList.map((row) => row.id),
+    endpoints: subscriptionList.map((row) => String(row.endpoint || "").slice(0, 72)),
+  });
 
   logPushEvent("push:subscription:found", {
     alertId,
@@ -361,6 +378,8 @@ async function sendPriceAlertPushNotifications({
     failed,
     skipped: 0,
     skipReason: failed > 0 ? "WEB_PUSH_SEND_FAILED" : null,
+    foundBy: subscriptionLookup.foundBy || null,
+    subscriptionCount: subscriptionList.length,
   };
 }
 
