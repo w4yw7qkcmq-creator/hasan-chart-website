@@ -28,7 +28,7 @@ const { buildPriceAlertEmailPayload, PRICE_ALERT_FROM } = require("./price-alert
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v13-independent-alert-dispatch";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-30-v14-notification-first-dispatch";
 
 let priceAlertCheckInProgress = false;
 const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
@@ -1124,18 +1124,40 @@ async function deliverTriggeredAlertAfterClaim({
       targetPrice,
       currentPrice,
       condition,
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
     })
   );
 
-  const [siteNotification, emailResult, pushStats] = await Promise.all([
-    createSiteNotificationForAlert({
+  let siteNotification = { success: false };
+
+  try {
+    siteNotification = await createSiteNotificationForAlert({
       alertId,
       email: userEmail,
       notificationMessage,
-    }).catch((error) => ({
+    });
+  } catch (error) {
+    console.error(
+      "alert:notification:create:error",
+      JSON.stringify({
+        alertId,
+        email: userEmail,
+        phase: "unhandled",
+        message: error?.message || String(error),
+      })
+    );
+
+    siteNotification = {
       success: false,
       error: { message: error?.message || String(error) },
-    })),
+    };
+  }
+
+  if (siteNotification?.success) {
+    summary.notificationsCreated += 1;
+  }
+
+  const [emailResult, pushStats] = await Promise.all([
     sendAlertEmailOnly({
       email: userEmail,
       coin,
@@ -1164,10 +1186,6 @@ async function deliverTriggeredAlertAfterClaim({
       skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
     })),
   ]);
-
-  if (siteNotification?.success) {
-    summary.notificationsCreated += 1;
-  }
 
   aggregatePushStats(summary, pushStats);
 
@@ -1373,17 +1391,35 @@ async function checkPriceAlerts() {
           currentPrice,
         });
 
-        await deliverTriggeredAlertAfterClaim({
-          summary,
-          alertId: alert.id,
-          userEmail,
-          userId: alert.user_id || null,
-          coin,
-          condition,
-          targetPrice,
-          currentPrice,
-          notificationMessage,
-        });
+        try {
+          await deliverTriggeredAlertAfterClaim({
+            summary,
+            alertId: alert.id,
+            userEmail,
+            userId: alert.user_id || null,
+            coin,
+            condition,
+            targetPrice,
+            currentPrice,
+            notificationMessage,
+          });
+        } catch (dispatchError) {
+          logWorkerEvent("ALERT_DISPATCH_FAILED", {
+            worker: WORKER_ENTRY,
+            alertId: alert.id,
+            email: userEmail,
+            error: dispatchError?.message || String(dispatchError),
+          });
+
+          console.error(
+            "alert:dispatch:error",
+            JSON.stringify({
+              alertId: alert.id,
+              email: userEmail,
+              message: dispatchError?.message || String(dispatchError),
+            })
+          );
+        }
 
         triggeredItems.push({
           alertId: alert.id,
