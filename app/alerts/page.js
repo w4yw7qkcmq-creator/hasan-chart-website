@@ -1,25 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { createPriceAlert } from "../../lib/price-alert-create-client";
 import AppModal from "../components/AppModal";
+import { useAuth } from "../components/AuthProvider";
 
 export default function Alerts() {
+  const { authResolved, user: currentUser } = useAuth();
   const [coin, setCoin] = useState("");
   const [price, setPrice] = useState("");
   const [condition, setCondition] = useState("above");
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState({ open: false, type: "info", title: "", message: "" });
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    try {
-      const storedUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-      setCurrentUser(storedUser);
-    } catch {
-      setCurrentUser(null);
-    }
-  }, []);
 
   const showModal = ({ type, title, message }) => {
     setModal({ open: true, type, title, message });
@@ -29,6 +22,15 @@ export default function Alerts() {
     e.preventDefault();
 
     if (loading) return;
+
+    if (!authResolved) {
+      showModal({
+        type: "info",
+        title: "جاري التحقق",
+        message: "جاري التحقق من جلسة الدخول، حاول مرة أخرى بعد لحظات.",
+      });
+      return;
+    }
 
     if (!currentUser?.email) {
       showModal({
@@ -57,34 +59,20 @@ export default function Alerts() {
     const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     try {
-      const response = await fetch("/api/alerts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const result = await createPriceAlert({
+        coin: cleanCoin,
+        price: cleanPrice,
+        condition,
         signal: controller.signal,
-        body: JSON.stringify({
-          user_email: currentUser.email,
-          username: currentUser.username || currentUser.email,
-          coin: cleanCoin,
-          price: cleanPrice,
-          condition,
-        }),
       });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "فشل إضافة التنبيه");
-      }
 
       setAlerts((prev) => [
         {
-          id: result.alert?.id || Date.now(),
-          coin: cleanCoin,
-          price: cleanPrice,
-          condition,
-          status: "active",
+          id: result.alert.id,
+          coin: result.alert.coin || cleanCoin,
+          price: result.alert.target_price || cleanPrice,
+          condition: result.alert.condition || condition,
+          status: result.alert.status || "active",
         },
         ...prev,
       ]);
@@ -98,7 +86,7 @@ export default function Alerts() {
         message: result?.message || "سيتم إرسال الإيميل فقط عند تحقق السعر.",
       });
     } catch (err) {
-      console.error("Alert API error:", err);
+      console.error("PRICE_ALERT_CREATE_FAILED", err);
 
       showModal({
         type: "error",
@@ -130,11 +118,15 @@ export default function Alerts() {
           أضف تنبيهًا للحصول على إشعار عندما يصل سعر العملة لمستوى معين.
         </p>
 
-        {!currentUser?.email && (
+        {!authResolved ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-sm font-bold text-slate-200">
+            جاري التحقق من جلسة الدخول...
+          </div>
+        ) : !currentUser?.email ? (
           <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-center text-sm font-bold text-amber-100">
             يجب تسجيل الدخول أولاً حتى يتم ربط التنبيه بحسابك.
           </div>
-        )}
+        ) : null}
 
         <form onSubmit={handleAddAlert} className="space-y-4">
           <input
@@ -166,7 +158,7 @@ export default function Alerts() {
 
           <button
             type="submit"
-            disabled={loading || !currentUser?.email}
+            disabled={loading || !authResolved || !currentUser?.email}
             className="w-full rounded-2xl bg-emerald-400 py-4 font-bold text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "جاري إضافة التنبيه..." : "إضافة التنبيه"}

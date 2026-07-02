@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { fetchWithTimeout } from "../lib/fetch-with-timeout";
+import { createPriceAlert } from "../lib/price-alert-create-client";
 import { supabase } from "../lib/supabase";
 import { MiniTicker } from "./components/market/MiniTicker";
 import { useAppModal } from "./components/AppModalProvider";
@@ -328,8 +329,24 @@ export default function Home() {
   const submitAlert = async () => {
     if (alertSubmitting) return;
 
-    const user = requireLogin();
-    if (!user) return;
+    if (!authResolved) {
+      showAppModal({
+        type: "info",
+        title: "جاري التحقق",
+        message: "جاري التحقق من جلسة الدخول، حاول مرة أخرى بعد لحظات.",
+      });
+      return;
+    }
+
+    if (!user?.email) {
+      showAppModal({
+        type: "warning",
+        title: "يجب تسجيل الدخول",
+        message: "يجب الدخول للحساب أولاً",
+      });
+      window.location.href = "/login";
+      return;
+    }
 
     const cleanCoin = alertCoin.trim().toUpperCase();
     const cleanPrice = String(alertPrice || "").trim();
@@ -349,26 +366,12 @@ export default function Home() {
     const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     try {
-      const response = await fetch("/api/alerts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      await createPriceAlert({
+        coin: cleanCoin,
+        price: cleanPrice,
+        condition: "auto",
         signal: controller.signal,
-        body: JSON.stringify({
-          user_email: user.email,
-          username: user.username || user.email,
-          coin: cleanCoin,
-          price: cleanPrice,
-          condition: "auto",
-        }),
       });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || `فشل إنشاء التنبيه. كود الخطأ: ${response.status}`);
-      }
 
       showAppModal({
         type: "success",
@@ -379,7 +382,7 @@ export default function Home() {
       setAlertCoin("");
       setAlertPrice("");
     } catch (err) {
-      console.error("Submit alert error:", err);
+      console.error("PRICE_ALERT_CREATE_FAILED", err);
 
       showAppModal({
         type: "error",
@@ -688,9 +691,10 @@ export default function Home() {
             </div>
 
             <button
+              type="button"
               onClick={submitAlert}
-              disabled={alertSubmitting}
-              className={`greenBtn ${alertSubmitting ? "cursor-not-allowed opacity-60" : ""}`}
+              disabled={!authResolved || !user?.email || alertSubmitting}
+              className={`greenBtn ${!authResolved || !user?.email || alertSubmitting ? "cursor-not-allowed opacity-60" : ""}`}
             >
               {alertSubmitting ? "جاري تفعيل التنبيه..." : "تفعيل التنبيه"}
             </button>

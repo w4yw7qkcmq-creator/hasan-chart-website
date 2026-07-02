@@ -140,6 +140,16 @@ export async function POST(req) {
 
     const supabase = getSupabaseAdmin();
 
+    console.log(
+      "PRICE_ALERT_CREATE_START",
+      JSON.stringify({
+        user_email,
+        coin,
+        price,
+        condition,
+      })
+    );
+
     const resolvedCondition = await resolveAlertCondition({
       coin,
       targetPrice: Number(price),
@@ -161,17 +171,38 @@ export async function POST(req) {
       .select()
       .single();
 
-    if (error) {
-      console.error("ALERT INSERT ERROR:", error);
+    if (error || !data?.id) {
+      console.error(
+        "PRICE_ALERT_CREATE_FAILED",
+        JSON.stringify({
+          user_email,
+          coin,
+          price,
+          condition: resolvedCondition,
+          error: error?.message || "MISSING_INSERTED_ALERT_ID",
+        })
+      );
 
       return Response.json(
         {
           success: false,
-          error: error.message || "فشل حفظ التنبيه.",
+          error: error?.message || "فشل حفظ التنبيه في قاعدة البيانات.",
         },
         { status: 500 }
       );
     }
+
+    console.log(
+      "PRICE_ALERT_CREATE_SUCCESS",
+      JSON.stringify({
+        alertId: data.id,
+        user_email,
+        coin,
+        price,
+        condition: resolvedCondition,
+        status: data.status || "active",
+      })
+    );
 
     return Response.json({
       success: true,
@@ -179,7 +210,12 @@ export async function POST(req) {
       alert: data,
     });
   } catch (err) {
-    console.error("ALERT API ERROR:", err);
+    console.error(
+      "PRICE_ALERT_CREATE_FAILED",
+      JSON.stringify({
+        error: err?.message || String(err),
+      })
+    );
 
     return Response.json(
       {
