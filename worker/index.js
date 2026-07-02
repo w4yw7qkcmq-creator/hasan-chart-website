@@ -34,7 +34,7 @@ const { sendPriceAlertEmail } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-07-01-v22-single-email-idempotent";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v23-atomic-email-claim";
 const PRICE_ALERT_SINGLE_PATH = "worker/index.js::deliverRealPriceAlert";
 
 function logPriceAlertDeliveryError({ alertId, email, userId, phase, message, details = {} }) {
@@ -964,6 +964,20 @@ async function deliverRealPriceAlert({
         skipped: pushStats.skipped || 0,
       },
     });
+  } else {
+    console.log(
+      "WEB_PUSH_SKIPPED",
+      JSON.stringify({
+        path: PRICE_ALERT_SINGLE_PATH,
+        alertId,
+        email: normalizedEmail || null,
+        userId: normalizedUserId,
+        reason: pushStats?.skipReason || "WEB_PUSH_NOT_SENT",
+        sent: pushStats.sent || 0,
+        failed: pushStats.failed || 0,
+        skipped: pushStats.skipped || 0,
+      })
+    );
   }
 
   let emailResult = { success: false, sent: false, error: "EMAIL_NOT_ATTEMPTED" };

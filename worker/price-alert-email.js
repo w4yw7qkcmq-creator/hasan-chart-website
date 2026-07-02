@@ -3,8 +3,6 @@ const PRICE_ALERT_CTA_URL = "https://www.hasanchartworld.com/alerts";
 const PRICE_ALERT_EMAIL_TEMPLATE = "dark-compact-v1";
 const PRICE_ALERT_MESSAGE_TYPE = "price-alert";
 
-const sentPriceAlertEmailIds = new Set();
-
 function logPriceAlertDuplicateSkipped({ alertId, email, userId, emailSentAt, emailResendId }) {
   console.log(
     "PRICE_ALERT_EMAIL_DUPLICATE_SKIPPED",
@@ -177,8 +175,6 @@ async function releasePriceAlertEmailClaim(supabase, alertId) {
   const normalizedAlertId = String(alertId || "").trim();
   if (!normalizedAlertId) return;
 
-  sentPriceAlertEmailIds.delete(normalizedAlertId);
-
   await supabase
     .from("price_alerts")
     .update({ email_sent_at: null, email_resend_id: null })
@@ -272,59 +268,6 @@ async function sendPriceAlertEmail({
     };
   }
 
-  if (sentPriceAlertEmailIds.has(normalizedAlertId)) {
-    logPriceAlertDuplicateSkipped({
-      alertId: normalizedAlertId,
-      email: normalizedEmail,
-      userId,
-      emailSentAt: "in-memory",
-      emailResendId: null,
-    });
-
-    return {
-      success: true,
-      skipped: true,
-      sent: false,
-      reason: "EMAIL_ALREADY_SENT_FOR_ALERT",
-      alertId: normalizedAlertId,
-    };
-  }
-
-  let emailState = null;
-
-  try {
-    emailState = await loadPriceAlertEmailState(supabase, normalizedAlertId);
-  } catch (error) {
-    return {
-      success: false,
-      sent: false,
-      error: error?.message || String(error),
-      reason: "EMAIL_STATE_LOOKUP_FAILED",
-    };
-  }
-
-  if (emailState.emailSentAt) {
-    sentPriceAlertEmailIds.add(normalizedAlertId);
-
-    logPriceAlertDuplicateSkipped({
-      alertId: normalizedAlertId,
-      email: normalizedEmail,
-      userId,
-      emailSentAt: emailState.emailSentAt,
-      emailResendId: emailState.emailResendId,
-    });
-
-    return {
-      success: true,
-      skipped: true,
-      sent: false,
-      reason: "EMAIL_ALREADY_SENT_FOR_ALERT",
-      alertId: normalizedAlertId,
-      emailSentAt: emailState.emailSentAt,
-      emailResendId: emailState.emailResendId,
-    };
-  }
-
   let claimed = false;
 
   try {
@@ -339,20 +282,27 @@ async function sendPriceAlertEmail({
   }
 
   if (!claimed) {
-    let refreshedState = emailState;
+    let refreshedState = { emailSentAt: null, emailResendId: null };
 
     try {
       refreshedState = await loadPriceAlertEmailState(supabase, normalizedAlertId);
     } catch (error) {
+      logPriceAlertDuplicateSkipped({
+        alertId: normalizedAlertId,
+        email: normalizedEmail,
+        userId,
+        emailSentAt: null,
+        emailResendId: null,
+      });
+
       return {
-        success: false,
+        success: true,
+        skipped: true,
         sent: false,
-        error: error?.message || String(error),
-        reason: "EMAIL_STATE_REFRESH_FAILED",
+        reason: "EMAIL_ALREADY_SENT_FOR_ALERT",
+        alertId: normalizedAlertId,
       };
     }
-
-    sentPriceAlertEmailIds.add(normalizedAlertId);
 
     logPriceAlertDuplicateSkipped({
       alertId: normalizedAlertId,
@@ -372,8 +322,6 @@ async function sendPriceAlertEmail({
       emailResendId: refreshedState.emailResendId,
     };
   }
-
-  sentPriceAlertEmailIds.add(normalizedAlertId);
 
   const payload = buildPriceAlertEmailPayload({
     email: normalizedEmail,
@@ -400,9 +348,8 @@ async function sendPriceAlertEmail({
       await releasePriceAlertEmailClaim(supabase, normalizedAlertId);
     } catch (releaseError) {
       console.error(
-        "PRICE_ALERT_EMAIL_SENT_SINGLE",
+        "PRICE_ALERT_EMAIL_CLAIM_RELEASE_FAILED",
         JSON.stringify({
-          phase: "email_claim_release_failed",
           alertId: normalizedAlertId,
           message: releaseError?.message || String(releaseError),
         })
