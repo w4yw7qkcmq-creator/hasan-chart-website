@@ -7,7 +7,7 @@ import { NOTIFICATION_TYPES } from "../../lib/notifications-shared";
 import {
   installPriceAlertBrowserSoundListener,
   playBrowserSoundForNotificationType,
-  setupPriceAlertBrowserSoundUnlock,
+  setupBrowserSoundUnlock,
 } from "../../lib/price-alert-browser-sound";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
