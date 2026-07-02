@@ -4,6 +4,7 @@ import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-disp
 import { createUserNotification, createUserNotifications } from "../../../../lib/create-user-notification";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
+import { blockPriceAlertEmailSend } from "../../../../lib/price-alert-email-guard";
 import { buildEmailLogoHtml } from "../../../../lib/email-branding.js";
 import { NOTIFICATION_TYPES } from "../../../../lib/notifications-shared";
 import { processEmailQueue } from "../../../../lib/email-queue";
@@ -346,6 +347,17 @@ function buildVipSignalEmailHtml({ signalType, coin, entry, targets, stopLoss, n
 }
 
 async function sendEmailViaResend({ to, subject, html }) {
+  const blocked = blockPriceAlertEmailSend({
+    path: "app/api/admin/dashboard/route.js::sendEmailViaResend",
+    subject,
+    html,
+    to,
+  });
+
+  if (blocked) {
+    return { skipped: true, reason: blocked.reason };
+  }
+
   const resendApiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.EMAIL_FROM || "HasaN CharT World <support@hasanchartworld.com>";
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyCronSecret } from "../../../lib/admin-auth";
 import { PRICE_ALERT_SINGLE_PATH } from "../../../lib/price-alerts-runner";
+import { logPriceAlertEmailBlockedOldPath } from "../../../lib/price-alert-email-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,6 +18,10 @@ export async function GET(request) {
       { status: authCheck.status }
     );
   }
+
+  logPriceAlertEmailBlockedOldPath({
+    path: "app/api/check-price-alerts/route.js::GET",
+  });
 
   return NextResponse.json(
     {

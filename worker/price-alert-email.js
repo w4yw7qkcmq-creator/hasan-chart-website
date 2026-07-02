@@ -332,6 +332,19 @@ async function sendPriceAlertEmail({
     alertId: normalizedAlertId,
   });
 
+  console.log(
+    "PRICE_ALERT_EMAIL_SENT_SINGLE",
+    JSON.stringify({
+      phase: "pre-send",
+      path: "worker/price-alert-email.js::sendPriceAlertEmail",
+      alertId: normalizedAlertId,
+      email: normalizedEmail,
+      userId: userId || null,
+      template: PRICE_ALERT_EMAIL_TEMPLATE,
+      subject: payload.subject,
+    })
+  );
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -379,6 +392,7 @@ async function sendPriceAlertEmail({
   console.log(
     "PRICE_ALERT_EMAIL_SENT_SINGLE",
     JSON.stringify({
+      phase: "sent",
       path: "worker/price-alert-email.js::sendPriceAlertEmail",
       alertId: normalizedAlertId,
       email: normalizedEmail,

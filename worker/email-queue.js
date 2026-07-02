@@ -5,6 +5,10 @@ const MAX_RETRIES = 3;
 const PRICE_ALERT_QUEUE_LABELS = new Set(["price-alerts", "price-alerts-real-path", "price_alert"]);
 
 const { logWorkerEvent } = require("./alert-logger");
+const {
+  isPriceAlertEmailContent,
+  logPriceAlertEmailBlockedOldPath,
+} = require("./price-alert-email-guard");
 
 function isBlockedPriceAlertQueueItem({ label, item }) {
   const normalizedLabel = String(label || "").trim().toLowerCase();
@@ -14,6 +18,20 @@ function isBlockedPriceAlertQueueItem({ label, item }) {
   }
 
   if (item?.alertId && normalizedLabel.includes("price")) {
+    return true;
+  }
+
+  if (
+    isPriceAlertEmailContent({
+      subject: item?.subject,
+      html: item?.html,
+      text: item?.text,
+      title: item?.title,
+      content: item?.content,
+      tags: item?.tags,
+      template: item?.template,
+    })
+  ) {
     return true;
   }
 
@@ -195,16 +213,14 @@ async function processEmailQueue(items, options = {}) {
     }
 
     if (isBlockedPriceAlertQueueItem({ label, item })) {
-      console.log(
-        "PRICE_ALERT_EMAIL_DUPLICATE_SKIPPED",
-        JSON.stringify({
-          path: "worker/email-queue.js::processEmailQueue",
-          reason: "PRICE_ALERT_EMAIL_BLOCKED_USE_WORKER_ONLY",
-          label,
-          to,
-          alertId: item?.alertId || null,
-        })
-      );
+      logPriceAlertEmailBlockedOldPath({
+        path: "worker/email-queue.js::processEmailQueue",
+        label,
+        to,
+        alertId: item?.alertId || null,
+        subject: item?.subject || null,
+        title: item?.title || null,
+      });
       stats.skippedCount += 1;
       continue;
     }
