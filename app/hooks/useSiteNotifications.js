@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
-import { playNotificationSound, setupNotificationSoundUnlock, installNotificationSoundTestHook } from "../../lib/notification-sound";
+import { playNotificationSound, installNotificationSoundTestHook } from "../../lib/notification-sound";
+import { NOTIFICATION_TYPES } from "../../lib/notifications-shared";
 import {
   installPriceAlertBrowserSoundListener,
-  playPriceAlertBrowserSound,
+  playBrowserSoundForNotificationType,
+  setupPriceAlertBrowserSoundUnlock,
 } from "../../lib/price-alert-browser-sound";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
@@ -297,8 +299,17 @@ export function useSiteNotifications() {
         }
 
         toastedIdsRef.current.add(normalized.id);
-        if (normalized.type === "price-alert") {
-          playPriceAlertBrowserSound({ alertId: normalized.id, source: "site-notification" });
+        if (
+          normalized.type === NOTIFICATION_TYPES.PRICE_ALERT ||
+          normalized.type === NOTIFICATION_TYPES.VIP_SPOT ||
+          normalized.type === NOTIFICATION_TYPES.VIP_FUTURES ||
+          normalized.type === "breaking-news"
+        ) {
+          playBrowserSoundForNotificationType({
+            notificationType: normalized.type,
+            id: normalized.id,
+            source: "site-notification",
+          });
         } else {
           playNotificationSound();
         }
@@ -596,7 +607,7 @@ export function useSiteNotifications() {
       return;
     }
 
-    setupNotificationSoundUnlock();
+    setupBrowserSoundUnlock();
     const removeSoundTestHook = installNotificationSoundTestHook();
     const removePriceAlertSoundListener = installPriceAlertBrowserSoundListener();
 

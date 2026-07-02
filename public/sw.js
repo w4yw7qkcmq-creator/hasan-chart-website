@@ -1,5 +1,13 @@
-const PRICE_ALERT_CHANNEL = "hasan-chart-price-alert";
-const SW_VERSION = "2026-06-23-price-alert-v1";
+const BROWSER_SOUND_CHANNEL = "hasan-chart-browser-sound";
+const BROWSER_SOUND_MESSAGE_TYPE = "BROWSER_SOUND";
+const SW_VERSION = "2026-07-03-browser-sound-v3";
+
+const SOUND_TYPE_BY_PUSH = {
+  "price-alert": "price-alert",
+  "vip-spot": "vip-signal",
+  "vip-futures": "vip-signal",
+  "breaking-news": "breaking-news",
+};
 
 function parsePushPayload(event) {
   const defaults = {
@@ -11,7 +19,10 @@ function parsePushPayload(event) {
     type: "general",
     tag: null,
     alertId: null,
+    signalId: null,
+    newsId: null,
     sound: false,
+    soundType: null,
   };
 
   if (!event.data) {
@@ -37,6 +48,14 @@ function resolveNotificationTag(payload) {
     return `price-alert-${payload.alertId}`;
   }
 
+  if (payload.signalId) {
+    return `vip-signal-${payload.signalId}`;
+  }
+
+  if (payload.newsId) {
+    return `breaking-news-${payload.newsId}`;
+  }
+
   return `hasan-chart-push-${Date.now()}`;
 }
 
@@ -60,24 +79,68 @@ function resolveNotificationUrl(payload) {
     return "/notifications";
   }
 
+  if (payload.type === "vip-spot") {
+    return "/vip-spot";
+  }
+
+  if (payload.type === "vip-futures") {
+    return "/vip-futures";
+  }
+
+  if (payload.type === "breaking-news") {
+    return "/news";
+  }
+
   return "/notifications";
 }
 
-function broadcastPriceAlertToClients(payload) {
-  if (payload.type !== "price-alert" || payload.sound !== true) {
+function resolveBrowserSoundType(payload, tag) {
+  const explicit = String(payload.soundType || "").trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const pushType = String(payload.type || "").trim();
+  if (SOUND_TYPE_BY_PUSH[pushType]) {
+    return SOUND_TYPE_BY_PUSH[pushType];
+  }
+
+  const resolvedTag = String(tag || "");
+  if (resolvedTag.startsWith("price-alert-")) return "price-alert";
+  if (resolvedTag.startsWith("vip-signal-")) return "vip-signal";
+  if (resolvedTag.startsWith("breaking-news-")) return "breaking-news";
+
+  return null;
+}
+
+function shouldBroadcastBrowserSound(payload, tag) {
+  if (payload.sound !== true) {
+    return false;
+  }
+
+  return Boolean(resolveBrowserSoundType(payload, tag));
+}
+
+function broadcastBrowserSoundToClients(payload, tag) {
+  const soundType = resolveBrowserSoundType(payload, tag);
+
+  if (!soundType) {
     return Promise.resolve();
   }
 
   const message = {
-    type: "price-alert",
+    type: BROWSER_SOUND_MESSAGE_TYPE,
+    soundType,
     alertId: payload.alertId ? String(payload.alertId) : null,
+    signalId: payload.signalId ? String(payload.signalId) : null,
+    newsId: payload.newsId ? String(payload.newsId) : null,
     sound: true,
-    tag: resolveNotificationTag(payload),
+    tag: tag || resolveNotificationTag(payload),
     swVersion: SW_VERSION,
   };
 
   if (typeof BroadcastChannel !== "undefined") {
-    const channel = new BroadcastChannel(PRICE_ALERT_CHANNEL);
+    const channel = new BroadcastChannel(BROWSER_SOUND_CHANNEL);
     channel.postMessage(message);
     channel.close();
   }
@@ -96,6 +159,7 @@ self.addEventListener("push", (event) => {
   const payload = parsePushPayload(event);
   const tag = resolveNotificationTag(payload);
   const targetUrl = resolveNotificationUrl(payload);
+  const soundType = resolveBrowserSoundType(payload, tag);
 
   console.log(
     "SERVICE_WORKER_PUSH_RECEIVED",
@@ -104,10 +168,14 @@ self.addEventListener("push", (event) => {
       type: payload.type || "general",
       tag,
       alertId: payload.alertId || null,
+      signalId: payload.signalId || null,
+      newsId: payload.newsId || null,
+      soundType,
       sound: payload.sound === true,
       url: targetUrl,
       hasTitle: Boolean(payload.title),
       hasBody: Boolean(payload.body),
+      willBroadcastSound: shouldBroadcastBrowserSound(payload, tag),
     })
   );
 
@@ -125,10 +193,13 @@ self.addEventListener("push", (event) => {
           url: targetUrl,
           type: payload.type || "general",
           alertId: payload.alertId ? String(payload.alertId) : null,
+          signalId: payload.signalId ? String(payload.signalId) : null,
+          newsId: payload.newsId ? String(payload.newsId) : null,
+          soundType,
           sound: payload.sound === true,
         },
       }),
-      broadcastPriceAlertToClients(payload),
+      broadcastBrowserSoundToClients(payload, tag),
     ])
   );
 });

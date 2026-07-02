@@ -17,6 +17,7 @@ import {
   setStoredPushEndpoint,
   subscribeToWebPush,
 } from "../../lib/push-client";
+import { setupBrowserSoundUnlock } from "../../lib/price-alert-browser-sound";
 import { useAppModal } from "./AppModalProvider";
 import { useAuth } from "./AuthProvider";
 import { useBootstrapLoadingOverlay } from "../hooks/useBootstrapLoadingOverlay";
@@ -273,6 +274,10 @@ function RootLayoutShell({ children }) {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    setupBrowserSoundUnlock();
   }, []);
 
   useEffect(() => {
