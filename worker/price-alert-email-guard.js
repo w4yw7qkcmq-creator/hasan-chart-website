@@ -3,7 +3,9 @@ const PRICE_ALERT_CANONICAL_PATH = "worker/price-alert-email.js::sendPriceAlertE
 const PRICE_ALERT_TEXT_MARKERS = [
   "وصل السعر إلى هدف التنبيه",
   "وصل السعر",
+  "تم تفعيل تنبيه",
   "تم تفعيل تنبيه السعر",
+  "تحقق تنبيه",
   "price alert triggered",
   "price alert",
   "price-alert",
@@ -37,7 +39,37 @@ function collectEmailGuardText({ subject, html, text, title, content, template, 
     .join("\n");
 }
 
+function matchesLegacyPriceAlertSubject(subject) {
+  const normalized = normalizeEmailGuardText(subject);
+  if (!normalized) return false;
+
+  if (normalized.includes("تم تفعيل تنبيه")) return true;
+  if (normalized.includes("تحقق تنبيه")) return true;
+  if (/تنبيه\s+[a-z0-9-]{2,20}usdt/.test(normalized)) return true;
+
+  return false;
+}
+
+function hasPriceAlertTag(tags) {
+  if (!Array.isArray(tags)) return false;
+
+  return tags.some((tag) => {
+    const name = normalizeEmailGuardText(tag?.name);
+    const value = normalizeEmailGuardText(tag?.value);
+
+    if (name === "message_type" && value === "price-alert") return true;
+    if (name === "category" && value === "price-alert") return true;
+    if (name === "alert_id" && value) return true;
+
+    return false;
+  });
+}
+
 function isPriceAlertEmailContent(fields = {}) {
+  if (fields?.alertId) return true;
+  if (hasPriceAlertTag(fields.tags)) return true;
+  if (matchesLegacyPriceAlertSubject(fields.subject || fields.title)) return true;
+
   const blob = collectEmailGuardText(fields);
   if (!blob) return false;
 
@@ -55,8 +87,9 @@ function logPriceAlertEmailBlockedOldPath({
   to = null,
 }) {
   console.log(
-    "PRICE_ALERT_EMAIL_BLOCKED_OLD_PATH",
+    "PRICE_ALERT_EMAIL_BLOCKED_FROM_WEBSITE",
     JSON.stringify({
+      service: "hasan-chart-worker-email-queue",
       path: path || "unknown",
       canonicalPath: PRICE_ALERT_CANONICAL_PATH,
       subject: subject || null,
@@ -86,7 +119,7 @@ function blockPriceAlertEmailSend({ path, ...fields }) {
     success: false,
     skipped: true,
     sent: false,
-    reason: "PRICE_ALERT_EMAIL_BLOCKED_OLD_PATH",
+    reason: "PRICE_ALERT_EMAIL_BLOCKED_FROM_WEBSITE",
     canonicalPath: PRICE_ALERT_CANONICAL_PATH,
   };
 }

@@ -4,7 +4,8 @@ import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-disp
 import { createUserNotification, createUserNotifications } from "../../../../lib/create-user-notification";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
-import { blockPriceAlertEmailSend, blockWebsiteResendPayload } from "../../../../lib/price-alert-email-guard";
+import { blockPriceAlertEmailSend } from "../../../../lib/price-alert-email-guard";
+import { sendWebsiteResendEmail } from "../../../../lib/resend-website";
 import { buildEmailLogoHtml } from "../../../../lib/email-branding.js";
 import { NOTIFICATION_TYPES } from "../../../../lib/notifications-shared";
 import { processEmailQueue } from "../../../../lib/email-queue";
@@ -372,31 +373,22 @@ async function sendEmailViaResend({ to, subject, html }) {
     html,
   };
 
-  const payloadBlocked = blockWebsiteResendPayload({
-    path: "app/api/admin/dashboard/route.js::sendEmailViaResend::resendPayload",
+  const outcome = await sendWebsiteResendEmail({
+    path: "app/api/admin/dashboard/route.js::sendEmailViaResend",
+    resendApiKey,
     payload: resendPayload,
     to,
   });
 
-  if (payloadBlocked) {
-    return { skipped: true, reason: payloadBlocked.reason };
+  if (!outcome.success) {
+    if (outcome.skipped) {
+      return { skipped: true, reason: outcome.reason };
+    }
+
+    throw new Error(outcome.error || "Email provider error");
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(resendPayload),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(text || "Email provider error");
-  }
-
-  return response.json().catch(() => ({ success: true }));
+  return outcome.result || { success: true, id: outcome.id || null };
 }
 
 function getSubscriptionDurationDays(planName) {
