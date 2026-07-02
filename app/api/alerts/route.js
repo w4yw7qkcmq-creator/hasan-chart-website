@@ -141,7 +141,6 @@ export async function POST(req) {
     const supabase = getSupabaseAdmin();
 
     console.log("PRICE_ALERT_CREATE_START", {
-      userId: session.id,
       user_email,
       coin,
       price,
@@ -158,7 +157,6 @@ export async function POST(req) {
       .from("price_alerts")
       .insert([
         {
-          user_id: session.id,
           user_email,
           username,
           coin,
