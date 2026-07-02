@@ -188,7 +188,7 @@ async function sendPriceAlertPushNotifications({
   userId,
   title,
   body,
-  url = "https://www.hasanchartworld.com/alerts",
+  url = "/notifications",
 }) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const alertUserId = String(userId || "").trim() || null;
@@ -305,11 +305,29 @@ async function sendPriceAlertPushNotifications({
   const payload = {
     title,
     body,
-    url,
     icon: "/logo.png",
-    type: "price-alert",
+    badge: "/logo.png",
+    url: url || "/notifications",
     tag: `price-alert-${alertId}`,
+    alertId: String(alertId),
+    type: "price-alert",
+    sound: true,
   };
+
+  logPushEvent("WEB_PUSH_PAYLOAD_READY", {
+    alertId,
+    email: normalizedEmail || null,
+    userId: alertUserId,
+    title: payload.title,
+    body: payload.body,
+    icon: payload.icon,
+    badge: payload.badge,
+    url: payload.url,
+    tag: payload.tag,
+    type: payload.type,
+    sound: payload.sound,
+    subscriptionCount: subscriptionList.length,
+  });
 
   let sent = 0;
   let failed = 0;

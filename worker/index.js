@@ -200,7 +200,7 @@ async function sendTriggeredAlertWebPush({
       userId: normalizedUserId,
       title: "🔔 وصل السعر إلى هدف التنبيه",
       body: pushBody,
-      url: "https://www.hasanchartworld.com/alerts",
+      url: "/notifications",
     });
   } catch (pushError) {
     return {

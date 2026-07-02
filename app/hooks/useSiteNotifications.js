@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 import { playNotificationSound, setupNotificationSoundUnlock, installNotificationSoundTestHook } from "../../lib/notification-sound";
+import {
+  installPriceAlertBrowserSoundListener,
+  playPriceAlertBrowserSound,
+} from "../../lib/price-alert-browser-sound";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
@@ -293,7 +297,11 @@ export function useSiteNotifications() {
         }
 
         toastedIdsRef.current.add(normalized.id);
-        playNotificationSound();
+        if (normalized.type === "price-alert") {
+          playPriceAlertBrowserSound({ alertId: normalized.id, source: "site-notification" });
+        } else {
+          playNotificationSound();
+        }
 
         if (!notificationPanelOpenRef.current) {
           pushToast(normalized);
@@ -590,6 +598,7 @@ export function useSiteNotifications() {
 
     setupNotificationSoundUnlock();
     const removeSoundTestHook = installNotificationSoundTestHook();
+    const removePriceAlertSoundListener = installPriceAlertBrowserSoundListener();
 
     let active = true;
     const generation = syncGenerationRef.current + 1;
@@ -717,6 +726,7 @@ export function useSiteNotifications() {
       setRealtimeConnected(false);
       realtimeConnectedRef.current = false;
       removeSoundTestHook();
+      removePriceAlertSoundListener();
     };
   }, [
     authResolved,
