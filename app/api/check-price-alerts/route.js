@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { verifyCronSecret } from "../../../lib/admin-auth";
 import { PRICE_ALERT_SINGLE_PATH } from "../../../lib/price-alerts-runner";
-import { logPriceAlertEmailBlockedFromWebsite } from "../../../lib/price-alert-email-guard";
+import { logPriceAlertEmailBlockedFromSupabaseOrWebsite, PRICE_ALERT_EMAIL_BLOCKED_EVENT } from "../../../lib/price-alert-email-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 function buildDisabledPriceAlertsResponse(method) {
-  logPriceAlertEmailBlockedFromWebsite({
+  logPriceAlertEmailBlockedFromSupabaseOrWebsite({
+    service: "hasan-chart-website",
     path: `app/api/check-price-alerts/route.js::${method}`,
     label: "route-disabled-410",
   });
@@ -17,7 +18,7 @@ function buildDisabledPriceAlertsResponse(method) {
       success: false,
       error: "Price alerts are handled by the Railway worker only.",
       canonicalPath: PRICE_ALERT_SINGLE_PATH,
-      websiteEmailPolicy: "PRICE_ALERT_EMAIL_BLOCKED_FROM_WEBSITE",
+      websiteEmailPolicy: PRICE_ALERT_EMAIL_BLOCKED_EVENT,
     },
     { status: 410 }
   );

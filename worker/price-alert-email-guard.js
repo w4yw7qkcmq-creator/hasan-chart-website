@@ -1,4 +1,6 @@
 const PRICE_ALERT_CANONICAL_PATH = "worker/price-alert-email.js::sendPriceAlertEmail";
+const PRICE_ALERT_EMAIL_BLOCKED_EVENT =
+  "PRICE_ALERT_EMAIL_BLOCKED_FROM_SUPABASE_OR_WEBSITE";
 
 const PRICE_ALERT_TEXT_MARKERS = [
   "وصل السعر إلى هدف التنبيه",
@@ -87,7 +89,7 @@ function logPriceAlertEmailBlockedOldPath({
   to = null,
 }) {
   console.log(
-    "PRICE_ALERT_EMAIL_BLOCKED_FROM_WEBSITE",
+    PRICE_ALERT_EMAIL_BLOCKED_EVENT,
     JSON.stringify({
       service: "hasan-chart-worker-email-queue",
       path: path || "unknown",
@@ -119,7 +121,7 @@ function blockPriceAlertEmailSend({ path, ...fields }) {
     success: false,
     skipped: true,
     sent: false,
-    reason: "PRICE_ALERT_EMAIL_BLOCKED_FROM_WEBSITE",
+    reason: PRICE_ALERT_EMAIL_BLOCKED_EVENT,
     canonicalPath: PRICE_ALERT_CANONICAL_PATH,
   };
 }

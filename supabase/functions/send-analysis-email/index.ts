@@ -1,4 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  isSupabasePriceAlertEmailRequest,
+} from "../_shared/price-alert-email-guard.ts";
+import {
+  rejectSupabasePriceAlertRequest,
+  sendSupabaseResendEmail,
+} from "../_shared/resend-edge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +15,7 @@ const corsHeaders = {
 
 const ADMIN_EMAIL_SECRET = Deno.env.get("ADMIN_EMAIL_SECRET") || "";
 const EMAIL_LOGO_URL = "https://www.hasanchartworld.com/favicon.png";
+const FUNCTION_PATH = "supabase/functions/send-analysis-email/index.ts";
 
 const buildEmailLogoHtml = () =>
   `<img src="${EMAIL_LOGO_URL}" alt="HasaN CharT World" width="64" height="64" style="display:block;border-radius:16px;margin:0 auto 16px;" />`;
@@ -39,10 +47,24 @@ serve(async (req) => {
       return jsonResponse({ error: "Unauthorized email request" }, 401);
     }
 
-    const { email, coin, reply } = await req.json();
+    const body = await req.json().catch(() => ({}));
+
+    if (isSupabasePriceAlertEmailRequest(body)) {
+      return jsonResponse(
+        rejectSupabasePriceAlertRequest(FUNCTION_PATH, body),
+        410
+      );
+    }
+
+    const { email, coin, reply } = body as Record<string, unknown>;
 
     if (!email || !coin || !reply) {
       return jsonResponse({ error: "Missing required fields" }, 400);
+    }
+
+    const replyText = String(reply || "").trim();
+    if (replyText.length < 2) {
+      return jsonResponse({ error: "Analysis reply content is required" }, 400);
     }
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -51,21 +73,16 @@ serve(async (req) => {
       return jsonResponse({ error: "Missing RESEND_API_KEY" }, 500);
     }
 
-    const safeCoin = escapeHtml(coin);
-    const safeReply = escapeHtml(reply);
+    const safeCoin = escapeHtml(String(coin));
+    const safeReply = escapeHtml(replyText);
     const logoHtml = buildEmailLogoHtml();
+    const subject = `📩 تم الرد على تحليل ${safeCoin}`;
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: "HasaN CharT World <alerts@hasanchartworld.com>",
-        to: email,
-        subject: `📩 تم الرد على تحليل ${safeCoin}`,
-        html: `
+    const resendPayload = {
+      from: "HasaN CharT World <alerts@hasanchartworld.com>",
+      to: email,
+      subject,
+      html: `
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <body style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;">
@@ -108,11 +125,29 @@ ${safeReply}
 </body>
 </html>
         `,
-      }),
+    };
+
+    const outcome = await sendSupabaseResendEmail({
+      path: `${FUNCTION_PATH}::send`,
+      resendApiKey: RESEND_API_KEY,
+      payload: resendPayload,
     });
 
-    const data = await response.json();
-    return jsonResponse(data, response.status);
+    if (outcome.blocked) {
+      return jsonResponse(outcome, 410);
+    }
+
+    if (!outcome.success) {
+      return jsonResponse(
+        {
+          error: outcome.error || "Email provider error",
+          data: outcome.data || null,
+        },
+        outcome.status || 500
+      );
+    }
+
+    return jsonResponse(outcome.data || { success: true }, outcome.status || 200);
   } catch (error) {
     return jsonResponse({ error: String(error?.message || error) }, 500);
   }
