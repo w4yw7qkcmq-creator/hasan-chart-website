@@ -340,9 +340,9 @@ export default function Home() {
 
     if (!user?.email) {
       showAppModal({
-        type: "warning",
+        type: "error",
         title: "يجب تسجيل الدخول",
-        message: "يجب الدخول للحساب أولاً",
+        message: "يجب الدخول للحساب أولاً قبل إنشاء تنبيه سعري.",
       });
       window.location.href = "/login";
       return;
@@ -363,20 +363,24 @@ export default function Home() {
     setAlertSubmitting(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      await createPriceAlert({
+      const result = await createPriceAlert({
         coin: cleanCoin,
         price: cleanPrice,
         condition: "auto",
         signal: controller.signal,
       });
 
+      if (!result?.alert?.id) {
+        throw new Error("لم يتم حفظ التنبيه في قاعدة البيانات.");
+      }
+
       showAppModal({
         type: "success",
         title: "تم إضافة التنبيه بنجاح",
-        message: "وسيتم إرسال الإيميل فقط عند تحقق السعر.",
+        message: result?.message || "وسيتم إرسال الإيميل فقط عند تحقق السعر.",
       });
 
       setAlertCoin("");
@@ -389,7 +393,7 @@ export default function Home() {
         title: "تعذر إنشاء التنبيه",
         message:
           err?.name === "AbortError"
-            ? "السيرفر لم يرد خلال 9 ثواني. جرّب مرة ثانية."
+            ? "السيرفر لم يرد خلال 15 ثانية. جرّب مرة ثانية."
             : err?.message || "حدث خطأ أثناء إنشاء التنبيه",
       });
     } finally {

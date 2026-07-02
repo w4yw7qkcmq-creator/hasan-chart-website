@@ -18,9 +18,7 @@ export default function Alerts() {
     setModal({ open: true, type, title, message });
   };
 
-  const handleAddAlert = async (e) => {
-    e.preventDefault();
-
+  const handleAddAlert = async () => {
     if (loading) return;
 
     if (!authResolved) {
@@ -34,7 +32,7 @@ export default function Alerts() {
 
     if (!currentUser?.email) {
       showModal({
-        type: "warning",
+        type: "error",
         title: "يجب تسجيل الدخول",
         message: "يجب تسجيل الدخول أولاً قبل إنشاء تنبيه سعري.",
       });
@@ -56,7 +54,7 @@ export default function Alerts() {
     setLoading(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
       const result = await createPriceAlert({
@@ -66,13 +64,19 @@ export default function Alerts() {
         signal: controller.signal,
       });
 
+      const createdAlert = result?.alert;
+
+      if (!createdAlert?.id) {
+        throw new Error("لم يتم حفظ التنبيه في قاعدة البيانات.");
+      }
+
       setAlerts((prev) => [
         {
-          id: result.alert.id,
-          coin: result.alert.coin || cleanCoin,
-          price: result.alert.target_price || cleanPrice,
-          condition: result.alert.condition || condition,
-          status: result.alert.status || "active",
+          id: createdAlert.id,
+          coin: createdAlert.coin || cleanCoin,
+          price: createdAlert.target_price || cleanPrice,
+          condition: createdAlert.condition || condition,
+          status: createdAlert.status || "active",
         },
         ...prev,
       ]);
@@ -80,10 +84,11 @@ export default function Alerts() {
       setCoin("");
       setPrice("");
       setCondition("above");
+
       showModal({
         type: "success",
         title: "تم إضافة التنبيه بنجاح",
-        message: result?.message || "سيتم إرسال الإيميل فقط عند تحقق السعر.",
+        message: result?.message || "وسيتم إرسال الإيميل فقط عند تحقق السعر.",
       });
     } catch (err) {
       console.error("PRICE_ALERT_CREATE_FAILED", err);
@@ -93,7 +98,7 @@ export default function Alerts() {
         title: "تعذر إضافة التنبيه",
         message:
           err?.name === "AbortError"
-            ? "السيرفر لم يرد خلال 9 ثواني. جرّب مرة ثانية."
+            ? "السيرفر لم يرد خلال 15 ثانية. جرّب مرة ثانية."
             : err?.message || "حدث خطأ أثناء إضافة التنبيه",
       });
     } finally {
@@ -128,13 +133,12 @@ export default function Alerts() {
           </div>
         ) : null}
 
-        <form onSubmit={handleAddAlert} className="space-y-4">
+        <div className="space-y-4">
           <input
             type="text"
             value={coin}
             onChange={(e) => setCoin(e.target.value)}
             placeholder="اسم العملة (مثال: BTC أو BTCUSDT)"
-            required
             className="w-full rounded-2xl border border-white/10 bg-[#111827] p-4 text-white outline-none"
           />
 
@@ -143,7 +147,6 @@ export default function Alerts() {
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="السعر المستهدف (USD)"
-            required
             className="w-full rounded-2xl border border-white/10 bg-[#111827] p-4 text-white outline-none"
           />
 
@@ -157,13 +160,14 @@ export default function Alerts() {
           </select>
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleAddAlert}
             disabled={loading || !authResolved || !currentUser?.email}
             className="w-full rounded-2xl bg-emerald-400 py-4 font-bold text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "جاري إضافة التنبيه..." : "إضافة التنبيه"}
           </button>
-        </form>
+        </div>
 
         {alerts.length > 0 && (
           <div className="space-y-4">

@@ -140,15 +140,13 @@ export async function POST(req) {
 
     const supabase = getSupabaseAdmin();
 
-    console.log(
-      "PRICE_ALERT_CREATE_START",
-      JSON.stringify({
-        user_email,
-        coin,
-        price,
-        condition,
-      })
-    );
+    console.log("PRICE_ALERT_CREATE_START", {
+      userId: session.id,
+      user_email,
+      coin,
+      price,
+      condition,
+    });
 
     const resolvedCondition = await resolveAlertCondition({
       coin,
@@ -160,6 +158,7 @@ export async function POST(req) {
       .from("price_alerts")
       .insert([
         {
+          user_id: session.id,
           user_email,
           username,
           coin,
@@ -172,16 +171,7 @@ export async function POST(req) {
       .single();
 
     if (error || !data?.id) {
-      console.error(
-        "PRICE_ALERT_CREATE_FAILED",
-        JSON.stringify({
-          user_email,
-          coin,
-          price,
-          condition: resolvedCondition,
-          error: error?.message || "MISSING_INSERTED_ALERT_ID",
-        })
-      );
+      console.error("PRICE_ALERT_CREATE_FAILED", error || "MISSING_INSERTED_ALERT_ID");
 
       return Response.json(
         {
@@ -192,17 +182,7 @@ export async function POST(req) {
       );
     }
 
-    console.log(
-      "PRICE_ALERT_CREATE_SUCCESS",
-      JSON.stringify({
-        alertId: data.id,
-        user_email,
-        coin,
-        price,
-        condition: resolvedCondition,
-        status: data.status || "active",
-      })
-    );
+    console.log("PRICE_ALERT_CREATE_SUCCESS", data);
 
     return Response.json({
       success: true,
@@ -210,12 +190,7 @@ export async function POST(req) {
       alert: data,
     });
   } catch (err) {
-    console.error(
-      "PRICE_ALERT_CREATE_FAILED",
-      JSON.stringify({
-        error: err?.message || String(err),
-      })
-    );
+    console.error("PRICE_ALERT_CREATE_FAILED", err);
 
     return Response.json(
       {
