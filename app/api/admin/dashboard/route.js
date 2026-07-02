@@ -4,7 +4,7 @@ import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-disp
 import { createUserNotification, createUserNotifications } from "../../../../lib/create-user-notification";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
-import { blockPriceAlertEmailSend } from "../../../../lib/price-alert-email-guard";
+import { blockPriceAlertEmailSend, blockWebsiteResendPayload } from "../../../../lib/price-alert-email-guard";
 import { buildEmailLogoHtml } from "../../../../lib/email-branding.js";
 import { NOTIFICATION_TYPES } from "../../../../lib/notifications-shared";
 import { processEmailQueue } from "../../../../lib/email-queue";
@@ -365,18 +365,30 @@ async function sendEmailViaResend({ to, subject, html }) {
     return { skipped: true };
   }
 
+  const resendPayload = {
+    from: fromEmail,
+    to,
+    subject,
+    html,
+  };
+
+  const payloadBlocked = blockWebsiteResendPayload({
+    path: "app/api/admin/dashboard/route.js::sendEmailViaResend::resendPayload",
+    payload: resendPayload,
+    to,
+  });
+
+  if (payloadBlocked) {
+    return { skipped: true, reason: payloadBlocked.reason };
+  }
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${resendApiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: fromEmail,
-      to,
-      subject,
-      html,
-    }),
+    body: JSON.stringify(resendPayload),
   });
 
   if (!response.ok) {

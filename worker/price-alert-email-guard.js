@@ -2,6 +2,7 @@ const PRICE_ALERT_CANONICAL_PATH = "worker/price-alert-email.js::sendPriceAlertE
 
 const PRICE_ALERT_TEXT_MARKERS = [
   "وصل السعر إلى هدف التنبيه",
+  "وصل السعر",
   "تم تفعيل تنبيه السعر",
   "price alert triggered",
   "price alert",
@@ -11,6 +12,10 @@ const PRICE_ALERT_TEXT_MARKERS = [
   "تنبيهات الأسعار",
   "هدف التنبيه",
   "فتح تنبيهات الأسعار",
+  "السعر الذي طلبته",
+  "السعر الحالي عند التفعيل",
+  "target_price",
+  "triggered_price",
   "dark-compact-v1",
 ];
 

@@ -34,7 +34,7 @@ const { sendPriceAlertEmail } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 
 const WORKER_ENTRY = "worker/index.js";
-const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v24-block-old-email-paths";
+const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v25-block-website-price-alert-email";
 const PRICE_ALERT_SINGLE_PATH = "worker/index.js::deliverRealPriceAlert";
 
 function logPriceAlertDeliveryError({ alertId, email, userId, phase, message, details = {} }) {
