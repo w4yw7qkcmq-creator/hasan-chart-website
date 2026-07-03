@@ -6,6 +6,7 @@ import {
   subscriptionRequestLimiter,
 } from "../../../lib/rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { buildAdminSubscriptionRequestEmailContent } from "../../../lib/email-layout.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,25 +26,22 @@ async function sendAdminSubscriptionRequestEmail({ userEmail, username, planName
   const paymentProofHtml = isInlinePaymentProof
     ? "صورة إثبات الدفع محفوظة داخل الطلب ويمكن عرضها من لوحة الإدارة."
     : paymentProof
-    ? `<a href="${paymentProof}" style="color:#2563eb;font-weight:800;text-decoration:none">فتح صورة إثبات الدفع</a>`
+    ? `<a href="${paymentProof}" style="color:#67e8f9;font-weight:800;text-decoration:none">فتح صورة إثبات الدفع</a>`
     : "غير مرفق";
 
   await sendTemplateEmail({
     to: ADMIN_EMAIL,
     subject: "طلب اشتراك جديد - HasaN CharT World",
     title: "طلب اشتراك جديد 💳",
-    content: `
-      <p>وصل طلب اشتراك جديد في باقات التوصيات.</p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:16px;line-height:1.9">
-        <p><strong>الباقة:</strong> ${planName}</p>
-        <p><strong>القسم:</strong> ${category}</p>
-        <p><strong>السعر:</strong> ${price}</p>
-        <p><strong>البريد:</strong> ${userEmail}</p>
-        <p><strong>اسم المستخدم:</strong> ${username || "غير متوفر"}</p>
-        <p><strong>تليجرام:</strong> ${telegramUsername}</p>
-        <p><strong>إثبات الدفع:</strong> ${paymentProofHtml}</p>
-      </div>
-    `,
+    content: buildAdminSubscriptionRequestEmailContent({
+      planName,
+      category,
+      price,
+      userEmail,
+      username,
+      telegramUsername,
+      paymentProofHtml,
+    }),
     actionText: "فتح لوحة الإدارة",
     actionUrl: `${getSiteUrl()}/admin`,
   });

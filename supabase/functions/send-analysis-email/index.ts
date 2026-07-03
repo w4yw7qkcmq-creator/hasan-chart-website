@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { buildAnalysisReplyEmailHtml } from "../_shared/email-layout.ts";
 import {
   isSupabasePriceAlertEmailRequest,
 } from "../_shared/price-alert-email-guard.ts";
@@ -14,20 +15,7 @@ const corsHeaders = {
 };
 
 const ADMIN_EMAIL_SECRET = Deno.env.get("ADMIN_EMAIL_SECRET") || "";
-const EMAIL_LOGO_URL = "https://www.hasanchartworld.com/favicon.png";
 const FUNCTION_PATH = "supabase/functions/send-analysis-email/index.ts";
-
-const buildEmailLogoHtml = () =>
-  `<img src="${EMAIL_LOGO_URL}" alt="HasaN CharT World" width="64" height="64" style="display:block;border-radius:16px;margin:0 auto 16px;" />`;
-
-const escapeHtml = (value: string) =>
-  String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;")
-    .replaceAll("\n", "<br />");
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -73,58 +61,16 @@ serve(async (req) => {
       return jsonResponse({ error: "Missing RESEND_API_KEY" }, 500);
     }
 
-    const safeCoin = escapeHtml(String(coin));
-    const safeReply = escapeHtml(replyText);
-    const logoHtml = buildEmailLogoHtml();
-    const subject = `📩 تم الرد على تحليل ${safeCoin}`;
+    const subject = `📩 تم الرد على تحليل ${String(coin)}`;
 
     const resendPayload = {
       from: "HasaN CharT World <alerts@hasanchartworld.com>",
       to: email,
       subject,
-      html: `
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<body style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#020617;padding:20px 8px;">
-<tr>
-<td align="center">
-<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#07142f;border:1px solid #1e3a5f;border-radius:22px;overflow:hidden;">
-<tr>
-<td align="center" style="background:#0ea5e9;padding:28px 18px;">
-${logoHtml}
-<div style="font-size:28px;font-weight:900;color:white;">HasaN CharT World</div>
-<div style="margin-top:10px;font-size:14px;color:#e0f2fe;">تم الرد على طلب التحليل الخاص بك</div>
-</td>
-</tr>
-<tr>
-<td style="padding:22px 16px;">
-<div style="background:#111c33;border:1px solid #263a5c;border-radius:18px;padding:22px;text-align:center;margin-bottom:18px;">
-<div style="font-size:14px;color:#94a3b8;margin-bottom:10px;">العملة المطلوبة</div>
-<div style="font-size:32px;font-weight:900;color:#67e8f9;">${safeCoin}</div>
-</div>
-<div style="background:#020617;border:1px solid #164e63;border-radius:18px;padding:18px;color:#e2e8f0;font-size:16px;line-height:2;">
-${safeReply}
-</div>
-<div style="text-align:center;margin-top:24px;">
-<a href="https://www.hasanchartworld.com/my-analysis" style="display:inline-block;background:#0ea5e9;color:white;text-decoration:none;padding:14px 24px;border-radius:16px;font-weight:900;">
-مشاهدة التحليل
-</a>
-</div>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding:18px;background:#020617;border-top:1px solid #1e293b;color:#64748b;font-size:12px;">
-© 2026 HasaN CharT World
-</td>
-</tr>
-</table>
-</td>
-</tr>
-</table>
-</body>
-</html>
-        `,
+      html: buildAnalysisReplyEmailHtml({
+        coin: String(coin),
+        reply: replyText,
+      }),
     };
 
     const outcome = await sendSupabaseResendEmail({

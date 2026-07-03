@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
 import { createUserNotification } from "../../../lib/create-user-notification";
 
 const supabase = createClient(
@@ -114,12 +115,10 @@ const processExpiredSubscription = async (subscription, email) => {
     to: email,
     subject: "انتهاء الاشتراك - HasaN CharT World",
     title: "انتهت صلاحية اشتراكك ⚠️",
-    content: `
-      <p>انتهت صلاحية الباقة التالية:</p>
-      <p style="font-size:20px"><strong>${planName}</strong></p>
-      <p>تم إيقاف الوصول إلى خدمات VIP بسبب انتهاء مدة الاشتراك.</p>
-      <p>يمكنك تجديد الاشتراك للعودة إلى التوصيات والخدمات المميزة.</p>
-    `,
+    content: buildSubscriptionExpiryEmailContent({
+      planName,
+      variant: "expired",
+    }),
     actionText: "تجديد الاشتراك",
     actionUrl: `${getSiteUrl()}/subscriptions`,
   });

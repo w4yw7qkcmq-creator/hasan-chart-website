@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { accountManagementLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { buildAdminAccountRequestEmailContent } from "../../../lib/email-layout.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -22,16 +23,13 @@ async function sendAdminAccountRequestEmail({
     to: ADMIN_EMAIL,
     subject: "طلب إدارة حساب جديد - HasaN CharT World",
     title: "طلب إدارة حساب جديد 📂",
-    content: `
-      <p>وصل طلب إدارة حساب جديد من أحد المستخدمين.</p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:16px;line-height:1.9">
-        <p><strong>البريد:</strong> ${email}</p>
-        <p><strong>المنصة:</strong> ${platform}</p>
-        <p><strong>رأس المال:</strong> ${capital}</p>
-        <p><strong>نوع الحساب:</strong> ${accountType || "غير محدد"}</p>
-        <p><strong>طريقة التواصل:</strong> ${contactMethod || "غير محددة"}</p>
-      </div>
-    `,
+    content: buildAdminAccountRequestEmailContent({
+      email,
+      platform,
+      capital,
+      accountType,
+      contactMethod,
+    }),
     actionText: "فتح لوحة الإدارة",
     actionUrl: `${getSiteUrl()}/admin`,
   });

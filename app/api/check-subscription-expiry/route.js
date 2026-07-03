@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyCronSecret } from "../../../lib/admin-auth";
 import { createUserNotification } from "../../../lib/create-user-notification";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
 import { processEmailQueue } from "../../../lib/email-queue";
 
 const supabase = createClient(
@@ -52,11 +53,11 @@ async function queueRenewalReminder({ email, planName, daysLeft }) {
         to: email,
         subject: title,
         title,
-        content: `
-      <p>مرحباً،</p>
-      <p>${message}</p>
-      <p>للاستمرار بالوصول إلى توصيات VIP والخدمات المميزة، يمكنك تجديد اشتراكك الآن.</p>
-    `,
+        content: buildSubscriptionExpiryEmailContent({
+          planName,
+          message,
+          variant: "reminder",
+        }),
         actionText: "تجديد الاشتراك",
         actionUrl: `${getSiteUrl()}/subscriptions`,
       }),
@@ -78,12 +79,10 @@ async function queueExpiredNotice({ email, planName }) {
         to: email,
         subject: "انتهاء الاشتراك - HasaN CharT World",
         title: "انتهت صلاحية اشتراكك ⚠️",
-        content: `
-      <p>انتهت صلاحية الباقة التالية:</p>
-      <p style="font-size:20px"><strong>${planName}</strong></p>
-      <p>تم إيقاف الوصول إلى خدمات VIP بسبب انتهاء مدة الاشتراك.</p>
-      <p>يمكنك تجديد الاشتراك للعودة إلى التوصيات والخدمات المميزة.</p>
-    `,
+        content: buildSubscriptionExpiryEmailContent({
+          planName,
+          variant: "expired",
+        }),
         actionText: "تجديد الاشتراك",
         actionUrl: `${getSiteUrl()}/subscriptions`,
       }),

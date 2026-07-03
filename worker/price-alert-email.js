@@ -2,11 +2,8 @@ const PRICE_ALERT_FROM = "HasaN CharT Alerts <alerts@hasanchartworld.com>";
 const PRICE_ALERT_CTA_URL = "https://www.hasanchartworld.com/alerts";
 const PRICE_ALERT_EMAIL_TEMPLATE = "dark-compact-v1";
 const PRICE_ALERT_MESSAGE_TYPE = "price-alert";
-const PRICE_ALERT_EMAIL_LOGO_URL = "https://www.hasanchartworld.com/favicon.png";
 
-function buildPriceAlertEmailLogoHtml() {
-  return `<img src="${PRICE_ALERT_EMAIL_LOGO_URL}" alt="HasaN CharT World" width="64" height="64" style="display:block;border-radius:16px;margin:0 auto 16px;" />`;
-}
+const { buildPriceAlertEmailLayoutHtml } = require("./email-layout");
 
 function logPriceAlertDuplicateSkipped({ alertId, email, userId, emailSentAt, emailResendId }) {
   console.log(
@@ -29,80 +26,13 @@ function buildPriceAlertEmailHtml({
   targetPrice,
   currentPrice,
 }) {
-  const safeCoin = String(coinLabel || "");
-  const safeConditionLabel = String(conditionLabel || "");
-  const safeTargetPrice = String(targetPrice ?? "");
-  const safeCurrentPrice = String(currentPrice ?? "");
-  const logoHtml = buildPriceAlertEmailLogoHtml();
-
-  return `
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<body style="margin:0;padding:0;background:#020617;font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#020617;padding:20px 8px;">
-<tr>
-<td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#07142f;border:1px solid #1e3a5f;border-radius:22px;overflow:hidden;">
-<tr>
-<td align="center" style="background:#0ea5e9;padding:28px 18px;">
-${logoHtml}
-<div style="font-size:28px;font-weight:900;color:#ffffff;line-height:1.4;">HasaN CharT World</div>
-<div style="margin-top:10px;font-size:14px;color:#e0f2fe;line-height:1.8;">تنبيهات الأسعار الذكية</div>
-</td>
-</tr>
-<tr>
-<td style="padding:22px 16px;">
-<h1 style="margin:0 0 18px;color:#ffffff;font-size:26px;line-height:1.6;font-weight:900;text-align:center;">
-🔔 وصل السعر إلى هدف التنبيه
-</h1>
-<p style="margin:0 0 18px;color:#94a3b8;font-size:15px;line-height:1.9;text-align:center;">
-تم تفعيل التنبيه لأن السعر وصل إلى المستوى الذي حددته داخل المنصة.
-</p>
-<div style="background:#111c33;border:1px solid #263a5c;border-radius:18px;padding:22px;text-align:center;margin-bottom:16px;">
-<div style="font-size:14px;color:#94a3b8;margin-bottom:10px;">العملة</div>
-<div style="font-size:32px;font-weight:900;color:#67e8f9;line-height:1.3;">${safeCoin}</div>
-</div>
-<div style="background:#020617;border:1px solid #164e63;border-radius:18px;padding:18px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-<tr>
-<td style="padding:10px 0;border-bottom:1px solid rgba(148,163,184,0.14);">
-<div style="font-size:13px;color:#94a3b8;margin-bottom:6px;">السعر الذي طلبته</div>
-<div style="font-size:22px;font-weight:800;color:#e2e8f0;">${safeTargetPrice}</div>
-</td>
-</tr>
-<tr>
-<td style="padding:10px 0;border-bottom:1px solid rgba(148,163,184,0.14);">
-<div style="font-size:13px;color:#94a3b8;margin-bottom:6px;">السعر الحالي عند التفعيل</div>
-<div style="font-size:24px;font-weight:900;color:#34d399;">${safeCurrentPrice}</div>
-</td>
-</tr>
-<tr>
-<td style="padding:10px 0 0;">
-<div style="font-size:13px;color:#94a3b8;margin-bottom:6px;">نوع التنبيه</div>
-<div style="font-size:18px;font-weight:800;color:#ffffff;">${safeConditionLabel}</div>
-</td>
-</tr>
-</table>
-</div>
-<div style="text-align:center;margin-top:24px;">
-<a href="${PRICE_ALERT_CTA_URL}" style="display:inline-block;background:#0ea5e9;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:16px;font-weight:900;font-size:16px;">
-فتح تنبيهات الأسعار
-</a>
-</div>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding:18px;background:#020617;border-top:1px solid #1e293b;color:#64748b;font-size:12px;line-height:1.8;">
-© 2026 HasaN CharT World — All Rights Reserved
-</td>
-</tr>
-</table>
-</td>
-</tr>
-</table>
-</body>
-</html>
-  `.trim();
+  return buildPriceAlertEmailLayoutHtml({
+    coinLabel: String(coinLabel || ""),
+    conditionLabel: String(conditionLabel || ""),
+    targetPrice: String(targetPrice ?? ""),
+    currentPrice: String(currentPrice ?? ""),
+    actionUrl: PRICE_ALERT_CTA_URL,
+  });
 }
 
 function buildPriceAlertEmailText({

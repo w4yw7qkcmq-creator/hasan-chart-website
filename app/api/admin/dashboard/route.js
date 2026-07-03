@@ -4,9 +4,7 @@ import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-disp
 import { createUserNotification, createUserNotifications } from "../../../../lib/create-user-notification";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
-import { blockPriceAlertEmailSend } from "../../../../lib/price-alert-email-guard";
-import { sendWebsiteResendEmail } from "../../../../lib/resend-website";
-import { buildEmailLogoHtml } from "../../../../lib/email-branding.js";
+import { buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
 import { NOTIFICATION_TYPES } from "../../../../lib/notifications-shared";
 import { processEmailQueue } from "../../../../lib/email-queue";
 import {
@@ -320,77 +318,6 @@ function matchesSignalSubscription(planText, signalType) {
   );
 }
 
-function buildVipSignalEmailHtml({ signalType, coin, entry, targets, stopLoss, notes }) {
-  const label = signalTypeLabel(signalType);
-  const logoHtml = buildEmailLogoHtml(getSiteUrl());
-
-  return `
-    <div dir="rtl" style="font-family: Arial, sans-serif; background:#f8fafc; padding:24px; color:#0f172a;">
-      <div style="max-width:620px; margin:0 auto; background:white; border-radius:24px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 18px 60px rgba(15,23,42,.08);">
-        <div style="background:linear-gradient(135deg,#06b6d4,#2563eb); color:white; padding:28px; text-align:center;">
-          ${logoHtml}
-          <div style="font-size:14px; font-weight:800; opacity:.95;">HasaN CharT World</div>
-          <h1 style="margin:10px 0 0; font-size:26px;">🚨 توصية VIP ${label} جديدة</h1>
-        </div>
-        <div style="padding:26px;">
-          <h2 style="margin:0 0 18px; font-size:24px;">${coin}</h2>
-          <div style="display:grid; gap:12px;">
-            <div style="background:#ecfeff; border:1px solid #bae6fd; border-radius:16px; padding:14px;"><b>منطقة الدخول:</b><br/>${entry || "غير محدد"}</div>
-            <div style="background:#ecfdf5; border:1px solid #bbf7d0; border-radius:16px; padding:14px;"><b>الأهداف:</b><br/>${String(targets || "غير محدد").replace(/\n/g, "<br/>")}</div>
-            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:16px; padding:14px;"><b>وقف الخسارة:</b><br/>${stopLoss || "غير محدد"}</div>
-            ${notes ? `<div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:16px; padding:14px;"><b>ملاحظات:</b><br/>${String(notes).replace(/\n/g, "<br/>")}</div>` : ""}
-          </div>
-          <p style="margin-top:22px; color:#64748b; font-size:13px; line-height:1.8;">هذه الرسالة مخصصة للمشتركين في توصيات VIP. يرجى الالتزام بإدارة رأس المال.</p>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-async function sendEmailViaResend({ to, subject, html }) {
-  const blocked = blockPriceAlertEmailSend({
-    path: "app/api/admin/dashboard/route.js::sendEmailViaResend",
-    subject,
-    html,
-    to,
-  });
-
-  if (blocked) {
-    return { skipped: true, reason: blocked.reason };
-  }
-
-  const resendApiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || "HasaN CharT World <support@hasanchartworld.com>";
-
-  if (!resendApiKey || !to) {
-    return { skipped: true };
-  }
-
-  const resendPayload = {
-    from: fromEmail,
-    to,
-    subject,
-    html,
-  };
-
-  const outcome = await sendWebsiteResendEmail({
-    path: "app/api/admin/dashboard/route.js::sendEmailViaResend",
-    resendApiKey,
-    payload: resendPayload,
-    to,
-  });
-
-  if (!outcome.success) {
-    if (outcome.skipped) {
-      return { skipped: true, reason: outcome.reason };
-    }
-
-    throw new Error(outcome.error || "Email provider error");
-  }
-
-  return outcome.result || { success: true, id: outcome.id || null };
-}
-
 function getSubscriptionDurationDays(planName) {
   const text = String(planName || "").toLowerCase();
 
@@ -528,16 +455,13 @@ async function notifyVipSubscribers(supabase, signal) {
     const subject = `🚨 توصية VIP ${label} جديدة - ${coin}`;
     const signalPageUrl = `${getSiteUrl()}${normalizedSignalType === "futures" ? "/vip-futures" : "/vip-spot"}`;
 
-    const emailContent = `
-      <h2 style="margin:0 0 18px;font-size:24px">${coin}</h2>
-      <div style="display:grid;gap:12px">
-        <div style="background:#ecfeff;border:1px solid #bae6fd;border-radius:16px;padding:14px"><b>منطقة الدخول:</b><br/>${entry || "غير محدد"}</div>
-        <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:16px;padding:14px"><b>الأهداف:</b><br/>${String(targets || "غير محدد").replace(/\n/g, "<br/>")}</div>
-        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:16px;padding:14px"><b>وقف الخسارة:</b><br/>${stopLoss || "غير محدد"}</div>
-        ${notes ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px;padding:14px"><b>ملاحظات:</b><br/>${String(notes).replace(/\n/g, "<br/>")}</div>` : ""}
-      </div>
-      <p style="margin-top:22px;color:#64748b;font-size:13px;line-height:1.8">هذه الرسالة مخصصة للمشتركين في توصيات VIP. يرجى الالتزام بإدارة رأس المال.</p>
-    `;
+    const emailContent = buildVipSignalEmailContent({
+      coin,
+      entry,
+      targets,
+      stopLoss,
+      notes,
+    });
 
     const emailStats = await processEmailQueue(
       recipientEmails.map((email) => ({

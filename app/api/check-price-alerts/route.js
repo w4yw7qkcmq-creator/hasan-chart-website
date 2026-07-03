@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifyCronSecret } from "../../../lib/admin-auth";
-import { PRICE_ALERT_SINGLE_PATH } from "../../../lib/price-alerts-runner";
-import { logPriceAlertEmailBlockedFromSupabaseOrWebsite, PRICE_ALERT_EMAIL_BLOCKED_EVENT } from "../../../lib/price-alert-email-guard";
+import {
+  logPriceAlertEmailBlockedFromSupabaseOrWebsite,
+  PRICE_ALERT_CANONICAL_PATH,
+  PRICE_ALERT_EMAIL_BLOCKED_EVENT,
+} from "../../../lib/price-alert-email-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +20,7 @@ function buildDisabledPriceAlertsResponse(method) {
     {
       success: false,
       error: "Price alerts are handled by the Railway worker only.",
-      canonicalPath: PRICE_ALERT_SINGLE_PATH,
+      canonicalPath: PRICE_ALERT_CANONICAL_PATH,
       websiteEmailPolicy: PRICE_ALERT_EMAIL_BLOCKED_EVENT,
     },
     { status: 410 }
