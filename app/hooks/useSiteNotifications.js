@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 import {
-  installNotificationSoundListener,
   installNotificationSoundTestHook,
   setupBrowserSoundUnlock,
 } from "../../lib/notification-sound-manager";
@@ -15,6 +14,8 @@ import {
   registerNotificationCenterBridge,
   unregisterNotificationCenterBridge,
 } from "../../lib/notification-center";
+import { parseNotificationRow } from "../../lib/notification-center-shared";
+import { NOTIFICATION_SOUND_KEYS, normalizeNotificationKey } from "../../lib/notification-sound-keys";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
@@ -304,7 +305,32 @@ export function useSiteNotifications() {
 
   const processNotificationCenterEvent = useCallback(
     (rawRow, { source = "realtime" } = {}) => {
-      if (mutationInFlightRef.current || clearedAllNotificationsRef.current) return null;
+      const parsedEvent = parseNotificationRow(rawRow);
+      const isPriceAlert =
+        normalizeNotificationKey(parsedEvent.notificationKey) ===
+        NOTIFICATION_SOUND_KEYS.PRICE_ALERT;
+
+      if (mutationInFlightRef.current) {
+        if (isPriceAlert) {
+          console.log("PRICE_ALERT_DUPLICATE_SKIPPED", {
+            id: parsedEvent.id || null,
+            reason: "mutation-in-flight",
+            source,
+          });
+        }
+        return null;
+      }
+
+      if (clearedAllNotificationsRef.current) {
+        if (isPriceAlert) {
+          console.log("PRICE_ALERT_DUPLICATE_SKIPPED", {
+            id: parsedEvent.id || null,
+            reason: "notifications-cleared-this-session",
+            source,
+          });
+        }
+        return null;
+      }
 
       registerIncomingNotification(rawRow, {
         bumpUnread: true,
@@ -371,7 +397,7 @@ export function useSiteNotifications() {
 
         applyServerSnapshot(serverNotifications);
 
-        if (announceNew && initialSyncCompleteRef.current) {
+        if (initialSyncCompleteRef.current) {
           serverNotifications.forEach((item) => {
             if (!item?.id || item.isRead || previousKnownIds.has(item.id)) return;
 
@@ -388,7 +414,7 @@ export function useSiteNotifications() {
                 is_read: item.isRead,
                 created_at: item.createdAt,
               },
-              { source: "polling" }
+              { source: announceNew ? "polling" : "sync-discovery" }
             );
           });
         }
@@ -631,7 +657,6 @@ export function useSiteNotifications() {
 
     setupBrowserSoundUnlock();
     const removeSoundTestHook = installNotificationSoundTestHook();
-    const removeNotificationSoundListener = installNotificationSoundListener();
 
     let active = true;
     const generation = syncGenerationRef.current + 1;
@@ -752,7 +777,6 @@ export function useSiteNotifications() {
       setRealtimeConnected(false);
       realtimeConnectedRef.current = false;
       removeSoundTestHook();
-      removeNotificationSoundListener();
     };
   }, [
     authResolved,

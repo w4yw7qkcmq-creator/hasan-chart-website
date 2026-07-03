@@ -142,7 +142,14 @@ const buildPriceAlertPushBody = ({ coin, targetPrice, currentPrice }) => {
   ].join(" | ");
 };
 
-async function createSiteNotificationForAlert({ alertId, email, notificationMessage }) {
+async function createSiteNotificationForAlert({
+  alertId,
+  email,
+  notificationMessage,
+  coin = null,
+  targetPrice = null,
+  currentPrice = null,
+}) {
   const { data: notificationRow, error: notificationError } = await createUserNotification(
     supabase,
     {
@@ -150,6 +157,16 @@ async function createSiteNotificationForAlert({ alertId, email, notificationMess
       title: "🔔 وصل السعر إلى هدف التنبيه",
       message: notificationMessage,
       type: "price-alert",
+      notificationKey: "price_alert",
+      url: "/alerts",
+      metadata: {
+        alertId,
+        type: "price-alert",
+        notification_key: "price_alert",
+        coin: coin || null,
+        targetPrice: targetPrice ?? null,
+        currentPrice: currentPrice ?? null,
+      },
     }
   );
 
@@ -158,13 +175,15 @@ async function createSiteNotificationForAlert({ alertId, email, notificationMess
   }
 
   console.log(
-    "SITE_NOTIFICATION_CREATED",
+    "PRICE_ALERT_NOTIFICATION_CREATED",
     JSON.stringify({
       path: PRICE_ALERT_SINGLE_PATH,
       alertId,
       email,
       notificationId: notificationRow?.id || null,
       type: "price-alert",
+      notificationKey: "price_alert",
+      url: "/alerts",
     })
   );
 
@@ -880,6 +899,9 @@ async function deliverRealPriceAlert({
       alertId,
       email: normalizedEmail,
       notificationMessage,
+      coin,
+      targetPrice,
+      currentPrice,
     });
   } catch (error) {
     logPriceAlertDeliveryError({

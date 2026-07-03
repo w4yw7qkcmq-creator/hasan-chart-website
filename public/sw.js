@@ -175,32 +175,30 @@ self.addEventListener("push", (event) => {
       url: targetUrl,
       hasTitle: Boolean(payload.title),
       hasBody: Boolean(payload.body),
-      willBroadcastSound: shouldBroadcastBrowserSound(payload, tag),
+      willBroadcastSound: false,
+      soundHandledBy: "notification-center-realtime",
     })
   );
 
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(payload.title || "HasaN CharT World", {
-        body: payload.body || "",
-        icon: payload.icon || "/logo.png",
-        badge: payload.badge || "/logo.png",
-        dir: "rtl",
-        lang: "ar",
-        tag,
-        renotify: true,
-        data: {
-          url: targetUrl,
-          type: payload.type || "general",
-          alertId: payload.alertId ? String(payload.alertId) : null,
-          signalId: payload.signalId ? String(payload.signalId) : null,
-          newsId: payload.newsId ? String(payload.newsId) : null,
-          soundType,
-          sound: payload.sound === true,
-        },
-      }),
-      broadcastBrowserSoundToClients(payload, tag),
-    ])
+    self.registration.showNotification(payload.title || "HasaN CharT World", {
+      body: payload.body || "",
+      icon: payload.icon || "/logo.png",
+      badge: payload.badge || "/logo.png",
+      dir: "rtl",
+      lang: "ar",
+      tag,
+      renotify: true,
+      data: {
+        url: targetUrl,
+        type: payload.type || "general",
+        alertId: payload.alertId ? String(payload.alertId) : null,
+        signalId: payload.signalId ? String(payload.signalId) : null,
+        newsId: payload.newsId ? String(payload.newsId) : null,
+        soundType,
+        sound: payload.sound === true,
+      },
+    })
   );
 });
 
