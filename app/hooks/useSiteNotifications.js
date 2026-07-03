@@ -92,6 +92,7 @@ export function useSiteNotifications() {
   const mutationInFlightRef = useRef(false);
   const clearedAllNotificationsRef = useRef(false);
   const markedAllReadAtRef = useRef(0);
+  const sessionStartedAtRef = useRef(Date.now());
 
   const applyServerSnapshot = useCallback((serverNotifications) => {
     let list = (serverNotifications || []).filter(Boolean);
@@ -303,7 +304,6 @@ export function useSiteNotifications() {
 
   const processNotificationCenterEvent = useCallback(
     (rawRow, { source = "realtime" } = {}) => {
-      if (!initialSyncCompleteRef.current) return null;
       if (mutationInFlightRef.current || clearedAllNotificationsRef.current) return null;
 
       registerIncomingNotification(rawRow, {
@@ -350,8 +350,16 @@ export function useSiteNotifications() {
         const previousKnownIds = new Set(knownIdsRef.current);
 
         if (!initializedRef.current) {
+          const sessionStartedAt = sessionStartedAtRef.current;
+
           serverNotifications.forEach((item) => {
-            if (item?.id) {
+            if (!item?.id) return;
+
+            const createdAtMs = new Date(item.createdAt || 0).getTime();
+            const isHistorical =
+              !Number.isFinite(createdAtMs) || createdAtMs < sessionStartedAt - 5000;
+
+            if (isHistorical) {
               markNotificationCenterRendered(item.id);
             }
           });
