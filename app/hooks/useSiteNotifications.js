@@ -2,13 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
-import { playNotificationSound, installNotificationSoundTestHook } from "../../lib/notification-sound";
-import { NOTIFICATION_TYPES } from "../../lib/notifications-shared";
 import {
-  installPriceAlertBrowserSoundListener,
-  playBrowserSoundForNotificationType,
+  installNotificationSoundListener,
+  installNotificationSoundTestHook,
   setupBrowserSoundUnlock,
-} from "../../lib/price-alert-browser-sound";
+} from "../../lib/notification-sound-manager";
+import {
+  clearNotificationCenterRendered,
+  handleNotificationCenterRealtimeEvent,
+  installNotificationCenterTestHook,
+  markNotificationCenterRendered,
+  registerNotificationCenterBridge,
+  unregisterNotificationCenterBridge,
+} from "../../lib/notification-center";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
@@ -68,7 +74,6 @@ export function useSiteNotifications() {
   const [recentlyAddedIds, setRecentlyAddedIds] = useState([]);
 
   const knownIdsRef = useRef(new Set());
-  const toastedIdsRef = useRef(new Set());
   const initializedRef = useRef(false);
   const initialSyncCompleteRef = useRef(false);
   const syncGenerationRef = useRef(0);
@@ -268,7 +273,7 @@ export function useSiteNotifications() {
   const pushToast = scheduleToastForNotification;
 
   const registerIncomingNotification = useCallback(
-    (rawNotification, { announce = false, bumpUnread = false, animateList = false } = {}) => {
+    (rawNotification, { bumpUnread = false, animateList = false } = {}) => {
       if (mutationInFlightRef.current || clearedAllNotificationsRef.current) {
         return null;
       }
@@ -286,44 +291,30 @@ export function useSiteNotifications() {
           return [normalized, ...withoutDuplicate].slice(0, 50);
         });
 
-        if (animateList || (announce && bumpUnread)) {
+        if (animateList || bumpUnread) {
           markNotificationAsRecentlyAdded(normalized.id);
         }
-      } else if (!announce) {
-        return null;
-      }
-
-      if (announce) {
-        if (!initialSyncCompleteRef.current || toastedIdsRef.current.has(normalized.id)) {
-          return normalized;
-        }
-
-        toastedIdsRef.current.add(normalized.id);
-        if (
-          normalized.type === NOTIFICATION_TYPES.PRICE_ALERT ||
-          normalized.type === NOTIFICATION_TYPES.VIP_SPOT ||
-          normalized.type === NOTIFICATION_TYPES.VIP_FUTURES ||
-          normalized.type === "breaking-news"
-        ) {
-          playBrowserSoundForNotificationType({
-            notificationType: normalized.type,
-            id: normalized.id,
-            source: "site-notification",
-          });
-        } else {
-          playNotificationSound();
-        }
-
-        if (!notificationPanelOpenRef.current) {
-          pushToast(normalized);
-        }
-
-        setBellShakeKey((value) => value + 1);
       }
 
       return normalized;
     },
-    [markNotificationAsRecentlyAdded, pushToast]
+    [markNotificationAsRecentlyAdded]
+  );
+
+  const processNotificationCenterEvent = useCallback(
+    (rawRow, { source = "realtime" } = {}) => {
+      if (!initialSyncCompleteRef.current) return null;
+      if (mutationInFlightRef.current || clearedAllNotificationsRef.current) return null;
+
+      registerIncomingNotification(rawRow, {
+        bumpUnread: true,
+        animateList: true,
+      });
+
+      void handleNotificationCenterRealtimeEvent(rawRow, { source });
+      return rawRow;
+    },
+    [registerIncomingNotification]
   );
 
   const syncFromServer = useCallback(
@@ -361,7 +352,7 @@ export function useSiteNotifications() {
         if (!initializedRef.current) {
           serverNotifications.forEach((item) => {
             if (item?.id) {
-              toastedIdsRef.current.add(item.id);
+              markNotificationCenterRendered(item.id);
             }
           });
           applyServerSnapshot(serverNotifications);
@@ -376,17 +367,20 @@ export function useSiteNotifications() {
           serverNotifications.forEach((item) => {
             if (!item?.id || item.isRead || previousKnownIds.has(item.id)) return;
 
-            registerIncomingNotification(
+            processNotificationCenterEvent(
               {
                 id: item.id,
                 user_email: item.userEmail,
                 title: item.title,
                 message: item.message,
                 type: item.type,
+                notification_key: item.notificationKey,
+                url: item.href,
+                metadata: item.metadata,
                 is_read: item.isRead,
                 created_at: item.createdAt,
               },
-              { announce: true, bumpUnread: false, animateList: true }
+              { source: "polling" }
             );
           });
         }
@@ -397,7 +391,7 @@ export function useSiteNotifications() {
         return null;
       }
     },
-    [applyServerSnapshot, registerIncomingNotification, userEmail]
+    [applyServerSnapshot, processNotificationCenterEvent, userEmail]
   );
 
   const refetchNotifications = useCallback(async () => {
@@ -441,7 +435,6 @@ export function useSiteNotifications() {
     if (!deletedId) return;
 
     knownIdsRef.current.delete(deletedId);
-    toastedIdsRef.current.delete(deletedId);
 
     setNotifications((current) => current.filter((item) => item.id !== deletedId));
   }, []);
@@ -529,7 +522,6 @@ export function useSiteNotifications() {
 
       setNotifications((current) => current.filter((item) => item.id !== notificationId));
       knownIdsRef.current.delete(notificationId);
-      toastedIdsRef.current.delete(notificationId);
 
       await runNotificationMutation(async () => {
         try {
@@ -555,7 +547,7 @@ export function useSiteNotifications() {
     clearedAllNotificationsRef.current = true;
     setNotifications([]);
     knownIdsRef.current = new Set();
-    toastedIdsRef.current = new Set();
+    clearNotificationCenterRendered();
     logNotificationMetrics("after-delete-all-local", []);
     console.log("notifications:after-delete-all");
 
@@ -578,6 +570,28 @@ export function useSiteNotifications() {
   }, [runNotificationMutation]);
 
   useEffect(() => {
+    registerNotificationCenterBridge({
+      showToast: (notification) => {
+        if (!notificationPanelOpenRef.current) {
+          pushToast(notification);
+        }
+      },
+      registerNotification: (rawNotification, options) =>
+        registerIncomingNotification(rawNotification, options),
+      isAuthenticated: () => Boolean(userEmail),
+      shouldSkipToast: () => notificationPanelOpenRef.current,
+      bumpBell: () => setBellShakeKey((value) => value + 1),
+    });
+
+    const removeCenterTestHook = installNotificationCenterTestHook();
+
+    return () => {
+      unregisterNotificationCenterBridge();
+      removeCenterTestHook();
+    };
+  }, [pushToast, registerIncomingNotification, userEmail]);
+
+  useEffect(() => {
     if (!authResolved) {
       syncGenerationRef.current += 1;
       setNotifications([]);
@@ -590,7 +604,7 @@ export function useSiteNotifications() {
       listEnterTimersRef.current.clear();
       setRecentlyAddedIds([]);
       knownIdsRef.current = new Set();
-      toastedIdsRef.current = new Set();
+      clearNotificationCenterRendered();
       mutationEpochRef.current = 0;
       mutationInFlightRef.current = false;
       clearedAllNotificationsRef.current = false;
@@ -609,7 +623,7 @@ export function useSiteNotifications() {
 
     setupBrowserSoundUnlock();
     const removeSoundTestHook = installNotificationSoundTestHook();
-    const removePriceAlertSoundListener = installPriceAlertBrowserSoundListener();
+    const removeNotificationSoundListener = installNotificationSoundListener();
 
     let active = true;
     const generation = syncGenerationRef.current + 1;
@@ -643,14 +657,7 @@ export function useSiteNotifications() {
               filter: `user_email=eq.${userEmail}`,
             },
             (payload) => {
-              if (!initialSyncCompleteRef.current) return;
-              if (mutationInFlightRef.current || clearedAllNotificationsRef.current) return;
-
-              registerIncomingNotification(payload.new, {
-                announce: true,
-                bumpUnread: true,
-                animateList: true,
-              });
+              processNotificationCenterEvent(payload.new, { source: "realtime" });
             }
           )
           .on(
@@ -737,7 +744,7 @@ export function useSiteNotifications() {
       setRealtimeConnected(false);
       realtimeConnectedRef.current = false;
       removeSoundTestHook();
-      removePriceAlertSoundListener();
+      removeNotificationSoundListener();
     };
   }, [
     authResolved,
@@ -745,7 +752,7 @@ export function useSiteNotifications() {
     clearToastTimers,
     handleRealtimeDelete,
     handleRealtimeUpdate,
-    registerIncomingNotification,
+    processNotificationCenterEvent,
     startFallbackPolling,
     stopFallbackPolling,
     syncFromServer,

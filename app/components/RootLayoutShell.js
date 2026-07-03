@@ -17,7 +17,7 @@ import {
   setStoredPushEndpoint,
   subscribeToWebPush,
 } from "../../lib/push-client";
-import { setupBrowserSoundUnlock } from "../../lib/price-alert-browser-sound";
+import { setupBrowserSoundUnlock } from "../../lib/notification-sound-manager";
 import { useAppModal } from "./AppModalProvider";
 import { useAuth } from "./AuthProvider";
 import { useBootstrapLoadingOverlay } from "../hooks/useBootstrapLoadingOverlay";

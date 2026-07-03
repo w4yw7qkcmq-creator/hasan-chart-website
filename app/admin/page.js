@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { adminFetch } from "../../lib/admin-fetch";
+import { notify } from "../../lib/notification-center";
 import { supabase } from "../../lib/supabase";
 import AppModal from "../components/AppModal";
 import { useAuth } from "../components/AuthProvider";
@@ -574,8 +575,6 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (!browserNotificationsEnabled) return;
-
     const pendingSubscriptions = subscriptionRequests.filter(
       (item) => getAdminStatusKey(item.status) === "pending"
     );
@@ -600,12 +599,16 @@ export default function AdminPage() {
     notifications.forEach((item) => {
       if (lastNotificationIds.includes(item.id)) return;
 
-      try {
-        new Notification(item.title, {
-          body: item.body,
-          icon: "/favicon.png",
-        });
-      } catch (_) {}
+      void notify({
+        key: "admin",
+        title: item.title,
+        body: item.body,
+        url: "/admin",
+        persist: false,
+        skipBrowser: !browserNotificationsEnabled,
+        metadata: { id: item.id },
+        source: "admin-dashboard",
+      });
     });
 
     setLastNotificationIds((prev) => [

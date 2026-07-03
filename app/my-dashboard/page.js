@@ -582,6 +582,12 @@ export default function MyDashboard() {
           <QuickAction href="/#alerts" icon="🔔" title="تنبيه سعر" text="حدد العملة والسعر المطلوب" />
           <QuickAction href="/my-analysis" icon="📩" title="ردود الإدارة" text="تابع ردود الإدارة على طلباتك" />
           <QuickAction href="/notifications" icon="🔔" title="الإشعارات" text="عرض كل الإشعارات" />
+          <QuickAction
+            href="/notification-sound-settings"
+            icon="🔊"
+            title="صوت الإشعارات"
+            text="تحكم بأصوات التنبيهات"
+          />
         </section>
 
         <section className="user-dashboard-grid">
