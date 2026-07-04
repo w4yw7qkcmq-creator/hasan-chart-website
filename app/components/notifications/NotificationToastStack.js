@@ -1,5 +1,6 @@
 "use client";
 
+import "./notification-toast-overrides.css";
 import { useRouter } from "next/navigation";
 import {
   formatNotificationTime,

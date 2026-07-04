@@ -5,7 +5,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { adminFetch } from "../../lib/admin-fetch";
-import { notify } from "../../lib/notification-center";
+import {
+  acknowledgeAdminDashboardNotifications,
+  countUnacknowledgedAdminNotifications,
+  isAdminDashboardNotificationAcknowledged,
+} from "../../lib/admin-dashboard-notifications";
+import {
+  isNotificationCenterRendered,
+  markNotificationCenterRendered,
+  notify,
+} from "../../lib/notification-center";
 import { supabase } from "../../lib/supabase";
 import AppModal from "../components/AppModal";
 import { useAuth } from "../components/AuthProvider";
@@ -32,10 +41,20 @@ function AdminOverviewNavLink({
   description,
   icon,
 }) {
+  const router = useRouter();
+
+  const handleNavigate = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    router.push(href);
+  };
+
   return (
     <a
       href={href}
-      className={`group relative block cursor-pointer overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition duration-200 ${hoverClasses}`}
+      onClick={handleNavigate}
+      onMouseDown={(event) => event.stopPropagation()}
+      className={`group relative z-[121] block cursor-pointer overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition duration-200 pointer-events-auto ${hoverClasses}`}
     >
       <div
         aria-hidden="true"
@@ -272,7 +291,7 @@ export default function AdminPage() {
   const [accountSearch, setAccountSearch] = useState("");
   const [activeAdminTab, setActiveAdminTab] = useState("overview");
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
-  const [lastNotificationIds, setLastNotificationIds] = useState([]);
+  const [adminAcknowledgedVersion, setAdminAcknowledgedVersion] = useState(0);
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
   const adminNotificationsRef = useRef(null);
   const updateRequestStatus = async (table, requestId, newStatus) => {
@@ -390,6 +409,8 @@ export default function AdminPage() {
     if (!adminNotificationsOpen) return;
 
     const handlePointerDown = (event) => {
+      if (event.target.closest("a[href]")) return;
+
       if (
         adminNotificationsRef.current &&
         !adminNotificationsRef.current.contains(event.target)
@@ -630,7 +651,8 @@ export default function AdminPage() {
     ];
 
     notifications.forEach((item) => {
-      if (lastNotificationIds.includes(item.id)) return;
+      if (isAdminDashboardNotificationAcknowledged(item.id)) return;
+      if (isNotificationCenterRendered(item.id)) return;
 
       void notify({
         key: item.key,
@@ -643,15 +665,11 @@ export default function AdminPage() {
         source: "admin-dashboard",
       });
     });
-
-    setLastNotificationIds((prev) => [
-      ...new Set([...prev, ...notifications.map((item) => item.id)]),
-    ]);
   }, [
     browserNotificationsEnabled,
     subscriptionRequests,
     accountRequests,
-    lastNotificationIds,
+    adminAcknowledgedVersion,
   ]);
 
   const updateSubscriptionRequest = async (request, newStatus) => {
@@ -750,6 +768,19 @@ export default function AdminPage() {
 
     return [...subscriptionItems, ...accountItems].slice(0, 20);
   }, [subscriptionRequests, accountRequests]);
+
+  const adminUnreadCount = useMemo(() => {
+    void adminAcknowledgedVersion;
+    return countUnacknowledgedAdminNotifications(adminNotifications);
+  }, [adminNotifications, adminAcknowledgedVersion]);
+
+  const handleAdminNotificationsBellClick = () => {
+    const ids = adminNotifications.map((item) => item.id);
+    acknowledgeAdminDashboardNotifications(ids);
+    ids.forEach((id) => markNotificationCenterRendered(id));
+    setAdminAcknowledgedVersion((value) => value + 1);
+    setAdminNotificationsOpen((prev) => !prev);
+  };
 
   const recentOverviewItems = useMemo(() => {
     const items = [
@@ -1197,34 +1228,46 @@ export default function AdminPage() {
               <div className="relative" ref={adminNotificationsRef}>
                 <button
                   type="button"
-                  onClick={() => setAdminNotificationsOpen((prev) => !prev)}
+                  onClick={handleAdminNotificationsBellClick}
                   className="relative rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-6 py-4 font-black text-cyan-100 transition hover:bg-cyan-400/20"
                 >
                   🔔 إشعارات الأدمن
-                  {adminNotifications.length > 0 && (
+                  {adminUnreadCount > 0 && (
                     <span className="absolute -right-2 -top-2 grid h-7 min-w-7 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_22px_rgba(239,68,68,0.55)]">
-                      {adminNotifications.length}
+                      {adminUnreadCount}
                     </span>
                   )}
                 </button>
 
                 {adminNotificationsOpen && (
-                  <div className="absolute right-0 top-full z-[140] mt-3 w-[min(92vw,520px)] overflow-hidden rounded-[28px] border border-cyan-200 bg-white/95 p-4 text-right text-slate-950 shadow-[0_24px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                      <h3 className="text-lg font-black text-slate-950">مركز إشعارات الأدمن</h3>
-                      <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-blacktext-cyan-200">
-                        {adminNotifications.length} جديد
-                      </span>
+                  <div className="absolute right-0 top-full z-[140] mt-3 w-[min(96vw,680px)] overflow-hidden rounded-[32px] border border-cyan-200/80 bg-white/98 text-right text-slate-950 shadow-[0_28px_100px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
+                    <div className="border-b border-slate-200/90 bg-gradient-to-l from-cyan-50 via-white to-white px-5 py-4 md:px-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
+                            Admin Notifications
+                          </p>
+                          <h3 className="mt-1 text-2xl font-black text-slate-950">مركز إشعارات الأدمن</h3>
+                          <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
+                            جميع الطلبات الجديدة التي تحتاج متابعة من لوحة الإدارة.
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-800">
+                          {adminNotifications.length} إشعار
+                        </span>
+                      </div>
                     </div>
 
                     {adminNotifications.length === 0 ? (
-                      <div className="py-8 text-center">
-                        <p className="text-3xl">✅</p>
-                        <p className="mt-3 font-black text-slate-950">لا توجد طلبات جديدة</p>
-                        <p className="mt-1 text-sm text-slate-600">طلبات الاشتراك وإدارة الحسابات الجديدة ستظهر هنا.</p>
+                      <div className="px-6 py-12 text-center">
+                        <p className="text-4xl">✅</p>
+                        <p className="mt-4 text-xl font-black text-slate-950">لا توجد طلبات جديدة</p>
+                        <p className="mt-2 text-sm font-bold leading-7 text-slate-600">
+                          طلبات الاشتراك وإدارة الحسابات الجديدة ستظهر هنا فور وصولها.
+                        </p>
                       </div>
                     ) : (
-                      <div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                      <div className="max-h-[min(70vh,560px)] space-y-4 overflow-y-auto px-4 py-4 md:px-5 md:py-5">
                         {adminNotifications.map((item) => (
                           <button
                             key={item.id}
@@ -1240,16 +1283,27 @@ export default function AdminPage() {
                                 setActiveAdminTab("accounts");
                               }
                             }}
-                            className="w-full rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 text-right transition hover:border-cyan-300 hover:bg-cyan-100"
+                            className="w-full rounded-[24px] border border-cyan-100 bg-gradient-to-l from-white via-cyan-50/40 to-white p-5 text-right transition hover:border-cyan-300 hover:bg-cyan-50/80"
                           >
-                            <div className="flex items-start gap-3">
-                              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-200 bg-white text-2xl shadow-sm">
+                            <div className="flex items-start gap-4">
+                              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-200 bg-white text-3xl shadow-sm">
                                 {item.icon}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="font-black text-slate-950">{item.title}</p>
-                                <p className="mt-1 break-words text-sm font-bold text-slate-700">{item.message}</p>
-                                {item.createdAt && <p className="mt-2 text-xs font-bold text-slate-300">{item.createdAt}</p>}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-lg font-black leading-7 text-slate-950">{item.title}</p>
+                                  {!isAdminDashboardNotificationAcknowledged(item.id) && (
+                                    <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-black text-red-700">
+                                      جديد
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-2 whitespace-normal break-words text-sm font-bold leading-7 text-slate-700">
+                                  {item.message}
+                                </p>
+                                {item.createdAt && (
+                                  <p className="mt-3 text-xs font-bold text-slate-500">{item.createdAt}</p>
+                                )}
                               </div>
                             </div>
                           </button>
@@ -1271,9 +1325,9 @@ export default function AdminPage() {
         </section>
 
         <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
-          {adminNotifications.length > 0 && (
+          {adminUnreadCount > 0 && (
             <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800">
-              يوجد طلبات جديدة تحتاج مراجعة
+              يوجد {adminUnreadCount} طلبات جديدة تحتاج مراجعة
             </div>
           )}
 
@@ -1364,8 +1418,8 @@ export default function AdminPage() {
         </section>
 
         {activeAdminTab === "overview" && (
-          <>
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
+          <div className="relative flex flex-col gap-5">
+        <section className="order-1 grid gap-5 md:grid-cols-2 xl:grid-cols-6">
           <AdminStat title="طلبات التحليل" value={analysisRequests.length} icon="🧠" subtitle="إجمالي الطلبات" />
           <AdminStat title="بانتظار الرد" value={stats.pendingAnalysis} icon="⏳" subtitle="طلبات تحتاج متابعة" tone="orange" />
           <AdminStat title="تم إنجازها" value={stats.completedAnalysis} icon="✅" subtitle="طلبات مكتملة" tone="green" />
@@ -1374,28 +1428,7 @@ export default function AdminPage() {
           <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
 
-        <nav className="relative z-[120] grid gap-5" aria-label="أدوات الإدارة">
-          <AdminOverviewNavLink
-            href="/admin/email-analytics"
-            gradientClass="from-blue-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
-            eyebrow="Email Analytics"
-            title="📧 مراقبة الإيميلات"
-            description="تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend"
-            icon="📧"
-          />
-          <AdminOverviewNavLink
-            href="/admin/notification-test"
-            gradientClass="from-violet-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-violet-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(139,92,246,0.22)]"
-            eyebrow="Notification Test Center"
-            title="🔔 اختبار الإشعارات"
-            description="إرسال حقيقي عبر دوال الإنتاج لكل نوع إشعار (Hub + Push + Email)"
-            icon="🔔"
-          />
-        </nav>
-
-        <section className="relative z-0 rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
+        <section className="order-3 relative z-0 rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h2 className="text-2xl font-black text-slate-950">آخر الطلبات الجديدة</h2>
@@ -1442,7 +1475,28 @@ export default function AdminPage() {
             </div>
           )}
         </section>
-          </>
+
+        <nav className="order-2 relative z-[120] grid gap-5" aria-label="أدوات الإدارة">
+          <AdminOverviewNavLink
+            href="/admin/email-analytics"
+            gradientClass="from-blue-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
+            eyebrow="Email Analytics"
+            title="📧 مراقبة الإيميلات"
+            description="تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend"
+            icon="📧"
+          />
+          <AdminOverviewNavLink
+            href="/admin/notification-test"
+            gradientClass="from-violet-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-violet-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(139,92,246,0.22)]"
+            eyebrow="Notification Test Center"
+            title="🔔 اختبار الإشعارات"
+            description="إرسال حقيقي عبر دوال الإنتاج لكل نوع إشعار (Hub + Push + Email)"
+            icon="🔔"
+          />
+        </nav>
+          </div>
         )}
 
         {activeAdminTab === "vip" && (

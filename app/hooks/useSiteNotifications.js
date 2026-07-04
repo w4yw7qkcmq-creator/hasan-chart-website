@@ -11,7 +11,6 @@ import {
   clearNotificationCenterRendered,
   handleNotificationCenterRealtimeEvent,
   installNotificationCenterTestHook,
-  markNotificationCenterRendered,
   registerNotificationCenterBridge,
   unregisterNotificationCenterBridge,
 } from "../../lib/notification-center";
@@ -639,7 +638,6 @@ export function useSiteNotifications() {
       listEnterTimersRef.current.clear();
       setRecentlyAddedIds([]);
       knownIdsRef.current = new Set();
-      clearNotificationCenterRendered();
       mutationEpochRef.current = 0;
       mutationInFlightRef.current = false;
       clearedAllNotificationsRef.current = false;
