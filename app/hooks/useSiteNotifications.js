@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 import {
+  installNotificationSoundListener,
   installNotificationSoundTestHook,
   setupBrowserSoundUnlock,
 } from "../../lib/notification-sound-manager";
@@ -656,6 +657,7 @@ export function useSiteNotifications() {
     }
 
     setupBrowserSoundUnlock();
+    const removeSoundListener = installNotificationSoundListener();
     const removeSoundTestHook = installNotificationSoundTestHook();
 
     let active = true;
@@ -776,6 +778,7 @@ export function useSiteNotifications() {
       }
       setRealtimeConnected(false);
       realtimeConnectedRef.current = false;
+      removeSoundListener();
       removeSoundTestHook();
     };
   }, [

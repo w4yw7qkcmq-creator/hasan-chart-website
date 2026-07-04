@@ -121,6 +121,14 @@ function shouldBroadcastBrowserSound(payload, tag) {
   return Boolean(resolveBrowserSoundType(payload, tag));
 }
 
+function shouldBroadcastPriceAlertSound(payload, tag) {
+  if (!shouldBroadcastBrowserSound(payload, tag)) {
+    return false;
+  }
+
+  return resolveBrowserSoundType(payload, tag) === "price-alert";
+}
+
 function broadcastBrowserSoundToClients(payload, tag) {
   const soundType = resolveBrowserSoundType(payload, tag);
 
@@ -161,6 +169,8 @@ self.addEventListener("push", (event) => {
   const targetUrl = resolveNotificationUrl(payload);
   const soundType = resolveBrowserSoundType(payload, tag);
 
+  const willBroadcastSound = shouldBroadcastPriceAlertSound(payload, tag);
+
   console.log(
     "SERVICE_WORKER_PUSH_RECEIVED",
     JSON.stringify({
@@ -175,30 +185,37 @@ self.addEventListener("push", (event) => {
       url: targetUrl,
       hasTitle: Boolean(payload.title),
       hasBody: Boolean(payload.body),
-      willBroadcastSound: false,
-      soundHandledBy: "notification-center-realtime",
+      willBroadcastSound,
+      soundHandledBy: willBroadcastSound
+        ? "sw-price-alert-broadcast-fallback"
+        : "notification-center-realtime",
     })
   );
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || "HasaN CharT World", {
-      body: payload.body || "",
-      icon: payload.icon || "/logo.png",
-      badge: payload.badge || "/logo.png",
-      dir: "rtl",
-      lang: "ar",
-      tag,
-      renotify: true,
-      data: {
-        url: targetUrl,
-        type: payload.type || "general",
-        alertId: payload.alertId ? String(payload.alertId) : null,
-        signalId: payload.signalId ? String(payload.signalId) : null,
-        newsId: payload.newsId ? String(payload.newsId) : null,
-        soundType,
-        sound: payload.sound === true,
-      },
-    })
+    Promise.all([
+      self.registration.showNotification(payload.title || "HasaN CharT World", {
+        body: payload.body || "",
+        icon: payload.icon || "/logo.png",
+        badge: payload.badge || "/logo.png",
+        dir: "rtl",
+        lang: "ar",
+        tag,
+        renotify: true,
+        data: {
+          url: targetUrl,
+          type: payload.type || "general",
+          alertId: payload.alertId ? String(payload.alertId) : null,
+          signalId: payload.signalId ? String(payload.signalId) : null,
+          newsId: payload.newsId ? String(payload.newsId) : null,
+          soundType,
+          sound: payload.sound === true,
+        },
+      }),
+      willBroadcastSound
+        ? broadcastBrowserSoundToClients(payload, tag)
+        : Promise.resolve(),
+    ])
   );
 });
 
