@@ -997,6 +997,28 @@ html[data-theme="light"] .bootstrapScreen__tagline {
   background: rgba(239, 68, 68, 0.2);
 }
 
+.notificationsPage__alertSuccess {
+  border: 1px solid rgba(52, 211, 153, 0.42);
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.24) 0%,
+    rgba(34, 211, 238, 0.16) 100%
+  );
+  color: #ecfdf5;
+  box-shadow: 0 10px 28px rgba(16, 185, 129, 0.14);
+}
+
+.notificationsPage__alertError {
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.24) 0%,
+    rgba(248, 113, 113, 0.14) 100%
+  );
+  color: #fee2e2;
+  box-shadow: 0 10px 28px rgba(239, 68, 68, 0.14);
+}
+
 .notificationHub {
   display: flex;
   flex-direction: column;
@@ -1465,6 +1487,28 @@ html[data-theme="light"] .notificationsPage__danger {
   border-color: rgba(239, 68, 68, 0.24);
   background: rgba(254, 226, 226, 0.72);
   color: #b91c1c;
+}
+
+html[data-theme="light"] .notificationsPage__alertSuccess {
+  border-color: rgba(5, 150, 105, 0.38);
+  background: linear-gradient(
+    135deg,
+    rgba(209, 250, 229, 0.96) 0%,
+    rgba(224, 242, 254, 0.92) 100%
+  );
+  color: #065f46;
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.12);
+}
+
+html[data-theme="light"] .notificationsPage__alertError {
+  border-color: rgba(220, 38, 38, 0.34);
+  background: linear-gradient(
+    135deg,
+    rgba(254, 226, 226, 0.96) 0%,
+    rgba(254, 242, 242, 0.92) 100%
+  );
+  color: #991b1b;
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.1);
 }
 
 @keyframes notificationToastEnter {

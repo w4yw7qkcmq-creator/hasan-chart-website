@@ -89,8 +89,7 @@ function ChannelSettingsCard({
   const channelPref = getChannelPreference(settings, channel.key);
   const soundPref = getNotificationKeyPreference(settings, channel.key);
   const channelDisabled = saving || !masterEnabled;
-  const emailToggleDisabled =
-    channelDisabled || !globalEmailEnabled || !channel.emailSupported;
+  const emailToggleDisabled = channelDisabled || !globalEmailEnabled;
 
   return (
     <article className="rounded-[24px] border border-cyan-300/12 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-4 sm:p-5">
@@ -137,12 +136,8 @@ function ChannelSettingsCard({
         <ToggleRow
           compact
           label="البريد الإلكتروني"
-          description={
-            channel.emailSupported
-              ? "نسخة إلى بريدك المسجل"
-              : "غير مدعوم لهذا النوع"
-          }
-          checked={channel.emailSupported && channelPref.email_enabled}
+          description="نسخة إلى بريدك المسجل"
+          checked={channelPref.email_enabled}
           disabled={emailToggleDisabled}
           onChange={(checked) => onUpdateChannel(channel.key, { email_enabled: checked })}
         />
@@ -205,9 +200,12 @@ export default function NotificationSettingsPage() {
     setError("");
 
     void loadNotificationSettings()
-      .then((nextSettings) => {
-        setSettings(nextSettings);
-        applyServerNotificationSettings(nextSettings);
+      .then((result) => {
+        console.log("NOTIFICATION_SETTINGS_LOAD_SUCCESS", {
+          channel_preferences: result.settings.channel_preferences,
+        });
+        setSettings(result.settings);
+        applyServerNotificationSettings(result.settings);
       })
       .catch((loadError) => {
         setError(loadError?.message || "تعذر تحميل الإعدادات.");
@@ -277,9 +275,10 @@ export default function NotificationSettingsPage() {
     setMessage("");
 
     try {
-      const saved = await saveNotificationSettings(settings);
-      setSettings(saved);
-      setMessage("تم حفظ إعدادات الإشعارات بنجاح.");
+      console.log("NOTIFICATION_SETTINGS_SAVE_START");
+      const result = await saveNotificationSettings(settings);
+      setSettings(result.settings);
+      setMessage("تم حفظ إعدادات الإشعارات بنجاح");
     } catch (saveError) {
       setError(saveError?.message || "تعذر حفظ الإعدادات.");
     } finally {
@@ -304,8 +303,8 @@ export default function NotificationSettingsPage() {
     setMessage("");
 
     try {
-      const saved = await resetNotificationSettings();
-      setSettings(saved);
+      const result = await resetNotificationSettings();
+      setSettings(result.settings);
       setMessage("تمت إعادة الإعدادات الافتراضية بنجاح.");
     } catch (resetError) {
       setError(resetError?.message || "تعذر إعادة الإعدادات.");
@@ -529,38 +528,47 @@ export default function NotificationSettingsPage() {
               </div>
             </SectionCard>
 
-            <div className="sticky bottom-4 z-20 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                disabled={saving || resetting}
-                onClick={() => void handleSave()}
-                className="notificationsPage__action flex-1 rounded-2xl border px-4 py-3.5 text-sm font-black transition disabled:opacity-50"
-              >
-                {saving ? "جاري الحفظ..." : "💾 حفظ الإعدادات"}
-              </button>
-              <button
-                type="button"
-                disabled={saving || resetting}
-                onClick={() => void handleReset()}
-                className="notificationsPage__danger flex-1 rounded-2xl border px-4 py-3.5 text-sm font-black transition disabled:opacity-50 sm:max-w-[220px]"
-              >
-                {resetting ? "جاري الإعادة..." : "↺ إعادة الافتراضي"}
-              </button>
+            <div className="sticky bottom-4 z-20 space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  disabled={saving || resetting}
+                  onClick={() => void handleSave()}
+                  className="notificationsPage__action flex-1 rounded-2xl border px-4 py-3.5 text-sm font-black transition disabled:opacity-50"
+                >
+                  {saving ? "جاري الحفظ..." : "💾 حفظ الإعدادات"}
+                </button>
+                <button
+                  type="button"
+                  disabled={saving || resetting}
+                  onClick={() => void handleReset()}
+                  className="notificationsPage__danger flex-1 rounded-2xl border px-4 py-3.5 text-sm font-black transition disabled:opacity-50 sm:max-w-[220px]"
+                >
+                  {resetting ? "جاري الإعادة..." : "↺ إعادة الافتراضي"}
+                </button>
+              </div>
+
+              {message ? (
+                <p
+                  role="status"
+                  className="notificationsPage__alertSuccess rounded-2xl px-4 py-3.5 text-sm font-black leading-relaxed"
+                >
+                  {message}
+                </p>
+              ) : null}
+
+              {error ? (
+                <p
+                  role="alert"
+                  className="notificationsPage__alertError rounded-2xl px-4 py-3.5 text-sm font-black leading-relaxed"
+                >
+                  {error}
+                </p>
+              ) : null}
             </div>
           </>
         )}
 
-        {message ? (
-          <p className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-200">
-            {message}
-          </p>
-        ) : null}
-
-        {error && isAuthenticated ? (
-          <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
-            {error}
-          </p>
-        ) : null}
       </div>
     </main>
   );

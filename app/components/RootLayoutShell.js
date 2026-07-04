@@ -38,7 +38,6 @@ const menuItems = [
   { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
   { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
   { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
-  { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات 🔔", auth: true },
   { href: "/vip-spot", icon: "⭐", label: "توصيات VIP Spot", auth: true, plan: "spot" },
   { href: "/vip-futures", icon: "🔥", label: "توصيات VIP Futures", auth: true, plan: "futures" },
   { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
@@ -47,6 +46,9 @@ const menuItems = [
   { href: "/affiliate", icon: "🤝", label: "التسويق بالعمولة" },
 ];
 
+const bottomMenuItems = [
+  { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات 🔔", auth: true },
+];
 
 const socialLinks = [
   { label: "الدعم الفني", badge: "Telegram", icon: "🛟", href: "https://t.me/HasaNCharTSupport" },
@@ -794,6 +796,17 @@ function RootLayoutShell({ children }) {
                     onNavigate={() => setMobileMenuOpen(false)}
                     variant="mobile"
                   />
+
+                  {bottomMenuItems.map((item) => (
+                    <SidebarMenuItem
+                      key={item.href}
+                      item={item}
+                      state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                      unreadAnalysisCount={shellUnreadAnalysisCount}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                      variant="mobile"
+                    />
+                  ))}
                 </nav>
 
                 <div className="relative z-10 mt-4 space-y-3 rounded-[24px] border border-cyan-300/10 bg-white/[0.035] p-4 backdrop-blur-xl">
@@ -885,6 +898,16 @@ function RootLayoutShell({ children }) {
                   ))}
                 </div>
               </details>
+
+              {bottomMenuItems.map((item) => (
+                <SidebarMenuItem
+                  key={item.href}
+                  item={item}
+                  state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                  unreadAnalysisCount={shellUnreadAnalysisCount}
+                  variant="desktop"
+                />
+              ))}
             </nav>
 
             <div className="relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4 border border-cyan-300/10 bg-white/[0.035] backdrop-blur-xl">
