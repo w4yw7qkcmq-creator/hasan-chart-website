@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -34,9 +33,9 @@ function AdminOverviewNavLink({
   icon,
 }) {
   return (
-    <Link
+    <a
       href={href}
-      className={`group relative z-[100] block cursor-pointer overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition duration-200 ${hoverClasses}`}
+      className={`group relative block cursor-pointer overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition duration-200 ${hoverClasses}`}
     >
       <div
         aria-hidden="true"
@@ -48,11 +47,11 @@ function AdminOverviewNavLink({
           <h3 className="mt-3 text-2xl font-black text-white">{title}</h3>
           <p className="mt-2 text-sm text-slate-300">{description}</p>
         </div>
-        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)] transition group-hover:scale-105">
+        <div className="pointer-events-none grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)] transition group-hover:scale-105">
           {icon}
         </div>
       </div>
-    </Link>
+    </a>
   );
 }
 
@@ -1375,7 +1374,7 @@ export default function AdminPage() {
           <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
 
-        <nav className="relative z-[100] isolate mb-2 grid gap-5" aria-label="أدوات الإدارة">
+        <nav className="relative z-[120] grid gap-5" aria-label="أدوات الإدارة">
           <AdminOverviewNavLink
             href="/admin/email-analytics"
             gradientClass="from-blue-500/20 to-cyan-400/10"
@@ -1396,8 +1395,7 @@ export default function AdminPage() {
           />
         </nav>
 
-        <section className="relative z-0 isolate pointer-events-none rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
-          <div className="pointer-events-auto">
+        <section className="relative z-0 rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h2 className="text-2xl font-black text-slate-950">آخر الطلبات الجديدة</h2>
@@ -1443,7 +1441,6 @@ export default function AdminPage() {
               ))}
             </div>
           )}
-          </div>
         </section>
           </>
         )}
