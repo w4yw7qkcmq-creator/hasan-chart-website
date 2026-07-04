@@ -24,6 +24,38 @@ const DailyAnalysisPublishPanel = dynamic(
   }
 );
 
+function AdminOverviewNavLink({
+  href,
+  gradientClass,
+  hoverClasses,
+  eyebrow,
+  title,
+  description,
+  icon,
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group relative z-[100] block cursor-pointer overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition duration-200 ${hoverClasses}`}
+    >
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${gradientClass} opacity-80 transition group-hover:opacity-100`}
+      />
+      <div className="relative z-10 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-slate-300">{eyebrow}</p>
+          <h3 className="mt-3 text-2xl font-black text-white">{title}</h3>
+          <p className="mt-2 text-sm text-slate-300">{description}</p>
+        </div>
+        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)] transition group-hover:scale-105">
+          {icon}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
   const glow =
     tone === "green"
@@ -36,7 +68,7 @@ function AdminStat({ title, value, icon, subtitle, tone = "blue" }) {
 
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl">
-      <div className={`absolute inset-0 bg-gradient-to-br ${glow}`} />
+      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${glow}`} />
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-slate-300">{title}</p>
@@ -1062,7 +1094,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="relative z-0 overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+    <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
       <AppModal
         open={adminNotice.open}
         type={adminNotice.type === "error" ? "error" : "success"}
@@ -1117,7 +1149,7 @@ export default function AdminPage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
 
-      <div className="relative z-10 space-y-8 p-4 text-slate-100 md:p-6">
+      <div className="relative z-20 space-y-8 p-4 text-slate-100 md:p-6">
         {refreshWarning && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-[0_10px_30px_rgba(245,158,11,0.12)]">
             <span>{refreshWarning}</span>
@@ -1132,8 +1164,8 @@ export default function AdminPage() {
         )}
 
         <section className="relative overflow-hidden rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
-          <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
-          <div className="absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="pointer-events-none absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
           <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div>
@@ -1343,24 +1375,29 @@ export default function AdminPage() {
           <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
 
-        <Link
-          href="/admin/email-analytics"
-          className="group relative block overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl transition duration-200 hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-400/10 opacity-80 transition group-hover:opacity-100" />
-          <div className="relative z-10 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-bold text-slate-300">Email Analytics</p>
-              <h3 className="mt-3 text-2xl font-black text-white">📧 مراقبة الإيميلات</h3>
-              <p className="mt-2 text-sm text-slate-300">تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend</p>
-            </div>
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-2xl shadow-[0_0_30px_rgba(0,163,255,0.18)] transition group-hover:scale-105">
-              📧
-            </div>
-          </div>
-        </Link>
+        <nav className="relative z-[100] isolate mb-2 grid gap-5" aria-label="أدوات الإدارة">
+          <AdminOverviewNavLink
+            href="/admin/email-analytics"
+            gradientClass="from-blue-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
+            eyebrow="Email Analytics"
+            title="📧 مراقبة الإيميلات"
+            description="تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend"
+            icon="📧"
+          />
+          <AdminOverviewNavLink
+            href="/admin/notification-test"
+            gradientClass="from-violet-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-violet-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(139,92,246,0.22)]"
+            eyebrow="Notification Test Center"
+            title="🔔 اختبار الإشعارات"
+            description="إرسال حقيقي عبر دوال الإنتاج لكل نوع إشعار (Hub + Push + Email)"
+            icon="🔔"
+          />
+        </nav>
 
-        <section className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
+        <section className="relative z-0 isolate pointer-events-none rounded-[30px] border border-cyan-200/70 bg-white/85 p-5 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl md:p-6">
+          <div className="pointer-events-auto">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h2 className="text-2xl font-black text-slate-950">آخر الطلبات الجديدة</h2>
@@ -1406,6 +1443,7 @@ export default function AdminPage() {
               ))}
             </div>
           )}
+          </div>
         </section>
           </>
         )}
