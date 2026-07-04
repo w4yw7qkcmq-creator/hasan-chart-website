@@ -139,6 +139,8 @@ function broadcastBrowserSoundToClients(payload, tag) {
   const message = {
     type: BROWSER_SOUND_MESSAGE_TYPE,
     soundType,
+    notification_key: "price_alert",
+    notificationKey: "price_alert",
     alertId: payload.alertId ? String(payload.alertId) : null,
     signalId: payload.signalId ? String(payload.signalId) : null,
     newsId: payload.newsId ? String(payload.newsId) : null,
