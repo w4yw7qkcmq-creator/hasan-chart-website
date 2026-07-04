@@ -38,6 +38,7 @@ const menuItems = [
   { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
   { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
   { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
+  { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات 🔔", auth: true },
   { href: "/vip-spot", icon: "⭐", label: "توصيات VIP Spot", auth: true, plan: "spot" },
   { href: "/vip-futures", icon: "🔥", label: "توصيات VIP Futures", auth: true, plan: "futures" },
   { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
