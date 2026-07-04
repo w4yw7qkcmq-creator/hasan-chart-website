@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { accountManagementLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 import { buildAdminAccountRequestEmailContent } from "../../../lib/email-layout.js";
+import { dispatchAdminSiteNotification } from "../../../lib/site-notification-dispatch.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -249,6 +250,23 @@ export async function POST(request) {
         { error: "تعذر إرسال الطلب حالياً" },
         { status: 500 }
       );
+    }
+
+    try {
+      await dispatchAdminSiteNotification(supabase, {
+        preset: "account_management",
+        title: "طلب إدارة حساب جديد 📂",
+        message: `طلب إدارة حساب جديد من ${user.email} على ${platform}.`,
+        url: "/admin",
+        metadata: {
+          userEmail: user.email,
+          platform,
+          accountType,
+          contactMethod,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Admin account notification error:", notificationError?.message || notificationError);
     }
 
     try {

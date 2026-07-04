@@ -7,6 +7,7 @@ import {
 } from "../../../lib/rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 import { buildAdminSubscriptionRequestEmailContent } from "../../../lib/email-layout.js";
+import { dispatchAdminSiteNotification } from "../../../lib/site-notification-dispatch.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -114,6 +115,22 @@ export async function POST(request) {
         },
         { status: 500 }
       );
+    }
+
+    try {
+      await dispatchAdminSiteNotification(supabase, {
+        preset: "subscription_request",
+        title: "طلب اشتراك جديد 💳",
+        message: `طلب اشتراك جديد في ${planName} (${category}) من ${userEmail}.`,
+        metadata: {
+          planName,
+          category,
+          userEmail,
+          username,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Admin subscription notification error:", notificationError?.message || notificationError);
     }
 
     try {

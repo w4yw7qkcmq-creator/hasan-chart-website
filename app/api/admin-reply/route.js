@@ -4,7 +4,6 @@ import { dispatchAnalysisReplyAlerts } from "../../../lib/analysis-reply-dispatc
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { adminMutationLimiter } from "../../../lib/rate-limit";
 import { invalidateReadCache } from "../../../lib/server-read-cache";
-import { sendAnalysisReadyPush } from "../../../lib/push-notifications";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -107,13 +106,6 @@ export async function POST(req) {
       userEmail: emailTarget,
       coin: coinTarget,
       reply,
-      requestId,
-    });
-
-    await sendAnalysisReadyPush({
-      supabase,
-      email: emailTarget,
-      coin: coinTarget,
       requestId,
     });
 

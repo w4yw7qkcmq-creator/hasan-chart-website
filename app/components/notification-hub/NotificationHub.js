@@ -101,8 +101,8 @@ export function NotificationHub({ onPanelOpenChange }) {
         </p>
 
         <div className="notificationHub__actionRow">
-          <Link href="/notification-sound-settings" className="notificationHub__actionBtn">
-            إعدادات الصوت
+          <Link href="/notification-settings" className="notificationHub__actionBtn">
+            إعدادات الإشعارات
           </Link>
           {unreadCount > 0 ? (
             <button type="button" onClick={() => void markAllAsRead()} className="notificationHub__actionBtn">

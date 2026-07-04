@@ -32,6 +32,7 @@ const { logWorkerEvent } = require("./alert-logger");
 const { sendPriceAlertPushNotifications, getVapidEnvStatus } = require("./push-sender");
 const { sendPriceAlertEmail } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
+const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
 
 const WORKER_ENTRY = "worker/index.js";
 const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v25-block-website-price-alert-email";
@@ -149,7 +150,36 @@ async function createSiteNotificationForAlert({
   coin = null,
   targetPrice = null,
   currentPrice = null,
+  userId = null,
+  delivery = null,
 }) {
+  const resolvedDelivery =
+    delivery ||
+    (await evaluateDeliveryForRecipient(supabase, {
+      userEmail: email,
+      userId,
+      notificationKey: "price_alert",
+    }));
+
+  if (!resolvedDelivery.inApp) {
+    console.log(
+      "PRICE_ALERT_NOTIFICATION_SKIPPED",
+      JSON.stringify({
+        path: PRICE_ALERT_SINGLE_PATH,
+        alertId,
+        email,
+        userId: userId || null,
+        reason: resolvedDelivery.blockedReason || "delivery-blocked",
+      })
+    );
+
+    return {
+      success: false,
+      skipped: true,
+      reason: resolvedDelivery.blockedReason || "delivery-blocked",
+    };
+  }
+
   const { data: notificationRow, error: notificationError } = await createUserNotification(
     supabase,
     {
@@ -167,6 +197,7 @@ async function createSiteNotificationForAlert({
         targetPrice: targetPrice ?? null,
         currentPrice: currentPrice ?? null,
       },
+      skipDeliveryGate: true,
     }
   );
 
@@ -893,8 +924,15 @@ async function deliverRealPriceAlert({
   );
 
   let siteNotification = { success: false };
+  let delivery = null;
 
   try {
+    delivery = await evaluateDeliveryForRecipient(supabase, {
+      userEmail: normalizedEmail,
+      userId: normalizedUserId,
+      notificationKey: "price_alert",
+    });
+
     siteNotification = await createSiteNotificationForAlert({
       alertId,
       email: normalizedEmail,
@@ -902,6 +940,8 @@ async function deliverRealPriceAlert({
       coin,
       targetPrice,
       currentPrice,
+      userId: normalizedUserId,
+      delivery,
     });
   } catch (error) {
     logPriceAlertDeliveryError({
@@ -919,42 +959,53 @@ async function deliverRealPriceAlert({
   }
 
   if (!siteNotification?.success) {
-    logPriceAlertDeliveryError({
-      alertId,
-      email: normalizedEmail,
-      userId: normalizedUserId,
-      phase: "site-notification",
-      message: siteNotification?.error?.message || "SITE_NOTIFICATION_FAILED",
-    });
+    if (!siteNotification?.skipped) {
+      logPriceAlertDeliveryError({
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+        phase: "site-notification",
+        message: siteNotification?.error?.message || "SITE_NOTIFICATION_FAILED",
+      });
+    }
   } else {
     summary.notificationsCreated += 1;
   }
 
   let pushStats = { sent: 0, failed: 0, skipped: 0, skipReason: "PUSH_NOT_ATTEMPTED" };
 
-  try {
-    pushStats = await sendTriggeredAlertWebPush({
-      alertId,
-      email: normalizedEmail,
-      userId: normalizedUserId,
-      coin,
-      targetPrice,
-      currentPrice,
-    });
-  } catch (error) {
-    logPriceAlertDeliveryError({
-      alertId,
-      email: normalizedEmail,
-      userId: normalizedUserId,
-      phase: "web-push",
-      message: error?.message || String(error),
-    });
+  if (delivery?.push) {
+    try {
+      pushStats = await sendTriggeredAlertWebPush({
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+        coin,
+        targetPrice,
+        currentPrice,
+      });
+    } catch (error) {
+      logPriceAlertDeliveryError({
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+        phase: "web-push",
+        message: error?.message || String(error),
+      });
 
+      pushStats = {
+        sent: 0,
+        failed: 1,
+        skipped: 0,
+        skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
+      };
+    }
+  } else {
     pushStats = {
       sent: 0,
-      failed: 1,
-      skipped: 0,
-      skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
+      failed: 0,
+      skipped: 1,
+      skipReason: delivery?.blockedReason || "PUSH_BLOCKED_BY_SETTINGS",
     };
   }
 
@@ -1004,47 +1055,56 @@ async function deliverRealPriceAlert({
 
   let emailResult = { success: false, sent: false, error: "EMAIL_NOT_ATTEMPTED" };
 
-  summary.emailsQueued += 1;
+  if (delivery?.email) {
+    summary.emailsQueued += 1;
 
-  try {
-    emailResult = await sendPriceAlertEmail({
-      supabase,
-      resendApiKey,
-      email: normalizedEmail,
-      coinLabel: escapeHtml(formatCoinPair(coin)),
-      conditionLabel: escapeHtml(getConditionLabel(condition)),
-      targetPrice: escapeHtml(formatNumber(targetPrice)),
-      currentPrice: escapeHtml(formatNumber(currentPrice)),
-      alertId,
-      userId: normalizedUserId,
-    });
-  } catch (error) {
-    logPriceAlertDeliveryError({
-      alertId,
-      email: normalizedEmail,
-      userId: normalizedUserId,
-      phase: "email",
-      message: error?.message || String(error),
-    });
+    try {
+      emailResult = await sendPriceAlertEmail({
+        supabase,
+        resendApiKey,
+        email: normalizedEmail,
+        coinLabel: escapeHtml(formatCoinPair(coin)),
+        conditionLabel: escapeHtml(getConditionLabel(condition)),
+        targetPrice: escapeHtml(formatNumber(targetPrice)),
+        currentPrice: escapeHtml(formatNumber(currentPrice)),
+        alertId,
+        userId: normalizedUserId,
+      });
+    } catch (error) {
+      logPriceAlertDeliveryError({
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+        phase: "email",
+        message: error?.message || String(error),
+      });
 
+      emailResult = {
+        success: false,
+        sent: false,
+        error: error?.message || String(error),
+      };
+    }
+
+    if (!emailResult?.sent && !emailResult?.skipped) {
+      logPriceAlertDeliveryError({
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+        phase: "email",
+        message: emailResult?.error || emailResult?.reason || "EMAIL_SEND_FAILED",
+        details: {
+          status: emailResult?.status || null,
+        },
+      });
+    }
+  } else {
     emailResult = {
       success: false,
       sent: false,
-      error: error?.message || String(error),
+      skipped: true,
+      reason: delivery?.blockedReason || "EMAIL_BLOCKED_BY_SETTINGS",
     };
-  }
-
-  if (!emailResult?.sent && !emailResult?.skipped) {
-    logPriceAlertDeliveryError({
-      alertId,
-      email: normalizedEmail,
-      userId: normalizedUserId,
-      phase: "email",
-      message: emailResult?.error || emailResult?.reason || "EMAIL_SEND_FAILED",
-      details: {
-        status: emailResult?.status || null,
-      },
-    });
   }
 
   return {

@@ -1,22 +1,17 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
 import { CACHE_NO_STORE } from "../../../../lib/api-response";
 import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-dispatch";
-import { createUserNotification, createUserNotifications } from "../../../../lib/create-user-notification";
+import { dispatchSiteNotification, dispatchSiteNotificationsBulk, shouldDeliverEmailToRecipient } from "../../../../lib/site-notification-dispatch.js";
+import { NOTIFICATION_SOUND_KEYS } from "../../../../lib/notification-sound-keys.js";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
 import { buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
-import { NOTIFICATION_TYPES } from "../../../../lib/notifications-shared";
 import { processEmailQueue } from "../../../../lib/email-queue";
 import {
   adminMutationLimiter,
   adminReadLimiter,
 } from "../../../../lib/rate-limit";
 import { invalidateReadCache, withReadCache } from "../../../../lib/server-read-cache";
-import {
-  sendAccountManagementAcceptedPush,
-  sendAnalysisReadyPush,
-  sendVipSignalPush,
-} from "../../../../lib/push-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -442,13 +437,24 @@ async function notifyVipSubscribers(supabase, signal) {
 
     if (recipientEmails.length === 0) return;
 
-    await createUserNotifications(
+    const signalPagePath = normalizedSignalType === "futures" ? "/vip-futures" : "/vip-spot";
+    const siteType = normalizedSignalType === "futures" ? "vip-futures" : "vip-spot";
+
+    await dispatchSiteNotificationsBulk(
       supabase,
       recipientEmails.map((email) => ({
+        preset: "vip_signal",
         userEmail: email,
         title: `🚨 توصية VIP ${label} جديدة`,
         message: `تم نشر توصية جديدة على ${coin}. افتح صفحة توصيات VIP ${label} للاطلاع على التفاصيل.`,
-        type: normalizedSignalType === "futures" ? "vip-futures" : "vip-spot",
+        type: siteType,
+        url: signalPagePath,
+        metadata: {
+          signalId: signalId || null,
+          signalType: normalizedSignalType,
+          coin,
+          notification_key: "vip_signal",
+        },
       }))
     );
 
@@ -463,8 +469,21 @@ async function notifyVipSubscribers(supabase, signal) {
       notes,
     });
 
+    const emailRecipients = [];
+
+    for (const email of recipientEmails) {
+      const emailAllowed = await shouldDeliverEmailToRecipient(supabase, {
+        userEmail: email,
+        notificationKey: NOTIFICATION_SOUND_KEYS.VIP_SIGNAL,
+      });
+
+      if (emailAllowed) {
+        emailRecipients.push(email);
+      }
+    }
+
     const emailStats = await processEmailQueue(
-      recipientEmails.map((email) => ({
+      emailRecipients.map((email) => ({
         to: email,
         send: () =>
           sendTemplateEmail({
@@ -485,27 +504,6 @@ async function notifyVipSubscribers(supabase, signal) {
       signalType: normalizedSignalType,
       coin,
       ...emailStats,
-    });
-
-    const pushResults = await Promise.all(
-      recipientEmails.map((email) =>
-        sendVipSignalPush({
-          supabase,
-          email,
-          signalType: normalizedSignalType,
-          coin,
-          signalId: signalId || `${normalizedSignalType}-${coin}`,
-        })
-      )
-    );
-
-    console.log("VIP signal push summary:", {
-      signalType: normalizedSignalType,
-      coin,
-      recipients: recipientEmails.length,
-      sent: pushResults.reduce((sum, item) => sum + (item.sent || 0), 0),
-      failed: pushResults.reduce((sum, item) => sum + (item.failed || 0), 0),
-      skipped: pushResults.reduce((sum, item) => sum + (item.skipped || 0), 0),
     });
   } catch (error) {
     console.error("VIP subscriber notification error:", error.message || error);
@@ -598,25 +596,40 @@ export async function POST(request) {
         targetTableConfig.table === "account_management_requests" &&
         newStatus === "نشط"
       ) {
-        await sendAccountManagementAcceptedPush({
-          supabase,
-          email: existingRow?.email,
-          userId: existingRow?.user_id,
-          requestId,
-          platform: existingRow?.platform,
-        });
+        const userEmail = String(existingRow?.email || "").trim().toLowerCase();
+        if (userEmail) {
+          await dispatchSiteNotification(supabase, {
+            preset: "account_management",
+            userEmail,
+            title: "تم قبول طلب إدارة حسابك ✅",
+            message: `تم تفعيل طلب إدارة حسابك على ${existingRow?.platform || "المنصة"}.`,
+            metadata: {
+              requestId,
+              platform: existingRow?.platform || null,
+              notification_key: "account_management",
+            },
+          });
+        }
       }
 
       if (
         targetTableConfig.table === "analysis_requests" &&
         (newStatus === "مكتمل" || newStatus === "تم الرد")
       ) {
-        await sendAnalysisReadyPush({
-          supabase,
-          email: existingRow?.user_email,
-          coin: existingRow?.coin,
-          requestId,
-        });
+        const userEmail = String(existingRow?.user_email || "").trim().toLowerCase();
+        if (userEmail) {
+          await dispatchSiteNotification(supabase, {
+            preset: "analysis_reply",
+            userEmail,
+            title: `📩 رد الإدارة على تحليل ${String(existingRow?.coin || "العملة").toUpperCase()}`,
+            message: "وصل رد جديد على طلب التحليل. افتح صفحة طلباتي للاطلاع على التفاصيل.",
+            metadata: {
+              requestId,
+              coin: existingRow?.coin || null,
+              notification_key: "analysis_reply",
+            },
+          });
+        }
       }
 
       invalidateDashboardCache();
@@ -738,13 +751,6 @@ export async function POST(request) {
         },
       });
 
-      await sendAnalysisReadyPush({
-        supabase,
-        email: existingRequest?.user_email,
-        coin: existingRequest?.coin,
-        requestId,
-      });
-
       return Response.json({
         success: true,
         notificationCreated: alertResult.notificationCreated,
@@ -803,11 +809,18 @@ export async function POST(request) {
           );
         }
 
-        await createUserNotification(supabase, {
+        await dispatchSiteNotification(supabase, {
+          preset: "system",
           userEmail,
           title: "تم تفعيل اشتراكك بنجاح 🎉",
           message: `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`,
-          type: "subscription",
+          url: "/subscriptions",
+          metadata: {
+            requestId,
+            planName: planName || null,
+            expiresAt: activationDates.expiresAt,
+            notification_key: "system",
+          },
         });
       }
 

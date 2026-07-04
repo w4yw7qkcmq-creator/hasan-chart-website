@@ -1,5 +1,13 @@
+const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
+
 function normalizeEmail(userEmail) {
   return String(userEmail || "").trim().toLowerCase();
+}
+
+function normalizeNotificationKey(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "system";
+  return raw.replace(/-/g, "_");
 }
 
 function isMissingExtendedNotificationColumnError(error) {
@@ -22,12 +30,51 @@ function buildBaseNotificationPayload({ userEmail, title, message, type }) {
 
 async function createUserNotification(
   supabase,
-  { userEmail, title, message, type, notificationKey = null, url = null, metadata = null }
+  {
+    userEmail,
+    title,
+    message,
+    type,
+    notificationKey = null,
+    url = null,
+    metadata = null,
+    skipDeliveryGate = false,
+  }
 ) {
   const normalizedEmail = normalizeEmail(userEmail);
 
   if (!normalizedEmail || !title || !type) {
     return { data: null, error: new Error("Missing notification fields") };
+  }
+
+  const resolvedKey = normalizeNotificationKey(
+    notificationKey || metadata?.notification_key || "system"
+  );
+
+  if (!skipDeliveryGate) {
+    const delivery = await evaluateDeliveryForRecipient(supabase, {
+      userEmail: normalizedEmail,
+      notificationKey: resolvedKey,
+    });
+
+    if (!delivery.inApp) {
+      console.log(
+        "NOTIFICATION_CREATE_SKIPPED",
+        JSON.stringify({
+          userEmail: normalizedEmail,
+          notificationKey: resolvedKey,
+          reason: delivery.blockedReason || "in-app-blocked",
+        })
+      );
+
+      return {
+        data: null,
+        error: null,
+        skipped: true,
+        reason: delivery.blockedReason || "in-app-blocked",
+        delivery,
+      };
+    }
   }
 
   const payload = buildBaseNotificationPayload({

@@ -586,11 +586,13 @@ export default function AdminPage() {
     const notifications = [
       ...pendingSubscriptions.map((item) => ({
         id: `subscription-${item.id}`,
+        key: "subscription_request",
         title: "طلب اشتراك جديد 💳",
         body: `${item.planName || "اشتراك جديد"} - ${item.userEmail || item.username || "مستخدم"}`,
       })),
       ...pendingAccounts.map((item) => ({
         id: `account-${item.id}`,
+        key: "account_management",
         title: "طلب إدارة حساب جديد 📂",
         body: item.email || item.telegram || "طلب جديد",
       })),
@@ -600,7 +602,7 @@ export default function AdminPage() {
       if (lastNotificationIds.includes(item.id)) return;
 
       void notify({
-        key: "admin",
+        key: item.key,
         title: item.title,
         body: item.body,
         url: "/admin",

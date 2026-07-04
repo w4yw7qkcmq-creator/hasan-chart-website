@@ -3,7 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
-import { createUserNotification } from "../../../lib/create-user-notification";
+import { NOTIFICATION_SOUND_KEYS } from "../../../lib/notification-sound-keys.js";
+import {
+  dispatchSiteNotification,
+  shouldDeliverEmailToRecipient,
+} from "../../../lib/site-notification-dispatch.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -104,12 +108,22 @@ const processExpiredSubscription = async (subscription, email) => {
     })
     .eq("id", subscription.id);
 
-  await createUserNotification(supabase, {
+  await dispatchSiteNotification(supabase, {
+    preset: "subscription_expiry",
     userEmail: email,
     title: "انتهى اشتراكك ⚠️",
     message: `انتهت صلاحية ${planName}. يمكنك التجديد من صفحة الباقات.`,
-    type: "subscription-expired",
+    metadata: { planName, subscriptionId: subscription.id, variant: "expired" },
   });
+
+  const emailAllowed = await shouldDeliverEmailToRecipient(supabase, {
+    userEmail: email,
+    notificationKey: NOTIFICATION_SOUND_KEYS.SUBSCRIPTION_EXPIRY,
+  });
+
+  if (!emailAllowed) {
+    return;
+  }
 
   await sendTemplateEmail({
     to: email,

@@ -7,6 +7,8 @@ const FormData = require("form-data");
 const { createCanvas, loadImage, registerFont } = require("canvas");
 require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
+const { createUserNotification } = require("./create-user-notification");
+const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
 
 try {
   const arabicFontPath = path.join(__dirname, "fonts", "NotoNaskhArabic-Regular.ttf");
@@ -2073,6 +2075,89 @@ async function savePublishedNewsToSupabase(item) {
   }
 }
 
+async function dispatchMarketNewsNotifications({ title, sourceLink, impactLevel }) {
+  if (impactLevel !== "HIGH") {
+    return;
+  }
+
+  try {
+    const { data: subscriptions, error } = await supabase
+      .from("push_subscriptions")
+      .select("email")
+      .not("email", "is", null);
+
+    if (error) {
+      console.error("MARKET_NEWS_NOTIFICATION_LOAD_ERROR:", error.message);
+      return;
+    }
+
+    const emails = [
+      ...new Set(
+        (subscriptions || [])
+          .map((row) => String(row.email || "").trim().toLowerCase())
+          .filter(Boolean)
+      ),
+    ];
+
+    if (!emails.length) {
+      console.log("MARKET_NEWS_NOTIFICATION_SKIPPED", JSON.stringify({ reason: "no-subscribers" }));
+      return;
+    }
+
+    const titleText = String(title || "").trim();
+    const isBreaking = /breaking|عاجل|urgent|emergency|fomc|rate decision/i.test(titleText);
+    const notificationKey = isBreaking ? "breaking_news" : "market_news";
+    const type = isBreaking ? "breaking-news" : "market_news";
+    const notificationTitle = isBreaking
+      ? `🚨 خبر عاجل: ${titleText.slice(0, 120)}`
+      : `📰 ${titleText.slice(0, 120)}`;
+    const notificationMessage = "خبر جديد في أخبار السوق. اضغط للاطلاع على التفاصيل.";
+
+    let dispatched = 0;
+
+    for (const email of emails) {
+      const delivery = await evaluateDeliveryForRecipient(supabase, {
+        userEmail: email,
+        notificationKey,
+      });
+
+      if (!delivery.inApp) {
+        continue;
+      }
+
+      const { error: insertError } = await createUserNotification(supabase, {
+        userEmail: email,
+        title: notificationTitle,
+        message: notificationMessage,
+        type,
+        notificationKey,
+        url: "/news",
+        metadata: {
+          sourceLink: sourceLink || null,
+          impactLevel,
+          notification_key: notificationKey,
+        },
+        skipDeliveryGate: true,
+      });
+
+      if (!insertError) {
+        dispatched += 1;
+      }
+    }
+
+    console.log(
+      "MARKET_NEWS_NOTIFICATIONS_DISPATCHED",
+      JSON.stringify({
+        dispatched,
+        recipients: emails.length,
+        notificationKey,
+      })
+    );
+  } catch (error) {
+    console.error("MARKET_NEWS_NOTIFICATION_ERROR:", error.message);
+  }
+}
+
 async function saveNewsPostToSupabase(post) {
   try {
     if (!post.image_url && post.source_link) {
@@ -3612,6 +3697,12 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
       image_url: finalImage || null,
       impact_level: latestNews.impactLevel || "MEDIUM",
       source_link: latestLink,
+    });
+
+    await dispatchMarketNewsNotifications({
+      title: latestNews.title || imageTitle,
+      sourceLink: latestLink,
+      impactLevel: latestNews.impactLevel || "MEDIUM",
     });
     savePublishedNewsLink(latestLink, combinedNewsIdentity);
     await savePublishedNewsToSupabase({

@@ -583,10 +583,10 @@ export default function MyDashboard() {
           <QuickAction href="/my-analysis" icon="📩" title="ردود الإدارة" text="تابع ردود الإدارة على طلباتك" />
           <QuickAction href="/notifications" icon="🔔" title="الإشعارات" text="عرض كل الإشعارات" />
           <QuickAction
-            href="/notification-sound-settings"
+            href="/notification-settings"
             icon="🔊"
-            title="صوت الإشعارات"
-            text="تحكم بأصوات التنبيهات"
+            title="إعدادات الإشعارات"
+            text="تحكم في الإشعارات والصوت والبريد"
           />
         </section>
 

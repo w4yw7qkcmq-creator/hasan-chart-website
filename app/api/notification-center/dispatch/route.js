@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireSessionEmail } from "../../../../lib/auth-session";
-import { createUserNotification } from "../../../../lib/create-user-notification";
 import {
   resolveSiteTypeForNotificationKey,
 } from "../../../../lib/notification-center-shared";
 import { normalizeNotificationKey } from "../../../../lib/notification-sound-keys";
 import { normalizeNotification } from "../../../../lib/notifications-shared";
+import { dispatchSiteNotification } from "../../../../lib/site-notification-dispatch.js";
 
 export const dynamic = "force-dynamic";
 
@@ -45,22 +45,30 @@ export async function POST(request) {
       return jsonError("عنوان الإشعار مطلوب.", 400);
     }
 
-    const { data, error } = await createUserNotification(session.supabase, {
+    const result = await dispatchSiteNotification(session.supabase, {
       userEmail: session.email,
+      notificationKey: key,
       title,
       message,
       type,
-      notificationKey: key,
       url: String(body.url || "").trim() || null,
       metadata,
     });
 
-    if (error) {
-      throw error;
+    if (result.skipped) {
+      return jsonOk({
+        skipped: true,
+        reason: result.reason || "delivery-blocked",
+        notification: null,
+      });
+    }
+
+    if (result.error) {
+      throw result.error;
     }
 
     return jsonOk({
-      notification: normalizeNotification(data),
+      notification: normalizeNotification(result.data),
     });
   } catch (error) {
     return jsonError(error, 500);

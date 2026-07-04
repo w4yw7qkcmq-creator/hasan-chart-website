@@ -216,6 +216,7 @@ export default function NotificationSoundSettingsPage() {
     playNotificationSound(notificationKey, {
       id: `settings-test-${notificationKey}-${Date.now()}`,
       source: "notification-sound-settings",
+      skipSettingsGate: true,
     });
 
     setMessage(`تم تشغيل صوت الاختبار: ${notificationKey}`);
