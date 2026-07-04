@@ -368,8 +368,22 @@ export default function NotificationSettingsPage() {
         </div>
 
         {loading ? (
-          <div className="notificationsPage__panel rounded-[28px] border p-10 text-center backdrop-blur-2xl">
-            <p className="text-sm font-bold text-slate-300">جاري تحميل إعداداتك من Supabase...</p>
+          <div className="notificationsPage__panel space-y-6 rounded-[28px] border p-6 backdrop-blur-2xl sm:p-8">
+            <div className="flex items-center justify-center gap-3 py-4">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-300/30 border-t-cyan-300" />
+              <p className="text-sm font-bold text-slate-300">جاري تحميل إعداداتك...</p>
+            </div>
+            <div className="space-y-4" aria-hidden="true">
+              {[1, 2, 3].map((section) => (
+                <div key={section} className="rounded-2xl border border-cyan-300/10 bg-white/[0.03] p-5">
+                  <div className="mb-4 h-5 w-40 animate-pulse rounded bg-white/10" />
+                  <div className="space-y-3">
+                    <div className="h-14 animate-pulse rounded-xl bg-white/[0.06]" />
+                    <div className="h-14 animate-pulse rounded-xl bg-white/[0.06]" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : !isAuthenticated ? (
           <div className="notificationsPage__panel rounded-[28px] border p-10 text-center backdrop-blur-2xl">

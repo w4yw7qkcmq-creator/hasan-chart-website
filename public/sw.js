@@ -52,6 +52,10 @@ function resolveNotificationTag(payload) {
     return `vip-signal-${payload.signalId}`;
   }
 
+  if (payload.requestId) {
+    return `analysis-ready-${payload.requestId}`;
+  }
+
   if (payload.newsId) {
     return `breaking-news-${payload.newsId}`;
   }
@@ -89,6 +93,25 @@ function resolveNotificationUrl(payload) {
 
   if (payload.type === "breaking-news") {
     return "/news";
+  }
+
+  if (payload.type === "analysis-ready") {
+    return "/my-analysis";
+  }
+
+  if (payload.type === "account-management") {
+    return "/my-dashboard";
+  }
+
+  if (
+    payload.type === "subscription-expired" ||
+    payload.type === "subscription-renewal-reminder"
+  ) {
+    return "/subscriptions";
+  }
+
+  if (payload.type === "system") {
+    return "/notifications";
   }
 
   return "/notifications";

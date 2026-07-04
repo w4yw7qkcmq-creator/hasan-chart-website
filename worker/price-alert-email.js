@@ -1,5 +1,5 @@
 const PRICE_ALERT_FROM = "HasaN CharT Alerts <alerts@hasanchartworld.com>";
-const PRICE_ALERT_CTA_URL = "https://www.hasanchartworld.com/alerts";
+const PRICE_ALERT_CTA_URL = "https://www.hasanchartworld.com/alerts?tab=notifications";
 const PRICE_ALERT_EMAIL_TEMPLATE = "dark-compact-v1";
 const PRICE_ALERT_MESSAGE_TYPE = "price-alert";
 

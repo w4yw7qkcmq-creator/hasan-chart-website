@@ -3,11 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
-import { NOTIFICATION_SOUND_KEYS } from "../../../lib/notification-sound-keys.js";
-import {
-  dispatchSiteNotification,
-  shouldDeliverEmailToRecipient,
-} from "../../../lib/site-notification-dispatch.js";
+import { dispatchUnifiedSiteAlerts } from "../../../lib/site-notification-dispatch.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -99,6 +95,8 @@ const processExpiredSubscription = async (subscription, email) => {
   }
 
   const planName = subscription.plan_name || "اشتراك VIP";
+  const title = "انتهى اشتراكك ⚠️";
+  const message = `انتهت صلاحية ${planName}. يمكنك التجديد من صفحة الباقات.`;
 
   await supabase
     .from("subscription_requests")
@@ -108,33 +106,28 @@ const processExpiredSubscription = async (subscription, email) => {
     })
     .eq("id", subscription.id);
 
-  await dispatchSiteNotification(supabase, {
+  await dispatchUnifiedSiteAlerts(supabase, {
     preset: "subscription_expiry",
     userEmail: email,
-    title: "انتهى اشتراكك ⚠️",
-    message: `انتهت صلاحية ${planName}. يمكنك التجديد من صفحة الباقات.`,
-    metadata: { planName, subscriptionId: subscription.id, variant: "expired" },
-  });
-
-  const emailAllowed = await shouldDeliverEmailToRecipient(supabase, {
-    userEmail: email,
-    notificationKey: NOTIFICATION_SOUND_KEYS.SUBSCRIPTION_EXPIRY,
-  });
-
-  if (!emailAllowed) {
-    return;
-  }
-
-  await sendTemplateEmail({
-    to: email,
-    subject: "انتهاء الاشتراك - HasaN CharT World",
-    title: "انتهت صلاحية اشتراكك ⚠️",
-    content: buildSubscriptionExpiryEmailContent({
+    title,
+    message,
+    metadata: {
       planName,
+      subscriptionId: subscription.id,
       variant: "expired",
-    }),
-    actionText: "تجديد الاشتراك",
-    actionUrl: `${getSiteUrl()}/subscriptions`,
+    },
+    sendEmail: () =>
+      sendTemplateEmail({
+        to: email,
+        subject: "انتهاء الاشتراك - HasaN CharT World",
+        title,
+        content: buildSubscriptionExpiryEmailContent({
+          planName,
+          variant: "expired",
+        }),
+        actionText: "تجديد الاشتراك",
+        actionUrl: `${getSiteUrl()}/subscriptions`,
+      }),
   });
 };
 

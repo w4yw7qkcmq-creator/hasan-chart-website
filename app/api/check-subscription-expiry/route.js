@@ -3,12 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyCronSecret } from "../../../lib/admin-auth";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
-import { processEmailQueue } from "../../../lib/email-queue";
-import { NOTIFICATION_SOUND_KEYS } from "../../../lib/notification-sound-keys.js";
-import {
-  dispatchSiteNotification,
-  shouldDeliverEmailToRecipient,
-} from "../../../lib/site-notification-dispatch.js";
+import { dispatchUnifiedSiteAlerts } from "../../../lib/site-notification-dispatch.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -43,26 +38,13 @@ async function queueRenewalReminder({ email, planName, daysLeft }) {
       ? `باقي يوم واحد على انتهاء ${planName}. يمكنك التجديد من صفحة الباقات.`
       : `باقي 3 أيام على انتهاء ${planName}. يمكنك التجديد من صفحة الباقات.`;
 
-  await dispatchSiteNotification(supabase, {
+  await dispatchUnifiedSiteAlerts(supabase, {
     preset: "subscription_renewal",
     userEmail: email,
     title,
     message,
     metadata: { planName, daysLeft, variant: "reminder" },
-  });
-
-  const emailAllowed = await shouldDeliverEmailToRecipient(supabase, {
-    userEmail: email,
-    notificationKey: NOTIFICATION_SOUND_KEYS.SUBSCRIPTION_EXPIRY,
-  });
-
-  if (!emailAllowed) {
-    return null;
-  }
-
-  return {
-    to: email,
-    send: () =>
+    sendEmail: () =>
       sendTemplateEmail({
         to: email,
         subject: title,
@@ -75,34 +57,24 @@ async function queueRenewalReminder({ email, planName, daysLeft }) {
         actionText: "تجديد الاشتراك",
         actionUrl: `${getSiteUrl()}/subscriptions`,
       }),
-  };
+  });
 }
 
 async function queueExpiredNotice({ email, planName }) {
-  await dispatchSiteNotification(supabase, {
+  const title = "انتهى اشتراكك ⚠️";
+  const message = `انتهت صلاحية ${planName}. اضغط لتجديد اشتراكك من صفحة الباقات.`;
+
+  await dispatchUnifiedSiteAlerts(supabase, {
     preset: "subscription_expiry",
     userEmail: email,
-    title: "انتهى اشتراكك ⚠️",
-    message: `انتهت صلاحية ${planName}. اضغط لتجديد اشتراكك من صفحة الباقات.`,
+    title,
+    message,
     metadata: { planName, variant: "expired" },
-  });
-
-  const emailAllowed = await shouldDeliverEmailToRecipient(supabase, {
-    userEmail: email,
-    notificationKey: NOTIFICATION_SOUND_KEYS.SUBSCRIPTION_EXPIRY,
-  });
-
-  if (!emailAllowed) {
-    return null;
-  }
-
-  return {
-    to: email,
-    send: () =>
+    sendEmail: () =>
       sendTemplateEmail({
         to: email,
         subject: "انتهاء الاشتراك - HasaN CharT World",
-        title: "انتهت صلاحية اشتراكك ⚠️",
+        title,
         content: buildSubscriptionExpiryEmailContent({
           planName,
           variant: "expired",
@@ -110,7 +82,7 @@ async function queueExpiredNotice({ email, planName }) {
         actionText: "تجديد الاشتراك",
         actionUrl: `${getSiteUrl()}/subscriptions`,
       }),
-  };
+  });
 }
 
 export async function GET(request) {
@@ -143,7 +115,6 @@ export async function GET(request) {
 
     let remindersSent = 0;
     let expiredProcessed = 0;
-    const emailJobs = [];
 
     for (const subscription of activeSubscriptions || []) {
       const email = String(subscription.user_email || "").trim().toLowerCase();
@@ -170,10 +141,7 @@ export async function GET(request) {
           .eq("email", email);
 
         if (!subscription.expired_notice_sent) {
-          const emailJob = await queueExpiredNotice({ email, planName });
-          if (emailJob) {
-            emailJobs.push(emailJob);
-          }
+          await queueExpiredNotice({ email, planName });
         }
 
         expiredProcessed += 1;
@@ -181,10 +149,7 @@ export async function GET(request) {
       }
 
       if (daysLeft === 3 && !subscription.reminder_3d_sent) {
-        const emailJob = await queueRenewalReminder({ email, planName, daysLeft: 3 });
-        if (emailJob) {
-          emailJobs.push(emailJob);
-        }
+        await queueRenewalReminder({ email, planName, daysLeft: 3 });
 
         await supabase
           .from("subscription_requests")
@@ -195,24 +160,11 @@ export async function GET(request) {
       }
     }
 
-    const emailStats =
-      emailJobs.length > 0
-        ? await processEmailQueue(emailJobs, {
-            label: "subscription-expiry",
-          })
-        : {
-            sentCount: 0,
-            failedCount: 0,
-            skippedCount: 0,
-            failedEmails: [],
-          };
-
     return NextResponse.json({
       success: true,
       checked: activeSubscriptions?.length || 0,
       remindersSent,
       expiredProcessed,
-      emailStats,
       now,
     });
   } catch (error) {

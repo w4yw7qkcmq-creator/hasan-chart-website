@@ -188,7 +188,7 @@ async function createSiteNotificationForAlert({
       message: notificationMessage,
       type: "price-alert",
       notificationKey: "price_alert",
-      url: "/alerts",
+      url: "/alerts?tab=notifications",
       metadata: {
         alertId,
         type: "price-alert",
@@ -214,7 +214,7 @@ async function createSiteNotificationForAlert({
       notificationId: notificationRow?.id || null,
       type: "price-alert",
       notificationKey: "price_alert",
-      url: "/alerts",
+      url: "/alerts?tab=notifications",
     })
   );
 

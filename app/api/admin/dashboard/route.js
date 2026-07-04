@@ -1,12 +1,10 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
 import { CACHE_NO_STORE } from "../../../../lib/api-response";
 import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-dispatch";
-import { dispatchSiteNotification, dispatchSiteNotificationsBulk, shouldDeliverEmailToRecipient } from "../../../../lib/site-notification-dispatch.js";
-import { NOTIFICATION_SOUND_KEYS } from "../../../../lib/notification-sound-keys.js";
+import { dispatchUnifiedSiteAlerts } from "../../../../lib/site-notification-dispatch.js";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
-import { buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
-import { processEmailQueue } from "../../../../lib/email-queue";
+import { buildEmailParagraph, buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
 import {
   adminMutationLimiter,
   adminReadLimiter,
@@ -274,6 +272,32 @@ function getAdminStatusTable(tableName) {
   return ADMIN_STATUS_TABLES[String(tableName || "").trim()] || null;
 }
 
+const ADMIN_STATUS_ROW_SELECT = {
+  account_management_requests: "id, email, user_id, platform",
+  analysis_requests: "id, user_email, coin, reply",
+  subscription_requests: "id, user_email",
+};
+
+function getAdminStatusRowSelect(tableName) {
+  return ADMIN_STATUS_ROW_SELECT[String(tableName || "").trim()] || "id";
+}
+
+async function resolveAccountManagementEmail(supabase, row) {
+  const directEmail = String(row?.email || "").trim().toLowerCase();
+  if (directEmail) return directEmail;
+
+  const userId = row?.user_id;
+  if (!userId) return "";
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return String(profile?.email || "").trim().toLowerCase();
+}
+
 
 function signalTypeLabel(signalType) {
   return signalType === "futures" ? "Futures" : "Spot";
@@ -439,28 +463,10 @@ async function notifyVipSubscribers(supabase, signal) {
 
     const signalPagePath = normalizedSignalType === "futures" ? "/vip-futures" : "/vip-spot";
     const siteType = normalizedSignalType === "futures" ? "vip-futures" : "vip-spot";
-
-    await dispatchSiteNotificationsBulk(
-      supabase,
-      recipientEmails.map((email) => ({
-        preset: "vip_signal",
-        userEmail: email,
-        title: `🚨 توصية VIP ${label} جديدة`,
-        message: `تم نشر توصية جديدة على ${coin}. افتح صفحة توصيات VIP ${label} للاطلاع على التفاصيل.`,
-        type: siteType,
-        url: signalPagePath,
-        metadata: {
-          signalId: signalId || null,
-          signalType: normalizedSignalType,
-          coin,
-          notification_key: "vip_signal",
-        },
-      }))
-    );
-
-    const subject = `🚨 توصية VIP ${label} جديدة - ${coin}`;
-    const signalPageUrl = `${getSiteUrl()}${normalizedSignalType === "futures" ? "/vip-futures" : "/vip-spot"}`;
-
+    const notificationTitle = `🚨 توصية VIP ${label} جديدة`;
+    const notificationMessage = `تم نشر توصية جديدة على ${coin}. افتح صفحة توصيات VIP ${label} للاطلاع على التفاصيل.`;
+    const subject = `${notificationTitle} - ${coin}`;
+    const signalPageUrl = `${getSiteUrl()}${signalPagePath}`;
     const emailContent = buildVipSignalEmailContent({
       coin,
       entry,
@@ -469,41 +475,43 @@ async function notifyVipSubscribers(supabase, signal) {
       notes,
     });
 
-    const emailRecipients = [];
+    const dispatchResults = [];
 
     for (const email of recipientEmails) {
-      const emailAllowed = await shouldDeliverEmailToRecipient(supabase, {
-        userEmail: email,
-        notificationKey: NOTIFICATION_SOUND_KEYS.VIP_SIGNAL,
-      });
-
-      if (emailAllowed) {
-        emailRecipients.push(email);
-      }
+      dispatchResults.push(
+        await dispatchUnifiedSiteAlerts(supabase, {
+          preset: "vip_signal",
+          userEmail: email,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: siteType,
+          url: signalPagePath,
+          metadata: {
+            signalId: signalId || null,
+            signalType: normalizedSignalType,
+            coin,
+            notification_key: "vip_signal",
+          },
+          sendEmail: () =>
+            sendTemplateEmail({
+              to: email,
+              subject,
+              title: notificationTitle,
+              content: emailContent,
+              actionText: "فتح صفحة التوصيات",
+              actionUrl: signalPageUrl,
+            }),
+        })
+      );
     }
 
-    const emailStats = await processEmailQueue(
-      emailRecipients.map((email) => ({
-        to: email,
-        send: () =>
-          sendTemplateEmail({
-            to: email,
-            subject,
-            title: `🚨 توصية VIP ${label} جديدة`,
-            content: emailContent,
-            actionText: "فتح صفحة التوصيات",
-            actionUrl: signalPageUrl,
-          }),
-      })),
-      {
-        label: `vip-${normalizedSignalType}`,
-      }
-    );
-
-    console.log("VIP signal email queue summary:", {
+    console.log("VIP signal dispatch summary:", {
       signalType: normalizedSignalType,
       coin,
-      ...emailStats,
+      recipients: recipientEmails.length,
+      notificationsCreated: dispatchResults.filter((item) => item.notificationCreated).length,
+      pushSent: dispatchResults.filter((item) => (item.pushResult?.sent || 0) > 0).length,
+      emailsSent: dispatchResults.filter((item) => item.emailResult?.sent).length,
     });
   } catch (error) {
     console.error("VIP subscriber notification error:", error.message || error);
@@ -565,7 +573,7 @@ export async function POST(request) {
 
       const { data: existingRow, error: fetchError } = await supabase
         .from(targetTableConfig.table)
-        .select("id, user_email, email, user_id, coin, platform")
+        .select(getAdminStatusRowSelect(targetTableConfig.table))
         .eq("id", requestId)
         .maybeSingle();
 
@@ -596,18 +604,32 @@ export async function POST(request) {
         targetTableConfig.table === "account_management_requests" &&
         newStatus === "نشط"
       ) {
-        const userEmail = String(existingRow?.email || "").trim().toLowerCase();
+        const userEmail = await resolveAccountManagementEmail(supabase, existingRow);
+        const platformLabel = String(existingRow?.platform || "المنصة").trim();
+
         if (userEmail) {
-          await dispatchSiteNotification(supabase, {
+          await dispatchUnifiedSiteAlerts(supabase, {
             preset: "account_management",
             userEmail,
+            userId: existingRow?.user_id || null,
             title: "تم قبول طلب إدارة حسابك ✅",
-            message: `تم تفعيل طلب إدارة حسابك على ${existingRow?.platform || "المنصة"}.`,
+            message: `تم تفعيل طلب إدارة حسابك على ${platformLabel}.`,
             metadata: {
               requestId,
               platform: existingRow?.platform || null,
               notification_key: "account_management",
             },
+            sendEmail: () =>
+              sendTemplateEmail({
+                to: userEmail,
+                subject: "تم قبول طلب إدارة حسابك ✅",
+                title: "تم قبول طلب إدارة حسابك ✅",
+                content: buildEmailParagraph(
+                  `تم تفعيل طلب إدارة حسابك على ${platformLabel}. يمكنك متابعة التفاصيل من لوحة التحكم.`
+                ),
+                actionText: "فتح لوحة التحكم",
+                actionUrl: `${getSiteUrl()}/my-dashboard`,
+              }),
           });
         }
       }
@@ -617,17 +639,15 @@ export async function POST(request) {
         (newStatus === "مكتمل" || newStatus === "تم الرد")
       ) {
         const userEmail = String(existingRow?.user_email || "").trim().toLowerCase();
-        if (userEmail) {
-          await dispatchSiteNotification(supabase, {
-            preset: "analysis_reply",
+        const replyText = String(existingRow?.reply || "").trim();
+
+        if (userEmail && replyText) {
+          await dispatchAnalysisReplyAlerts({
+            supabase,
             userEmail,
-            title: `📩 رد الإدارة على تحليل ${String(existingRow?.coin || "العملة").toUpperCase()}`,
-            message: "وصل رد جديد على طلب التحليل. افتح صفحة طلباتي للاطلاع على التفاصيل.",
-            metadata: {
-              requestId,
-              coin: existingRow?.coin || null,
-              notification_key: "analysis_reply",
-            },
+            coin: existingRow?.coin,
+            reply: replyText,
+            requestId,
           });
         }
       }
@@ -755,6 +775,7 @@ export async function POST(request) {
         success: true,
         notificationCreated: alertResult.notificationCreated,
         emailSent: Boolean(alertResult.emailResult?.sent),
+        pushSent: (alertResult.pushResult?.sent || 0) > 0,
       });
     }
 
@@ -809,7 +830,7 @@ export async function POST(request) {
           );
         }
 
-        await dispatchSiteNotification(supabase, {
+        await dispatchUnifiedSiteAlerts(supabase, {
           preset: "system",
           userEmail,
           title: "تم تفعيل اشتراكك بنجاح 🎉",
@@ -821,6 +842,17 @@ export async function POST(request) {
             expiresAt: activationDates.expiresAt,
             notification_key: "system",
           },
+          sendEmail: () =>
+            sendTemplateEmail({
+              to: userEmail,
+              subject: "تم تفعيل اشتراكك بنجاح 🎉",
+              title: "تم تفعيل اشتراكك بنجاح 🎉",
+              content: buildEmailParagraph(
+                `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`
+              ),
+              actionText: "عرض الباقات",
+              actionUrl: `${getSiteUrl()}/subscriptions`,
+            }),
         });
       }
 

@@ -77,22 +77,68 @@ const getOkxMarketPrice = async (symbol) => {
     return currentPrice;
   }
 
-  throw new Error(`تعذر جلب سعر ${cleanSymbol} من OKX`);
+  throw new Error(`تعذر جلب السعر الحالي لـ ${cleanSymbol}. تأكد من اسم العملة وحاول مرة أخرى.`);
 };
 
-const resolveAlertCondition = async ({ coin, targetPrice, condition }) => {
-  const cleanCondition = String(condition || "auto")
-    .trim()
-    .toLowerCase();
+const resolveAlertCondition = async ({ coin, targetPrice }) => {
+  const target = Number(targetPrice);
 
-  if (cleanCondition === "above" || cleanCondition === "below") {
-    return cleanCondition;
+  if (!Number.isFinite(target) || target <= 0) {
+    throw new Error("السعر المستهدف غير صالح.");
   }
 
   const currentPrice = await getOkxMarketPrice(coin);
 
-  return Number(targetPrice) >= currentPrice ? "above" : "below";
+  return target >= currentPrice ? "above" : "below";
 };
+
+export async function GET() {
+  try {
+    const session = await requireSessionUser();
+    const userEmail = String(session.user?.email || "").trim().toLowerCase();
+
+    if (!userEmail) {
+      return Response.json(
+        { success: false, error: "يجب تسجيل الدخول أولاً." },
+        { status: 401 }
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+      .from("price_alerts")
+      .select("id, coin, target_price, condition, status, created_at")
+      .ilike("user_email", userEmail)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      throw new Error(error.message || "تعذر تحميل التنبيهات.");
+    }
+
+    const alerts = (data || []).map((row) => ({
+      id: row.id,
+      coin: row.coin,
+      price: row.target_price,
+      condition: row.condition,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
+
+    return Response.json({ success: true, alerts });
+  } catch (err) {
+    console.error("PRICE_ALERT_LIST_FAILED", err);
+
+    return Response.json(
+      {
+        success: false,
+        error: err?.message || "تعذر تحميل التنبيهات.",
+      },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(req) {
   try {
@@ -124,7 +170,6 @@ export async function POST(req) {
 
     const coin = normalizeText(body?.coin, 30).toUpperCase();
     const price = normalizeText(body?.price, 30);
-    const condition = normalizeText(body?.condition, 20) || "auto";
     const user_email = session.email;
     const username = session.username;
 
@@ -144,13 +189,11 @@ export async function POST(req) {
       user_email,
       coin,
       price,
-      condition,
     });
 
     const resolvedCondition = await resolveAlertCondition({
       coin,
       targetPrice: Number(price),
-      condition,
     });
 
     const { data, error } = await supabase

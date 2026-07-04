@@ -13,6 +13,7 @@ import { flushSync } from "react-dom";
 import { isAdminUser } from "../../lib/admin-emails";
 import { buildAppUser } from "../../lib/auth-profile";
 import {
+  buildAppUserFromSessionPayload,
   buildMinimalAppUser,
   resolveSupabaseAuthUser,
   restoreSessionFromCookies,
@@ -38,7 +39,12 @@ export function AuthProvider({ children }) {
     enrichRequestRef.current = requestId;
 
     try {
-      const appUser = await buildAppUser(authUser, supabase);
+      const appUser = await Promise.race([
+        buildAppUser(authUser, supabase),
+        new Promise((resolve) => {
+          setTimeout(() => resolve(null), 10_000);
+        }),
+      ]);
 
       if (enrichRequestRef.current !== requestId) {
         return;
@@ -57,8 +63,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const applyAuthenticatedUser = useCallback(
-    (authUser, { enrichProfile = true } = {}) => {
-      const minimalUser = buildMinimalAppUser(authUser);
+    (authUser, { enrichProfile = true, serverSessionUser = null } = {}) => {
+      const minimalUser = serverSessionUser?.email
+        ? buildAppUserFromSessionPayload(serverSessionUser)
+        : buildMinimalAppUser(authUser);
 
       if (!minimalUser) {
         setUser(null);
@@ -74,7 +82,15 @@ export function AuthProvider({ children }) {
 
       if (enrichProfile) {
         setProfileReady(false);
-        void enrichUserProfile(authUser);
+        const enrichSource =
+          authUser?.email
+            ? authUser
+            : {
+                id: minimalUser.id,
+                email: minimalUser.email,
+                user_metadata: { role: minimalUser.role },
+              };
+        void enrichUserProfile(enrichSource);
       } else {
         setProfileReady(true);
       }
@@ -94,18 +110,45 @@ export function AuthProvider({ children }) {
     let active = true;
 
     async function initAuth() {
-      await restoreSessionFromCookies();
+      try {
+        const restored = await restoreSessionFromCookies();
 
-      const { user: authUser, error } = await resolveSupabaseAuthUser();
+        if (!active) return;
 
-      if (!active) return;
+        const { user: authUser, error } = await resolveSupabaseAuthUser();
 
-      if (error || !authUser?.email) {
+        if (!active) return;
+
+        if (authUser?.email) {
+          applyAuthenticatedUser(authUser, {
+            serverSessionUser: restored.sessionUser,
+          });
+          return;
+        }
+
+        if (restored.sessionUser?.email) {
+          applyAuthenticatedUser(
+            {
+              id: restored.sessionUser.id,
+              email: restored.sessionUser.email,
+              user_metadata: { role: restored.sessionUser.role },
+            },
+            { serverSessionUser: restored.sessionUser }
+          );
+          return;
+        }
+
+        if (error) {
+          console.warn("resolveSupabaseAuthUser skipped:", error.message);
+        }
+
         clearAuthenticatedUser();
-        return;
+      } catch (err) {
+        console.warn("initAuth failed:", err?.message || err);
+        if (active) {
+          clearAuthenticatedUser();
+        }
       }
-
-      applyAuthenticatedUser(authUser);
     }
 
     void initAuth();

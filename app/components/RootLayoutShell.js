@@ -83,6 +83,38 @@ function hasActiveSubscriptionStatus(status) {
   return normalized === "نشط" || normalized === "active" || normalized === "مفعل";
 }
 
+function AuthAccountSkeleton({ compact = false }) {
+  if (compact) {
+    return (
+      <div className="hidden sm:flex items-center gap-3" aria-hidden="true">
+        <div className="h-10 w-24 animate-pulse rounded-2xl bg-white/10" />
+        <div className="h-10 w-24 animate-pulse rounded-2xl bg-white/10" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3" aria-hidden="true">
+      <div className="flex items-center gap-3">
+        <div className="h-11 w-11 animate-pulse rounded-2xl bg-white/10" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-4 w-28 animate-pulse rounded bg-white/10" />
+          <div className="h-3 w-36 animate-pulse rounded bg-white/10" />
+        </div>
+      </div>
+      <div className="h-11 w-full animate-pulse rounded-2xl bg-white/10" />
+    </div>
+  );
+}
+
+function AuthLoginLink({ className, onClick, compact = false }) {
+  return (
+    <Link href="/login" onClick={onClick} className={className}>
+      {compact ? "الدخول للحساب" : "الدخول للحساب"}
+    </Link>
+  );
+}
+
 function resolveMenuItemState(item, authResolved, currentUser) {
   if (!item.auth && !item.plan) {
     return "visible";
@@ -228,6 +260,7 @@ function RootLayoutShell({ children }) {
   const mounted = useClientMounted();
   const shellUser = mounted ? currentUser : null;
   const shellAuthResolved = mounted ? authResolved : false;
+  const authLoading = !mounted || !authResolved;
   const shellNotificationPermission = mounted ? notificationPermission : "default";
   const shellWebPushEnabled = mounted ? webPushEnabled : false;
   const shellIsAdmin = mounted ? isAdmin : false;
@@ -829,7 +862,9 @@ function RootLayoutShell({ children }) {
                     {browserNotificationLabel}
                   </button>
 
-                  {shellUser ? (
+                  {authLoading ? (
+                    <AuthAccountSkeleton />
+                  ) : shellUser ? (
                     <>
                       <Link href="/my-dashboard" onClick={() => setMobileMenuOpen(false)} className="mb-4 flex items-center gap-3">
                         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-300 font-black shadow-[0_0_25px_rgba(0,163,255,0.35)]">
@@ -843,7 +878,10 @@ function RootLayoutShell({ children }) {
                       <button onClick={logoutAndRedirect} className="w-full rounded-2xl border border-red-400/20 bg-red-500/15 px-4 py-3 font-black text-red-100 transition hover:bg-red-500/25">تسجيل الخروج</button>
                     </>
                   ) : (
-                    <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block w-full rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-4 py-3 text-center font-black shadow-[0_16px_40px_rgba(37,99,235,0.30)]">الدخول للحساب</Link>
+                    <AuthLoginLink
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block w-full rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-4 py-3 text-center font-black shadow-[0_16px_40px_rgba(37,99,235,0.30)]"
+                    />
                   )}
                 </div>
               </aside>
@@ -918,7 +956,9 @@ function RootLayoutShell({ children }) {
                 {sidebarThemeLabel}
               </button>
 
-              {shellUser ? (
+              {authLoading ? (
+                <AuthAccountSkeleton />
+              ) : shellUser ? (
                 <>
                   <Link href="/my-dashboard" className="flex items-center gap-3 mb-4">
                     <div className="h-11 w-11 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-600 to-cyan-300 font-black shadow-[0_0_25px_rgba(0,163,255,0.35)]">
@@ -932,7 +972,7 @@ function RootLayoutShell({ children }) {
                   <button onClick={logoutAndRedirect} className="w-full rounded-2xl bg-red-500/15 border border-red-400/20 px-4 py-3 text-red-100 font-black hover:bg-red-500/25 transition">تسجيل الخروج</button>
                 </>
               ) : (
-                <Link href="/login" className="block w-full rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-4 py-3 text-center font-black shadow-[0_16px_40px_rgba(37,99,235,0.30)]">الدخول للحساب</Link>
+                <AuthLoginLink className="block w-full rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-4 py-3 text-center font-black shadow-[0_16px_40px_rgba(37,99,235,0.30)]" />
               )}
             </div>
           </aside>
@@ -965,7 +1005,14 @@ function RootLayoutShell({ children }) {
                   {browserNotificationLabel}
                 </button>
 
-                {shellUser ? <NotificationBell className="relative shrink-0" /> : null}
+                {authLoading ? (
+                  <div
+                    className="hidden h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-white/10 sm:grid"
+                    aria-hidden="true"
+                  />
+                ) : shellUser ? (
+                  <NotificationBell className="relative shrink-0" />
+                ) : null}
 
                 <button
                   onClick={toggleTheme}
@@ -974,13 +1021,15 @@ function RootLayoutShell({ children }) {
                   {headerThemeLabel}
                 </button>
 
-                {shellUser ? (
+                {authLoading ? (
+                  <AuthAccountSkeleton compact />
+                ) : shellUser ? (
                   <div className="hidden sm:flex items-center gap-3">
                     <Link href="/my-dashboard" className="topUserChip">{shellUser.username || shellUser.email || "حسابي"}</Link>
                     <button onClick={logoutAndRedirect} className="topLogoutBtn">تسجيل الخروج</button>
                   </div>
                 ) : (
-                  <Link href="/login" className="topLoginBtn hidden sm:inline-flex">الدخول للحساب</Link>
+                  <AuthLoginLink className="topLoginBtn hidden sm:inline-flex" compact />
                 )}
               </div>
             </header>
