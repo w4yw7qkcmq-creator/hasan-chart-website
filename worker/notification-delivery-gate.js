@@ -129,6 +129,8 @@ function evaluateNotificationDelivery(settings, notificationKey) {
   else if (dndActive) blockedReason = "dnd-active";
 
   const deliveryAllowed = masterEnabled && channel.enabled && !dndActive;
+  const emailAllowed =
+    deliveryAllowed && (normalized.email_copy_enabled === true || channel.email_enabled);
 
   return {
     notificationKey: key,
@@ -141,7 +143,7 @@ function evaluateNotificationDelivery(settings, notificationKey) {
     blockedReason,
     inApp: deliveryAllowed,
     push: deliveryAllowed && channel.push_enabled,
-    email: deliveryAllowed && normalized.email_copy_enabled === true && channel.email_enabled,
+    email: emailAllowed,
     sound: deliveryAllowed && normalized.sound_enabled !== false,
   };
 }

@@ -220,6 +220,17 @@ async function sendPriceAlertEmail({
   const normalizedAlertId = String(alertId || "").trim();
 
   if (!resendApiKey || !normalizedEmail) {
+    console.log(
+      "PRICE_ALERT_EMAIL_ERROR",
+      JSON.stringify({
+        path: "worker/price-alert-email.js::sendPriceAlertEmail",
+        alertId: normalizedAlertId || null,
+        email: normalizedEmail || null,
+        userId: userId || null,
+        reason: !resendApiKey ? "Missing RESEND_API_KEY" : "Missing user email",
+      })
+    );
+
     return {
       success: false,
       skipped: true,
@@ -326,6 +337,18 @@ async function sendPriceAlertEmail({
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    console.log(
+      "PRICE_ALERT_EMAIL_ERROR",
+      JSON.stringify({
+        path: "worker/price-alert-email.js::sendPriceAlertEmail",
+        alertId: normalizedAlertId,
+        email: normalizedEmail,
+        userId: userId || null,
+        status: response.status,
+        error: data?.message || response.statusText || "Email provider error",
+      })
+    );
+
     try {
       await releasePriceAlertEmailClaim(supabase, normalizedAlertId);
     } catch (releaseError) {
@@ -378,6 +401,7 @@ async function sendPriceAlertEmail({
     sent: true,
     status: response.status,
     id: resendId,
+    resendId,
     emailSentAt: sentAt,
     emailResendId: resendId,
     data,

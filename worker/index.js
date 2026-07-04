@@ -896,6 +896,30 @@ const generateOpenAiAnalysis = async ({ symbol, currentPrice, candles, technical
   };
 };
 
+async function resolvePriceAlertRecipientEmail({ userEmail, userId }) {
+  const fromAlert = String(userEmail || "").trim().toLowerCase();
+  if (fromAlert) {
+    return fromAlert;
+  }
+
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", normalizedUserId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return String(data?.email || "").trim().toLowerCase() || null;
+}
+
 async function deliverRealPriceAlert({
   summary,
   alertId,
@@ -907,8 +931,35 @@ async function deliverRealPriceAlert({
   currentPrice,
   notificationMessage,
 }) {
-  const normalizedEmail = String(userEmail || "").trim().toLowerCase();
   const normalizedUserId = String(userId || "").trim() || null;
+  let normalizedEmail = null;
+
+  try {
+    normalizedEmail = await resolvePriceAlertRecipientEmail({
+      userEmail,
+      userId: normalizedUserId,
+    });
+  } catch (error) {
+    logPriceAlertDeliveryError({
+      alertId,
+      email: String(userEmail || "").trim().toLowerCase() || null,
+      userId: normalizedUserId,
+      phase: "email-recipient-resolve",
+      message: error?.message || String(error),
+    });
+  }
+
+  if (!normalizedEmail) {
+    console.log(
+      "PRICE_ALERT_EMAIL_MISSING_RECIPIENT",
+      JSON.stringify({
+        path: PRICE_ALERT_SINGLE_PATH,
+        alertId,
+        userEmail: userEmail || null,
+        userId: normalizedUserId,
+      })
+    );
+  }
 
   console.log(
     "PRICE_ALERT_SINGLE_PATH",
@@ -1055,8 +1106,65 @@ async function deliverRealPriceAlert({
 
   let emailResult = { success: false, sent: false, error: "EMAIL_NOT_ATTEMPTED" };
 
-  if (delivery?.email) {
+  console.log(
+    "PRICE_ALERT_EMAIL_EVALUATED",
+    JSON.stringify({
+      path: PRICE_ALERT_SINGLE_PATH,
+      alertId,
+      email: normalizedEmail || null,
+      userId: normalizedUserId,
+      resendConfigured: Boolean(resendApiKey),
+      delivery: delivery
+        ? {
+            email: delivery.email,
+            emailCopyEnabled: delivery.emailCopyEnabled,
+            emailChannelEnabled: delivery.emailChannelEnabled,
+            blockedReason: delivery.blockedReason || null,
+            dndActive: delivery.dndActive,
+          }
+        : null,
+    })
+  );
+
+  if (!normalizedEmail) {
+    emailResult = {
+      success: false,
+      sent: false,
+      skipped: true,
+      reason: "MISSING_RECIPIENT_EMAIL",
+    };
+  } else if (!delivery?.email) {
+    console.log(
+      "PRICE_ALERT_EMAIL_SKIPPED_BY_SETTINGS",
+      JSON.stringify({
+        path: PRICE_ALERT_SINGLE_PATH,
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+        reason: delivery?.blockedReason || "EMAIL_BLOCKED_BY_SETTINGS",
+        emailCopyEnabled: delivery?.emailCopyEnabled ?? null,
+        emailChannelEnabled: delivery?.emailChannelEnabled ?? null,
+      })
+    );
+
+    emailResult = {
+      success: false,
+      sent: false,
+      skipped: true,
+      reason: delivery?.blockedReason || "EMAIL_BLOCKED_BY_SETTINGS",
+    };
+  } else {
     summary.emailsQueued += 1;
+
+    console.log(
+      "PRICE_ALERT_EMAIL_SEND_START",
+      JSON.stringify({
+        path: PRICE_ALERT_SINGLE_PATH,
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+      })
+    );
 
     try {
       emailResult = await sendPriceAlertEmail({
@@ -1070,7 +1178,43 @@ async function deliverRealPriceAlert({
         alertId,
         userId: normalizedUserId,
       });
+
+      if (emailResult?.sent) {
+        console.log(
+          "PRICE_ALERT_EMAIL_SENT",
+          JSON.stringify({
+            path: PRICE_ALERT_SINGLE_PATH,
+            alertId,
+            email: normalizedEmail,
+            userId: normalizedUserId,
+            resendId: emailResult.resendId || null,
+          })
+        );
+      } else if (!emailResult?.skipped) {
+        console.log(
+          "PRICE_ALERT_EMAIL_ERROR",
+          JSON.stringify({
+            path: PRICE_ALERT_SINGLE_PATH,
+            alertId,
+            email: normalizedEmail,
+            userId: normalizedUserId,
+            reason: emailResult?.reason || emailResult?.error || "EMAIL_SEND_FAILED",
+            status: emailResult?.status || null,
+          })
+        );
+      }
     } catch (error) {
+      console.log(
+        "PRICE_ALERT_EMAIL_ERROR",
+        JSON.stringify({
+          path: PRICE_ALERT_SINGLE_PATH,
+          alertId,
+          email: normalizedEmail,
+          userId: normalizedUserId,
+          message: error?.message || String(error),
+        })
+      );
+
       logPriceAlertDeliveryError({
         alertId,
         email: normalizedEmail,
@@ -1098,13 +1242,6 @@ async function deliverRealPriceAlert({
         },
       });
     }
-  } else {
-    emailResult = {
-      success: false,
-      sent: false,
-      skipped: true,
-      reason: delivery?.blockedReason || "EMAIL_BLOCKED_BY_SETTINGS",
-    };
   }
 
   return {
