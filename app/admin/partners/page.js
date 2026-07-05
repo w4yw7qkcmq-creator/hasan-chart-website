@@ -1,5 +1,6 @@
 "use client";
 
+import "../admin-theme.css";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "../../../lib/admin-fetch";
@@ -9,12 +10,12 @@ const WITHDRAWAL_STATUSES = ["all", "pending", "approved", "rejected", "paid"];
 
 function AdminStatCard({ title, value, icon }) {
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl backdrop-blur-2xl">
+    <div className="admin-stat-card relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-400/10" />
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-slate-300">{title}</p>
-          <h3 className="mt-2 text-3xl font-black text-white">{value}</h3>
+          <p className="admin-stat-card__title">{title}</p>
+          <h3 className="admin-stat-card__value">{value}</h3>
         </div>
         <div className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-xl">
           {icon}
@@ -80,6 +81,9 @@ export default function AdminPartnersPage() {
   const [withdrawalNetwork, setWithdrawalNetwork] = useState("all");
   const [withdrawalSearch, setWithdrawalSearch] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
+  const [markPaidTarget, setMarkPaidTarget] = useState(null);
+  const [markPaidNote, setMarkPaidNote] = useState("");
+  const [markPaidProof, setMarkPaidProof] = useState("");
   const [adminAnalytics, setAdminAnalytics] = useState(null);
   const [topPartners, setTopPartners] = useState([]);
 
@@ -199,6 +203,13 @@ export default function AdminPartnersPage() {
   };
 
   const runWithdrawalAction = async (withdrawalId, action) => {
+    if (action === "mark-paid") {
+      setMarkPaidTarget({ id: withdrawalId });
+      setMarkPaidNote("");
+      setMarkPaidProof("");
+      return;
+    }
+
     let adminNote = "";
 
     if (action === "reject") {
@@ -207,7 +218,7 @@ export default function AdminPartnersPage() {
       if (!adminNote.trim()) {
         return;
       }
-    } else if (action === "mark-paid" || action === "approve") {
+    } else if (action === "approve") {
       adminNote = window.prompt("ملاحظة الإدارة (اختياري):") || "";
     }
 
@@ -232,6 +243,57 @@ export default function AdminPartnersPage() {
       await reloadAll();
     } catch (actionError) {
       setError(actionError?.message || "تعذر تنفيذ العملية");
+    } finally {
+      setActionLoadingId("");
+    }
+  };
+
+  const handleMarkPaidProof = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("يرجى رفع صورة إثبات التحويل فقط.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setMarkPaidProof(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submitMarkPaid = async () => {
+    if (!markPaidTarget?.id) return;
+
+    setActionLoadingId(`mark-paid-${markPaidTarget.id}`);
+
+    try {
+      const response = await adminFetch(
+        `/api/admin/partner-withdrawals/${markPaidTarget.id}/mark-paid`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            adminNote: markPaidNote.trim() || undefined,
+            paymentProof: markPaidProof || undefined,
+          }),
+        }
+      );
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر تسجيل الدفع");
+      }
+
+      setMarkPaidTarget(null);
+      setMarkPaidNote("");
+      setMarkPaidProof("");
+      await reloadAll();
+    } catch (actionError) {
+      setError(actionError?.message || "تعذر تسجيل الدفع");
     } finally {
       setActionLoadingId("");
     }
@@ -278,7 +340,7 @@ export default function AdminPartnersPage() {
   }
 
   return (
-    <main className="space-y-8 rounded-[34px] border border-cyan-300/10 bg-[#020617] p-4 text-white md:p-6">
+    <main className="admin-theme-page space-y-8 rounded-[34px] border border-cyan-300/10 bg-[#020617] p-4 text-white md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-cyan-200/70">Admin Partner Center</p>
@@ -310,6 +372,58 @@ export default function AdminPartnersPage() {
       {error ? (
         <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
           {error}
+        </div>
+      ) : null}
+
+      {markPaidTarget ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
+          <div className="admin-modal w-full max-w-lg">
+            <h3 className="text-2xl font-black">Mark as Paid</h3>
+            <p className="admin-muted mt-2 text-sm">
+              سيتم خصم الرصيد من محفظة الشريك. أرفق صورة إثبات التحويل ليرسلها للمستخدم.
+            </p>
+            <div className="mt-4 space-y-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold">ملاحظة الإدارة (اختياري)</span>
+                <textarea
+                  value={markPaidNote}
+                  onChange={(event) => setMarkPaidNote(event.target.value)}
+                  rows={3}
+                  className="admin-input w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold">صورة إثبات التحويل</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleMarkPaidProof}
+                  className="admin-input w-full"
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void submitMarkPaid()}
+                disabled={Boolean(actionLoadingId)}
+                className="admin-btn admin-btn--paid px-5 py-2"
+              >
+                {actionLoadingId ? "جاري التسجيل..." : "تأكيد الدفع"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMarkPaidTarget(null);
+                  setMarkPaidNote("");
+                  setMarkPaidProof("");
+                }}
+                className="admin-btn admin-btn--ghost px-5 py-2"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -639,19 +753,19 @@ export default function AdminPartnersPage() {
           />
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div className="mt-4 admin-table-wrap">
+          <table className="admin-table">
             <thead>
-              <tr className="border-b border-white/10 text-right text-slate-300">
-                <th className="px-3 py-3">الشريك</th>
-                <th className="px-3 py-3">البريد</th>
-                <th className="px-3 py-3">المبلغ</th>
-                <th className="px-3 py-3">العملة</th>
-                <th className="px-3 py-3">الشبكة</th>
-                <th className="px-3 py-3">المحفظة</th>
-                <th className="px-3 py-3">التاريخ</th>
-                <th className="px-3 py-3">الحالة</th>
-                <th className="px-3 py-3">إجراءات</th>
+              <tr>
+                <th>الشريك</th>
+                <th>البريد</th>
+                <th>المبلغ</th>
+                <th>العملة</th>
+                <th>الشبكة</th>
+                <th>المحفظة</th>
+                <th>التاريخ</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -685,7 +799,7 @@ export default function AdminPartnersPage() {
                           type="button"
                           disabled={Boolean(actionLoadingId)}
                           onClick={() => void runWithdrawalAction(item.id, "approve")}
-                          className="rounded-xl bg-blue-600 px-3 py-1 text-xs font-black"
+                          className="admin-btn admin-btn--approve"
                         >
                           Approve
                         </button>
@@ -695,7 +809,7 @@ export default function AdminPartnersPage() {
                           type="button"
                           disabled={Boolean(actionLoadingId)}
                           onClick={() => void runWithdrawalAction(item.id, "mark-paid")}
-                          className="rounded-xl bg-emerald-600 px-3 py-1 text-xs font-black"
+                          className="admin-btn admin-btn--paid"
                         >
                           Mark as Paid
                         </button>
@@ -705,7 +819,7 @@ export default function AdminPartnersPage() {
                           type="button"
                           disabled={Boolean(actionLoadingId)}
                           onClick={() => void runWithdrawalAction(item.id, "reject")}
-                          className="rounded-xl bg-red-600 px-3 py-1 text-xs font-black"
+                          className="admin-btn admin-btn--reject"
                         >
                           Reject
                         </button>

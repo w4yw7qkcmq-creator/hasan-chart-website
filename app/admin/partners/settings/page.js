@@ -1,5 +1,6 @@
 "use client";
 
+import "../../admin-theme.css";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { adminFetch } from "../../../../lib/admin-fetch";
@@ -150,7 +151,7 @@ export default function PartnerAutomationSettingsPage() {
   }
 
   return (
-    <main className="space-y-6 rounded-[34px] border border-cyan-300/10 bg-[#020617] p-4 text-white md:p-6">
+    <main className="admin-theme-page space-y-6 rounded-[34px] border border-cyan-300/10 bg-[#020617] p-4 text-white md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-cyan-200/70">Partner Automation</p>

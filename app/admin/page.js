@@ -1,5 +1,6 @@
 "use client";
 
+import "./admin-theme.css";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -293,6 +294,7 @@ export default function AdminPage() {
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
   const [adminAcknowledgedVersion, setAdminAcknowledgedVersion] = useState(0);
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
+  const [adminFeedNotifications, setAdminFeedNotifications] = useState([]);
   const adminNotificationsRef = useRef(null);
   const updateRequestStatus = async (table, requestId, newStatus) => {
     const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${getAdminStatusLabel(newStatus)}؟`);
@@ -560,6 +562,7 @@ export default function AdminPage() {
     setAnalysisRequests(formattedAnalysis);
     setSubscriptionRequests(formattedSubscriptions);
     setAccountRequests(formattedAccounts);
+    setAdminFeedNotifications(result.admin_notifications || []);
     setDataMode("secure-api");
     setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
     hasLoadedAdminDataRef.current = true;
@@ -743,31 +746,7 @@ export default function AdminPage() {
     return { pendingAnalysis, completedAnalysis, pendingAccounts, pendingSubscriptions, usersCount: users.length };
   }, [analysisRequests, accountRequests, subscriptionRequests, users]);
 
-  const adminNotifications = useMemo(() => {
-    const subscriptionItems = subscriptionRequests
-      .filter((item) => getAdminStatusKey(item.status) === "pending")
-      .map((item) => ({
-        id: `subscription-${item.id}`,
-        type: "subscription",
-        icon: "💳",
-        title: "طلب اشتراك جديد",
-        message: `${item.planName || "اشتراك جديد"} - ${item.userEmail || item.username || "مستخدم"}`,
-        createdAt: item.createdAt,
-      }));
-
-    const accountItems = accountRequests
-      .filter((item) => getAdminStatusKey(item.status) === "pending")
-      .map((item) => ({
-        id: `account-${item.id}`,
-        type: "account",
-        icon: "📂",
-        title: "طلب إدارة حساب جديد",
-        message: item.email || item.telegram || "طلب جديد",
-        createdAt: item.createdAt,
-      }));
-
-    return [...subscriptionItems, ...accountItems].slice(0, 20);
-  }, [subscriptionRequests, accountRequests]);
+  const adminNotifications = useMemo(() => adminFeedNotifications, [adminFeedNotifications]);
 
   const adminUnreadCount = useMemo(() => {
     void adminAcknowledgedVersion;
@@ -775,11 +754,14 @@ export default function AdminPage() {
   }, [adminNotifications, adminAcknowledgedVersion]);
 
   const handleAdminNotificationsBellClick = () => {
+    setAdminNotificationsOpen((prev) => !prev);
+  };
+
+  const handleMarkAllAdminNotificationsRead = () => {
     const ids = adminNotifications.map((item) => item.id);
     acknowledgeAdminDashboardNotifications(ids);
     ids.forEach((id) => markNotificationCenterRendered(id));
     setAdminAcknowledgedVersion((value) => value + 1);
-    setAdminNotificationsOpen((prev) => !prev);
   };
 
   const recentOverviewItems = useMemo(() => {
@@ -1124,7 +1106,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+    <main className="admin-theme-page relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
       <AppModal
         open={adminNotice.open}
         type={adminNotice.type === "error" ? "error" : "success"}
@@ -1193,7 +1175,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <section className="relative overflow-hidden rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
+        <section className="relative overflow-visible rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
           <div className="pointer-events-none absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
           <div className="pointer-events-none absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
@@ -1240,7 +1222,7 @@ export default function AdminPage() {
                 </button>
 
                 {adminNotificationsOpen && (
-                  <div className="absolute right-0 top-full z-[140] mt-3 w-[min(96vw,680px)] overflow-hidden rounded-[32px] border border-cyan-200/80 bg-white/98 text-right text-slate-950 shadow-[0_28px_100px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
+                  <div className="admin-notifications-panel absolute right-0 top-full mt-3 w-[min(96vw,680px)] overflow-hidden rounded-[32px] border border-cyan-200/80 bg-white/98 text-right text-slate-950 shadow-[0_28px_100px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
                     <div className="border-b border-slate-200/90 bg-gradient-to-l from-cyan-50 via-white to-white px-5 py-4 md:px-6">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -1249,12 +1231,30 @@ export default function AdminPage() {
                           </p>
                           <h3 className="mt-1 text-2xl font-black text-slate-950">مركز إشعارات الأدمن</h3>
                           <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
-                            جميع الطلبات الجديدة التي تحتاج متابعة من لوحة الإدارة.
+                            آخر الطلبات والتنبيهات التي تحتاج متابعة.
                           </p>
                         </div>
-                        <span className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-800">
-                          {adminNotifications.length} إشعار
-                        </span>
+                        <div className="admin-notifications-panel__actions">
+                          <span className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-800">
+                            {adminNotifications.length} إشعار
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void loadAdminData()}
+                            className="admin-notifications-panel__action"
+                          >
+                            تحديث الآن
+                          </button>
+                          {adminUnreadCount > 0 ? (
+                            <button
+                              type="button"
+                              onClick={handleMarkAllAdminNotificationsRead}
+                              className="admin-notifications-panel__action"
+                            >
+                              تعليم الكل كمقروء
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
 
@@ -1281,6 +1281,13 @@ export default function AdminPage() {
                               if (item.type === "account") {
                                 setAccountFilter("pending");
                                 setActiveAdminTab("accounts");
+                              }
+                              if (item.type === "analysis") {
+                                setAnalysisFilter("pending");
+                                setActiveAdminTab("analysis");
+                              }
+                              if (item.type === "withdrawal") {
+                                window.location.href = item.url || "/admin/partners";
                               }
                             }}
                             className="w-full rounded-[24px] border border-cyan-100 bg-gradient-to-l from-white via-cyan-50/40 to-white p-5 text-right transition hover:border-cyan-300 hover:bg-cyan-50/80"

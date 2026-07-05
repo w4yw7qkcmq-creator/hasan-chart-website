@@ -26,6 +26,7 @@ export async function POST(request, { params }) {
 
     const withdrawal = await markPartnerWithdrawalPaid(adminCheck.supabase, withdrawalId, {
       adminNote: body?.adminNote,
+      paymentProof: body?.paymentProof,
     });
 
     return Response.json({

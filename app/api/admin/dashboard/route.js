@@ -10,6 +10,8 @@ import {
   adminReadLimiter,
 } from "../../../../lib/rate-limit";
 import { invalidateReadCache, withReadCache } from "../../../../lib/server-read-cache";
+import { buildAdminNotificationsFeed } from "../../../../lib/admin-notifications-feed";
+import { formatPartnerMoney } from "../../../../lib/partner-shared";
 import {
   onPartnerAccountManagementActivated,
   onPartnerSubscriptionActivated,
@@ -37,40 +39,13 @@ function sanitizeAccountRequest(item) {
   };
 }
 
-function buildAdminDashboardNotifications({ subscriptions = [], accounts = [] }) {
-  const subscriptionNotifications = (subscriptions || [])
-    .filter((item) => {
-      const status = String(item.status || "بانتظار المراجعة").trim();
-      return status === "بانتظار المراجعة" || status === "قيد المعالجة" || status === "جديد";
-    })
-    .map((item) => ({
-      id: `subscription-${item.id}`,
-      type: "subscription_request",
-      title: "طلب اشتراك جديد 💳",
-      message: `طلب اشتراك جديد في ${item.plan_name || item.category || "باقات التوصيات"} من ${item.user_email || item.username || "مستخدم جديد"}.`,
-      targetSection: "subscriptions",
-      targetId: item.id,
-      created_at: item.created_at || null,
-    }));
-
-  const accountNotifications = (accounts || [])
-    .filter((item) => {
-      const status = String(item.status || "جديد").trim();
-      return status === "جديد" || status === "بانتظار المراجعة";
-    })
-    .map((item) => ({
-      id: `account-${item.id}`,
-      type: "account_management_request",
-      title: "طلب إدارة حساب جديد 📂",
-      message: `طلب إدارة حساب جديد من ${item.email || item.contact_method || "مستخدم جديد"}.`,
-      targetSection: "accounts",
-      targetId: item.id,
-      created_at: item.created_at || null,
-    }));
-
-  return [...subscriptionNotifications, ...accountNotifications]
-    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-    .slice(0, 20);
+function buildAdminDashboardNotifications({
+  analysis = [],
+  subscriptions = [],
+  accounts = [],
+  withdrawals = [],
+}) {
+  return buildAdminNotificationsFeed({ analysis, subscriptions, accounts, withdrawals });
 }
 
 export async function GET() {
@@ -97,7 +72,7 @@ export async function GET() {
       async () => {
         const supabase = adminCheck.supabase;
 
-        const [analysis, accounts, subscriptions, profiles] = await Promise.all([
+        const [analysis, accounts, subscriptions, profiles, pendingWithdrawals] = await Promise.all([
       supabase
         .from("analysis_requests")
         .select(
@@ -125,6 +100,12 @@ export async function GET() {
           "id,email,username,telegram,role,subscription_plan,subscription_status,created_at"
         )
         .limit(500),
+      supabase
+        .from("partner_withdrawals")
+        .select("id, partner_id, amount, currency, status, created_at, partners(user_id)")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(20),
     ]);
 
     const tableErrors = {
@@ -146,8 +127,20 @@ export async function GET() {
     });
 
     const adminNotifications = buildAdminDashboardNotifications({
+      analysis: analysis.error ? [] : analysis.data || [],
       subscriptions: subscriptions.error ? [] : subscriptions.data || [],
       accounts: accounts.error ? [] : accounts.data || [],
+      withdrawals: pendingWithdrawals.error
+        ? []
+        : (pendingWithdrawals.data || []).map((row) => ({
+            id: row.id,
+            status: row.status,
+            amount: row.amount,
+            amountLabel: formatPartnerMoney(row.amount),
+            created_at: row.created_at,
+            partner_email: null,
+            partnerLabel: row.partner_id ? `شريك #${String(row.partner_id).slice(0, 8)}` : "شريك",
+          })),
     });
 
         return {
