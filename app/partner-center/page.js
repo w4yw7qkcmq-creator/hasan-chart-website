@@ -1,5 +1,6 @@
 "use client";
 
+import "./partner-center-theme.css";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAppModal } from "../components/AppModalProvider";
@@ -13,6 +14,8 @@ import {
   WITHDRAWAL_NETWORKS,
   commissionStatusLabel,
   formatPartnerMoney,
+  buildReferralLink,
+  getPartnerSiteUrl,
   serviceTypeLabel,
   withdrawalStatusLabel,
 } from "../../lib/partner-shared";
@@ -150,13 +153,16 @@ export default function PartnerCenterPage() {
   const wallet = data?.wallet;
   const tierProgress = data?.tierProgress;
   const canRequestWithdrawal = Boolean(wallet?.canWithdraw);
-  const qrLink = partner?.shortReferralLink || partner?.referralLink || "";
+  const referralLink = partner?.referralCode
+    ? buildReferralLink(partner.referralCode, getPartnerSiteUrl())
+    : partner?.referralLink || "";
+  const qrLink = referralLink;
 
   const copyReferralLink = async () => {
-    if (!partner?.referralLink) return;
+    if (!referralLink) return;
 
     try {
-      await navigator.clipboard.writeText(partner.referralLink);
+      await navigator.clipboard.writeText(referralLink);
       showAppModal({
         type: "success",
         title: "تم النسخ",
@@ -263,7 +269,7 @@ export default function PartnerCenterPage() {
   }
 
   return (
-    <div className="user-dashboard-page space-y-6">
+    <div className="user-dashboard-page partner-center-page space-y-6">
       <header className="user-dashboard-hero">
         <div>
           <p className="user-dashboard-hero__eyebrow">Partner Program</p>
@@ -291,66 +297,66 @@ export default function PartnerCenterPage() {
             subtitle="تزداد نسبة العمولة 5% مع كل مستوى — الترقية تلقائية للأعلى فقط"
           >
             <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-[#07142f]/60 p-5">
-                <p className="text-sm font-bold text-cyan-100/70">المستوى الحالي</p>
-                <p className="mt-2 text-3xl font-black text-white">
+              <div className="partner-surface partner-surface--p5">
+                <p className="partner-label">المستوى الحالي</p>
+                <p className="partner-title-lg">
                   {tierProgress?.tierName || partner.tierName || "Partner"}
                 </p>
-                <p className="mt-2 text-lg font-bold text-emerald-300">
+                <p className="partner-accent-green">
                   نسبة العمولة: {tierProgress?.commissionPercent ?? partner.commissionPercent ?? 10}%
                 </p>
                 {tierProgress?.tierUpdatedAt ? (
-                  <p className="mt-2 text-xs text-slate-400">
+                  <p className="partner-muted--sm mt-2">
                     آخر تحديث للمستوى: {formatDate(tierProgress.tierUpdatedAt)}
                   </p>
                 ) : null}
               </div>
 
               {tierProgress?.nextTier ? (
-                <div className="rounded-2xl border border-white/10 bg-[#07142f]/60 p-5">
-                  <p className="text-sm font-bold text-cyan-100/70">
+                <div className="partner-surface partner-surface--p5">
+                  <p className="partner-label">
                     التقدم نحو {tierProgress.nextTier.tierName} ({tierProgress.nextTier.commissionPercent}%)
                   </p>
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <div className="mb-1 flex justify-between text-xs text-slate-300">
+                  <div className="partner-progress">
+                    <div className="partner-progress">
+                      <div className="partner-progress__head">
                         <span>الحسابات النشطة</span>
                         <span>
                           {tierProgress.activeReferrals} / {tierProgress.nextTier.minActiveReferrals}
                         </span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="partner-progress__track">
                         <div
-                          className="h-full rounded-full bg-cyan-400 transition-all"
+                          className="partner-progress__fill partner-progress__fill--cyan"
                           style={{ width: `${tierProgress.nextTier.activeReferralsProgress}%` }}
                         />
                       </div>
                     </div>
-                    <div>
-                      <div className="mb-1 flex justify-between text-xs text-slate-300">
+                    <div className="partner-progress">
+                      <div className="partner-progress__head">
                         <span>إجمالي المبيعات المعتمدة</span>
                         <span>
                           {formatPartnerMoney(tierProgress.totalSales)} /{" "}
                           {formatPartnerMoney(tierProgress.nextTier.minTotalSales)}
                         </span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="partner-progress__track">
                         <div
-                          className="h-full rounded-full bg-emerald-400 transition-all"
+                          className="partner-progress__fill partner-progress__fill--green"
                           style={{ width: `${tierProgress.nextTier.totalSalesProgress}%` }}
                         />
                       </div>
                     </div>
-                    <p className="text-xs text-slate-400">
+                    <p className="partner-progress__hint">
                       شروط المستوى التالي: {tierProgress.nextTier.minActiveReferrals} حساب نشط على
                       الأقل و{formatPartnerMoney(tierProgress.nextTier.minTotalSales)} مبيعات معتمدة.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5">
-                  <p className="text-lg font-black text-emerald-200">أعلى مستوى — Diamond</p>
-                  <p className="mt-2 text-sm text-emerald-100/80">
+                <div className="partner-surface partner-surface--p5 partner-surface--success">
+                  <p className="partner-accent-success-title">أعلى مستوى — Diamond</p>
+                  <p className="partner-accent-success-text">
                     وصلت إلى أعلى مستوى في برنامج الشركاء بنسبة عمولة 30%.
                   </p>
                 </div>
@@ -403,11 +409,11 @@ export default function PartnerCenterPage() {
             </div>
 
             {wallet?.lastWithdrawal ? (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-[#07142f]/60 p-4 text-sm">
-                <p className="font-bold text-white">
+              <div className="partner-surface partner-surface--p4 partner-wallet-note mt-4">
+                <p className="partner-wallet-note__title">
                   حالة آخر طلب: {withdrawalStatusLabel(wallet.lastWithdrawalStatus)}
                 </p>
-                <p className="mt-2 text-slate-300">
+                <p className="partner-wallet-note__meta">
                   {wallet.lastWithdrawal.network} · {formatDate(wallet.lastWithdrawal.createdAt)}
                   {wallet.lastWithdrawal.paidAt
                     ? ` · مدفوع: ${formatDate(wallet.lastWithdrawal.paidAt)}`
@@ -498,27 +504,27 @@ export default function PartnerCenterPage() {
             <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
               <div className="space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm font-bold text-cyan-100/80">كود الإحالة</label>
+                  <label className="partner-label mb-2 block">كود الإحالة</label>
                   <input
                     type="text"
                     readOnly
                     value={partner.referralCode}
-                    className="w-full rounded-2xl border border-white/10 bg-[#07142f]/80 px-4 py-3 font-mono text-white"
+                    className="partner-input partner-input--mono"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-bold text-cyan-100/80">رابط الإحالة</label>
+                  <label className="partner-label mb-2 block">رابط الإحالة</label>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <input
                       type="text"
                       readOnly
-                      value={partner.referralLink}
-                      className="w-full rounded-2xl border border-white/10 bg-[#07142f]/80 px-4 py-3 text-sm text-white"
+                      value={referralLink}
+                      className="partner-input text-sm"
                     />
                     <button
                       type="button"
                       onClick={() => void copyReferralLink()}
-                      className="shrink-0 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-5 py-3 font-black text-white"
+                      className="partner-btn-primary"
                     >
                       نسخ الرابط
                     </button>
@@ -527,9 +533,9 @@ export default function PartnerCenterPage() {
               </div>
 
               {qrLink ? (
-                <div className="flex flex-col items-center justify-center rounded-3xl border border-white/10 bg-white p-4">
+                <div className="partner-qr-box">
                   <PartnerQrCode value={qrLink} size={220} />
-                  <p className="mt-3 text-sm font-bold text-slate-700">QR Code</p>
+                  <p className="partner-qr-box__label">QR Code</p>
                 </div>
               ) : null}
             </div>
@@ -606,7 +612,7 @@ export default function PartnerCenterPage() {
           >
             <div className="space-y-4">
               {!canRequestWithdrawal ? (
-                <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                <div className="partner-alert-warn">
                   {(wallet?.balanceWithdrawable ?? partner.balanceWithdrawable ?? 0) <
                   MIN_PARTNER_WITHDRAWAL_USDT
                     ? `الحد الأدنى للسحب هو ${MIN_PARTNER_WITHDRAWAL_USDT} USDT`
@@ -621,14 +627,14 @@ export default function PartnerCenterPage() {
                   type="button"
                   onClick={() => setWithdrawOpen(true)}
                   disabled={!canRequestWithdrawal}
-                  className="rounded-2xl bg-gradient-to-l from-emerald-600 to-cyan-400 px-6 py-3 font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="partner-btn-success disabled:cursor-not-allowed"
                 >
                   طلب سحب الأرباح
                 </button>
               ) : (
                 <form onSubmit={submitWithdrawal} className="space-y-4 max-w-xl">
                   <div>
-                    <label className="mb-2 block text-sm font-bold">المبلغ (USDT)</label>
+                    <label className="partner-label mb-2 block">المبلغ (USDT)</label>
                     <input
                       type="number"
                       min={MIN_PARTNER_WITHDRAWAL_USDT}
@@ -637,30 +643,30 @@ export default function PartnerCenterPage() {
                       value={withdrawAmount}
                       onChange={(event) => setWithdrawAmount(event.target.value)}
                       required
-                      className="w-full rounded-2xl border border-white/10 bg-[#07142f]/80 px-4 py-3 text-white"
+                      className="partner-input"
                     />
-                    <p className="mt-2 text-xs text-cyan-100/60">
+                    <p className="partner-input-hint">
                       الحد الأدنى: {MIN_PARTNER_WITHDRAWAL_USDT} USDT · الحد الأقصى:{" "}
                       {formatPartnerMoney(wallet?.balanceWithdrawable ?? partner.balanceWithdrawable)}
                     </p>
                   </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-bold">العملة</label>
+                      <label className="partner-label mb-2 block">العملة</label>
                       <input
                         type="text"
                         readOnly
                         value="USDT"
-                        className="w-full rounded-2xl border border-white/10 bg-[#07142f]/80 px-4 py-3 text-white"
+                        className="partner-input"
                       />
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-bold">الشبكة</label>
+                      <label className="partner-label mb-2 block">الشبكة</label>
                       <select
                         value={withdrawNetwork}
                         onChange={(event) => setWithdrawNetwork(event.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-[#07142f]/80 px-4 py-3 text-white"
+                        className="partner-select"
                       >
                         {WITHDRAWAL_NETWORKS.map((network) => (
                           <option key={network} value={network}>
@@ -671,13 +677,13 @@ export default function PartnerCenterPage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm font-bold">عنوان المحفظة</label>
+                      <label className="partner-label mb-2 block">عنوان المحفظة</label>
                       <input
                         type="text"
                         value={withdrawWallet}
                         onChange={(event) => setWithdrawWallet(event.target.value)}
                         required
-                        className="w-full rounded-2xl border border-white/10 bg-[#07142f]/80 px-4 py-3 font-mono text-white"
+                        className="partner-input partner-input--mono"
                         placeholder="أدخل عنوان المحفظة"
                       />
                     </div>
@@ -693,13 +699,13 @@ export default function PartnerCenterPage() {
                     </label>
 
                     <div>
-                      <label className="mb-2 block text-sm font-bold">ملاحظات (اختياري)</label>
+                      <label className="partner-label mb-2 block">ملاحظات (اختياري)</label>
                       <textarea
                         value={withdrawNote}
                         onChange={(event) => setWithdrawNote(event.target.value)}
                         rows={3}
                         maxLength={500}
-                        className="w-full rounded-2xl border border-white/10 bg-[#07142f]/80 px-4 py-3 text-white"
+                        className="partner-textarea"
                         placeholder="أي ملاحظات للإدارة..."
                       />
                     </div>
@@ -708,7 +714,7 @@ export default function PartnerCenterPage() {
                       <button
                         type="submit"
                         disabled={submittingWithdraw}
-                        className="rounded-2xl bg-gradient-to-l from-emerald-600 to-cyan-400 px-6 py-3 font-black text-white disabled:opacity-60"
+                        className="partner-btn-success"
                       >
                         {submittingWithdraw ? "جاري الإرسال..." : "إرسال"}
                       </button>
@@ -719,7 +725,7 @@ export default function PartnerCenterPage() {
                           setWithdrawConfirmed(false);
                           setWithdrawNote("");
                         }}
-                        className="rounded-2xl border border-white/15 px-6 py-3 font-bold text-white"
+                        className="partner-btn-ghost"
                       >
                         إلغاء
                       </button>
@@ -728,8 +734,8 @@ export default function PartnerCenterPage() {
                 )}
 
               {data.withdrawals?.length ? (
-                <div className="mt-6 space-y-3 border-t border-white/10 pt-6">
-                  <h3 className="font-black text-white">طلبات السحب السابقة</h3>
+                <div className="partner-divider space-y-3">
+                  <h3 className="partner-divider__title">طلبات السحب السابقة</h3>
                   {data.withdrawals.map((item) => (
                     <article key={item.id} className="user-dashboard-list-item">
                       <div className="user-dashboard-list-item__head">

@@ -5,6 +5,7 @@ import {
   formatPartnerMoney,
   serviceTypeLabel,
   PARTNER_LEADERBOARD_METRICS,
+  PARTNER_LEADERBOARD_UI_ENABLED,
 } from "../../../lib/partner-shared";
 import {
   PartnerBarChart,
@@ -48,6 +49,8 @@ export function PartnerAnalyticsDashboard() {
   const [error, setError] = useState("");
 
   const loadLeaderboard = useCallback(async (metric) => {
+    if (!PARTNER_LEADERBOARD_UI_ENABLED) return;
+
     const response = await fetch(`/api/partner/leaderboard?metric=${encodeURIComponent(metric)}`, {
       credentials: "include",
       cache: "no-store",
@@ -85,7 +88,10 @@ export function PartnerAnalyticsDashboard() {
       setAnalytics(analyticsData.analytics);
       setCharts(chartsData?.success ? chartsData.charts : null);
       setTopReferrals(referralsData?.success ? referralsData.referrals || [] : []);
-      await loadLeaderboard(leaderboardMetric);
+
+      if (PARTNER_LEADERBOARD_UI_ENABLED) {
+        await loadLeaderboard(leaderboardMetric);
+      }
     } catch (loadError) {
       setError(loadError?.message || "تعذر تحميل Analytics");
     } finally {
@@ -98,7 +104,7 @@ export function PartnerAnalyticsDashboard() {
   }, [loadAll]);
 
   useEffect(() => {
-    if (loading) return;
+    if (!PARTNER_LEADERBOARD_UI_ENABLED || loading) return;
     void loadLeaderboard(leaderboardMetric).catch(() => {});
   }, [leaderboardMetric, loading, loadLeaderboard]);
 
@@ -126,7 +132,7 @@ export function PartnerAnalyticsDashboard() {
     return (
       <section className="user-dashboard-panel">
         <div className="user-dashboard-panel__body">
-          <p className="text-red-200">{error}</p>
+          <p className="partner-error-text">{error}</p>
         </div>
       </section>
     );
@@ -168,20 +174,20 @@ export function PartnerAnalyticsDashboard() {
           <h2 className="user-dashboard-panel__title">الرسوم البيانية</h2>
         </div>
         <div className="user-dashboard-panel__body grid gap-6 xl:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-[#07142f]/60 p-4">
-            <p className="mb-4 font-bold text-white">العمولات — آخر 30 يوماً</p>
+          <div className="partner-chart-card">
+            <p className="partner-chart-card__title">العمولات — آخر 30 يوماً</p>
             <PartnerLineChart items={commissionSeries} formatValue={(v) => formatPartnerMoney(v)} />
           </div>
-          <div className="rounded-2xl border border-white/10 bg-[#07142f]/60 p-4">
-            <p className="mb-4 font-bold text-white">الأرباح حسب نوع الخدمة</p>
+          <div className="partner-chart-card">
+            <p className="partner-chart-card__title">الأرباح حسب نوع الخدمة</p>
             <PartnerServiceBreakdownChart items={charts?.earningsByService || []} />
           </div>
-          <div className="rounded-2xl border border-white/10 bg-[#07142f]/60 p-4 xl:col-span-2">
-            <p className="mb-4 font-bold text-white">مقارنة آخر 12 شهر</p>
+          <div className="partner-chart-card xl:col-span-2">
+            <p className="partner-chart-card__title">مقارنة آخر 12 شهر</p>
             <PartnerMonthlyComparisonChart items={charts?.monthlyComparison || []} />
           </div>
-          <div className="rounded-2xl border border-white/10 bg-[#07142f]/60 p-4">
-            <p className="mb-4 font-bold text-white">العملاء الجدد شهرياً</p>
+          <div className="partner-chart-card">
+            <p className="partner-chart-card__title">العملاء الجدد شهرياً</p>
             <PartnerBarChart
               items={(charts?.monthlyNewCustomers || []).map((row) => ({
                 label: row.month,
@@ -198,84 +204,90 @@ export function PartnerAnalyticsDashboard() {
           <h2 className="user-dashboard-panel__title">Top Referrals</h2>
         </div>
         <div className="user-dashboard-panel__body overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="partner-table">
             <thead>
-              <tr className="border-b border-white/10 text-right text-slate-300">
-                <th className="px-3 py-3">الاسم</th>
-                <th className="px-3 py-3">البريد</th>
-                <th className="px-3 py-3">الخدمة</th>
-                <th className="px-3 py-3">المبيعات</th>
-                <th className="px-3 py-3">العمولات</th>
-                <th className="px-3 py-3">التسجيل</th>
-                <th className="px-3 py-3">آخر نشاط</th>
+              <tr>
+                <th>الاسم</th>
+                <th>البريد</th>
+                <th>الخدمة</th>
+                <th>المبيعات</th>
+                <th>العمولات</th>
+                <th>التسجيل</th>
+                <th>آخر نشاط</th>
               </tr>
             </thead>
             <tbody>
               {topReferrals.map((item) => (
-                <tr key={item.userId || item.username} className="border-b border-white/5">
-                  <td className="px-3 py-3">{item.username}</td>
-                  <td className="px-3 py-3">{item.email}</td>
-                  <td className="px-3 py-3">{serviceTypeLabel(item.primaryService)}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(item.totalSales)}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(item.totalCommissions)}</td>
-                  <td className="px-3 py-3">{formatDate(item.registeredAt)}</td>
-                  <td className="px-3 py-3">{formatDate(item.lastActivityAt)}</td>
+                <tr key={item.userId || item.username}>
+                  <td>{item.username}</td>
+                  <td>{item.email}</td>
+                  <td>{serviceTypeLabel(item.primaryService)}</td>
+                  <td>{formatPartnerMoney(item.totalSales)}</td>
+                  <td>{formatPartnerMoney(item.totalCommissions)}</td>
+                  <td>{formatDate(item.registeredAt)}</td>
+                  <td>{formatDate(item.lastActivityAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {!topReferrals.length ? <p className="text-slate-400">لا توجد إحالات بارزة بعد.</p> : null}
+          {!topReferrals.length ? <p className="partner-muted mt-3">لا توجد إحالات بارزة بعد.</p> : null}
         </div>
       </section>
 
-      <section className="user-dashboard-panel">
-        <div className="user-dashboard-panel__header">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="user-dashboard-panel__title">Partner Leaderboard</h2>
-            <select
-              value={leaderboardMetric}
-              onChange={(event) => setLeaderboardMetric(event.target.value)}
-              className="rounded-xl border border-white/10 bg-[#07142f]/80 px-3 py-2 text-sm text-white"
-            >
-              {PARTNER_LEADERBOARD_METRICS.map((metric) => (
-                <option key={metric.key} value={metric.key}>
-                  {metric.label}
-                </option>
-              ))}
-            </select>
+      {/*
+        Partner Leaderboard — hidden until partner base grows.
+        Re-enable: set PARTNER_LEADERBOARD_UI_ENABLED = true in lib/partner-shared.js
+      */}
+      {PARTNER_LEADERBOARD_UI_ENABLED ? (
+        <section className="user-dashboard-panel">
+          <div className="user-dashboard-panel__header">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="user-dashboard-panel__title">Partner Leaderboard</h2>
+              <select
+                value={leaderboardMetric}
+                onChange={(event) => setLeaderboardMetric(event.target.value)}
+                className="partner-select w-auto text-sm"
+              >
+                {PARTNER_LEADERBOARD_METRICS.map((metric) => (
+                  <option key={metric.key} value={metric.key}>
+                    {metric.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-        <div className="user-dashboard-panel__body overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-right text-slate-300">
-                <th className="px-3 py-3">#</th>
-                <th className="px-3 py-3">الشريك</th>
-                <th className="px-3 py-3">المستوى</th>
-                <th className="px-3 py-3">المبيعات</th>
-                <th className="px-3 py-3">العمولات</th>
-                <th className="px-3 py-3">الإحالات</th>
-                <th className="px-3 py-3">نشط</th>
-                <th className="px-3 py-3">التحويل</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboard.map((item) => (
-                <tr key={item.partnerId} className="border-b border-white/5">
-                  <td className="px-3 py-3">{item.rank}</td>
-                  <td className="px-3 py-3">{item.username}</td>
-                  <td className="px-3 py-3">{item.tierName}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(item.totalSales)}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(item.totalCommissions)}</td>
-                  <td className="px-3 py-3">{item.signupCount}</td>
-                  <td className="px-3 py-3">{item.activeAccountCount}</td>
-                  <td className="px-3 py-3">{item.conversionRate}%</td>
+          <div className="user-dashboard-panel__body overflow-x-auto">
+            <table className="partner-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>الشريك</th>
+                  <th>المستوى</th>
+                  <th>المبيعات</th>
+                  <th>العمولات</th>
+                  <th>الإحالات</th>
+                  <th>نشط</th>
+                  <th>التحويل</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {leaderboard.map((item) => (
+                  <tr key={item.partnerId}>
+                    <td>{item.rank}</td>
+                    <td>{item.username}</td>
+                    <td>{item.tierName}</td>
+                    <td>{formatPartnerMoney(item.totalSales)}</td>
+                    <td>{formatPartnerMoney(item.totalCommissions)}</td>
+                    <td>{item.signupCount}</td>
+                    <td>{item.activeAccountCount}</td>
+                    <td>{item.conversionRate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -1,28 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../../lib/auth-session";
 import { getPartnerDashboard } from "../../../../lib/partner-server";
-import { buildReferralLink, buildShortReferralLink } from "../../../../lib/partner-shared";
+import { buildReferralLink, buildShortReferralLink, getPartnerSiteUrl } from "../../../../lib/partner-shared";
 
 export const dynamic = "force-dynamic";
 
-function resolveSiteOrigin(request) {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
-
-  if (configured) {
-    return String(configured).replace(/\/$/, "");
-  }
-
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-  const proto = request.headers.get("x-forwarded-proto") || "https";
-
-  if (host) {
-    return `${proto}://${host}`;
-  }
-
-  return "https://www.hasanchartworld.com";
-}
-
-export async function GET(request) {
+export async function GET() {
   try {
     const session = await requireSessionUser();
 
@@ -33,7 +16,7 @@ export async function GET(request) {
       );
     }
 
-    const siteOrigin = resolveSiteOrigin(request);
+    const siteOrigin = getPartnerSiteUrl();
     const dashboard = await getPartnerDashboard(
       session.supabase,
       session.id,

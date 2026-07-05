@@ -74,23 +74,21 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
             {achievements.map((item) => (
               <div
                 key={item.key}
-                className={`rounded-2xl border p-4 ${
-                  item.unlocked
-                    ? "border-emerald-400/30 bg-emerald-500/10"
-                    : "border-white/10 bg-[#07142f]/50 opacity-70"
+                className={`partner-surface partner-surface--p4 ${
+                  item.unlocked ? "partner-surface--unlocked" : "partner-surface--locked"
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-3xl" aria-hidden="true">
+                  <span className="partner-achievement-card__icon" aria-hidden="true">
                     {item.badgeIcon}
                   </span>
                   <div>
-                    <p className="font-black text-white">{item.badgeLabel}</p>
-                    <p className="mt-1 text-sm text-slate-300">{item.description}</p>
+                    <p className="partner-achievement-card__title">{item.badgeLabel}</p>
+                    <p className="partner-achievement-card__desc">{item.description}</p>
                     {item.unlocked ? (
-                      <p className="mt-2 text-xs text-emerald-300">مفتوح · {formatDate(item.unlockedAt)}</p>
+                      <p className="partner-unlocked-meta">مفتوح · {formatDate(item.unlockedAt)}</p>
                     ) : (
-                      <p className="mt-2 text-xs text-slate-500">لم يُفتح بعد</p>
+                      <p className="partner-locked-meta">لم يُفتح بعد</p>
                     )}
                   </div>
                 </div>
@@ -110,16 +108,18 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
               {milestones.map((item) => (
                 <div
                   key={`${item.tierKey}-${item.milestonePercent}`}
-                  className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-center"
+                  className="partner-surface partner-surface--p4 partner-surface--cyan partner-milestone-card"
                 >
-                  <p className="text-2xl font-black text-cyan-100">{item.milestonePercent}%</p>
-                  <p className="mt-1 text-sm text-slate-300">{item.tierKey}</p>
-                  <p className="mt-2 text-xs text-slate-400">{formatDate(item.reachedAt)}</p>
+                  <p className="partner-accent-cyan">{item.milestonePercent}%</p>
+                  <p className="partner-muted mt-1 text-sm">{item.tierKey}</p>
+                  <p className="partner-muted--sm mt-2">{formatDate(item.reachedAt)}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-slate-400">ستظهر المعالم تلقائياً مع تقدمك في المستوى (25% / 50% / 75% / 100%).</p>
+            <p className="partner-muted">
+              ستظهر المعالم تلقائياً مع تقدمك في المستوى (25% / 50% / 75% / 100%).
+            </p>
           )}
         </div>
       </section>
@@ -132,20 +132,22 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
           {notifications.map((item) => (
             <article
               key={item.id}
-              className={`rounded-2xl border px-4 py-3 ${
-                item.isRead ? "border-white/10 bg-[#07142f]/40" : "border-cyan-400/20 bg-cyan-500/10"
+              className={`partner-surface partner-surface--p4 ${
+                item.isRead ? "partner-surface--read" : "partner-surface--unread"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-bold text-white">{item.title}</p>
-                <span className="text-xs text-slate-400">{formatDate(item.createdAt)}</span>
+                <p className="partner-notification-card__title">{item.title}</p>
+                <span className="partner-muted--sm">{formatDate(item.createdAt)}</span>
               </div>
-              {item.body ? <p className="mt-2 text-sm text-slate-300">{item.body}</p> : null}
-              <p className="mt-1 text-xs font-mono text-slate-500">{item.type}</p>
+              {item.body ? <p className="partner-notification-card__body">{item.body}</p> : null}
+              <p className="partner-notification-type">{item.type}</p>
             </article>
           ))}
           {!notifications.length ? (
-            <p className="text-slate-400">لا توجد إشعارات بعد — ستصل تلقائياً عند الترقية أو العمولات أو المكافآت.</p>
+            <p className="partner-muted">
+              لا توجد إشعارات بعد — ستصل تلقائياً عند الترقية أو العمولات أو المكافآت.
+            </p>
           ) : null}
         </div>
       </section>
