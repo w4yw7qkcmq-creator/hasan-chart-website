@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AppModal from "../components/AppModal";
+import { useRequireAuth } from "../hooks/useRequireAuth";
 
 const plans = [
   {
@@ -134,6 +135,7 @@ function getRemainingDays(expiresAt) {
 }
 
 export default function SubscriptionsPage() {
+  const { user, sessionPending, isAuthenticated, shouldShowLogin } = useRequireAuth();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [notification, setNotification] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -153,22 +155,21 @@ export default function SubscriptionsPage() {
   }, [notification]);
 
   useEffect(() => {
+    if (sessionPending) return;
+
+    if (!isAuthenticated || !user?.email) {
+      setCurrentSubscription(null);
+      setSubscriptionLoading(false);
+      return;
+    }
+
     const loadCurrentSubscription = async () => {
       try {
-        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-
-        if (!currentUser?.email) {
-          setCurrentSubscription(null);
-          return;
-        }
-
-        const response = await fetch(
-          `/api/my-subscription-status?email=${encodeURIComponent(currentUser.email)}`,
-          {
-            method: "GET",
-            cache: "no-store",
-          }
-        );
+        const response = await fetch("/api/my-subscription-status", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+        });
 
         const result = await response.json().catch(() => null);
 
@@ -185,8 +186,8 @@ export default function SubscriptionsPage() {
       }
     };
 
-    loadCurrentSubscription();
-  }, []);
+    void loadCurrentSubscription();
+  }, [sessionPending, isAuthenticated, user?.email]);
 
   const handlePaymentProof = (event) => {
     const file = event.target.files?.[0];
@@ -219,9 +220,9 @@ export default function SubscriptionsPage() {
   };
 
   const requestSubscription = async (plan) => {
-    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+    if (sessionPending) return;
 
-    if (!currentUser?.email) {
+    if (shouldShowLogin || !isAuthenticated || !user?.email) {
       setNotification({
         type: "error",
         title: "يجب تسجيل الدخول أولاً",
@@ -240,9 +241,7 @@ export default function SubscriptionsPage() {
   };
 
   const submitSubscriptionRequest = async () => {
-    const currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
-
-    if (!selectedPlan || !currentUser?.email) return;
+    if (sessionPending || !selectedPlan || !isAuthenticated || !user?.email) return;
 
     const cleanTelegramUsername = telegramUsername.trim();
 
@@ -272,9 +271,10 @@ export default function SubscriptionsPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
-          user_email: currentUser.email,
-          username: currentUser.username || currentUser.email,
+          user_email: user.email,
+          username: user.username || user.email,
           plan_name: selectedPlan.name,
           category: selectedPlan.category,
           price: selectedPlan.price,
@@ -565,10 +565,14 @@ export default function SubscriptionsPage() {
                         <div className="mt-8 space-y-3">
                           <button
                             onClick={() => requestSubscription(plan)}
-                            disabled={loadingPlan === plan.name}
+                            disabled={sessionPending || loadingPlan === plan.name}
                             className="block w-full rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-6 py-4 text-center font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.32)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70"
                           >
-                            {loadingPlan === plan.name ? "جاري إرسال الطلب..." : "اشترك الآن"}
+                            {sessionPending
+                              ? "جاري التحقق..."
+                              : loadingPlan === plan.name
+                                ? "جاري إرسال الطلب..."
+                                : "اشترك الآن"}
                           </button>
 
                           <Link
