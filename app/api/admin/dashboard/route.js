@@ -10,6 +10,10 @@ import {
   adminReadLimiter,
 } from "../../../../lib/rate-limit";
 import { invalidateReadCache, withReadCache } from "../../../../lib/server-read-cache";
+import {
+  onPartnerAccountManagementActivated,
+  onPartnerSubscriptionActivated,
+} from "../../../../lib/partner-service-hooks";
 
 export const dynamic = "force-dynamic";
 
@@ -632,6 +636,14 @@ export async function POST(request) {
               }),
           });
         }
+
+        await onPartnerAccountManagementActivated(supabase, {
+          requestId,
+          userId: existingRow?.user_id || null,
+          userEmail,
+          username: existingRow?.username || null,
+          capital: existingRow?.capital || null,
+        });
       }
 
       if (
@@ -853,6 +865,10 @@ export async function POST(request) {
               actionText: "عرض الباقات",
               actionUrl: `${getSiteUrl()}/subscriptions`,
             }),
+        });
+
+        await onPartnerSubscriptionActivated(supabase, {
+          subscriptionRequestId: requestId,
         });
       }
 

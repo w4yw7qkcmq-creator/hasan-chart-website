@@ -1478,6 +1478,15 @@ export default function AdminPage() {
 
         <nav className="order-2 relative z-[120] grid gap-5" aria-label="أدوات الإدارة">
           <AdminOverviewNavLink
+            href="/admin/partners"
+            gradientClass="from-emerald-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-emerald-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(16,185,129,0.18)]"
+            eyebrow="Partner Program"
+            title="🤝 إدارة الشركاء"
+            description="إحصائيات الشركاء، التفاصيل، وطلبات السحب"
+            icon="🤝"
+          />
+          <AdminOverviewNavLink
             href="/admin/email-analytics"
             gradientClass="from-blue-500/20 to-cyan-400/10"
             hoverClasses="hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"

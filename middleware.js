@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  REFERRAL_COOKIE_MAX_AGE_SECONDS,
+  REFERRAL_COOKIE_NAME,
+  VISITOR_COOKIE_MAX_AGE_SECONDS,
+  VISITOR_COOKIE_NAME,
+  sanitizeReferralCode,
+} from "./lib/partner-shared";
 
 const ADMIN_API_PREFIX = "/api/admin";
 const ADMIN_REPLY_API = "/api/admin-reply";
@@ -24,7 +31,33 @@ function attachSecurityHeaders(response) {
   return response;
 }
 
-export function middleware(request) {
+function applyCaptureResultCookies(response, capturePayload) {
+  if (!capturePayload?.captured || !capturePayload?.code) {
+    return response;
+  }
+
+  response.cookies.set(REFERRAL_COOKIE_NAME, capturePayload.code, {
+    maxAge: REFERRAL_COOKIE_MAX_AGE_SECONDS,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+  });
+
+  if (capturePayload.setVisitorCookie && capturePayload.visitorId) {
+    response.cookies.set(VISITOR_COOKIE_NAME, capturePayload.visitorId, {
+      maxAge: VISITOR_COOKIE_MAX_AGE_SECONDS,
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+    });
+  }
+
+  return response;
+}
+
+export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const isAdminApi = isProtectedAdminApi(pathname);
 
@@ -62,7 +95,36 @@ export function middleware(request) {
     return attachSecurityHeaders(response);
   }
 
-  return attachSecurityHeaders(NextResponse.next());
+  if (pathname.startsWith("/r/")) {
+    return attachSecurityHeaders(NextResponse.next());
+  }
+
+  const referralCode = sanitizeReferralCode(request.nextUrl.searchParams.get("ref"));
+  const existingReferralCookie = request.cookies.get(REFERRAL_COOKIE_NAME)?.value;
+  const response = attachSecurityHeaders(NextResponse.next());
+
+  if (referralCode && !existingReferralCookie) {
+    try {
+      const captureUrl = new URL("/api/partner/capture-ref", request.url);
+      const captureResponse = await fetch(captureUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: request.headers.get("cookie") || "",
+        },
+        body: JSON.stringify({ code: referralCode }),
+      });
+
+      if (captureResponse.ok) {
+        const capturePayload = await captureResponse.json().catch(() => null);
+        applyCaptureResultCookies(response, capturePayload);
+      }
+    } catch {
+      // Ignore referral capture failures — page must load normally.
+    }
+  }
+
+  return response;
 }
 
 export const config = {

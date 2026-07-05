@@ -1,5 +1,9 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "../../../../lib/auth-session";
+import { linkPartnerRegistration } from "../../../../lib/partner-server";
+import { REFERRAL_COOKIE_NAME, sanitizeReferralCode } from "../../../../lib/partner-shared";
 import {
   getClientIp,
   registerIpLimiter,
@@ -54,7 +58,7 @@ export async function POST(request) {
 
     const supabase = createAuthClient();
 
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password: String(password),
       options: {
@@ -74,6 +78,29 @@ export async function POST(request) {
         },
         { status: 400 }
       );
+    }
+
+    const newUserId = signUpData?.user?.id;
+
+    if (newUserId) {
+      try {
+        const cookieStore = await cookies();
+        const referralCode = sanitizeReferralCode(
+          cookieStore.get(REFERRAL_COOKIE_NAME)?.value
+        );
+
+        if (referralCode) {
+          const admin = getSupabaseAdmin();
+
+          await linkPartnerRegistration(admin, {
+            newUserId,
+            newUsername: cleanUsername,
+            referralCode,
+          });
+        }
+      } catch (partnerError) {
+        console.error("Partner registration hook failed");
+      }
     }
 
     return NextResponse.json({ success: true });
