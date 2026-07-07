@@ -255,7 +255,26 @@ export default function PartnerCenterPage() {
       setWithdrawWallet("");
       setWithdrawNote("");
       setWithdrawConfirmed(false);
-      await loadDashboard();
+
+      if (result.withdrawal) {
+        setData((current) => {
+          if (!current) return current;
+
+          return {
+            ...current,
+            withdrawals: [result.withdrawal, ...(current.withdrawals || [])].slice(0, 20),
+            wallet: current.wallet
+              ? {
+                  ...current.wallet,
+                  canWithdraw: false,
+                  hasActiveWithdrawalRequest: true,
+                }
+              : current.wallet,
+          };
+        });
+      }
+
+      void loadDashboard({ silent: true });
     } catch (error) {
       showAppModal({
         type: "error",

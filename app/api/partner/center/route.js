@@ -36,7 +36,11 @@ export async function GET() {
         shortReferralLink,
         visitCount: Number(dashboard.partner.visit_count || 0),
         signupCount: Number(dashboard.partner.signup_count || 0),
-        activeAccountCount: Number(dashboard.partner.active_account_count || 0),
+        activeAccountCount: Number(
+          dashboard.tierProgress?.activeReferrals ??
+            dashboard.partner.active_account_count ??
+            0
+        ),
         balanceWithdrawable: Number(dashboard.partner.balance_withdrawable || 0),
         balancePending: Number(dashboard.partner.balance_pending || 0),
         balanceBonusPending: Number(dashboard.partner.balance_bonus_pending || 0),

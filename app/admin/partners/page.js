@@ -108,6 +108,8 @@ export default function AdminPartnersPage() {
   const [markPaidTarget, setMarkPaidTarget] = useState(null);
   const [markPaidNote, setMarkPaidNote] = useState("");
   const [markPaidProof, setMarkPaidProof] = useState("");
+  const [withdrawalActionModal, setWithdrawalActionModal] = useState(null);
+  const [withdrawalActionNote, setWithdrawalActionNote] = useState("");
   const [adminAnalytics, setAdminAnalytics] = useState(null);
   const [topPartners, setTopPartners] = useState([]);
   const [healthModalOpen, setHealthModalOpen] = useState(false);
@@ -264,16 +266,28 @@ export default function AdminPartnersPage() {
       return;
     }
 
-    let adminNote = "";
-
     if (action === "reject") {
-      adminNote = window.prompt("سبب الرفض:") || "";
+      setWithdrawalActionModal({ id: withdrawalId, action: "reject" });
+      setWithdrawalActionNote("");
+      return;
+    }
 
-      if (!adminNote.trim()) {
-        return;
-      }
-    } else if (action === "approve") {
-      adminNote = window.prompt("ملاحظة الإدارة (اختياري):") || "";
+    if (action === "approve") {
+      setWithdrawalActionModal({ id: withdrawalId, action: "approve" });
+      setWithdrawalActionNote("");
+      return;
+    }
+  };
+
+  const submitWithdrawalActionModal = async () => {
+    if (!withdrawalActionModal?.id || !withdrawalActionModal?.action) return;
+
+    const { id: withdrawalId, action } = withdrawalActionModal;
+    const adminNote = withdrawalActionNote.trim();
+
+    if (action === "reject" && !adminNote) {
+      setError("يرجى إدخال سبب الرفض");
+      return;
     }
 
     setActionLoadingId(`${action}-${withdrawalId}`);
@@ -284,7 +298,7 @@ export default function AdminPartnersPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ adminNote: adminNote.trim() || undefined }),
+          body: JSON.stringify({ adminNote: adminNote || undefined }),
         }
       );
 
@@ -298,6 +312,8 @@ export default function AdminPartnersPage() {
         applyWithdrawalUpdate(withdrawalId, result.withdrawal);
       }
 
+      setWithdrawalActionModal(null);
+      setWithdrawalActionNote("");
       void refreshWithdrawalSection().catch(() => {});
     } catch (actionError) {
       setError(actionError?.message || "تعذر تنفيذ العملية");
@@ -512,6 +528,75 @@ export default function AdminPartnersPage() {
                 className="admin-btn admin-btn--ghost px-5 py-2"
               >
                 إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {withdrawalActionModal ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
+          <div className="admin-modal w-full max-w-lg">
+            <h3 className="text-2xl font-black">
+              {withdrawalActionModal.action === "approve"
+                ? "قبول طلب السحب"
+                : "رفض طلب السحب"}
+            </h3>
+            <p className="admin-muted mt-2 text-sm">
+              {withdrawalActionModal.action === "approve"
+                ? "يمكنك إضافة ملاحظة اختيارية للشريك قبل تأكيد القبول."
+                : "يرجى توضيح سبب الرفض — سيصل للشريك مع الإشعار."}
+            </p>
+            <div className="mt-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold">
+                  {withdrawalActionModal.action === "approve"
+                    ? "ملاحظة الإدارة (اختياري)"
+                    : "سبب الرفض"}
+                </span>
+                <textarea
+                  value={withdrawalActionNote}
+                  onChange={(event) => setWithdrawalActionNote(event.target.value)}
+                  rows={4}
+                  className="admin-input w-full"
+                  placeholder={
+                    withdrawalActionModal.action === "approve"
+                      ? "أي ملاحظات للشريك..."
+                      : "اكتب سبب الرفض..."
+                  }
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void submitWithdrawalActionModal()}
+                disabled={
+                  actionLoadingId ===
+                  `${withdrawalActionModal.action}-${withdrawalActionModal.id}`
+                }
+                className={
+                  withdrawalActionModal.action === "approve"
+                    ? "admin-btn admin-btn--approve px-5 py-2"
+                    : "admin-btn admin-btn--reject px-5 py-2"
+                }
+              >
+                {actionLoadingId ===
+                `${withdrawalActionModal.action}-${withdrawalActionModal.id}`
+                  ? "جاري التنفيذ..."
+                  : withdrawalActionModal.action === "approve"
+                    ? "تأكيد القبول"
+                    : "تأكيد الرفض"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWithdrawalActionModal(null);
+                  setWithdrawalActionNote("");
+                }}
+                className="admin-btn admin-btn--ghost px-5 py-2"
+              >
+                إلغاء
               </button>
             </div>
           </div>
