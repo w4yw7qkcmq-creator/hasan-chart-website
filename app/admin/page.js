@@ -1222,52 +1222,45 @@ export default function AdminPage() {
                 </button>
 
                 {adminNotificationsOpen && (
-                  <div className="admin-notifications-panel absolute right-0 top-full mt-3 w-[min(96vw,680px)] overflow-hidden rounded-[32px] border border-cyan-200/80 bg-white/98 text-right text-slate-950 shadow-[0_28px_100px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
-                    <div className="border-b border-slate-200/90 bg-gradient-to-l from-cyan-50 via-white to-white px-5 py-4 md:px-6">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
-                            Admin Notifications
-                          </p>
-                          <h3 className="mt-1 text-2xl font-black text-slate-950">مركز إشعارات الأدمن</h3>
-                          <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
-                            آخر الطلبات والتنبيهات التي تحتاج متابعة.
-                          </p>
-                        </div>
-                        <div className="admin-notifications-panel__actions">
-                          <span className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-800">
-                            {adminNotifications.length} إشعار
-                          </span>
+                  <div
+                    className="admin-notifications-dropdown"
+                    role="dialog"
+                    aria-label="إشعارات الأدمن"
+                  >
+                    <div className="admin-notifications-dropdown__header">
+                      <div>
+                        <p className="admin-notifications-dropdown__title">إشعارات الأدمن</p>
+                        <p className="admin-notifications-dropdown__meta">
+                          {adminNotifications.length} إشعار
+                          {adminUnreadCount > 0 ? ` · ${adminUnreadCount} جديد` : ""}
+                        </p>
+                      </div>
+                      <div className="admin-notifications-panel__actions">
+                        <button
+                          type="button"
+                          onClick={() => void loadAdminData()}
+                          className="admin-notifications-panel__action"
+                        >
+                          تحديث
+                        </button>
+                        {adminUnreadCount > 0 ? (
                           <button
                             type="button"
-                            onClick={() => void loadAdminData()}
+                            onClick={handleMarkAllAdminNotificationsRead}
                             className="admin-notifications-panel__action"
                           >
-                            تحديث الآن
+                            مقروء
                           </button>
-                          {adminUnreadCount > 0 ? (
-                            <button
-                              type="button"
-                              onClick={handleMarkAllAdminNotificationsRead}
-                              className="admin-notifications-panel__action"
-                            >
-                              تعليم الكل كمقروء
-                            </button>
-                          ) : null}
-                        </div>
+                        ) : null}
                       </div>
                     </div>
 
                     {adminNotifications.length === 0 ? (
-                      <div className="px-6 py-12 text-center">
-                        <p className="text-4xl">✅</p>
-                        <p className="mt-4 text-xl font-black text-slate-950">لا توجد طلبات جديدة</p>
-                        <p className="mt-2 text-sm font-bold leading-7 text-slate-600">
-                          طلبات الاشتراك وإدارة الحسابات الجديدة ستظهر هنا فور وصولها.
-                        </p>
+                      <div className="admin-notifications-dropdown__empty">
+                        لا توجد إشعارات جديدة حالياً
                       </div>
                     ) : (
-                      <div className="max-h-[min(70vh,560px)] space-y-4 overflow-y-auto px-4 py-4 md:px-5 md:py-5">
+                      <div className="admin-notifications-dropdown__list">
                         {adminNotifications.map((item) => (
                           <button
                             key={item.id}
@@ -1290,28 +1283,20 @@ export default function AdminPage() {
                                 window.location.href = item.url || "/admin/partners";
                               }
                             }}
-                            className="w-full rounded-[24px] border border-cyan-100 bg-gradient-to-l from-white via-cyan-50/40 to-white p-5 text-right transition hover:border-cyan-300 hover:bg-cyan-50/80"
+                            className="admin-notifications-dropdown__item"
                           >
-                            <div className="flex items-start gap-4">
-                              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-200 bg-white text-3xl shadow-sm">
-                                {item.icon}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-lg font-black leading-7 text-slate-950">{item.title}</p>
-                                  {!isAdminDashboardNotificationAcknowledged(item.id) && (
-                                    <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-black text-red-700">
-                                      جديد
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mt-2 whitespace-normal break-words text-sm font-bold leading-7 text-slate-700">
-                                  {item.message}
-                                </p>
-                                {item.createdAt && (
-                                  <p className="mt-3 text-xs font-bold text-slate-500">{item.createdAt}</p>
+                            <span className="admin-notifications-dropdown__icon">{item.icon}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="admin-notifications-dropdown__item-title">{item.title}</p>
+                                {!isAdminDashboardNotificationAcknowledged(item.id) && (
+                                  <span className="admin-notifications-dropdown__badge">جديد</span>
                                 )}
                               </div>
+                              <p className="admin-notifications-dropdown__item-message">{item.message}</p>
+                              {item.createdAt ? (
+                                <p className="admin-notifications-dropdown__item-time">{item.createdAt}</p>
+                              ) : null}
                             </div>
                           </button>
                         ))}

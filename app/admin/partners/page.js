@@ -26,13 +26,13 @@ function AdminStatCard({ title, value, icon }) {
 }
 
 function StatusBadge({ status }) {
-  const styles = {
-    pending: "border-amber-200 bg-amber-50 text-amber-800",
-    approved: "border-blue-200 bg-blue-50 text-blue-800",
-    rejected: "border-red-200 bg-red-50 text-red-800",
-    paid: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    active: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    suspended: "border-red-200 bg-red-50 text-red-800",
+  const badgeClass = {
+    pending: "admin-badge--pending",
+    approved: "admin-badge--approved",
+    rejected: "admin-badge--rejected",
+    paid: "admin-badge--paid",
+    active: "admin-badge--active",
+    suspended: "admin-badge--suspended",
   };
 
   const labels = {
@@ -45,11 +45,7 @@ function StatusBadge({ status }) {
   };
 
   return (
-    <span
-      className={`rounded-full border px-3 py-1 text-xs font-black ${
-        styles[status] || "border-slate-200 bg-slate-50 text-slate-700"
-      }`}
-    >
+    <span className={`admin-badge ${badgeClass[status] || "admin-badge--suspended"}`}>
       {labels[status] || status}
     </span>
   );
@@ -66,6 +62,28 @@ function formatDate(value) {
   } catch {
     return value;
   }
+}
+
+function patchWithdrawalFromApi(existing, raw) {
+  if (!raw) return existing;
+
+  return {
+    ...(existing || {}),
+    id: raw.id ?? existing?.id,
+    partnerId: raw.partner_id ?? existing?.partnerId,
+    amount: Number(raw.amount ?? existing?.amount ?? 0),
+    currency: raw.currency ?? existing?.currency,
+    network: raw.network ?? existing?.network,
+    walletAddress: raw.wallet_address ?? existing?.walletAddress,
+    status: raw.status ?? existing?.status,
+    adminNote: raw.admin_note ?? existing?.adminNote ?? null,
+    partnerNote: raw.partner_note ?? existing?.partnerNote ?? null,
+    createdAt: raw.created_at ?? existing?.createdAt,
+    approvedAt: raw.approved_at ?? existing?.approvedAt ?? null,
+    rejectedAt: raw.rejected_at ?? existing?.rejectedAt ?? null,
+    paidAt: raw.paid_at ?? existing?.paidAt ?? null,
+    partner: existing?.partner ?? null,
+  };
 }
 
 export default function AdminPartnersPage() {
@@ -181,6 +199,32 @@ export default function AdminPartnersPage() {
     }
   }, [loadPartners, loadWithdrawals, loadCommissionRules, loadAdminAnalytics]);
 
+  const refreshWithdrawalSection = useCallback(async () => {
+    await Promise.all([loadWithdrawals(), loadPartners()]);
+  }, [loadWithdrawals, loadPartners]);
+
+  const applyWithdrawalUpdate = useCallback(
+    (withdrawalId, rawWithdrawal) => {
+      setWithdrawals((current) => {
+        const updated = current.map((item) =>
+          item.id === withdrawalId ? patchWithdrawalFromApi(item, rawWithdrawal) : item
+        );
+
+        if (withdrawalStatus === "all") {
+          return updated;
+        }
+
+        const changed = updated.find((item) => item.id === withdrawalId);
+        if (changed && changed.status !== withdrawalStatus) {
+          return updated.filter((item) => item.id !== withdrawalId);
+        }
+
+        return updated;
+      });
+    },
+    [withdrawalStatus]
+  );
+
   useEffect(() => {
     void reloadAll();
   }, []);
@@ -240,7 +284,11 @@ export default function AdminPartnersPage() {
         throw new Error(result?.error || "تعذر تنفيذ العملية");
       }
 
-      await reloadAll();
+      if (result.withdrawal) {
+        applyWithdrawalUpdate(withdrawalId, result.withdrawal);
+      }
+
+      void refreshWithdrawalSection().catch(() => {});
     } catch (actionError) {
       setError(actionError?.message || "تعذر تنفيذ العملية");
     } finally {
@@ -291,7 +339,12 @@ export default function AdminPartnersPage() {
       setMarkPaidTarget(null);
       setMarkPaidNote("");
       setMarkPaidProof("");
-      await reloadAll();
+
+      if (result.withdrawal) {
+        applyWithdrawalUpdate(markPaidTarget.id, result.withdrawal);
+      }
+
+      void refreshWithdrawalSection().catch(() => {});
     } catch (actionError) {
       setError(actionError?.message || "تعذر تسجيل الدفع");
     } finally {
@@ -333,38 +386,32 @@ export default function AdminPartnersPage() {
 
   if (loading) {
     return (
-      <main className="rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white">
-        <p className="text-slate-300">جاري تحميل Admin Partner Center...</p>
+      <main className="admin-theme-page admin-panel p-6">
+        <p className="admin-muted">جاري تحميل Admin Partner Center...</p>
       </main>
     );
   }
 
   return (
-    <main className="admin-theme-page space-y-8 rounded-[34px] border border-cyan-300/10 bg-[#020617] p-4 text-white md:p-6">
+    <main className="admin-theme-page admin-panel space-y-8 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-cyan-200/70">Admin Partner Center</p>
+          <p className="text-sm font-bold text-cyan-300">Admin Partner Center</p>
           <h1 className="mt-2 text-3xl font-black">إدارة برنامج الشركاء</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="admin-subheading">
             إدارة الشركاء، الإحصائيات، وطلبات السحب — بدون دفع تلقائي.
           </p>
         </div>
         <Link
           href="/admin/partners/settings"
-          className="rounded-2xl border border-emerald-300/20 px-4 py-2 text-sm font-black text-emerald-100"
+          className="admin-btn admin-btn--ghost px-4 py-2 text-sm"
         >
           ⚙️ Automation Settings
         </Link>
-        <Link
-          href="/api/admin/partner-health"
-          className="rounded-2xl border border-amber-300/20 px-4 py-2 text-sm font-black text-amber-100"
-        >
+        <Link href="/api/admin/partner-health" className="admin-btn admin-btn--ghost px-4 py-2 text-sm">
           🩺 Health Check
         </Link>
-        <Link
-          href="/admin"
-          className="rounded-2xl border border-cyan-300/20 px-4 py-2 text-sm font-black text-cyan-100"
-        >
+        <Link href="/admin" className="admin-btn admin-btn--ghost px-4 py-2 text-sm">
           ← العودة للوحة الإدارة
         </Link>
       </header>
@@ -406,10 +453,12 @@ export default function AdminPartnersPage() {
               <button
                 type="button"
                 onClick={() => void submitMarkPaid()}
-                disabled={Boolean(actionLoadingId)}
+                disabled={actionLoadingId === `mark-paid-${markPaidTarget.id}`}
                 className="admin-btn admin-btn--paid px-5 py-2"
               >
-                {actionLoadingId ? "جاري التسجيل..." : "تأكيد الدفع"}
+                {actionLoadingId === `mark-paid-${markPaidTarget.id}`
+                  ? "جاري التسجيل..."
+                  : "تأكيد الدفع"}
               </button>
               <button
                 type="button"
@@ -433,9 +482,9 @@ export default function AdminPartnersPage() {
         ))}
       </section>
 
-      <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-        <h2 className="text-xl font-black">Partner Analytics</h2>
-        <p className="mt-2 text-sm text-slate-400">إحصائيات برنامج الشركاء — Aggregation عبر SQL RPC</p>
+      <section className="admin-surface p-5">
+        <h2 className="admin-heading">Partner Analytics</h2>
+        <p className="admin-subheading">إحصائيات برنامج الشركاء — Aggregation عبر SQL RPC</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <AdminStatCard title="عدد الشركاء" value={adminAnalytics?.totalPartners ?? 0} icon="🤝" />
           <AdminStatCard title="الشركاء النشطين" value={adminAnalytics?.activePartners ?? 0} icon="✅" />
@@ -457,76 +506,67 @@ export default function AdminPartnersPage() {
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="admin-surface p-4">
             <h3 className="font-black">أعلى 10 شركاء</h3>
             <div className="mt-3 space-y-2">
               {topPartners.map((partner) => (
                 <Link
                   key={partner.partnerId}
                   href={`/admin/partners/${partner.partnerId}`}
-                  className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 hover:border-cyan-300/30"
+                  className="admin-list-item"
                 >
-                  <span>{partner.username}</span>
-                  <span className="text-emerald-200">{formatPartnerMoney(partner.totalSales)}</span>
+                  <span className="font-bold">{partner.username}</span>
+                  <span className="font-black text-emerald-300">{formatPartnerMoney(partner.totalSales)}</span>
                 </Link>
               ))}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="admin-surface p-4">
             <h3 className="font-black">أكثر الخدمات مبيعاً</h3>
             <div className="mt-3 space-y-2">
               {(adminAnalytics?.topServices || []).map((item) => (
-                <div
-                  key={item.serviceType}
-                  className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2"
-                >
+                <div key={item.serviceType} className="admin-list-item">
                   <span className="font-mono">{item.serviceType}</span>
-                  <span>{formatPartnerMoney(item.sales)}</span>
+                  <span className="font-black">{formatPartnerMoney(item.sales)}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="admin-surface p-4">
             <h3 className="font-black">أكثر المستويات انتشاراً</h3>
             <div className="mt-3 space-y-2">
               {(adminAnalytics?.topTiers || []).map((item) => (
-                <div
-                  key={item.tierKey}
-                  className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2"
-                >
+                <div key={item.tierKey} className="admin-list-item">
                   <span>{item.tierName}</span>
-                  <span>{item.count}</span>
+                  <span className="font-black">{item.count}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="admin-surface p-4">
             <h3 className="font-black">آخر التسجيلات</h3>
             <div className="mt-3 space-y-2">
               {(adminAnalytics?.latestSignups || []).map((item) => (
-                <div key={item.id} className="rounded-xl border border-white/10 px-3 py-2 text-sm">
+                <div key={item.id} className="admin-list-item text-sm">
                   <p className="font-bold">{item.username || "عميل"}</p>
-                  <p className="text-slate-400">{formatDate(item.registeredAt)}</p>
+                  <p className="admin-muted">{formatDate(item.registeredAt)}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 lg:col-span-2">
+          <div className="admin-surface p-4 lg:col-span-2">
             <h3 className="font-black">آخر عمليات السحب</h3>
             <div className="mt-3 space-y-2">
               {(adminAnalytics?.latestWithdrawals || []).map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm"
-                >
+                <div key={item.id} className="admin-list-item text-sm">
                   <span>
                     {formatPartnerMoney(item.amount)} {item.currency} · {item.network}
                   </span>
-                  <span className="text-slate-400">{formatDate(item.createdAt)}</span>
+                  <span className="admin-muted">{formatDate(item.createdAt)}</span>
                   <StatusBadge status={item.status} />
                 </div>
               ))}
@@ -536,48 +576,48 @@ export default function AdminPartnersPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-          <h2 className="text-xl font-black">أفضل الشركاء — التسجيلات</h2>
+        <div className="admin-surface p-5">
+          <h2 className="admin-heading">أفضل الشركاء — التسجيلات</h2>
           <div className="mt-4 space-y-3">
             {(summary?.topBySignups || []).map((partner) => (
               <Link
                 key={partner.id}
                 href={`/admin/partners/${partner.id}`}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition hover:border-cyan-300/30"
+                className="admin-list-item"
               >
                 <span className="font-bold">{partner.username}</span>
-                <span className="text-cyan-200">{partner.signupCount} تسجيل</span>
+                <span className="font-black text-cyan-300">{partner.signupCount} تسجيل</span>
               </Link>
             ))}
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-          <h2 className="text-xl font-black">أفضل الشركاء — الأرباح</h2>
+        <div className="admin-surface p-5">
+          <h2 className="admin-heading">أفضل الشركاء — الأرباح</h2>
           <div className="mt-4 space-y-3">
             {(summary?.topByEarnings || []).map((partner) => (
               <Link
                 key={partner.id}
                 href={`/admin/partners/${partner.id}`}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition hover:border-cyan-300/30"
+                className="admin-list-item"
               >
                 <span className="font-bold">{partner.username}</span>
-                <span className="text-emerald-200">{formatPartnerMoney(partner.totalEarnings)}</span>
+                <span className="font-black text-emerald-300">{formatPartnerMoney(partner.totalEarnings)}</span>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
+      <section className="admin-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-xl font-black">جدول الشركاء</h2>
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <span>فلتر المستوى:</span>
+          <h2 className="admin-heading">جدول الشركاء</h2>
+          <label className="flex items-center gap-2 text-sm font-bold">
+            <span className="admin-muted">فلتر المستوى:</span>
             <select
               value={tierFilter}
               onChange={(event) => setTierFilter(event.target.value)}
-              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white"
+              className="admin-select"
             >
               <option value="all">الكل</option>
               {tiers.map((tier) => (
@@ -588,45 +628,45 @@ export default function AdminPartnersPage() {
             </select>
           </label>
         </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div className="mt-4 admin-table-wrap">
+          <table className="admin-table">
             <thead>
-              <tr className="border-b border-white/10 text-right text-slate-300">
-                <th className="px-3 py-3">الشريك</th>
-                <th className="px-3 py-3">البريد</th>
-                <th className="px-3 py-3">Referral Code</th>
-                <th className="px-3 py-3">المستوى</th>
-                <th className="px-3 py-3">العمولة %</th>
-                <th className="px-3 py-3">زيارات</th>
-                <th className="px-3 py-3">تسجيلات</th>
-                <th className="px-3 py-3">نشط</th>
-                <th className="px-3 py-3">قابل للسحب</th>
-                <th className="px-3 py-3">معلق</th>
-                <th className="px-3 py-3">مكافآت</th>
-                <th className="px-3 py-3">إجمالي</th>
-                <th className="px-3 py-3">الحالة</th>
+              <tr>
+                <th>الشريك</th>
+                <th>البريد</th>
+                <th>Referral Code</th>
+                <th>المستوى</th>
+                <th>العمولة %</th>
+                <th>زيارات</th>
+                <th>تسجيلات</th>
+                <th>نشط</th>
+                <th>قابل للسحب</th>
+                <th>معلق</th>
+                <th>مكافآت</th>
+                <th>إجمالي</th>
+                <th>الحالة</th>
               </tr>
             </thead>
             <tbody>
               {filteredPartners.map((partner) => (
-                <tr key={partner.id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                  <td className="px-3 py-3">
-                    <Link href={`/admin/partners/${partner.id}`} className="font-bold text-cyan-200">
+                <tr key={partner.id}>
+                  <td>
+                    <Link href={`/admin/partners/${partner.id}`} className="admin-link">
                       {partner.username}
                     </Link>
                   </td>
-                  <td className="px-3 py-3">{partner.email}</td>
-                  <td className="px-3 py-3 font-mono">{partner.referralCode}</td>
-                  <td className="px-3 py-3">{partner.tierName}</td>
-                  <td className="px-3 py-3">{partner.commissionPercent}%</td>
-                  <td className="px-3 py-3">{partner.visitCount}</td>
-                  <td className="px-3 py-3">{partner.signupCount}</td>
-                  <td className="px-3 py-3">{partner.activeAccountCount}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(partner.balanceWithdrawable)}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(partner.balancePending)}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(partner.balanceBonusPending)}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(partner.totalEarnings)}</td>
-                  <td className="px-3 py-3">
+                  <td>{partner.email}</td>
+                  <td className="font-mono">{partner.referralCode}</td>
+                  <td>{partner.tierName}</td>
+                  <td>{partner.commissionPercent}%</td>
+                  <td>{partner.visitCount}</td>
+                  <td>{partner.signupCount}</td>
+                  <td>{partner.activeAccountCount}</td>
+                  <td>{formatPartnerMoney(partner.balanceWithdrawable)}</td>
+                  <td>{formatPartnerMoney(partner.balancePending)}</td>
+                  <td>{formatPartnerMoney(partner.balanceBonusPending)}</td>
+                  <td>{formatPartnerMoney(partner.totalEarnings)}</td>
+                  <td>
                     <StatusBadge status={partner.status} />
                   </td>
                 </tr>
@@ -636,32 +676,32 @@ export default function AdminPartnersPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-        <h2 className="text-xl font-black">Partner Tiers</h2>
-        <p className="mt-2 text-sm text-slate-400">
+      <section className="admin-surface p-5">
+        <h2 className="admin-heading">Partner Tiers</h2>
+        <p className="admin-subheading">
           مستويات الشركاء ونسب العمولة — عرض فقط في هذه المرحلة.
         </p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div className="mt-4 admin-table-wrap">
+          <table className="admin-table">
             <thead>
-              <tr className="border-b border-white/10 text-right text-slate-300">
-                <th className="px-3 py-3">tier_key</th>
-                <th className="px-3 py-3">tier_name</th>
-                <th className="px-3 py-3">commission_percent</th>
-                <th className="px-3 py-3">min_active_referrals</th>
-                <th className="px-3 py-3">min_total_sales</th>
-                <th className="px-3 py-3">sort_order</th>
+              <tr>
+                <th>tier_key</th>
+                <th>tier_name</th>
+                <th>commission_percent</th>
+                <th>min_active_referrals</th>
+                <th>min_total_sales</th>
+                <th>sort_order</th>
               </tr>
             </thead>
             <tbody>
               {tiers.map((tier) => (
-                <tr key={tier.tier_key} className="border-b border-white/5 hover:bg-white/[0.03]">
-                  <td className="px-3 py-3 font-mono">{tier.tier_key}</td>
-                  <td className="px-3 py-3">{tier.tier_name}</td>
-                  <td className="px-3 py-3">{tier.commission_percent}%</td>
-                  <td className="px-3 py-3">{tier.min_active_referrals}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(tier.min_total_sales)}</td>
-                  <td className="px-3 py-3">{tier.sort_order}</td>
+                <tr key={tier.tier_key}>
+                  <td className="font-mono">{tier.tier_key}</td>
+                  <td>{tier.tier_name}</td>
+                  <td>{tier.commission_percent}%</td>
+                  <td>{tier.min_active_referrals}</td>
+                  <td>{formatPartnerMoney(tier.min_total_sales)}</td>
+                  <td>{tier.sort_order}</td>
                 </tr>
               ))}
             </tbody>
@@ -669,32 +709,32 @@ export default function AdminPartnersPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-        <h2 className="text-xl font-black">Commission Rules</h2>
-        <p className="mt-2 text-sm text-slate-400">
+      <section className="admin-surface p-5">
+        <h2 className="admin-heading">Commission Rules</h2>
+        <p className="admin-subheading">
           قواعد العمولات العامة لكل خدمة — عرض فقط في هذه المرحلة.
         </p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div className="mt-4 admin-table-wrap">
+          <table className="admin-table">
             <thead>
-              <tr className="border-b border-white/10 text-right text-slate-300">
-                <th className="px-3 py-3">service_type</th>
-                <th className="px-3 py-3">commission_percent</th>
-                <th className="px-3 py-3">commission_mode</th>
-                <th className="px-3 py-3">active</th>
-                <th className="px-3 py-3">notes</th>
+              <tr>
+                <th>service_type</th>
+                <th>commission_percent</th>
+                <th>commission_mode</th>
+                <th>active</th>
+                <th>notes</th>
               </tr>
             </thead>
             <tbody>
               {commissionRules.map((rule) => (
-                <tr key={rule.service_type} className="border-b border-white/5 hover:bg-white/[0.03]">
-                  <td className="px-3 py-3 font-mono">{rule.service_type}</td>
-                  <td className="px-3 py-3">{rule.commission_percent}%</td>
-                  <td className="px-3 py-3">{rule.commission_mode}</td>
-                  <td className="px-3 py-3">
+                <tr key={rule.service_type}>
+                  <td className="font-mono">{rule.service_type}</td>
+                  <td>{rule.commission_percent}%</td>
+                  <td>{rule.commission_mode}</td>
+                  <td>
                     <StatusBadge status={rule.is_active ? "active" : "suspended"} />
                   </td>
-                  <td className="px-3 py-3">{rule.notes || "—"}</td>
+                  <td>{rule.notes || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -702,11 +742,11 @@ export default function AdminPartnersPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
+      <section className="admin-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black">Wallet & Withdrawals</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <h2 className="admin-heading">Wallet & Withdrawals</h2>
+            <p className="admin-subheading">
               إدارة طلبات السحب — الخصم من الرصيد يتم فقط عند Mark as Paid
             </p>
           </div>
@@ -716,10 +756,10 @@ export default function AdminPartnersPage() {
                 key={status}
                 type="button"
                 onClick={() => setWithdrawalStatus(status)}
-                className={`rounded-full px-4 py-2 text-xs font-black ${
+                className={`admin-filter-btn ${
                   withdrawalStatus === status
-                    ? "bg-cyan-400 text-slate-900"
-                    : "border border-white/10 bg-black/20 text-slate-200"
+                    ? "admin-filter-btn--active"
+                    : "admin-filter-btn--idle"
                 }`}
               >
                 {status}
@@ -729,12 +769,12 @@ export default function AdminPartnersPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <span>الشبكة:</span>
+          <label className="flex items-center gap-2 text-sm font-bold">
+            <span className="admin-muted">الشبكة:</span>
             <select
               value={withdrawalNetwork}
               onChange={(event) => setWithdrawalNetwork(event.target.value)}
-              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white"
+              className="admin-select"
             >
               <option value="all">الكل</option>
               {WITHDRAWAL_NETWORKS.map((network) => (
@@ -749,7 +789,7 @@ export default function AdminPartnersPage() {
             value={withdrawalSearch}
             onChange={(event) => setWithdrawalSearch(event.target.value)}
             placeholder="بحث بالبريد أو اسم الشريك..."
-            className="min-w-[240px] flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-sm text-white"
+            className="admin-input min-w-[240px] flex-1 text-sm"
           />
         </div>
 
@@ -770,29 +810,29 @@ export default function AdminPartnersPage() {
             </thead>
             <tbody>
               {withdrawals.map((item) => (
-                <tr key={item.id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                  <td className="px-3 py-3">{item.partner?.username || "—"}</td>
-                  <td className="px-3 py-3">{item.partner?.email || "—"}</td>
-                  <td className="px-3 py-3">{formatPartnerMoney(item.amount)}</td>
-                  <td className="px-3 py-3">{item.currency}</td>
-                  <td className="px-3 py-3">{item.network}</td>
-                  <td className="px-3 py-3">
+                <tr key={item.id}>
+                  <td>{item.partner?.username || "—"}</td>
+                  <td>{item.partner?.email || "—"}</td>
+                  <td className="font-black">{formatPartnerMoney(item.amount)}</td>
+                  <td>{item.currency}</td>
+                  <td>{item.network}</td>
+                  <td>
                     <div className="flex max-w-[320px] items-center gap-2">
                       <span className="break-all font-mono text-xs">{item.walletAddress}</span>
                       <button
                         type="button"
                         onClick={() => void copyWalletAddress(item.walletAddress)}
-                        className="shrink-0 rounded-lg border border-white/10 px-2 py-1 text-xs font-black"
+                        className="admin-btn admin-btn--ghost shrink-0 px-2 py-1 text-xs"
                       >
                         نسخ
                       </button>
                     </div>
                   </td>
-                  <td className="px-3 py-3">{formatDate(item.createdAt)}</td>
-                  <td className="px-3 py-3">
+                  <td>{formatDate(item.createdAt)}</td>
+                  <td>
                     <StatusBadge status={item.status} />
                   </td>
-                  <td className="px-3 py-3">
+                  <td>
                     <div className="flex flex-wrap gap-2">
                       {item.status === "pending" ? (
                         <button
@@ -801,7 +841,7 @@ export default function AdminPartnersPage() {
                           onClick={() => void runWithdrawalAction(item.id, "approve")}
                           className="admin-btn admin-btn--approve"
                         >
-                          Approve
+                          {actionLoadingId === `approve-${item.id}` ? "جاري..." : "Approve"}
                         </button>
                       ) : null}
                       {item.status === "approved" ? (
@@ -811,7 +851,7 @@ export default function AdminPartnersPage() {
                           onClick={() => void runWithdrawalAction(item.id, "mark-paid")}
                           className="admin-btn admin-btn--paid"
                         >
-                          Mark as Paid
+                          {actionLoadingId === `mark-paid-${item.id}` ? "جاري..." : "Mark as Paid"}
                         </button>
                       ) : null}
                       {["pending", "approved"].includes(item.status) ? (
@@ -821,7 +861,7 @@ export default function AdminPartnersPage() {
                           onClick={() => void runWithdrawalAction(item.id, "reject")}
                           className="admin-btn admin-btn--reject"
                         >
-                          Reject
+                          {actionLoadingId === `reject-${item.id}` ? "جاري..." : "Reject"}
                         </button>
                       ) : null}
                     </div>
