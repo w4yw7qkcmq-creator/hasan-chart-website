@@ -203,7 +203,7 @@ export function PartnerAnalyticsDashboard() {
         <div className="user-dashboard-panel__header">
           <h2 className="user-dashboard-panel__title">Top Referrals</h2>
         </div>
-        <div className="user-dashboard-panel__body overflow-x-auto">
+        <div className="user-dashboard-panel__body partner-scroll-panel partner-scroll-panel--table">
           <table className="partner-table">
             <thead>
               <tr>
@@ -256,7 +256,7 @@ export function PartnerAnalyticsDashboard() {
               </select>
             </div>
           </div>
-          <div className="user-dashboard-panel__body overflow-x-auto">
+          <div className="user-dashboard-panel__body partner-scroll-panel partner-scroll-panel--table">
             <table className="partner-table">
               <thead>
                 <tr>

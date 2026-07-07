@@ -19,7 +19,9 @@ export default function NotificationsPage() {
           </p>
         </div>
 
-        <NotificationHub onPanelOpenChange={setNotificationPanelOpen} />
+        <div className="notificationsPage__hub">
+          <NotificationHub onPanelOpenChange={setNotificationPanelOpen} />
+        </div>
 
         <p className="mt-4 text-center text-xs font-bold text-slate-500">
           <Link href="/" className="notificationsPage__action inline-flex rounded-xl border px-3 py-2">

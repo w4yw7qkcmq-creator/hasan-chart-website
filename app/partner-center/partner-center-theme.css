@@ -565,3 +565,19 @@ html[data-theme="light"] .partner-alert-warn {
   font-size: 0.875rem;
   color: var(--ud-muted);
 }
+
+/* Scroll panels — fixed height, internal scroll (like admin) */
+.partner-scroll-panel {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.partner-scroll-panel--list {
+  max-height: 420px;
+}
+
+.partner-scroll-panel--table {
+  max-height: 480px;
+}

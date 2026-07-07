@@ -105,8 +105,10 @@ export default function PartnerCenterPage() {
   const [withdrawConfirmed, setWithdrawConfirmed] = useState(false);
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
 
     try {
       const [centerResponse, walletResponse] = await Promise.all([
@@ -140,13 +142,44 @@ export default function PartnerCenterPage() {
         message: error?.message || "تعذر تحميل البيانات",
       });
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [showAppModal]);
 
   useEffect(() => {
     if (sessionPending || !isAuthenticated) return;
     void loadDashboard();
+  }, [sessionPending, isAuthenticated, loadDashboard]);
+
+  useEffect(() => {
+    if (sessionPending || !isAuthenticated) return;
+
+    const refreshSilently = () => {
+      void loadDashboard({ silent: true });
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) {
+        refreshSilently();
+      }
+    }, 30000);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshSilently();
+      }
+    };
+
+    window.addEventListener("focus", refreshSilently);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshSilently);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [sessionPending, isAuthenticated, loadDashboard]);
 
   const partner = data?.partner;
@@ -543,7 +576,7 @@ export default function PartnerCenterPage() {
 
           <Panel title="سجل الإحالات" subtitle="المستخدمون الذين سجّلوا عبر رابطك">
             {data.referrals?.length ? (
-              <div className="space-y-3">
+              <div className="partner-scroll-panel partner-scroll-panel--list space-y-3">
                 {data.referrals.map((item) => (
                   <article key={item.id} className="user-dashboard-list-item">
                     <div className="user-dashboard-list-item__head">
@@ -569,7 +602,7 @@ export default function PartnerCenterPage() {
 
           <Panel title="سجل العمولات" subtitle="تفاصيل كل عمولة: الخدمة، السبب، النسبة، المبلغ، الحالة، والتاريخ">
             {data.commissions?.length ? (
-              <div className="space-y-3">
+              <div className="partner-scroll-panel partner-scroll-panel--list space-y-3">
                 {data.commissions.map((item) => (
                   <article key={item.id} className="user-dashboard-list-item">
                     <div className="user-dashboard-list-item__head">
@@ -734,9 +767,10 @@ export default function PartnerCenterPage() {
                 )}
 
               {data.withdrawals?.length ? (
-                <div className="partner-divider space-y-3">
+                <div className="partner-divider">
                   <h3 className="partner-divider__title">طلبات السحب السابقة</h3>
-                  {data.withdrawals.map((item) => (
+                  <div className="partner-scroll-panel partner-scroll-panel--list mt-3 space-y-3">
+                    {data.withdrawals.map((item) => (
                     <article key={item.id} className="user-dashboard-list-item">
                       <div className="user-dashboard-list-item__head">
                         <div className="user-dashboard-list-item__main">
@@ -755,7 +789,8 @@ export default function PartnerCenterPage() {
                         </span>
                       </div>
                     </article>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>

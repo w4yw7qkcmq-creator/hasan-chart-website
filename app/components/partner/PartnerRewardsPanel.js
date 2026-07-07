@@ -20,8 +20,10 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
   const [rewards, setRewards] = useState(initialRewards);
   const [loading, setLoading] = useState(!initialRewards);
 
-  const loadRewards = useCallback(async () => {
-    setLoading(true);
+  const loadRewards = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
 
     try {
       const response = await fetch("/api/partner/rewards", {
@@ -34,7 +36,9 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
         setRewards(result.rewards);
       }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -43,6 +47,33 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
       void loadRewards();
     }
   }, [initialRewards, loadRewards]);
+
+  useEffect(() => {
+    const refreshSilently = () => {
+      void loadRewards({ silent: true });
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) {
+        refreshSilently();
+      }
+    }, 30000);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshSilently();
+      }
+    };
+
+    window.addEventListener("focus", refreshSilently);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshSilently);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadRewards]);
 
   if (loading && !rewards) {
     return (
@@ -70,8 +101,9 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
           </div>
         </div>
         <div className="user-dashboard-panel__body">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {achievements.map((item) => (
+          <div className="partner-scroll-panel partner-scroll-panel--list">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {achievements.map((item) => (
               <div
                 key={item.key}
                 className={`partner-surface partner-surface--p4 ${
@@ -94,6 +126,7 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         </div>
       </section>
@@ -129,7 +162,8 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
           <h2 className="user-dashboard-panel__title">Notifications</h2>
         </div>
         <div className="user-dashboard-panel__body space-y-3">
-          {notifications.map((item) => (
+          <div className="partner-scroll-panel partner-scroll-panel--list space-y-3">
+            {notifications.map((item) => (
             <article
               key={item.id}
               className={`partner-surface partner-surface--p4 ${
@@ -143,7 +177,8 @@ export function PartnerRewardsPanel({ initialRewards = null }) {
               {item.body ? <p className="partner-notification-card__body">{item.body}</p> : null}
               <p className="partner-notification-type">{item.type}</p>
             </article>
-          ))}
+            ))}
+          </div>
           {!notifications.length ? (
             <p className="partner-muted">
               لا توجد إشعارات بعد — ستصل تلقائياً عند الترقية أو العمولات أو المكافآت.
