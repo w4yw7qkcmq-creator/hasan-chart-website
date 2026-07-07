@@ -8,6 +8,12 @@ import { formatPartnerMoney, WITHDRAWAL_NETWORKS } from "../../../lib/partner-sh
 
 const WITHDRAWAL_STATUSES = ["all", "pending", "approved", "rejected", "paid"];
 
+const HEALTH_CHECK_LABELS = {
+  settings: "إعدادات البرنامج",
+  tiers: "مستويات الشركاء",
+  commissionRules: "قواعد العمولات",
+};
+
 function AdminStatCard({ title, value, icon }) {
   return (
     <div className="admin-stat-card relative overflow-hidden">
@@ -104,6 +110,10 @@ export default function AdminPartnersPage() {
   const [markPaidProof, setMarkPaidProof] = useState("");
   const [adminAnalytics, setAdminAnalytics] = useState(null);
   const [topPartners, setTopPartners] = useState([]);
+  const [healthModalOpen, setHealthModalOpen] = useState(false);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthResult, setHealthResult] = useState(null);
+  const [healthError, setHealthError] = useState("");
 
   const loadPartners = useCallback(async () => {
     const response = await adminFetch("/api/admin/partners", {
@@ -360,6 +370,31 @@ export default function AdminPartnersPage() {
     return partners.filter((partner) => partner.tierKey === tierFilter);
   }, [partners, tierFilter]);
 
+  const runHealthCheck = async () => {
+    setHealthModalOpen(true);
+    setHealthLoading(true);
+    setHealthResult(null);
+    setHealthError("");
+
+    try {
+      const response = await adminFetch("/api/admin/partner-health", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر فحص صحة النظام");
+      }
+
+      setHealthResult(result.health || null);
+    } catch (healthCheckError) {
+      setHealthError(healthCheckError?.message || "تعذر فحص صحة النظام");
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
   const topCards = useMemo(
     () => [
       { title: "إجمالي الشركاء", value: summary?.totalPartners ?? 0, icon: "🤝" },
@@ -408,9 +443,13 @@ export default function AdminPartnersPage() {
         >
           ⚙️ Automation Settings
         </Link>
-        <Link href="/api/admin/partner-health" className="admin-btn admin-btn--ghost px-4 py-2 text-sm">
+        <button
+          type="button"
+          onClick={() => void runHealthCheck()}
+          className="admin-btn admin-btn--ghost px-4 py-2 text-sm"
+        >
           🩺 Health Check
-        </Link>
+        </button>
         <Link href="/admin" className="admin-btn admin-btn--ghost px-4 py-2 text-sm">
           ← العودة للوحة الإدارة
         </Link>
@@ -419,6 +458,63 @@ export default function AdminPartnersPage() {
       {error ? (
         <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
           {error}
+        </div>
+      ) : null}
+
+      {healthModalOpen ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
+          <div className="admin-modal w-full max-w-md">
+            <h3 className="text-2xl font-black">🩺 Health Check</h3>
+            {healthLoading ? (
+              <p className="admin-muted mt-4 text-sm">جاري فحص نظام الشركاء...</p>
+            ) : healthError ? (
+              <div className="mt-4 space-y-3">
+                <p className="font-black text-red-300">تعذر إكمال الفحص</p>
+                <p className="admin-muted text-sm">{healthError}</p>
+              </div>
+            ) : healthResult?.healthy ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-lg font-black text-emerald-300">✅ النظام سليم</p>
+                <ul className="space-y-2 text-sm">
+                  {Object.entries(healthResult.checks || {}).map(([key, ok]) => (
+                    <li key={key} className="admin-list-item justify-between">
+                      <span>{HEALTH_CHECK_LABELS[key] || key}</span>
+                      <span className={ok ? "text-emerald-300" : "text-red-300"}>
+                        {ok ? "✅" : "❌"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <p className="text-lg font-black text-amber-300">⚠️ يوجد مشكلة في النظام</p>
+                <ul className="space-y-2 text-sm">
+                  {Object.entries(healthResult?.checks || {}).map(([key, ok]) => (
+                    <li key={key} className="admin-list-item justify-between">
+                      <span>{HEALTH_CHECK_LABELS[key] || key}</span>
+                      <span className={ok ? "text-emerald-300" : "text-red-300"}>
+                        {ok ? "سليم" : "غير متوفر"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setHealthModalOpen(false);
+                  setHealthResult(null);
+                  setHealthError("");
+                }}
+                className="admin-btn admin-btn--ghost px-5 py-2"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -508,7 +604,7 @@ export default function AdminPartnersPage() {
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <div className="admin-surface p-4">
             <h3 className="font-black">أعلى 10 شركاء</h3>
-            <div className="mt-3 space-y-2">
+            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
               {topPartners.map((partner) => (
                 <Link
                   key={partner.partnerId}
@@ -524,7 +620,7 @@ export default function AdminPartnersPage() {
 
           <div className="admin-surface p-4">
             <h3 className="font-black">أكثر الخدمات مبيعاً</h3>
-            <div className="mt-3 space-y-2">
+            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
               {(adminAnalytics?.topServices || []).map((item) => (
                 <div key={item.serviceType} className="admin-list-item">
                   <span className="font-mono">{item.serviceType}</span>
@@ -536,7 +632,7 @@ export default function AdminPartnersPage() {
 
           <div className="admin-surface p-4">
             <h3 className="font-black">أكثر المستويات انتشاراً</h3>
-            <div className="mt-3 space-y-2">
+            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
               {(adminAnalytics?.topTiers || []).map((item) => (
                 <div key={item.tierKey} className="admin-list-item">
                   <span>{item.tierName}</span>
@@ -548,7 +644,7 @@ export default function AdminPartnersPage() {
 
           <div className="admin-surface p-4">
             <h3 className="font-black">آخر التسجيلات</h3>
-            <div className="mt-3 space-y-2">
+            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
               {(adminAnalytics?.latestSignups || []).map((item) => (
                 <div key={item.id} className="admin-list-item text-sm">
                   <p className="font-bold">{item.username || "عميل"}</p>
@@ -560,7 +656,7 @@ export default function AdminPartnersPage() {
 
           <div className="admin-surface p-4 lg:col-span-2">
             <h3 className="font-black">آخر عمليات السحب</h3>
-            <div className="mt-3 space-y-2">
+            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
               {(adminAnalytics?.latestWithdrawals || []).map((item) => (
                 <div key={item.id} className="admin-list-item text-sm">
                   <span>
@@ -578,7 +674,7 @@ export default function AdminPartnersPage() {
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="admin-surface p-5">
           <h2 className="admin-heading">أفضل الشركاء — التسجيلات</h2>
-          <div className="mt-4 space-y-3">
+          <div className="admin-scroll-panel admin-scroll-panel--list mt-4 space-y-3">
             {(summary?.topBySignups || []).map((partner) => (
               <Link
                 key={partner.id}
@@ -594,7 +690,7 @@ export default function AdminPartnersPage() {
 
         <div className="admin-surface p-5">
           <h2 className="admin-heading">أفضل الشركاء — الأرباح</h2>
-          <div className="mt-4 space-y-3">
+          <div className="admin-scroll-panel admin-scroll-panel--list mt-4 space-y-3">
             {(summary?.topByEarnings || []).map((partner) => (
               <Link
                 key={partner.id}
@@ -628,7 +724,7 @@ export default function AdminPartnersPage() {
             </select>
           </label>
         </div>
-        <div className="mt-4 admin-table-wrap">
+        <div className="admin-scroll-panel admin-scroll-panel--table admin-table-wrap mt-4">
           <table className="admin-table">
             <thead>
               <tr>
@@ -681,7 +777,7 @@ export default function AdminPartnersPage() {
         <p className="admin-subheading">
           مستويات الشركاء ونسب العمولة — عرض فقط في هذه المرحلة.
         </p>
-        <div className="mt-4 admin-table-wrap">
+        <div className="admin-scroll-panel admin-scroll-panel--table admin-table-wrap mt-4">
           <table className="admin-table">
             <thead>
               <tr>
@@ -714,7 +810,7 @@ export default function AdminPartnersPage() {
         <p className="admin-subheading">
           قواعد العمولات العامة لكل خدمة — عرض فقط في هذه المرحلة.
         </p>
-        <div className="mt-4 admin-table-wrap">
+        <div className="admin-scroll-panel admin-scroll-panel--table admin-table-wrap mt-4">
           <table className="admin-table">
             <thead>
               <tr>
@@ -793,7 +889,7 @@ export default function AdminPartnersPage() {
           />
         </div>
 
-        <div className="mt-4 admin-table-wrap">
+        <div className="admin-scroll-panel admin-scroll-panel--table admin-table-wrap mt-4">
           <table className="admin-table">
             <thead>
               <tr>

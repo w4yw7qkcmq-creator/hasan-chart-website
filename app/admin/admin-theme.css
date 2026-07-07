@@ -67,6 +67,29 @@ html[data-theme="light"] .admin-theme-page .admin-stat-card__title {
   overflow-x: auto;
 }
 
+.admin-scroll-panel {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-scroll-panel--list {
+  max-height: 400px;
+}
+
+.admin-scroll-panel--table {
+  max-height: 480px;
+}
+
+.admin-scroll-panel--cards {
+  max-height: 560px;
+}
+
+.admin-scroll-panel--cards-lg {
+  max-height: 640px;
+}
+
 .admin-theme-page .admin-table {
   min-width: 100%;
   font-size: 0.875rem;
@@ -334,6 +357,13 @@ html[data-theme="light"] .admin-theme-page .admin-modal {
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
 }
 
+.admin-notifications-dropdown--portal {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 9999;
+}
+
 html[data-theme="light"] .admin-notifications-dropdown {
   background: linear-gradient(180deg, #ffffff 0%, #edf7ff 100%);
 }
@@ -364,6 +394,14 @@ html[data-theme="light"] .admin-notifications-dropdown {
 .admin-notifications-dropdown__list {
   overflow-y: auto;
   max-height: 280px;
+  padding: 0.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.admin-notifications-dropdown__footer {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(56, 168, 242, 0.14);
   padding: 0.5rem;
 }
 

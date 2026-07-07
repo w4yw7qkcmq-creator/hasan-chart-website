@@ -2,7 +2,7 @@
 
 import "./admin-theme.css";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { adminFetch } from "../../lib/admin-fetch";
@@ -296,6 +296,9 @@ export default function AdminPage() {
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
   const [adminFeedNotifications, setAdminFeedNotifications] = useState([]);
   const adminNotificationsRef = useRef(null);
+  const adminNotificationsBellRef = useRef(null);
+  const adminNotificationsPanelRef = useRef(null);
+  const [adminNotificationsDropdownStyle, setAdminNotificationsDropdownStyle] = useState(null);
   const updateRequestStatus = async (table, requestId, newStatus) => {
     const confirmed = await confirmAdminAction(`هل تريد تغيير حالة الطلب إلى: ${getAdminStatusLabel(newStatus)}؟`);
     if (!confirmed) return;
@@ -414,16 +417,48 @@ export default function AdminPage() {
       if (event.target.closest("a[href]")) return;
 
       if (
-        adminNotificationsRef.current &&
-        !adminNotificationsRef.current.contains(event.target)
+        adminNotificationsRef.current?.contains(event.target) ||
+        adminNotificationsPanelRef.current?.contains(event.target)
       ) {
-        setAdminNotificationsOpen(false);
+        return;
       }
+
+      setAdminNotificationsOpen(false);
     };
 
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [adminNotificationsOpen]);
+
+  const updateAdminNotificationsDropdownPosition = useCallback(() => {
+    const bell = adminNotificationsBellRef.current;
+    if (!bell) return;
+
+    const rect = bell.getBoundingClientRect();
+    const panelWidth = Math.min(360, window.innerWidth - 16);
+
+    setAdminNotificationsDropdownStyle({
+      top: rect.bottom + 8,
+      left: Math.max(8, rect.right - panelWidth),
+      width: panelWidth,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!adminNotificationsOpen) return;
+
+    updateAdminNotificationsDropdownPosition();
+
+    const handleReposition = () => updateAdminNotificationsDropdownPosition();
+
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
+
+    return () => {
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
+    };
+  }, [adminNotificationsOpen, updateAdminNotificationsDropdownPosition]);
 
   useEffect(() => {
     return () => {
@@ -754,7 +789,15 @@ export default function AdminPage() {
   }, [adminNotifications, adminAcknowledgedVersion]);
 
   const handleAdminNotificationsBellClick = () => {
-    setAdminNotificationsOpen((prev) => !prev);
+    setAdminNotificationsOpen((prev) => {
+      const next = !prev;
+
+      if (next) {
+        requestAnimationFrame(() => updateAdminNotificationsDropdownPosition());
+      }
+
+      return next;
+    });
   };
 
   const handleMarkAllAdminNotificationsRead = () => {
@@ -1146,6 +1189,103 @@ export default function AdminPage() {
           )
         : null}
 
+      {adminNotificationsOpen &&
+      adminNotificationsDropdownStyle &&
+      typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={adminNotificationsPanelRef}
+              className="admin-notifications-dropdown admin-notifications-dropdown--portal"
+              style={{
+                position: "fixed",
+                top: adminNotificationsDropdownStyle.top,
+                left: adminNotificationsDropdownStyle.left,
+                width: adminNotificationsDropdownStyle.width,
+                zIndex: 9999,
+              }}
+              role="dialog"
+              aria-label="إشعارات الأدمن"
+            >
+              <div className="admin-notifications-dropdown__header">
+                <div>
+                  <p className="admin-notifications-dropdown__title">إشعارات الأدمن</p>
+                  <p className="admin-notifications-dropdown__meta">
+                    {adminNotifications.length} إشعار
+                    {adminUnreadCount > 0 ? ` · ${adminUnreadCount} جديد` : ""}
+                  </p>
+                </div>
+                <div className="admin-notifications-panel__actions">
+                  <button
+                    type="button"
+                    onClick={() => void loadAdminData()}
+                    className="admin-notifications-panel__action"
+                  >
+                    تحديث
+                  </button>
+                  {adminUnreadCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={handleMarkAllAdminNotificationsRead}
+                      className="admin-notifications-panel__action"
+                    >
+                      مقروء
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {adminNotifications.length === 0 ? (
+                <div className="admin-notifications-dropdown__empty">
+                  لا توجد إشعارات جديدة حالياً
+                </div>
+              ) : (
+                <div className="admin-notifications-dropdown__list">
+                  {adminNotifications.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setAdminNotificationsOpen(false);
+                          if (item.type === "subscription") {
+                            setSubscriptionFilter("pending");
+                            setActiveAdminTab("subscriptions");
+                          }
+                          if (item.type === "account") {
+                            setAccountFilter("pending");
+                            setActiveAdminTab("accounts");
+                          }
+                          if (item.type === "analysis") {
+                            setAnalysisFilter("pending");
+                            setActiveAdminTab("analysis");
+                          }
+                          if (item.type === "withdrawal") {
+                            window.location.href = item.url || "/admin/partners";
+                          }
+                        }}
+                        className="admin-notifications-dropdown__item"
+                      >
+                        <span className="admin-notifications-dropdown__icon">{item.icon}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className="admin-notifications-dropdown__item-title">{item.title}</p>
+                            {!isAdminDashboardNotificationAcknowledged(item.id) && (
+                              <span className="admin-notifications-dropdown__badge">جديد</span>
+                            )}
+                          </div>
+                          <p className="admin-notifications-dropdown__item-message">{item.message}</p>
+                          {item.createdAt ? (
+                            <p className="admin-notifications-dropdown__item-time">{item.createdAt}</p>
+                          ) : null}
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>,
+            document.body
+          )
+        : null}
+
       <AppModal
         open={adminConfirm.open}
         type="warning"
@@ -1209,6 +1349,7 @@ export default function AdminPage() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative" ref={adminNotificationsRef}>
                 <button
+                  ref={adminNotificationsBellRef}
                   type="button"
                   onClick={handleAdminNotificationsBellClick}
                   className="relative rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-6 py-4 font-black text-cyan-100 transition hover:bg-cyan-400/20"
@@ -1220,90 +1361,6 @@ export default function AdminPage() {
                     </span>
                   )}
                 </button>
-
-                {adminNotificationsOpen && (
-                  <div
-                    className="admin-notifications-dropdown"
-                    role="dialog"
-                    aria-label="إشعارات الأدمن"
-                  >
-                    <div className="admin-notifications-dropdown__header">
-                      <div>
-                        <p className="admin-notifications-dropdown__title">إشعارات الأدمن</p>
-                        <p className="admin-notifications-dropdown__meta">
-                          {adminNotifications.length} إشعار
-                          {adminUnreadCount > 0 ? ` · ${adminUnreadCount} جديد` : ""}
-                        </p>
-                      </div>
-                      <div className="admin-notifications-panel__actions">
-                        <button
-                          type="button"
-                          onClick={() => void loadAdminData()}
-                          className="admin-notifications-panel__action"
-                        >
-                          تحديث
-                        </button>
-                        {adminUnreadCount > 0 ? (
-                          <button
-                            type="button"
-                            onClick={handleMarkAllAdminNotificationsRead}
-                            className="admin-notifications-panel__action"
-                          >
-                            مقروء
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {adminNotifications.length === 0 ? (
-                      <div className="admin-notifications-dropdown__empty">
-                        لا توجد إشعارات جديدة حالياً
-                      </div>
-                    ) : (
-                      <div className="admin-notifications-dropdown__list">
-                        {adminNotifications.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setAdminNotificationsOpen(false);
-                              if (item.type === "subscription") {
-                                setSubscriptionFilter("pending");
-                                setActiveAdminTab("subscriptions");
-                              }
-                              if (item.type === "account") {
-                                setAccountFilter("pending");
-                                setActiveAdminTab("accounts");
-                              }
-                              if (item.type === "analysis") {
-                                setAnalysisFilter("pending");
-                                setActiveAdminTab("analysis");
-                              }
-                              if (item.type === "withdrawal") {
-                                window.location.href = item.url || "/admin/partners";
-                              }
-                            }}
-                            className="admin-notifications-dropdown__item"
-                          >
-                            <span className="admin-notifications-dropdown__icon">{item.icon}</span>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <p className="admin-notifications-dropdown__item-title">{item.title}</p>
-                                {!isAdminDashboardNotificationAcknowledged(item.id) && (
-                                  <span className="admin-notifications-dropdown__badge">جديد</span>
-                                )}
-                              </div>
-                              <p className="admin-notifications-dropdown__item-message">{item.message}</p>
-                              {item.createdAt ? (
-                                <p className="admin-notifications-dropdown__item-time">{item.createdAt}</p>
-                              ) : null}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               <button
@@ -1437,7 +1494,7 @@ export default function AdminPage() {
               <p className="mt-3 font-black text-slate-950">لا توجد طلبات جديدة حالياً</p>
             </div>
           ) : (
-            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="admin-scroll-panel admin-scroll-panel--list mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {recentOverviewItems.map((item) => (
                 <button
                   key={item.id}
@@ -1608,7 +1665,7 @@ export default function AdminPage() {
               <h3 className="text-2xl font-black text-slate-950">لا توجد طلبات تحليل حالياً</h3>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="admin-scroll-panel admin-scroll-panel--cards-lg grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredAnalysis.map((req) => (
                 <article
                   key={req.id}
@@ -1800,7 +1857,7 @@ export default function AdminPage() {
               <h3 className="text-2xl font-black text-slate-950">لا توجد طلبات إدارة حسابات حالياً</h3>
             </div>
           ) : (
-            <div className="grid gap-5">
+            <div className="admin-scroll-panel admin-scroll-panel--cards-lg grid gap-5">
               {filteredAccounts.map((req) => {
                 const revealedKeys = accountKeys[req.id];
 
@@ -1939,7 +1996,7 @@ export default function AdminPage() {
               <h3 className="text-2xl font-black text-slate-950">لا توجد طلبات اشتراك حالياً</h3>
             </div>
           ) : (
-            <div className="grid gap-5">
+            <div className="admin-scroll-panel admin-scroll-panel--cards-lg grid gap-5">
               {filteredSubscriptions.map((req) => (
                 <article key={req.id} className="rounded-[30px] border border-cyan-200/70 bg-white/85 p-6 text-slate-950 shadow-[0_20px_70px_rgba(14,165,233,0.14)] backdrop-blur-2xl">
                   <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
