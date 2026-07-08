@@ -36,7 +36,7 @@ const menuItems = [
   { href: "/#alerts", icon: "🔔", label: "تنبيه سعر" },
   { href: "/#services", icon: "💼", label: "الخدمات" },
   { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
-  { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء", loginGate: true },
+  { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء" },
   { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
   { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
   { href: "/vip-spot", icon: "⭐", label: "توصيات VIP Spot", auth: true, plan: "spot" },

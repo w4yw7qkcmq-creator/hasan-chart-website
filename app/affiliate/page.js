@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-// صفحة نظام التسويق بالعمولة
+// صفحة برنامج الشركاء
 export default function Affiliate() {
   // قيم افتراضية للمدعوين والأرباح
   const [invites] = useState(24);
@@ -13,7 +13,7 @@ export default function Affiliate() {
   return (
     <main className="min-h-screen bg-[#020617] text-white py-12 px-4">
       <div className="max-w-xl mx-auto space-y-8">
-          <h1 className="text-3xl font-bold">نظام التسويق بالعمولة</h1>
+          <h1 className="text-3xl font-bold">برنامج الشركاء</h1>
           <p className="text-slate-400">
             شارك رابط الإحالة الخاص بك واربح عند دعوة الآخرين للاشتراك في خدماتنا. تحصل على 0.2$ عن كل مستخدم ينجح في التسجيل، و15% من قيمة كل اشتراك مدفوع.
           </p>

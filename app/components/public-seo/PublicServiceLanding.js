@@ -167,6 +167,29 @@ export default function PublicServiceLanding({ pageKey }) {
           </SectionBlock>
         ) : null}
 
+        <ProseSection title="الأرباح والعمولات" paragraphs={page.earnings} />
+
+        {page.terms?.length ? (
+          <section className="public-seo-card rounded-[34px] border border-cyan-300/15 bg-white/[0.045] p-8 shadow-2xl backdrop-blur-2xl md:p-10">
+            <h2 className="text-3xl font-black text-white">شروط مختصرة</h2>
+            <ul className="mt-6 space-y-4">
+              {page.terms.map((term) => (
+                <li
+                  key={term}
+                  className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-slate-200"
+                >
+                  <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cyan-400/10 text-cyan-300">
+                    •
+                  </span>
+                  <span className="leading-8">
+                    <LinkifiedText text={term} maxLinks={1} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {page.whoIsItFor?.length ? (
           <SectionBlock title="لمن تناسب؟" subtitle="اختر الخدمة إذا كنت ضمن هذه الفئات">
             <ul className="grid gap-4 md:grid-cols-2">
