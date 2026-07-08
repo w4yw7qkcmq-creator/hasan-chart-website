@@ -36,7 +36,7 @@ const menuItems = [
   { href: "/#alerts", icon: "🔔", label: "تنبيه سعر" },
   { href: "/#services", icon: "💼", label: "الخدمات" },
   { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
-  { href: "/partner-center", icon: "🤝", label: "مركز الشركاء", auth: true },
+  { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء", loginGate: true },
   { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
   { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
   { href: "/vip-spot", icon: "⭐", label: "توصيات VIP Spot", auth: true, plan: "spot" },
@@ -44,7 +44,6 @@ const menuItems = [
   { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
   { href: "/daily-analysis", icon: "📝", label: "التحليلات اليومية" },
   { href: "/news", icon: "📰", label: "الأخبار" },
-  { href: "/affiliate", icon: "🤝", label: "التسويق بالعمولة" },
 ];
 
 const bottomMenuItems = [
@@ -116,6 +115,18 @@ function AuthLoginLink({ className, onClick, compact = false }) {
   );
 }
 
+function resolveSidebarHref(item, authResolved, currentUser) {
+  if (!item.loginGate) {
+    return item.href;
+  }
+
+  if (authResolved && currentUser) {
+    return item.href;
+  }
+
+  return `/login?next=${encodeURIComponent(item.href)}`;
+}
+
 function resolveMenuItemState(item, authResolved, currentUser) {
   if (!item.auth && !item.plan) {
     return "visible";
@@ -151,11 +162,14 @@ const sidebarMenuItemDesktopClass = `${sidebarMenuItemClass} hover:-translate-x-
 function SidebarMenuItem({
   item,
   state,
+  authResolved,
+  currentUser,
   unreadAnalysisCount = 0,
   onNavigate,
   variant = "desktop",
 }) {
   const itemClass = variant === "desktop" ? sidebarMenuItemDesktopClass : sidebarMenuItemClass;
+  const href = resolveSidebarHref(item, authResolved, currentUser);
 
   if (state === "hidden") {
     return null;
@@ -178,7 +192,7 @@ function SidebarMenuItem({
   return (
     <Link
       key={item.href}
-      href={item.href}
+      href={href}
       onClick={onNavigate}
       className={itemClass}
     >
@@ -818,6 +832,8 @@ function RootLayoutShell({ children }) {
                       key={item.href}
                       item={item}
                       state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                      authResolved={shellAuthResolved}
+                      currentUser={shellUser}
                       unreadAnalysisCount={shellUnreadAnalysisCount}
                       onNavigate={() => setMobileMenuOpen(false)}
                       variant="mobile"
@@ -836,6 +852,8 @@ function RootLayoutShell({ children }) {
                       key={item.href}
                       item={item}
                       state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                      authResolved={shellAuthResolved}
+                      currentUser={shellUser}
                       unreadAnalysisCount={shellUnreadAnalysisCount}
                       onNavigate={() => setMobileMenuOpen(false)}
                       variant="mobile"
@@ -908,6 +926,8 @@ function RootLayoutShell({ children }) {
                   key={item.href}
                   item={item}
                   state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                  authResolved={shellAuthResolved}
+                  currentUser={shellUser}
                   unreadAnalysisCount={shellUnreadAnalysisCount}
                   variant="desktop"
                 />
@@ -943,6 +963,8 @@ function RootLayoutShell({ children }) {
                   key={item.href}
                   item={item}
                   state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
+                  authResolved={shellAuthResolved}
+                  currentUser={shellUser}
                   unreadAnalysisCount={shellUnreadAnalysisCount}
                   variant="desktop"
                 />

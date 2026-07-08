@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { isAdminUser } from "../../lib/admin-emails";
 import { applyClientSession } from "../../lib/auth-session-client";
 import { useAppModal } from "../components/AppModalProvider";
@@ -34,6 +34,25 @@ function BrandMark({ size = "lg" }) {
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 const SIGN_IN_TIMEOUT_MS = 10000;
 const SIGN_IN_TIMEOUT_MESSAGE = "تعذر الاتصال بخدمة تسجيل الدخول، أعد المحاولة";
+
+function getSafeNextPath(next) {
+  if (typeof next !== "string") return null;
+
+  const trimmed = next.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function resolvePostLoginDestination({ email, nextPath }) {
+  if (isAdminUser({ email })) {
+    return "/admin";
+  }
+
+  return getSafeNextPath(nextPath) || "/my-dashboard";
+}
 
 async function loginWithApi(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -112,6 +131,8 @@ const verifyTurnstileToken = async (token) => {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next");
   const { showAppModal } = useAppModal();
   const { authResolved, user, acknowledgeSignIn } = useAuth();
   const [email, setEmail] = useState("");
@@ -126,8 +147,8 @@ export default function LoginPage() {
   useEffect(() => {
     if (!authResolved || !user?.email) return;
 
-    router.replace(isAdminUser(user) ? "/admin" : "/my-dashboard");
-  }, [authResolved, user, router]);
+    router.replace(resolvePostLoginDestination({ email: user.email, nextPath }));
+  }, [authResolved, user, router, nextPath]);
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY) return;
@@ -239,9 +260,10 @@ export default function LoginPage() {
         return;
       }
 
-      const destination = isAdminUser({ email: data.user.email })
-        ? "/admin"
-        : "/my-dashboard";
+      const destination = resolvePostLoginDestination({
+        email: data.user.email,
+        nextPath,
+      });
 
       const applied = await applyClientSession(data.session);
 
