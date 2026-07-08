@@ -1,4 +1,5 @@
-import { buildPublicServiceJsonLd, serializeJsonLd } from "../../../lib/seo";
+import { buildBreadcrumbJsonLd, buildPublicServiceJsonLd, serializeJsonLd } from "../../../lib/seo";
+import { getServiceBreadcrumbs } from "../../../lib/internal-links";
 import { getPublicSeoPage } from "../../../lib/public-seo-content";
 
 export default function PublicPageJsonLd({ pageKey }) {
@@ -14,11 +15,18 @@ export default function PublicPageJsonLd({ pageKey }) {
     description: page.description,
     faq: page.faq,
   });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(getServiceBreadcrumbs(pageKey));
 
   return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+      />
+    </>
   );
 }

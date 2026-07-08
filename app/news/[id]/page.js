@@ -3,6 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import CopyArticleButton from "../../components/CopyArticleButton";
 import { NewsArticleCoverImage } from "../../components/news/NewsCoverImage";
+import NewsServiceLinks from "../../components/news/NewsServiceLinks";
+import Breadcrumbs from "../../components/seo/Breadcrumbs";
+import LinkifiedText from "../../components/seo/LinkifiedText";
 import {
   detectNewsCategory,
   getNewsCategoryVisual,
@@ -15,6 +18,7 @@ import {
   serializeJsonLd,
   SITE_URL,
 } from "../../../lib/seo";
+import { getNewsTopicServiceLinks } from "../../../lib/internal-links";
 
 function getSupabaseClient() {
   return createClient(
@@ -279,6 +283,13 @@ export default async function NewsDetailsPage({ params }) {
   const categoryLabel = getCategoryLabel(category);
   const categoryVisual = getCategoryVisual(category);
   const newsTags = detectTags(news);
+  const topicServiceLinks = getNewsTopicServiceLinks(news);
+  const newsBreadcrumbs = [
+    { label: "الرئيسية", href: "/" },
+    { label: "الأخبار", href: "/news" },
+    { label: categoryLabel, href: `/news/category/${category}` },
+    { label: title, href: getNewsHref(news) },
+  ];
 
   const safeTitle = sanitizeJsonLdText(title, 150);
   const safeDescription = sanitizeJsonLdText(content, 180);
@@ -287,32 +298,12 @@ export default async function NewsDetailsPage({ params }) {
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "الرئيسية",
-        item: SITE_URL,
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "الأخبار",
-        item: `${SITE_URL}/news`,
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: safeCategoryLabel,
-        item: `${SITE_URL}/news/category/${category}`,
-      },
-      {
-        "@type": "ListItem",
-        position: 4,
-        name: safeTitle,
-        item: articleUrl,
-      },
-    ],
+    itemListElement: newsBreadcrumbs.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: sanitizeJsonLdText(item.label, index === newsBreadcrumbs.length - 1 ? 150 : 80),
+      item: `${SITE_URL}${item.href}`,
+    })),
   };
 
   const jsonLd = {
@@ -425,19 +416,9 @@ export default async function NewsDetailsPage({ params }) {
         </div>
 
         <div className="p-7 md:p-10" dir="rtl">
-          <nav className="mb-5 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-500" aria-label="مسار التنقل">
-            <Link href="/" className="text-slate-500 no-underline transition hover:text-cyan-700">
-              الرئيسية
-            </Link>
-            <span className="text-slate-300">/</span>
-            <Link href="/news" className="text-slate-500 no-underline transition hover:text-cyan-700">
-              الأخبار
-            </Link>
-            <span className="text-slate-300">/</span>
-            <Link href={`/news/category/${category}`} className="text-cyan-700 no-underline transition hover:text-cyan-900">
-              {categoryLabel}
-            </Link>
-          </nav>
+          <div className="mb-5">
+            <Breadcrumbs items={newsBreadcrumbs.slice(0, 3)} variant="light" />
+          </div>
 
           {newsTags.length > 0 ? (
             <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -466,9 +447,13 @@ export default async function NewsDetailsPage({ params }) {
               .split(/(?<=[.!؟])\s+/)
               .filter(Boolean)
               .map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
+                <p key={index}>
+                  <LinkifiedText text={paragraph} variant="light" maxLinks={2} />
+                </p>
               ))}
           </div>
+
+          <NewsServiceLinks links={topicServiceLinks} />
 
           <div className="mt-10 border-t border-slate-200 pt-6 text-center">
             <div className="mb-5 text-sm font-bold text-slate-400">
@@ -521,7 +506,7 @@ export default async function NewsDetailsPage({ params }) {
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="mb-2 text-sm font-black text-cyan-600">{categoryLabel}</div>
-              <h2 className="text-2xl font-black text-slate-950">أخبار ذات صلة قد تهمك</h2>
+              <h2 className="text-2xl font-black text-slate-950">اقرأ أيضاً</h2>
             </div>
             <Link
               href={`/news/category/${category}`}
