@@ -1,7 +1,8 @@
-"use client";
+import { PRIVATE_PAGE_METADATA } from "../../lib/seo";
+import AdminLayoutClient from "./AdminLayoutClient";
 
-import { AdminAccessGate } from "../components/AdminAccessGate";
+export const metadata = PRIVATE_PAGE_METADATA;
 
 export default function AdminLayout({ children }) {
-  return <AdminAccessGate>{children}</AdminAccessGate>;
+  return <AdminLayoutClient>{children}</AdminLayoutClient>;
 }

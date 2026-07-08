@@ -9,6 +9,7 @@ import { PartnerAnalyticsDashboard } from "../components/partner/PartnerAnalytic
 import { PartnerRewardsPanel } from "../components/partner/PartnerRewardsPanel";
 import { PartnerMetricSkeletonGrid } from "../components/partner/PartnerLoadingSkeleton";
 import { useRequireAuth } from "../hooks/useRequireAuth";
+import PublicServiceLanding from "../components/public-seo/PublicServiceLanding";
 import {
   MIN_PARTNER_WITHDRAWAL_USDT,
   WITHDRAWAL_NETWORKS,
@@ -300,24 +301,7 @@ export default function PartnerCenterPage() {
   }
 
   if (shouldShowLogin) {
-    return (
-      <div className="user-dashboard-page">
-        <div className="user-dashboard-empty">
-          <span className="user-dashboard-empty__icon" aria-hidden="true">
-            🔐
-          </span>
-          <p>يجب تسجيل الدخول للوصول إلى مركز الشركاء</p>
-          <Link href="/login" className="user-dashboard-action mt-4 inline-flex">
-            <span className="user-dashboard-action__icon" aria-hidden="true">
-              →
-            </span>
-            <div>
-              <h3 className="user-dashboard-action__title">الدخول للحساب</h3>
-            </div>
-          </Link>
-        </div>
-      </div>
-    );
+    return <PublicServiceLanding pageKey="partner-center" />;
   }
 
   return (

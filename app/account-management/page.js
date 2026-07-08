@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import SuccessModal from "../components/SuccessModal";
+import PublicServiceLanding from "../components/public-seo/PublicServiceLanding";
+import { useRequireAuth } from "../hooks/useRequireAuth";
 
-export default function AccountManagement() {
+function AccountManagementAuthenticated() {
   const [spot, setSpot] = useState({
     telegram: "",
     capital: "",
@@ -394,4 +396,22 @@ export default function AccountManagement() {
       </div>
     </main>
   );
+}
+
+export default function AccountManagement() {
+  const { sessionPending, isAuthenticated, shouldShowLogin } = useRequireAuth();
+
+  if (sessionPending) {
+    return (
+      <main className="flex min-h-[50vh] items-center justify-center bg-[#020617] text-white">
+        <p className="font-black text-cyan-200">جاري التحقق من الجلسة...</p>
+      </main>
+    );
+  }
+
+  if (shouldShowLogin || !isAuthenticated) {
+    return <PublicServiceLanding pageKey="account-management" />;
+  }
+
+  return <AccountManagementAuthenticated />;
 }

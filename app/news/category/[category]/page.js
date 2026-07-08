@@ -1,9 +1,14 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { resolveNewsImageUrl } from "../../../../lib/news-images";
 import { NewsCoverImage } from "../../../components/news/NewsCoverImage";
-
-const SITE_URL = "https://www.hasanchartworld.com";
+import {
+  buildAbsoluteUrl,
+  PUBLIC_PAGE_METADATA,
+  PRIVATE_PAGE_METADATA,
+  SITE_URL,
+} from "../../../../lib/seo";
 
 const CATEGORY_CONFIG = {
   geopolitics: {
@@ -140,16 +145,17 @@ export async function generateMetadata({ params }) {
 
   if (!config) {
     return {
-      title: "الأخبار - HasaN CharT World",
-      robots: { index: false, follow: false },
+      title: "التصنيف غير موجود - HasaN CharT World",
+      robots: PRIVATE_PAGE_METADATA.robots,
     };
   }
 
   return {
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
+    robots: PUBLIC_PAGE_METADATA.robots,
     alternates: {
-      canonical: `${SITE_URL}/news/category/${params.category}`,
+      canonical: buildAbsoluteUrl(`/news/category/${params.category}`),
     },
     openGraph: {
       title: `${config.title} | HasaN CharT World`,
@@ -166,14 +172,7 @@ export default async function CategoryPage({ params }) {
   const config = CATEGORY_CONFIG[params.category];
 
   if (!config) {
-    return (
-      <main className="min-h-screen px-4 py-10 text-center text-slate-950">
-        <h1 className="text-3xl font-black">التصنيف غير موجود</h1>
-        <Link href="/news" className="mt-6 inline-flex rounded-2xl bg-cyan-600 px-6 py-3 font-black !text-white no-underline">
-          العودة للأخبار
-        </Link>
-      </main>
-    );
+    notFound();
   }
 
   const supabase = getSupabaseClient();

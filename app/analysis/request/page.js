@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import SuccessModal from "../../components/SuccessModal";
+import PublicServiceLanding from "../../components/public-seo/PublicServiceLanding";
+import { useRequireAuth } from "../../hooks/useRequireAuth";
 
-export default function RequestAnalysis() {
+function RequestAnalysisAuthenticated() {
   const [coin, setCoin] = useState("");
   const [timeframe, setTimeframe] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -106,4 +108,22 @@ export default function RequestAnalysis() {
       </div>
     </main>
   );
+}
+
+export default function RequestAnalysis() {
+  const { sessionPending, isAuthenticated, shouldShowLogin } = useRequireAuth();
+
+  if (sessionPending) {
+    return (
+      <main className="flex min-h-[50vh] items-center justify-center bg-[#020617] text-white">
+        <p className="font-black text-cyan-200">جاري التحقق من الجلسة...</p>
+      </main>
+    );
+  }
+
+  if (shouldShowLogin || !isAuthenticated) {
+    return <PublicServiceLanding pageKey="analysis-request" />;
+  }
+
+  return <RequestAnalysisAuthenticated />;
 }

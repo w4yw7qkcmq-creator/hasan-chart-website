@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AppModal from "../components/AppModal";
+import PublicServiceLanding from "../components/public-seo/PublicServiceLanding";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 
 const plans = [
@@ -313,6 +314,18 @@ export default function SubscriptionsPage() {
       setLoadingPlan(null);
     }
   };
+
+  if (sessionPending) {
+    return (
+      <main className="flex min-h-[50vh] items-center justify-center bg-[#020617] text-white">
+        <p className="font-black text-cyan-200">جاري التحقق من الجلسة...</p>
+      </main>
+    );
+  }
+
+  if (shouldShowLogin || !isAuthenticated) {
+    return <PublicServiceLanding pageKey="subscriptions" />;
+  }
 
   return (
     <main className="relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">

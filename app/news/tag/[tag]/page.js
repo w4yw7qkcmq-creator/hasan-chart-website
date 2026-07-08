@@ -1,9 +1,15 @@
 
-
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-
-const SITE_URL = "https://www.hasanchartworld.com";
+import {
+  buildAbsoluteUrl,
+  PUBLIC_PAGE_METADATA,
+  PRIVATE_PAGE_METADATA,
+  sanitizeJsonLdText,
+  serializeJsonLd,
+  SITE_URL,
+} from "../../../../lib/seo";
 
 const TAG_CONFIG = {
   bitcoin: {
@@ -108,12 +114,14 @@ function matchesTag(item, config) {
 
 export async function generateMetadata({ params }) {
   const config = getTagConfig(params.tag);
+  const isKnownTag = Boolean(TAG_CONFIG[params.tag]);
 
   return {
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
+    robots: isKnownTag ? PUBLIC_PAGE_METADATA.robots : PRIVATE_PAGE_METADATA.robots,
     alternates: {
-      canonical: `${SITE_URL}/news/tag/${params.tag}`,
+      canonical: buildAbsoluteUrl(`/news/tag/${params.tag}`),
     },
     openGraph: {
       title: `${config.title} | HasaN CharT World`,
@@ -128,6 +136,11 @@ export async function generateMetadata({ params }) {
 
 export default async function TagPage({ params }) {
   const config = getTagConfig(params.tag);
+
+  if (!TAG_CONFIG[params.tag]) {
+    notFound();
+  }
+
   const supabase = getSupabaseClient();
 
   const { data } = await supabase
@@ -143,8 +156,8 @@ export default async function TagPage({ params }) {
     "@type": "CollectionPage",
     "@id": `${SITE_URL}/news/tag/${params.tag}`,
     url: `${SITE_URL}/news/tag/${params.tag}`,
-    name: config.title,
-    description: config.description,
+    name: sanitizeJsonLdText(config.title, 120),
+    description: sanitizeJsonLdText(config.description, 220),
     inLanguage: "ar",
     isPartOf: {
       "@type": "WebSite",
@@ -157,7 +170,7 @@ export default async function TagPage({ params }) {
     <main className="min-h-screen px-4 py-10 text-slate-950" dir="rtl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
 
       <div className="mx-auto max-w-7xl">

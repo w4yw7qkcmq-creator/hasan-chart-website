@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "../components/AuthProvider";
+import PublicServiceLanding from "../components/public-seo/PublicServiceLanding";
 
 const SIGNAL_ACTIVE_MS = 10 * 60 * 1000;
 
@@ -128,7 +129,7 @@ export default function VipSpotPage() {
   };
 
   useEffect(() => {
-    if (!authResolved) return undefined;
+    if (!authResolved || !user?.email) return undefined;
 
     loadSignals();
 
@@ -145,6 +146,18 @@ export default function VipSpotPage() {
       clearInterval(statusTimer);
     };
   }, [authResolved, user?.email]);
+
+  if (!authResolved) {
+    return (
+      <main className="flex min-h-[50vh] items-center justify-center bg-[#020617] text-white">
+        <p className="font-black text-cyan-200">جاري التحقق من الجلسة...</p>
+      </main>
+    );
+  }
+
+  if (!user?.email) {
+    return <PublicServiceLanding pageKey="vip-spot" />;
+  }
 
   if (subscriptionExpired) {
     return (

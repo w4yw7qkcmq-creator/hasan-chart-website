@@ -3,13 +3,14 @@ import { AppProviders } from "./components/AppProviders";
 import RootLayoutShell from "./components/RootLayoutShell";
 import { readThemeFromRequestCookies } from "../lib/theme-server";
 import { THEME_BOOT_SCRIPT, THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
+import { sanitizeJsonLdText, serializeJsonLd, SITE_URL } from "../lib/seo";
 
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "HasaN CharT World",
-  alternateName: ["HasaN CharT", "Hasan Chart World", "حسن شارت"],
-  url: "https://www.hasanchartworld.com",
+  alternateName: ["HasaN CharT", "Hasan Chart World"],
+  url: SITE_URL,
   description:
     "منصة احترافية لمتابعة أسواق المال، تحليلات العملات الرقمية والفوركس، توصيات التداول، الأخبار الاقتصادية والتنبيهات السعرية.",
   publisher: {
@@ -17,7 +18,7 @@ const structuredData = {
     name: "HasaN CharT World",
     logo: {
       "@type": "ImageObject",
-      url: "https://www.hasanchartworld.com/favicon.png",
+      url: `${SITE_URL}/favicon.png`,
     },
   },
 };
@@ -61,7 +62,6 @@ export default async function RootLayout({ children }) {
         <meta property="og:url" content="https://www.hasanchartworld.com" />
         <meta property="og:site_name" content="HasaN CharT World" />
         <meta property="og:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
-        <meta property="og:determiner" content="" />
         <meta
           property="og:description"
           content="منصة HasaN CharT World تقدم تحليلات للأسواق المالية، توصيات Spot و Futures، أخبار اقتصادية، تنبيهات سعرية، وخدمات احترافية للمتداولين."
@@ -81,7 +81,12 @@ export default async function RootLayout({ children }) {
         <meta name="twitter:image" content="https://www.hasanchartworld.com/favicon.png" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{
+            __html: serializeJsonLd({
+              ...structuredData,
+              description: sanitizeJsonLdText(structuredData.description, 300),
+            }),
+          }}
         />
       </head>
       <body className="min-h-screen bg-[#020617] text-white antialiased overflow-x-hidden theme-pending-body">

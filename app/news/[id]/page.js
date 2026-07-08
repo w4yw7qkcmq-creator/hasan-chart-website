@@ -9,8 +9,12 @@ import {
   isBlockedNewsImageUrl,
   resolveNewsImageUrl,
 } from "../../../lib/news-images";
-
-const SITE_URL = "https://www.hasanchartworld.com";
+import {
+  PUBLIC_PAGE_METADATA,
+  sanitizeJsonLdText,
+  serializeJsonLd,
+  SITE_URL,
+} from "../../../lib/seo";
 
 function getSupabaseClient() {
   return createClient(
@@ -217,6 +221,7 @@ export async function generateMetadata({ params }) {
     title: `${title} - HasaN CharT World`,
     description,
     keywords,
+    robots: PUBLIC_PAGE_METADATA.robots,
     alternates: {
       canonical: url,
     },
@@ -275,6 +280,10 @@ export default async function NewsDetailsPage({ params }) {
   const categoryVisual = getCategoryVisual(category);
   const newsTags = detectTags(news);
 
+  const safeTitle = sanitizeJsonLdText(title, 150);
+  const safeDescription = sanitizeJsonLdText(content, 180);
+  const safeCategoryLabel = sanitizeJsonLdText(categoryLabel, 80);
+
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -294,13 +303,13 @@ export default async function NewsDetailsPage({ params }) {
       {
         "@type": "ListItem",
         position: 3,
-        name: categoryLabel,
+        name: safeCategoryLabel,
         item: `${SITE_URL}/news/category/${category}`,
       },
       {
         "@type": "ListItem",
         position: 4,
-        name: title,
+        name: safeTitle,
         item: articleUrl,
       },
     ],
@@ -314,20 +323,20 @@ export default async function NewsDetailsPage({ params }) {
     inLanguage: "ar",
     isAccessibleForFree: true,
     keywords: [
-      title,
+      safeTitle,
       "أخبار اقتصادية",
       "فوركس",
       "عملات رقمية",
       "أسواق عالمية",
     ],
-    articleSection: categoryLabel,
+    articleSection: safeCategoryLabel,
     wordCount: content.split(/\s+/).filter(Boolean).length,
     about: {
       "@type": "Thing",
-      name: categoryLabel,
+      name: safeCategoryLabel,
     },
-    headline: title,
-    description: content.slice(0, 180),
+    headline: safeTitle,
+    description: safeDescription,
     image: image ? [image] : [`${SITE_URL}/favicon.png`],
     datePublished: news.created_at,
     dateModified: news.created_at,
@@ -362,11 +371,11 @@ export default async function NewsDetailsPage({ params }) {
     <main className="min-h-screen px-4 py-10 text-slate-950">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
 
       <div className="mx-auto mb-6 flex max-w-4xl flex-wrap items-center justify-between gap-3" dir="rtl">
