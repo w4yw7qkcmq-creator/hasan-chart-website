@@ -4,24 +4,10 @@ const crypto = require("crypto");
 const Parser = require("rss-parser");
 const axios = require("axios");
 const FormData = require("form-data");
-const { createCanvas, loadImage, registerFont } = require("canvas");
 require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 const { createUserNotification } = require("./create-user-notification");
 const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
-
-try {
-  const arabicFontPath = path.join(__dirname, "fonts", "NotoNaskhArabic-Regular.ttf");
-
-  if (fs.existsSync(arabicFontPath)) {
-    registerFont(arabicFontPath, { family: "Arabic" });
-    console.log("✅ Arabic font registered");
-  } else {
-    console.log("⚠️ Arabic font file not found, using system fallback");
-  }
-} catch (error) {
-  console.error("⚠️ Arabic font registration failed:", error.message);
-}
 
 const parser = new Parser();
 
@@ -1813,188 +1799,36 @@ function getExternalImageByNewsTopic(title, impactLevel = "MEDIUM") {
 }
 
 async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
-  const width = 1920;
-  const height = 1080;
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
+  void title;
+  void impactLevel;
 
-  const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#07111f");
-  gradient.addColorStop(0.55, "#0b1f35");
-  gradient.addColorStop(1, "#020617");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  try {
-    let finalImageUrl = imageUrl;
-
-    if (!finalImageUrl) {
-      console.log("⏭️ No external image found");
-      return null;
-    }
-
-    if (!USE_LOCAL_IMAGE_FALLBACK && typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl)) {
-      console.log("⏭️ Local image fallback is disabled. Skipping image card:", finalImageUrl);
-      return null;
-    }
-
-    let image = await loadImage(finalImageUrl);
-    let isLocalAssetImage = typeof finalImageUrl === "string" && !/^https?:\/\//i.test(finalImageUrl);
-
-    const useLocalFallbackImage = async (reason) => {
-      console.log(`⏭️ ${reason}: ${image.width}x${image.height}. Local fallback disabled.`);
-      throw new Error("Local image fallback disabled");
-    };
-
-    if (!isLocalAssetImage && (image.width < MIN_IMAGE_WIDTH || image.height < MIN_IMAGE_HEIGHT)) {
-      console.log(`⚠️ External image is below preferred quality: ${image.width}x${image.height}. Using it anyway for variety.`);
-    }
-
-    const imageAspectRatio = image.width / image.height;
-    if (!isLocalAssetImage && (imageAspectRatio < 1.35 || imageAspectRatio > 2.2)) {
-      console.log(`⚠️ External image shape is not ideal: ${image.width}x${image.height}. Using it anyway for variety.`);
-    }
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    const scale = Math.max(width / image.width, height / image.height);
-    const scaledWidth = image.width * scale;
-    const scaledHeight = image.height * scale;
-    const x = (width - scaledWidth) / 2;
-    const y = (height - scaledHeight) / 2;
-
-    ctx.save();
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.filter = "contrast(115%) saturate(120%) brightness(105%)";
-    ctx.drawImage(image, x, y, scaledWidth, scaledHeight);
-    ctx.filter = "none";
-    ctx.restore();
-
-    const imageOverlay = ctx.createLinearGradient(0, 0, 0, height);
-    imageOverlay.addColorStop(0, "rgba(2, 6, 23, 0.00)");
-    imageOverlay.addColorStop(1, "rgba(2, 6, 23, 0.05)");
-    ctx.fillStyle = imageOverlay;
-    ctx.fillRect(0, 0, width, height);
-
-    // --- New design overlay block ---
-    const bottomFade = ctx.createLinearGradient(0, height * 0.58, 0, height);
-    bottomFade.addColorStop(0, "rgba(2, 6, 23, 0.00)");
-    bottomFade.addColorStop(0.62, "rgba(2, 6, 23, 0.18)");
-    bottomFade.addColorStop(1, "rgba(2, 6, 23, 0.46)");
-    ctx.fillStyle = bottomFade;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.fillStyle = "rgba(56, 189, 248, 0.92)";
-    ctx.fillRect(0, height - 8, width, 8);
-    // --- End new design overlay block ---
-  } catch (error) {
-    console.error("⚠️ Image load failed:", error.message);
+  if (!imageUrl) {
     return null;
   }
 
-
-  // --- Impact badge only: keep the image clean and avoid empty title boxes ---
-  ctx.save();
-  const impactBadgeText = impactLevel === "HIGH" ? "عاجل" : "مهم";
-  ctx.fillStyle = impactLevel === "HIGH" ? "rgba(220, 38, 38, 0.92)" : "rgba(234, 179, 8, 0.94)";
-  ctx.roundRect(56, 42, 160, 52, 18);
-  ctx.fill();
-  ctx.fillStyle = impactLevel === "HIGH" ? "#ffffff" : "#111827";
-  ctx.font = "bold 26px Arabic";
-  ctx.textAlign = "center";
-  ctx.direction = "rtl";
-  ctx.fillText(impactBadgeText, 136, 77);
-  ctx.restore();
-  // --- End impact badge block ---
-
-  // --- Top brand block ---
-  ctx.save();
-  if (fs.existsSync(CHANNEL_LOGO_FILE)) {
-    const logo = await loadImage(CHANNEL_LOGO_FILE);
-    const brandLogoSize = 64;
-    const brandX = width - 250;
-    const brandY = 38;
-
-    ctx.fillStyle = "rgba(2, 6, 23, 0.62)";
-    ctx.roundRect(brandX - 18, brandY - 10, 214, 84, 24);
-    ctx.fill();
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-    ctx.beginPath();
-    ctx.arc(brandX + brandLogoSize / 2, brandY + brandLogoSize / 2, brandLogoSize / 2 + 7, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.drawImage(logo, brandX, brandY, brandLogoSize, brandLogoSize);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 22px Arabic";
-    ctx.textAlign = "right";
-    ctx.direction = "rtl";
-    ctx.fillText("الأخبار الاقتصادية", brandX - 26 + 196, brandY + 29);
-
-    ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 18px Arabic";
-    ctx.fillText("Economic News", brandX - 26 + 196, brandY + 56);
-  }
-  ctx.restore();
-
-
   try {
-    ctx.save();
+    let buffer = null;
 
-    const watermarkWidth = 430;
-    const watermarkHeight = 78;
-    const watermarkX = width - watermarkWidth - 24;
-    const watermarkY = height - watermarkHeight - 22;
-
-    ctx.globalAlpha = 0.92;
-    ctx.fillStyle = "rgba(2, 6, 23, 0.58)";
-    ctx.roundRect(watermarkX, watermarkY, watermarkWidth, watermarkHeight, 18);
-    ctx.fill();
-
-    if (fs.existsSync(CHANNEL_LOGO_FILE)) {
-      const logo = await loadImage(CHANNEL_LOGO_FILE);
-      const logoSize = 58;
-      const logoX = watermarkX + watermarkWidth - logoSize - 14;
-      const logoY = watermarkY + 10;
-
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 7, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
-      ctx.shadowBlur = 14;
-      ctx.shadowOffsetY = 4;
-      ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
-      ctx.shadowColor = "transparent";
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetY = 0;
+    if (/^https?:\/\//i.test(imageUrl)) {
+      const response = await axios.get(imageUrl, {
+        responseType: "arraybuffer",
+        timeout: 15000,
+      });
+      buffer = Buffer.from(response.data);
+    } else if (fs.existsSync(imageUrl)) {
+      buffer = fs.readFileSync(imageUrl);
     }
 
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 22px Arabic";
-    ctx.textAlign = "right";
-    ctx.direction = "rtl";
-    ctx.fillText("Economic News | الأخبار الاقتصادية", watermarkX + watermarkWidth - 78, watermarkY + 33);
+    if (!buffer || buffer.length === 0) {
+      return null;
+    }
 
-    ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 20px Arabic";
-    ctx.fillText("t.me/EconomicNewsi", watermarkX + watermarkWidth - 78, watermarkY + 61);
-
-    ctx.restore();
+    fs.writeFileSync(NEWS_CARD_FILE, buffer);
+    return NEWS_CARD_FILE;
   } catch (error) {
-    console.error("⚠️ Watermark failed:", error.message);
+    console.error("⚠️ Image save failed:", error.message);
+    return null;
   }
-
-  ctx.filter = "none";
-  const buffer = canvas.toBuffer("image/png");
-  fs.writeFileSync(NEWS_CARD_FILE, buffer);
-
-  return NEWS_CARD_FILE;
 }
 
 async function loadPublishedNewsFromSupabase() {

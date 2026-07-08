@@ -1,56 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import QRCode from "react-qr-code";
 
 export function PartnerQrCode({ value, size = 220 }) {
-  const [dataUrl, setDataUrl] = useState("");
-
-  useEffect(() => {
-    if (!value) {
-      setDataUrl("");
-      return undefined;
-    }
-
-    let active = true;
-
-    void (async () => {
-      try {
-        const QRCode = (await import("qrcode")).default;
-        const url = await QRCode.toDataURL(value, {
-          width: size,
-          margin: 2,
-          color: {
-            dark: "#020617",
-            light: "#ffffff",
-          },
-        });
-
-        if (active) {
-          setDataUrl(url);
-        }
-      } catch {
-        if (active) {
-          setDataUrl("");
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [value, size]);
-
-  if (!dataUrl) {
+  if (!value) {
     return null;
   }
 
   return (
-    <img
-      src={dataUrl}
-      alt="QR Code لرابط الإحالة"
-      width={size}
-      height={size}
-      className="rounded-xl"
-    />
+    <div
+      className="rounded-xl bg-white p-3"
+      style={{ width: size, height: size }}
+    >
+      <QRCode
+        value={value}
+        size={size - 24}
+        bgColor="#ffffff"
+        fgColor="#020617"
+        level="M"
+      />
+    </div>
   );
 }
