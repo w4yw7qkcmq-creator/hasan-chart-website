@@ -4,7 +4,31 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatNotificationTime } from "../../lib/notifications-shared";
 import { useRequireAuth } from "../hooks/useRequireAuth";
-import StatusBadge from "../components/StatusBadge";
+
+function StatusBadge({ status, variant = "dashboard" }) {
+  if (variant !== "dashboard") {
+    return <span className="user-dashboard-badge">{status || "غير محدد"}</span>;
+  }
+
+  const isDone = status === "triggered" || status === "مكتمل";
+  const isActive = status === "active";
+  const label =
+    status === "triggered"
+      ? "تم الوصول"
+      : status === "active"
+      ? "نشط"
+      : status === "مكتمل"
+      ? "مكتمل"
+      : status || "غير محدد";
+
+  const badgeClass = isDone
+    ? "user-dashboard-badge--done"
+    : isActive
+    ? "user-dashboard-badge--active"
+    : "user-dashboard-badge--new";
+
+  return <span className={`user-dashboard-badge ${badgeClass}`}>{label}</span>;
+}
 
 function DashboardMetricCard({ title, value, subtitle, icon, tone = "blue" }) {
   return (

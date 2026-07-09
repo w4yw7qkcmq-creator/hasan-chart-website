@@ -1,13 +1,12 @@
-import { requireSessionUser } from "../../../lib/auth-session";
+import { getSupabaseAdmin, requireSessionUser } from "../../../lib/auth-session";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { alertLimiter, RATE_LIMIT_ERROR, userReadLimiter } from "../../../lib/rate-limit";
 import {
   mapPriceAlertRow,
   normalizeSymbol,
   resolveAlertCondition,
+  trimText,
 } from "../../../lib/price-alert-shared";
-import { getSupabaseAdmin } from "../../../lib/supabase-admin";
-import { trimText } from "../../../lib/text-sanitize";
 import { logApiError, logApiRequest } from "../../../lib/structured-logger";
 
 export const dynamic = "force-dynamic";
