@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "start:worker": "node worker/index.js",
+    "start:worker:news": "node worker/news-worker.js",
+    "install:worker": "npm install --prefix worker"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

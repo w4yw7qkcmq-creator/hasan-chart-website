@@ -1,7 +1,7 @@
 {
-  "name": "worker",
+  "name": "hasan-chart-price-alerts-worker",
   "version": "1.0.0",
-  "description": "",
+  "description": "HasaN CharT World price alerts worker (push, email, site notifications)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -14,6 +14,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
     "axios": "^1.16.1",
