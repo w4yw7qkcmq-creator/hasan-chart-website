@@ -21,6 +21,9 @@ const {
 } = require("./worker-security");
 const { redactLogMeta } = require("./log-redaction");
 
+const WebSocket = require("ws");
+global.WebSocket = WebSocket;
+
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

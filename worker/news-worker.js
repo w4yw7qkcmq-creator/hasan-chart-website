@@ -5,6 +5,10 @@ const Parser = require("rss-parser");
 const axios = require("axios");
 const FormData = require("form-data");
 require("dotenv").config();
+
+const WebSocket = require("ws");
+global.WebSocket = WebSocket;
+
 const { createClient } = require("@supabase/supabase-js");
 const { createUserNotification } = require("./create-user-notification");
 const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
