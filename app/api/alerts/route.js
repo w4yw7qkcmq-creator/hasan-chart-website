@@ -1,109 +1,36 @@
-import { createClient } from "@supabase/supabase-js";
 import { requireSessionUser } from "../../../lib/auth-session";
-import { alertLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
+import { alertLimiter, RATE_LIMIT_ERROR, userReadLimiter } from "../../../lib/rate-limit";
+import {
+  mapPriceAlertRow,
+  normalizeSymbol,
+  resolveAlertCondition,
+} from "../../../lib/price-alert-shared";
+import { getSupabaseAdmin } from "../../../lib/supabase-admin";
+import { trimText } from "../../../lib/text-sanitize";
+import { logApiError, logApiRequest } from "../../../lib/structured-logger";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
 
-const getSupabaseAdmin = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error(
-      "إعدادات السيرفر ناقصة: تأكد من إضافة NEXT_PUBLIC_SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY في Vercel"
-    );
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-};
-
-const normalizeText = (value, maxLength) => {
-  return String(value || "")
-    .trim()
-    .slice(0, maxLength);
-};
-
-const normalizeSymbol = (value) => {
-  return String(value || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-};
-
-const toOkxInstId = (symbol) => {
-  const cleanSymbol = normalizeSymbol(symbol);
-
-  if (!cleanSymbol) {
-    throw new Error("EMPTY_SYMBOL");
-  }
-
-  const base = cleanSymbol.endsWith("USDT")
-    ? cleanSymbol.slice(0, -4)
-    : cleanSymbol;
-
-  if (!base) {
-    throw new Error("EMPTY_SYMBOL");
-  }
-
-  return `${base}-USDT`;
-};
-
-const getOkxMarketPrice = async (symbol) => {
-  const cleanSymbol = normalizeSymbol(symbol);
-
-  if (!cleanSymbol) {
-    throw new Error("EMPTY_SYMBOL");
-  }
-
-  const okxSymbol = toOkxInstId(symbol);
-
-  const response = await fetch(
-    `https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(okxSymbol)}`,
-    {
-      cache: "no-store",
-    }
-  );
-
-  const data = await response.json().catch(() => null);
-  const currentPrice = Number(data?.data?.[0]?.last);
-
-  if (Number.isFinite(currentPrice)) {
-    return currentPrice;
-  }
-
-  throw new Error(`تعذر جلب السعر الحالي لـ ${cleanSymbol}. تأكد من اسم العملة وحاول مرة أخرى.`);
-};
-
-const resolveAlertCondition = async ({ coin, targetPrice }) => {
-  const target = Number(targetPrice);
-
-  if (!Number.isFinite(target) || target <= 0) {
-    throw new Error("السعر المستهدف غير صالح.");
-  }
-
-  const currentPrice = await getOkxMarketPrice(coin);
-
-  return target >= currentPrice ? "above" : "below";
-};
-
 export async function GET() {
   try {
     const session = await requireSessionUser();
-    const userEmail = String(session.user?.email || "").trim().toLowerCase();
 
-    if (!userEmail) {
+    if (session.error) {
       return Response.json(
         { success: false, error: "يجب تسجيل الدخول أولاً." },
         { status: 401 }
       );
     }
 
+    const rateLimited = await enforceRateLimit(userReadLimiter, session.email);
+
+    if (rateLimited) {
+      return rateLimited;
+    }
+
+    const userEmail = session.email;
     const supabase = getSupabaseAdmin();
 
     const { data, error } = await supabase
@@ -117,18 +44,16 @@ export async function GET() {
       throw new Error(error.message || "تعذر تحميل التنبيهات.");
     }
 
-    const alerts = (data || []).map((row) => ({
-      id: row.id,
-      coin: row.coin,
-      price: row.target_price,
-      condition: row.condition,
-      status: row.status,
-      createdAt: row.created_at,
-    }));
+    const alerts = (data || []).map(mapPriceAlertRow);
 
     return Response.json({ success: true, alerts });
   } catch (err) {
-    console.error("PRICE_ALERT_LIST_FAILED", err);
+    logApiError({
+      route: "/api/alerts",
+      method: "GET",
+      event: "PRICE_ALERT_LIST_FAILED",
+      error: err?.message || String(err),
+    });
 
     return Response.json(
       {
@@ -168,12 +93,10 @@ export async function POST(req) {
 
     const body = await req.json().catch(() => null);
 
-    const coin = normalizeText(body?.coin, 30).toUpperCase();
-    const price = normalizeText(body?.price, 30);
-    const user_email = session.email;
-    const username = session.username;
+    const coin = trimText(body?.coin, 30).toUpperCase();
+    const price = trimText(body?.price, 30);
 
-    if (!coin || !price) {
+    if (!coin || coin.length < 2 || !price) {
       return Response.json(
         {
           success: false,
@@ -183,10 +106,15 @@ export async function POST(req) {
       );
     }
 
+    const user_email = session.email;
+    const username = session.username;
+
     const supabase = getSupabaseAdmin();
 
-    console.log("PRICE_ALERT_CREATE_START", {
-      user_email,
+    logApiRequest({
+      route: "/api/alerts",
+      method: "POST",
+      event: "PRICE_ALERT_CREATE_START",
       coin,
       price,
     });
@@ -202,7 +130,7 @@ export async function POST(req) {
         {
           user_email,
           username,
-          coin,
+          coin: normalizeSymbol(coin) || coin,
           target_price: price,
           condition: resolvedCondition,
           status: "active",
@@ -212,7 +140,12 @@ export async function POST(req) {
       .single();
 
     if (error || !data?.id) {
-      console.error("PRICE_ALERT_CREATE_FAILED", error || "MISSING_INSERTED_ALERT_ID");
+      logApiError({
+        route: "/api/alerts",
+        method: "POST",
+        event: "PRICE_ALERT_CREATE_FAILED",
+        error: error?.message || "MISSING_INSERTED_ALERT_ID",
+      });
 
       return Response.json(
         {
@@ -223,7 +156,13 @@ export async function POST(req) {
       );
     }
 
-    console.log("PRICE_ALERT_CREATE_SUCCESS", data);
+    logApiRequest({
+      route: "/api/alerts",
+      method: "POST",
+      event: "PRICE_ALERT_CREATE_SUCCESS",
+      alertId: data?.id || null,
+      coin: data?.coin || coin,
+    });
 
     return Response.json({
       success: true,
@@ -231,7 +170,12 @@ export async function POST(req) {
       alert: data,
     });
   } catch (err) {
-    console.error("PRICE_ALERT_CREATE_FAILED", err);
+    logApiError({
+      route: "/api/alerts",
+      method: "POST",
+      event: "PRICE_ALERT_CREATE_FAILED",
+      error: err?.message || String(err),
+    });
 
     return Response.json(
       {

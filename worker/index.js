@@ -1,13 +1,25 @@
 const path = require("path");
 
-console.log("WORKER_ENTRY_FILE", __filename);
-console.log("WORKER_ENTRY_REALPATH", path.resolve(__filename));
-console.log("WORKER_PROCESS_CWD", process.cwd());
+if (process.env.NODE_ENV !== "production") {
+  console.log("WORKER_ENTRY_FILE", __filename);
+  console.log("WORKER_ENTRY_REALPATH", path.resolve(__filename));
+  console.log("WORKER_PROCESS_CWD", process.cwd());
+}
 
-require("dotenv").config({ path: path.join(__dirname, "../.env.local") });
-require("dotenv").config();
+try {
+  require("dotenv").config({ path: path.join(__dirname, "../.env.local") });
+  require("dotenv").config();
+} catch (_) {
+  // dotenv is optional on Railway — env vars are injected by the platform
+}
 const express = require("express");
 const cors = require("cors");
+const {
+  createWorkerCorsOptions,
+  workerAccessDeniedMiddleware,
+  instantAnalysisRateLimitMiddleware,
+} = require("./worker-security");
+const { redactLogMeta } = require("./log-redaction");
 
 const { createClient } = require("@supabase/supabase-js");
 
@@ -41,16 +53,18 @@ const PRICE_ALERT_SINGLE_PATH = "worker/index.js::deliverRealPriceAlert";
 function logPriceAlertDeliveryError({ alertId, email, userId, phase, message, details = {} }) {
   console.error(
     "PRICE_ALERT_DELIVERY_ERROR",
-    JSON.stringify({
-      path: PRICE_ALERT_SINGLE_PATH,
-      alertId,
-      email: email || null,
-      userId: userId || null,
-      phase,
-      message: message || "DELIVERY_FAILED",
-      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-      ...details,
-    })
+    JSON.stringify(
+      redactLogMeta({
+        path: PRICE_ALERT_SINGLE_PATH,
+        alertId,
+        email: email || null,
+        userId: userId || null,
+        phase,
+        message: message || "DELIVERY_FAILED",
+        moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+        ...details,
+      })
+    )
   );
 }
 
@@ -91,7 +105,7 @@ const MAX_ALERTS_PER_RUN = 20;
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 
-app.use(cors());
+app.use(cors(createWorkerCorsOptions()));
 app.use(express.json({ limit: "2mb" }));
 
 const analysisJobs = new Map();
@@ -1509,7 +1523,11 @@ app.get("/health", async (_req, res) => {
   });
 });
 
-app.post("/api/instant-analysis", async (req, res) => {
+app.post(
+  "/api/instant-analysis",
+  workerAccessDeniedMiddleware,
+  instantAnalysisRateLimitMiddleware,
+  async (req, res) => {
   try {
     const symbol = normalizeSymbol(req.body?.symbol);
 
@@ -1563,9 +1581,13 @@ app.post("/api/instant-analysis", async (req, res) => {
       error: error?.message || "SERVER_ERROR",
     });
   }
-});
+  }
+);
 
-app.get("/api/instant-analysis/:jobId", async (req, res) => {
+app.get(
+  "/api/instant-analysis/:jobId",
+  workerAccessDeniedMiddleware,
+  async (req, res) => {
   try {
     const jobId = String(req.params?.jobId || "").trim();
 
@@ -1588,7 +1610,8 @@ app.get("/api/instant-analysis/:jobId", async (req, res) => {
       error: error?.message || "SERVER_ERROR",
     });
   }
-});
+  }
+);
 
 app.listen(PORT, () => {
   const vapidStatus = getVapidEnvStatus();

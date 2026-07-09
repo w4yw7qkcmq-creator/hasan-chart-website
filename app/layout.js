@@ -3,28 +3,67 @@ import { AppProviders } from "./components/AppProviders";
 import RootLayoutShell from "./components/RootLayoutShell";
 import { readThemeFromRequestCookies } from "../lib/theme-server";
 import { THEME_BOOT_SCRIPT, THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
-import { sanitizeJsonLdText, serializeJsonLd, SITE_URL } from "../lib/seo";
+import {
+  SITE_ORGANIZATION_NAME,
+  buildPublicMetadata,
+  buildSiteEntityGraph,
+  serializeJsonLd,
+} from "../lib/seo";
+import { getSupabaseOrigin } from "../lib/external-origin-hints";
 
-const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: "HasaN CharT World",
-  alternateName: ["HasaN CharT", "Hasan Chart World"],
-  url: SITE_URL,
-  description:
-    "منصة احترافية لمتابعة أسواق المال، تحليلات العملات الرقمية والفوركس، توصيات التداول، الأخبار الاقتصادية والتنبيهات السعرية.",
-  publisher: {
-    "@type": "Organization",
-    name: "HasaN CharT World",
-    logo: {
-      "@type": "ImageObject",
-      url: `${SITE_URL}/favicon.png`,
+const ROOT_TITLE = "HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول";
+const ROOT_DESCRIPTION =
+  "HasaN CharT World منصة احترافية لمتابعة أسواق المال، تشمل تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، تنبيهات سعرية، أخبار اقتصادية، وطلبات تحليل العملات.";
+const ROOT_OG_DESCRIPTION =
+  "منصة HasaN CharT World تقدم تحليلات للأسواق المالية، توصيات Spot و Futures، أخبار اقتصادية، تنبيهات سعرية، وخدمات احترافية للمتداولين.";
+const ROOT_TWITTER_DESCRIPTION =
+  "تابع تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، الأخبار الاقتصادية، والتنبيهات السعرية عبر منصة HasaN CharT World.";
+
+export const metadata = {
+  ...buildPublicMetadata({
+    path: "/",
+    title: { default: ROOT_TITLE },
+    description: ROOT_DESCRIPTION,
+    keywords: [
+      "HasaN CharT World",
+      "حسن شارت",
+      "تحليل بيتكوين",
+      "تحليل العملات الرقمية",
+      "توصيات كريبتو",
+      "توصيات فوركس",
+      "توصيات Spot",
+      "توصيات Futures",
+      "أخبار اقتصادية",
+      "تنبيهات سعرية",
+      "إدارة حسابات التداول",
+    ],
+    openGraph: {
+      title: ROOT_TITLE,
+      description: ROOT_OG_DESCRIPTION,
     },
+    twitter: {
+      title: ROOT_TITLE,
+      description: ROOT_TWITTER_DESCRIPTION,
+    },
+  }),
+  applicationName: SITE_ORGANIZATION_NAME,
+  appleWebApp: {
+    title: SITE_ORGANIZATION_NAME,
   },
+  icons: {
+    icon: [{ url: "/favicon.png", type: "image/png", sizes: "1024x1024" }],
+    shortcut: "/favicon.png",
+    apple: [{ url: "/favicon.png", sizes: "1024x1024" }],
+  },
+};
+
+export const viewport = {
+  themeColor: "#020617",
 };
 
 export default async function RootLayout({ children }) {
   const theme = await readThemeFromRequestCookies();
+  const supabaseOrigin = getSupabaseOrigin();
 
   return (
     <html
@@ -35,57 +74,15 @@ export default async function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <head>
+        <link rel="dns-prefetch" href="https://s3.tradingview.com" />
+        <link rel="dns-prefetch" href="https://s.tradingview.com" />
+        {supabaseOrigin ? <link rel="dns-prefetch" href={supabaseOrigin} /> : null}
         <style dangerouslySetInnerHTML={{ __html: THEME_CRITICAL_CSS }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-        <title>HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول</title>
-        <meta
-          name="description"
-          content="HasaN CharT World منصة احترافية لمتابعة أسواق المال، تشمل تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، تنبيهات سعرية، أخبار اقتصادية، وطلبات تحليل العملات."
-        />
-        <meta
-          name="keywords"
-          content="HasaN CharT World, حسن شارت, تحليل بيتكوين, تحليل العملات الرقمية, توصيات كريبتو, توصيات فوركس, توصيات Spot, توصيات Futures, أخبار اقتصادية, تنبيهات سعرية, إدارة حسابات التداول"
-        />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://www.hasanchartworld.com" />
-        <meta name="application-name" content="HasaN CharT World" />
-        <meta name="apple-mobile-web-app-title" content="HasaN CharT World" />
-        <meta name="name" content="HasaN CharT World" />
-        <meta itemProp="name" content="HasaN CharT World" />
-        <meta name="theme-color" content="#020617" />
-        <link rel="icon" type="image/png" sizes="1024x1024" href="/favicon.png" />
-        <link rel="shortcut icon" type="image/png" href="/favicon.png" />
-        <link rel="apple-touch-icon" sizes="1024x1024" href="/favicon.png" />
-
-        <meta property="og:type" content="website" />
-        <meta property="og:locale" content="ar_AR" />
-        <meta property="og:url" content="https://www.hasanchartworld.com" />
-        <meta property="og:site_name" content="HasaN CharT World" />
-        <meta property="og:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
-        <meta
-          property="og:description"
-          content="منصة HasaN CharT World تقدم تحليلات للأسواق المالية، توصيات Spot و Futures، أخبار اقتصادية، تنبيهات سعرية، وخدمات احترافية للمتداولين."
-        />
-        <meta property="og:image" content="https://www.hasanchartworld.com/favicon.png" />
-        <meta property="og:image:secure_url" content="https://www.hasanchartworld.com/favicon.png" />
-        <meta property="og:image:width" content="512" />
-        <meta property="og:image:height" content="512" />
-        <meta property="og:image:alt" content="HasaN CharT World Logo" />
-
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول" />
-        <meta
-          name="twitter:description"
-          content="تابع تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، الأخبار الاقتصادية، والتنبيهات السعرية عبر منصة HasaN CharT World."
-        />
-        <meta name="twitter:image" content="https://www.hasanchartworld.com/favicon.png" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: serializeJsonLd({
-              ...structuredData,
-              description: sanitizeJsonLdText(structuredData.description, 300),
-            }),
+            __html: serializeJsonLd(buildSiteEntityGraph()),
           }}
         />
       </head>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatNotificationTime } from "../../lib/notifications-shared";
 import { useRequireAuth } from "../hooks/useRequireAuth";
+import StatusBadge from "../components/StatusBadge";
 
 function DashboardMetricCard({ title, value, subtitle, icon, tone = "blue" }) {
   return (
@@ -60,17 +61,6 @@ function QuickAction({ href, icon, title, text }) {
   );
 }
 
-
-function StatusBadge({ status }) {
-  const isDone = status === "triggered" || status === "مكتمل";
-  const label = status === "triggered" ? "تم الوصول" : status === "active" ? "نشط" : status || "غير محدد";
-
-  return (
-    <span className={`user-dashboard-badge ${isDone ? "user-dashboard-badge--done" : "user-dashboard-badge--active"}`}>
-      {label}
-    </span>
-  );
-}
 
 function DashboardListItem({ title, meta, badge, children, actions }) {
   return (
@@ -253,11 +243,46 @@ export default function MyDashboard() {
   useEffect(() => {
     if (sessionPending || shouldShowLogin || !user?.email) return;
 
-    const allAlerts = JSON.parse(localStorage.getItem("priceAlerts") || "[]");
     const allAnalysis = JSON.parse(localStorage.getItem("analysisRequests") || "[]");
-
-    setMyAlerts(allAlerts.filter((a) => a.userEmail === user.email));
     setMyAnalysis(allAnalysis.filter((a) => a.userEmail === user.email));
+  }, [sessionPending, shouldShowLogin, user?.email]);
+
+  useEffect(() => {
+    if (sessionPending || shouldShowLogin || !user?.email) return undefined;
+
+    let cancelled = false;
+
+    fetch("/api/alerts", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then((response) => response.json().catch(() => null))
+      .then((result) => {
+        if (cancelled) return;
+
+        if (result?.success && Array.isArray(result.alerts)) {
+          setMyAlerts(
+            result.alerts.map((alert) => ({
+              id: alert.id,
+              coin: alert.coin,
+              targetPrice: alert.price,
+              status: alert.status,
+              createdAt: alert.createdAt,
+              condition: alert.condition,
+            }))
+          );
+        } else {
+          setMyAlerts([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMyAlerts([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionPending, shouldShowLogin, user?.email]);
 
   useEffect(() => {
@@ -311,14 +336,26 @@ export default function MyDashboard() {
   const subscriptionLabel = user?.subscription_plan || "لا يوجد اشتراك";
   const subscriptionStatus = user?.subscription_status || "غير مفعل";
 
-  const deleteAlert = (id) => {
+  const deleteAlert = async (id) => {
     if (!user) return;
 
-    const allAlerts = JSON.parse(localStorage.getItem("priceAlerts") || "[]");
-    const updated = allAlerts.filter((a) => a.id !== id);
+    try {
+      const response = await fetch(`/api/alerts/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+        cache: "no-store",
+      });
 
-    localStorage.setItem("priceAlerts", JSON.stringify(updated));
-    setMyAlerts(updated.filter((a) => a.userEmail === user.email));
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        return;
+      }
+
+      setMyAlerts((current) => current.filter((alert) => alert.id !== id));
+    } catch {
+      // ignore transient network errors
+    }
   };
 
   const analyzeCoinWithAI = async () => {
@@ -579,7 +616,7 @@ export default function MyDashboard() {
 
         <section className="user-dashboard-actions" aria-label="إجراءات سريعة">
           <QuickAction href="#instant-analysis" icon="📈" title="تحليل لحظي" text="SMC و ICT لحظياً" />
-          <QuickAction href="/#alerts" icon="🔔" title="تنبيه سعر" text="حدد العملة والسعر المطلوب" />
+          <QuickAction href="/alerts?tab=create" icon="🔔" title="تنبيه سعر" text="حدد العملة والسعر المطلوب" />
           <QuickAction href="/my-analysis" icon="📩" title="ردود الإدارة" text="تابع ردود الإدارة على طلباتك" />
           <QuickAction href="/notifications" icon="🔔" title="الإشعارات" text="عرض كل الإشعارات" />
           <QuickAction
@@ -647,7 +684,7 @@ export default function MyDashboard() {
                     key={req.id}
                     title={req.coin}
                     meta={`${req.frame || "—"} · ${req.createdAt || ""}`}
-                    badge={<StatusBadge status={req.status} />}
+                    badge={<StatusBadge status={req.status} variant="dashboard" />}
                   />
                 ))}
               </div>
@@ -660,7 +697,7 @@ export default function MyDashboard() {
             title="التنبيهات النشطة"
             subtitle="تنبيهاتك السعرية المفعّلة"
             action={
-              <Link href="/#alerts" className="user-dashboard-panel__link">
+              <Link href="/alerts?tab=create" className="user-dashboard-panel__link">
                 تنبيه جديد
               </Link>
             }
@@ -672,7 +709,7 @@ export default function MyDashboard() {
                     key={item.id}
                     title={item.coin}
                     meta={`السعر المطلوب: $${item.targetPrice} · ${item.createdAt || ""}`}
-                    badge={<StatusBadge status={item.status} />}
+                    badge={<StatusBadge status={item.status} variant="dashboard" />}
                     actions={
                       <button
                         type="button"
@@ -706,7 +743,7 @@ export default function MyDashboard() {
                     key={`reply-${req.id}`}
                     title={req.coin}
                     meta={req.createdAt || ""}
-                    badge={<StatusBadge status={req.status} />}
+                    badge={<StatusBadge status={req.status} variant="dashboard" />}
                   >
                     <p className="user-dashboard-reply">{req.reply}</p>
                   </DashboardListItem>

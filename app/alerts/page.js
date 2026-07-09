@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createPriceAlert } from "../../lib/price-alert-create-client";
+import { createPriceAlert, deletePriceAlert, updatePriceAlert } from "../../lib/price-alert-create-client";
 import AppModal from "../components/AppModal";
 import { useAuth } from "../components/AuthProvider";
 
@@ -18,6 +18,11 @@ function AlertsPageContent() {
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(false);
   const [modal, setModal] = useState({ open: false, type: "info", title: "", message: "" });
+  const [editingId, setEditingId] = useState(null);
+  const [editCoin, setEditCoin] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const showModal = ({ type, title, message }) => {
     setModal({ open: true, type, title, message });
@@ -45,8 +50,7 @@ function AlertsPageContent() {
       }
 
       setAlerts(result.alerts || []);
-    } catch (error) {
-      console.warn("PRICE_ALERT_LIST_FAILED", error?.message || error);
+    } catch {
       setAlerts([]);
     } finally {
       setListLoading(false);
@@ -125,8 +129,6 @@ function AlertsPageContent() {
 
       switchTab("notifications");
     } catch (err) {
-      console.error("PRICE_ALERT_CREATE_FAILED", err);
-
       showModal({
         type: "error",
         title: "تعذر إضافة التنبيه",
@@ -141,6 +143,93 @@ function AlertsPageContent() {
     }
   };
 
+  const startEditAlert = (alert) => {
+    if (alert.status !== "active") return;
+    setEditingId(alert.id);
+    setEditCoin(alert.coin || "");
+    setEditPrice(String(alert.price ?? ""));
+  };
+
+  const cancelEditAlert = () => {
+    setEditingId(null);
+    setEditCoin("");
+    setEditPrice("");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || actionLoading) return;
+
+    const cleanCoin = editCoin.trim().toUpperCase();
+    const cleanPrice = String(editPrice || "").trim();
+
+    if (!cleanCoin || !cleanPrice) {
+      showModal({
+        type: "warning",
+        title: "بيانات ناقصة",
+        message: "اكتب اسم العملة والسعر المستهدف.",
+      });
+      return;
+    }
+
+    setActionLoading(true);
+
+    try {
+      await updatePriceAlert({
+        id: editingId,
+        coin: cleanCoin,
+        price: cleanPrice,
+      });
+
+      cancelEditAlert();
+      await loadAlerts();
+
+      showModal({
+        type: "success",
+        title: "تم تحديث التنبيه",
+        message: "تم حفظ التعديلات بنجاح.",
+      });
+    } catch (err) {
+      showModal({
+        type: "error",
+        title: "تعذر تحديث التنبيه",
+        message: err?.message || "حدث خطأ أثناء تحديث التنبيه.",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId || actionLoading) return;
+
+    setActionLoading(true);
+
+    try {
+      await deletePriceAlert({ id: pendingDeleteId });
+      setPendingDeleteId(null);
+
+      if (editingId === pendingDeleteId) {
+        cancelEditAlert();
+      }
+
+      await loadAlerts();
+
+      showModal({
+        type: "success",
+        title: "تم حذف التنبيه",
+        message: "تم إزالة التنبيه من حسابك.",
+      });
+    } catch (err) {
+      showModal({
+        type: "error",
+        title: "تعذر حذف التنبيه",
+        message: err?.message || "حدث خطأ أثناء حذف التنبيه.",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const showLoginRequired = authResolved && !currentUser?.email;
   const formDisabled = !authResolved || !currentUser?.email || loading;
 
@@ -152,6 +241,23 @@ function AlertsPageContent() {
         title={modal.title}
         message={modal.message}
         onClose={() => setModal((current) => ({ ...current, open: false }))}
+      />
+
+      <AppModal
+        open={Boolean(pendingDeleteId)}
+        type="warning"
+        title="حذف التنبيه"
+        message="هل أنت متأكد من حذف هذا التنبيه؟ لا يمكن التراجع عن هذا الإجراء."
+        mode="confirm"
+        confirmText={actionLoading ? "جاري الحذف..." : "حذف"}
+        cancelText="إلغاء"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          if (!actionLoading) setPendingDeleteId(null);
+        }}
+        onClose={() => {
+          if (!actionLoading) setPendingDeleteId(null);
+        }}
       />
 
       <div className="mx-auto max-w-xl space-y-6">
@@ -205,15 +311,84 @@ function AlertsPageContent() {
                 {alerts.map((alert) => (
                   <li
                     key={alert.id}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4"
+                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
                   >
-                    <span>
-                      {alert.coin} {alert.condition === "below" ? "تحت" : "فوق"}{" "}
-                      <span className="font-bold">${alert.price}</span>
-                    </span>
-                    <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-200">
-                      {alert.status === "triggered" ? "مُفعّل" : "نشط"}
-                    </span>
+                    {editingId === alert.id ? (
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={editCoin}
+                          onChange={(e) => setEditCoin(e.target.value)}
+                          placeholder="اسم العملة"
+                          disabled={actionLoading}
+                          className="w-full rounded-2xl border border-white/10 bg-[#111827] p-3 text-white outline-none disabled:opacity-60"
+                        />
+                        <input
+                          type="number"
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(e.target.value)}
+                          placeholder="السعر المستهدف (USD)"
+                          disabled={actionLoading}
+                          className="w-full rounded-2xl border border-white/10 bg-[#111827] p-3 text-white outline-none disabled:opacity-60"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleSaveEdit}
+                            disabled={actionLoading}
+                            className="flex-1 rounded-xl bg-emerald-400 px-3 py-2 text-sm font-black text-black disabled:opacity-60"
+                          >
+                            {actionLoading ? "جاري الحفظ..." : "حفظ"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditAlert}
+                            disabled={actionLoading}
+                            className="flex-1 rounded-xl border border-white/10 px-3 py-2 text-sm font-bold text-slate-200 disabled:opacity-60"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span>
+                          {alert.coin} {alert.condition === "below" ? "تحت" : "فوق"}{" "}
+                          <span className="font-bold">${alert.price}</span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-200">
+                            {alert.status === "triggered" ? "مُفعّل" : "نشط"}
+                          </span>
+                          {alert.status === "active" ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => startEditAlert(alert)}
+                                className="rounded-xl border border-white/10 px-3 py-1 text-xs font-bold text-slate-200 hover:bg-white/5"
+                              >
+                                تعديل
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPendingDeleteId(alert.id)}
+                                className="rounded-xl border border-red-400/30 px-3 py-1 text-xs font-bold text-red-200 hover:bg-red-400/10"
+                              >
+                                حذف
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPendingDeleteId(alert.id)}
+                              className="rounded-xl border border-red-400/30 px-3 py-1 text-xs font-bold text-red-200 hover:bg-red-400/10"
+                            >
+                              حذف
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
