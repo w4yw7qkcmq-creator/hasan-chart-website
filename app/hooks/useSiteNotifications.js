@@ -20,6 +20,7 @@ import {
   clearNotificationCenterRendered,
   handleNotificationCenterRealtimeEvent,
   installNotificationCenterTestHook,
+  markNotificationCenterRendered,
   registerNotificationCenterBridge,
   unregisterNotificationCenterBridge,
 } from "../../lib/notification-center";
@@ -135,6 +136,16 @@ export function useSiteNotifications() {
     });
   }, []);
 
+  const logSetNotifications = useCallback((reason, beforeLength, newNotifications) => {
+    const afterLength = Array.isArray(newNotifications) ? newNotifications.length : -1;
+    console.log("SET_NOTIFICATIONS", {
+      beforeLength,
+      afterLength,
+      reason,
+      stack: new Error().stack,
+    });
+  }, []);
+
   useEffect(() => {
     notificationsRef.current = notifications;
   }, [notifications]);
@@ -170,7 +181,9 @@ export function useSiteNotifications() {
       trackedUnreadCount: trackedUnreadCountRef.current,
       clearedAll: clearedAllNotificationsRef.current,
     });
+    const beforeLength = notificationsRef.current?.length || 0;
     notificationsRef.current = list;
+    logSetNotifications("applyServerSnapshot", beforeLength, list);
     setNotifications(list);
     queueMicrotask(() => {
       const current = notificationsRef.current || [];
@@ -189,7 +202,7 @@ export function useSiteNotifications() {
       renderedCount: list.length,
     });
     return list;
-  }, []);
+  }, [logSetNotifications]);
 
   const setNotificationPanelOpen = useCallback((open) => {
     notificationPanelOpenRef.current = Boolean(open);
@@ -373,7 +386,9 @@ export function useSiteNotifications() {
 
         setNotifications((current) => {
           const withoutDuplicate = current.filter((item) => item.id !== normalized.id);
-          return [normalized, ...withoutDuplicate].slice(0, BELL_FEED_LIMIT);
+          const next = [normalized, ...withoutDuplicate].slice(0, BELL_FEED_LIMIT);
+          logSetNotifications("registerIncomingNotification", current.length, next);
+          return next;
         });
 
         if ((animateList || bumpUnread) && isNotificationUnread(normalized)) {
@@ -387,7 +402,7 @@ export function useSiteNotifications() {
 
       return normalized;
     },
-    [markNotificationAsRecentlyAdded]
+    [logSetNotifications, markNotificationAsRecentlyAdded]
   );
 
   const processNotificationCenterEvent = useCallback(
@@ -557,14 +572,13 @@ export function useSiteNotifications() {
 
     setNotifications((current) => {
       const exists = current.some((item) => item.id === updated.id);
-
-      if (!exists) {
-        return [updated, ...current].slice(0, 50);
-      }
-
-      return current.map((item) => (item.id === updated.id ? updated : item));
+      const next = !exists
+        ? [updated, ...current].slice(0, 50)
+        : current.map((item) => (item.id === updated.id ? updated : item));
+      logSetNotifications("handleRealtimeUpdate", current.length, next);
+      return next;
     });
-  }, []);
+  }, [logSetNotifications]);
 
   const handleRealtimeDelete = useCallback((payload) => {
     if (!initialSyncCompleteRef.current || clearedAllNotificationsRef.current) return;
@@ -579,9 +593,10 @@ export function useSiteNotifications() {
       if (current.length > 0 && next.length === 0) {
         logBellNotificationsCleared("realtime-delete");
       }
+      logSetNotifications("handleRealtimeDelete", current.length, next);
       return next;
     });
-  }, [logBellNotificationsCleared]);
+  }, [logBellNotificationsCleared, logSetNotifications]);
 
   const runNotificationMutation = useCallback(
     async (mutator) => {
@@ -605,13 +620,15 @@ export function useSiteNotifications() {
 
       let wasUnread = false;
 
-      setNotifications((current) =>
-        current.map((item) => {
+      setNotifications((current) => {
+        const next = current.map((item) => {
           if (item.id !== notificationId) return item;
           wasUnread = isNotificationUnread(item);
           return { ...item, isRead: true };
-        })
-      );
+        });
+        logSetNotifications("markAsRead", current.length, next);
+        return next;
+      });
 
       if (wasUnread) {
         setTrackedUnreadCount((count) => Math.max(0, count - 1));
@@ -636,7 +653,7 @@ export function useSiteNotifications() {
         }
       });
     },
-    [runNotificationMutation]
+    [logSetNotifications, runNotificationMutation]
   );
 
   const markAllAsRead = useCallback(() => {
@@ -645,6 +662,7 @@ export function useSiteNotifications() {
 
     setNotifications((current) => {
       const next = current.map((item) => ({ ...item, isRead: true }));
+      logSetNotifications("markAllAsRead", current.length, next);
       logNotificationMetrics("after-mark-read-local", next);
       devLog("notifications:after-mark-read");
       return next;
@@ -671,7 +689,7 @@ export function useSiteNotifications() {
         console.warn("Mark all notifications read skipped:", err?.message || err);
       }
     })();
-  }, [syncFromServer]);
+  }, [logSetNotifications, syncFromServer]);
 
   const deleteNotification = useCallback(
     async (notificationId) => {
@@ -686,6 +704,7 @@ export function useSiteNotifications() {
         if (current.length > 0 && next.length === 0) {
           logBellNotificationsCleared("delete-notification");
         }
+        logSetNotifications("deleteNotification", current.length, next);
         return next;
       });
       knownIdsRef.current.delete(notificationId);
@@ -713,12 +732,17 @@ export function useSiteNotifications() {
         }
       });
     },
-    [logBellNotificationsCleared, runNotificationMutation]
+    [logBellNotificationsCleared, logSetNotifications, runNotificationMutation]
   );
 
   const deleteAllNotifications = useCallback(async () => {
     clearedAllNotificationsRef.current = true;
     logBellNotificationsCleared("delete-all-notifications");
+    logSetNotifications(
+      "deleteAllNotifications",
+      notificationsRef.current?.length || 0,
+      []
+    );
     setNotifications([]);
     setTrackedUnreadCount(0);
     knownIdsRef.current = new Set();
@@ -743,7 +767,7 @@ export function useSiteNotifications() {
         console.warn("Delete all notifications skipped:", err?.message || err);
       }
     });
-  }, [logBellNotificationsCleared, runNotificationMutation]);
+  }, [logBellNotificationsCleared, logSetNotifications, runNotificationMutation]);
 
   useEffect(() => {
     registerNotificationCenterBridge({
@@ -771,6 +795,7 @@ export function useSiteNotifications() {
     if (!authResolved) {
       syncGenerationRef.current += 1;
       logBellNotificationsCleared("auth-not-resolved");
+      logSetNotifications("auth-not-resolved", notificationsRef.current?.length || 0, []);
       setNotifications([]);
       setTrackedUnreadCount(0);
       setActiveToast(null);
@@ -931,6 +956,7 @@ export function useSiteNotifications() {
     handleRealtimeDelete,
     handleRealtimeUpdate,
     logBellNotificationsCleared,
+    logSetNotifications,
     processNotificationCenterEvent,
     startFallbackPolling,
     stopFallbackPolling,
@@ -951,11 +977,13 @@ export function useSiteNotifications() {
       }
 
       if (event.type === "patch" && event.id) {
-        setNotifications((current) =>
-          current.map((item) =>
+        setNotifications((current) => {
+          const next = current.map((item) =>
             item.id === event.id ? { ...item, ...event.patch } : item
-          )
-        );
+          );
+          logSetNotifications("hub-patch", current.length, next);
+          return next;
+        });
         return;
       }
 
@@ -966,6 +994,7 @@ export function useSiteNotifications() {
           if (current.length > 0 && next.length === 0) {
             logBellNotificationsCleared("hub-remove-last-item");
           }
+          logSetNotifications("hub-remove", current.length, next);
           return next;
         });
         return;
@@ -974,7 +1003,11 @@ export function useSiteNotifications() {
       if (event.type === "bulk-read") {
         markedAllReadAtRef.current = Date.now();
         setTrackedUnreadCount(0);
-        setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+        setNotifications((current) => {
+          const next = current.map((item) => ({ ...item, isRead: true }));
+          logSetNotifications("hub-bulk-read", current.length, next);
+          return next;
+        });
         return;
       }
 
@@ -982,11 +1015,12 @@ export function useSiteNotifications() {
         clearedAllNotificationsRef.current = true;
         setTrackedUnreadCount(0);
         logBellNotificationsCleared("hub-clear-event");
+        logSetNotifications("hub-clear", notificationsRef.current?.length || 0, []);
         setNotifications([]);
         knownIdsRef.current = new Set();
       }
     });
-  }, [canSyncNotifications, logBellNotificationsCleared, registerIncomingNotification]);
+  }, [canSyncNotifications, logBellNotificationsCleared, logSetNotifications, registerIncomingNotification]);
 
   const sortedNotifications = useMemo(
     () =>

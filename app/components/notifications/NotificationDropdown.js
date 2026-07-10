@@ -69,6 +69,12 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
   }, [open, onClose, anchorRef]);
 
   const visibleItems = notifications.slice(0, 8);
+  console.log("NOTIFICATIONS_SLICE", {
+    beforeLength: notifications.length,
+    afterLength: visibleItems.length,
+    reason: "dropdown-visible-items-slice-read-only",
+    stack: new Error().stack,
+  });
 
   const handleDeleteAll = async () => {
     if (!notifications.length) return;
