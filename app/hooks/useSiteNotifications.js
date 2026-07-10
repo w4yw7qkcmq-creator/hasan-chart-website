@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { devLog } from "../../lib/dev-log";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
+import {
+  emitNotificationHubBulkRead,
+  emitNotificationHubClear,
+  emitNotificationHubPatch,
+  emitNotificationHubRemove,
+  emitNotificationHubUpsert,
+  subscribeNotificationHub,
+} from "../../lib/notification-hub-events";
 import {
   installNotificationSoundListener,
   installNotificationSoundTestHook,
@@ -56,6 +65,10 @@ async function waitForSupabaseSession(maxWaitMs = REALTIME_SESSION_WAIT_MS) {
 }
 
 function logNotificationMetrics(label, list) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
   console.log("notifications:count", { label, count: list.length });
   console.log("notifications:unread-count", {
     label,
@@ -63,11 +76,27 @@ function logNotificationMetrics(label, list) {
   });
 }
 
+const BELL_FEED_LIMIT = 50;
+
+function buildBellFeedUrl() {
+  const params = new URLSearchParams({
+    limit: String(BELL_FEED_LIMIT),
+    key: "all",
+    read: "all",
+    _: String(Date.now()),
+  });
+
+  return `/api/notification-hub/feed?${params.toString()}`;
+}
+
 export function useSiteNotifications() {
   const { authResolved, user } = useAuth();
+  const userId = String(user?.id || "").trim();
   const userEmail = String(user?.email || "").trim().toLowerCase();
+  const canSyncNotifications = Boolean(userId && userEmail);
 
   const [notifications, setNotifications] = useState([]);
+  const [trackedUnreadCount, setTrackedUnreadCount] = useState(0);
   const [activeToast, setActiveToast] = useState(null);
   const [bellShakeKey, setBellShakeKey] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
@@ -83,6 +112,7 @@ export function useSiteNotifications() {
   const channelRef = useRef(null);
   const toastHideTimerRef = useRef(null);
   const toastBatchTimerRef = useRef(null);
+  const dismissToastTimerRef = useRef(null);
   const toastShowingRef = useRef(false);
   const activeToastRef = useRef(null);
   const notificationPanelOpenRef = useRef(false);
@@ -134,6 +164,10 @@ export function useSiteNotifications() {
       window.clearTimeout(toastBatchTimerRef.current);
       toastBatchTimerRef.current = null;
     }
+    if (dismissToastTimerRef.current) {
+      window.clearTimeout(dismissToastTimerRef.current);
+      dismissToastTimerRef.current = null;
+    }
   }, []);
 
   const markNotificationAsRecentlyAdded = useCallback((notificationId) => {
@@ -183,7 +217,8 @@ export function useSiteNotifications() {
       clearToastTimers();
       setActiveToast((current) => (current?.id === toastId ? { ...current, exiting: true } : current));
 
-      window.setTimeout(() => {
+      dismissToastTimerRef.current = window.setTimeout(() => {
+        dismissToastTimerRef.current = null;
         finalizeDismissToast(toastId);
       }, TOAST_EXIT_MS);
     },
@@ -290,8 +325,12 @@ export function useSiteNotifications() {
 
         setNotifications((current) => {
           const withoutDuplicate = current.filter((item) => item.id !== normalized.id);
-          return [normalized, ...withoutDuplicate].slice(0, 50);
+          return [normalized, ...withoutDuplicate].slice(0, BELL_FEED_LIMIT);
         });
+
+        if ((animateList || bumpUnread) && isNotificationUnread(normalized)) {
+          setTrackedUnreadCount((count) => count + 1);
+        }
 
         if (animateList || bumpUnread) {
           markNotificationAsRecentlyAdded(normalized.id);
@@ -312,7 +351,7 @@ export function useSiteNotifications() {
 
       if (mutationInFlightRef.current) {
         if (isPriceAlert) {
-          console.log("PRICE_ALERT_DUPLICATE_SKIPPED", {
+          devLog("PRICE_ALERT_DUPLICATE_SKIPPED", {
             id: parsedEvent.id || null,
             reason: "mutation-in-flight",
             source,
@@ -323,7 +362,7 @@ export function useSiteNotifications() {
 
       if (clearedAllNotificationsRef.current) {
         if (isPriceAlert) {
-          console.log("PRICE_ALERT_DUPLICATE_SKIPPED", {
+          devLog("PRICE_ALERT_DUPLICATE_SKIPPED", {
             id: parsedEvent.id || null,
             reason: "notifications-cleared-this-session",
             source,
@@ -332,10 +371,14 @@ export function useSiteNotifications() {
         return null;
       }
 
-      registerIncomingNotification(rawRow, {
+      const normalized = registerIncomingNotification(rawRow, {
         bumpUnread: true,
         animateList: true,
       });
+
+      if (normalized) {
+        emitNotificationHubUpsert(rawRow, { source: source || "site-notifications" });
+      }
 
       void handleNotificationCenterRealtimeEvent(rawRow, { source });
       return rawRow;
@@ -345,7 +388,7 @@ export function useSiteNotifications() {
 
   const syncFromServer = useCallback(
     async ({ announceNew = false, generation = 0, mutationEpoch = 0, fresh = false } = {}) => {
-      if (!userEmail) return null;
+      if (!canSyncNotifications) return null;
 
       if (mutationInFlightRef.current && !mutationEpoch) {
         return null;
@@ -357,7 +400,7 @@ export function useSiteNotifications() {
 
       try {
         const response = await fetchWithTimeout(
-          `/api/my-notifications?include_read=1&limit=50&fresh=${fresh ? "1" : "0"}&_=${Date.now()}`,
+          buildBellFeedUrl(),
           {
             method: "GET",
             cache: "no-store",
@@ -372,7 +415,8 @@ export function useSiteNotifications() {
         if (generation && generation !== syncGenerationRef.current) return null;
         if (mutationEpoch && mutationEpoch !== mutationEpochRef.current) return null;
 
-        const serverNotifications = (result.notifications || []).filter(Boolean);
+        const serverNotifications = (result.items || []).filter(Boolean);
+        setTrackedUnreadCount(Number(result.unreadCount || 0));
         const previousKnownIds = new Set(knownIdsRef.current);
 
         if (!initializedRef.current) {
@@ -425,7 +469,7 @@ export function useSiteNotifications() {
         return null;
       }
     },
-    [applyServerSnapshot, processNotificationCenterEvent, userEmail]
+    [applyServerSnapshot, canSyncNotifications, processNotificationCenterEvent]
   );
 
   const refetchNotifications = useCallback(async () => {
@@ -433,13 +477,13 @@ export function useSiteNotifications() {
   }, [syncFromServer]);
 
   const startFallbackPolling = useCallback(() => {
-    if (pollTimerRef.current || !userEmail || document.hidden) return;
+    if (pollTimerRef.current || !canSyncNotifications || document.hidden) return;
 
     pollTimerRef.current = window.setInterval(() => {
-      if (document.hidden || !userEmail || mutationInFlightRef.current) return;
+      if (document.hidden || !canSyncNotifications || mutationInFlightRef.current) return;
       void syncFromServer({ announceNew: true });
     }, FALLBACK_POLL_MS);
-  }, [syncFromServer, userEmail]);
+  }, [canSyncNotifications, syncFromServer]);
 
   const handleRealtimeUpdate = useCallback((payload) => {
     if (!initialSyncCompleteRef.current || mutationInFlightRef.current || clearedAllNotificationsRef.current) {
@@ -493,11 +537,21 @@ export function useSiteNotifications() {
     async (notificationId) => {
       if (!notificationId) return;
 
+      let wasUnread = false;
+
       setNotifications((current) =>
-        current.map((item) =>
-          item.id === notificationId ? { ...item, isRead: true } : item
-        )
+        current.map((item) => {
+          if (item.id !== notificationId) return item;
+          wasUnread = isNotificationUnread(item);
+          return { ...item, isRead: true };
+        })
       );
+
+      if (wasUnread) {
+        setTrackedUnreadCount((count) => Math.max(0, count - 1));
+      }
+
+      emitNotificationHubPatch(notificationId, { isRead: true }, { source: "notification-bell" });
 
       await runNotificationMutation(async () => {
         try {
@@ -521,13 +575,16 @@ export function useSiteNotifications() {
 
   const markAllAsRead = useCallback(() => {
     markedAllReadAtRef.current = Date.now();
+    setTrackedUnreadCount(0);
 
     setNotifications((current) => {
       const next = current.map((item) => ({ ...item, isRead: true }));
       logNotificationMetrics("after-mark-read-local", next);
-      console.log("notifications:after-mark-read");
+      devLog("notifications:after-mark-read");
       return next;
     });
+
+    emitNotificationHubBulkRead({ source: "notification-bell" });
 
     void (async () => {
       try {
@@ -554,8 +611,20 @@ export function useSiteNotifications() {
     async (notificationId) => {
       if (!notificationId) return;
 
-      setNotifications((current) => current.filter((item) => item.id !== notificationId));
+      let wasUnread = false;
+
+      setNotifications((current) => {
+        const target = current.find((item) => item.id === notificationId);
+        wasUnread = isNotificationUnread(target);
+        return current.filter((item) => item.id !== notificationId);
+      });
       knownIdsRef.current.delete(notificationId);
+
+      if (wasUnread) {
+        setTrackedUnreadCount((count) => Math.max(0, count - 1));
+      }
+
+      emitNotificationHubRemove(notificationId, { source: "notification-bell" });
 
       await runNotificationMutation(async () => {
         try {
@@ -580,10 +649,12 @@ export function useSiteNotifications() {
   const deleteAllNotifications = useCallback(async () => {
     clearedAllNotificationsRef.current = true;
     setNotifications([]);
+    setTrackedUnreadCount(0);
     knownIdsRef.current = new Set();
     clearNotificationCenterRendered();
+    emitNotificationHubClear({ source: "notification-bell" });
     logNotificationMetrics("after-delete-all-local", []);
-    console.log("notifications:after-delete-all");
+    devLog("notifications:after-delete-all");
 
     await runNotificationMutation(async () => {
       try {
@@ -612,7 +683,7 @@ export function useSiteNotifications() {
       },
       registerNotification: (rawNotification, options) =>
         registerIncomingNotification(rawNotification, options),
-      isAuthenticated: () => Boolean(userEmail),
+      isAuthenticated: () => canSyncNotifications,
       shouldSkipToast: () => notificationPanelOpenRef.current,
       bumpBell: () => setBellShakeKey((value) => value + 1),
     });
@@ -623,12 +694,13 @@ export function useSiteNotifications() {
       unregisterNotificationCenterBridge();
       removeCenterTestHook();
     };
-  }, [pushToast, registerIncomingNotification, userEmail]);
+  }, [canSyncNotifications, pushToast, registerIncomingNotification]);
 
   useEffect(() => {
     if (!authResolved) {
       syncGenerationRef.current += 1;
       setNotifications([]);
+      setTrackedUnreadCount(0);
       setActiveToast(null);
       pendingToastBatchRef.current = [];
       deferredToastBatchRef.current = [];
@@ -648,8 +720,9 @@ export function useSiteNotifications() {
       return;
     }
 
-    if (!userEmail) {
+    if (!canSyncNotifications) {
       setLoading(false);
+      setTrackedUnreadCount(0);
       stopFallbackPolling();
       return;
     }
@@ -781,7 +854,7 @@ export function useSiteNotifications() {
     };
   }, [
     authResolved,
-    userEmail,
+    canSyncNotifications,
     clearToastTimers,
     handleRealtimeDelete,
     handleRealtimeUpdate,
@@ -789,7 +862,51 @@ export function useSiteNotifications() {
     startFallbackPolling,
     stopFallbackPolling,
     syncFromServer,
+    userEmail,
   ]);
+
+  useEffect(() => {
+    if (!canSyncNotifications) return undefined;
+
+    return subscribeNotificationHub((event) => {
+      if (event.type === "upsert" && event.notification) {
+        registerIncomingNotification(event.notification, {
+          bumpUnread: isNotificationUnread(event.notification),
+          animateList: true,
+        });
+        return;
+      }
+
+      if (event.type === "patch" && event.id) {
+        setNotifications((current) =>
+          current.map((item) =>
+            item.id === event.id ? { ...item, ...event.patch } : item
+          )
+        );
+        return;
+      }
+
+      if (event.type === "remove" && event.id) {
+        knownIdsRef.current.delete(event.id);
+        setNotifications((current) => current.filter((item) => item.id !== event.id));
+        return;
+      }
+
+      if (event.type === "bulk-read") {
+        markedAllReadAtRef.current = Date.now();
+        setTrackedUnreadCount(0);
+        setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+        return;
+      }
+
+      if (event.type === "clear") {
+        clearedAllNotificationsRef.current = true;
+        setTrackedUnreadCount(0);
+        setNotifications([]);
+        knownIdsRef.current = new Set();
+      }
+    });
+  }, [canSyncNotifications, registerIncomingNotification]);
 
   const sortedNotifications = useMemo(
     () =>
@@ -800,13 +917,15 @@ export function useSiteNotifications() {
     [notifications]
   );
 
-  const unreadCount = useMemo(
-    () => countUnreadNotifications(sortedNotifications),
-    [sortedNotifications]
-  );
+  const unreadCount = useMemo(() => {
+    const localUnread = countUnreadNotifications(sortedNotifications);
+    return Math.max(trackedUnreadCount, localUnread);
+  }, [sortedNotifications, trackedUnreadCount]);
 
   useEffect(() => {
-    logNotificationMetrics("state", notifications);
+    if (process.env.NODE_ENV !== "production") {
+      logNotificationMetrics("state", notifications);
+    }
   }, [notifications]);
 
   const unreadAnalysisCount = useMemo(

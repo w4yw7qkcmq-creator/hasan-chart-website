@@ -11,7 +11,15 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 
 function jsonOk(payload, status = 200) {
-  return NextResponse.json({ success: true, ...payload }, { status });
+  return NextResponse.json(
+    { success: true, ...payload },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    }
+  );
 }
 
 function jsonError(error, status = 400) {

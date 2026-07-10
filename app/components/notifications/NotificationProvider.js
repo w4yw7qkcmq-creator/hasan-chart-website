@@ -1,26 +1,23 @@
 "use client";
 
-import { createContext, useContext } from "react";
-import { useSiteNotifications } from "../../hooks/useSiteNotifications";
+import { useAuth } from "../AuthProvider";
+import { AuthenticatedNotificationLayer } from "./AuthenticatedNotificationLayer";
+import { NotificationContext } from "./notification-context";
+import { GUEST_NOTIFICATION_VALUE } from "./notification-guest-stub";
 
-const NotificationContext = createContext(null);
+export { useNotifications } from "./notification-context";
 
 export function NotificationProvider({ children }) {
-  const value = useSiteNotifications();
+  const { authResolved, user } = useAuth();
+  const shouldLoadAuthenticated = authResolved && Boolean(user?.id && user?.email);
 
-  return (
-    <NotificationContext.Provider value={value}>
-      {children}
-    </NotificationContext.Provider>
-  );
-}
-
-export function useNotifications() {
-  const context = useContext(NotificationContext);
-
-  if (!context) {
-    throw new Error("useNotifications must be used within NotificationProvider");
+  if (!shouldLoadAuthenticated) {
+    return (
+      <NotificationContext.Provider value={GUEST_NOTIFICATION_VALUE}>
+        {children}
+      </NotificationContext.Provider>
+    );
   }
 
-  return context;
+  return <AuthenticatedNotificationLayer>{children}</AuthenticatedNotificationLayer>;
 }

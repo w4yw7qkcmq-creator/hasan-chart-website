@@ -1,0 +1,17 @@
+export const GUEST_NOTIFICATION_VALUE = {
+  notifications: [],
+  unreadCount: 0,
+  unreadAnalysisCount: 0,
+  activeToast: null,
+  bellShakeKey: 0,
+  realtimeConnected: false,
+  loading: false,
+  recentlyAddedIds: [],
+  dismissToast: () => {},
+  markAsRead: async () => {},
+  markAllAsRead: () => {},
+  deleteNotification: async () => {},
+  deleteAllNotifications: async () => {},
+  refreshNotifications: async () => null,
+  setNotificationPanelOpen: () => {},
+};
