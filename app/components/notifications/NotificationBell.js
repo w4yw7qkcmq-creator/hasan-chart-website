@@ -24,7 +24,7 @@ export function NotificationBell({ className = "" }) {
     return () => setNotificationPanelOpen(false);
   }, [setNotificationPanelOpen]);
 
-  if (!user?.id || !user?.email) return null;
+  if (!user?.email) return null;
 
   const notificationAriaLabel =
     unreadCount > 0

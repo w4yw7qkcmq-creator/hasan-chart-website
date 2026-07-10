@@ -91,9 +91,8 @@ function buildBellFeedUrl() {
 
 export function useSiteNotifications() {
   const { authResolved, user } = useAuth();
-  const userId = String(user?.id || "").trim();
   const userEmail = String(user?.email || "").trim().toLowerCase();
-  const canSyncNotifications = Boolean(userId && userEmail);
+  const canSyncNotifications = Boolean(userEmail);
 
   const [notifications, setNotifications] = useState([]);
   const [trackedUnreadCount, setTrackedUnreadCount] = useState(0);
