@@ -12,7 +12,7 @@ const NotificationDropdown = dynamic(
 
 export function NotificationBell({ className = "" }) {
   const { user } = useAuth();
-  const { unreadCount, bellShakeKey, setNotificationPanelOpen, markAllAsRead } = useNotifications();
+  const { unreadCount, bellShakeKey, setNotificationPanelOpen } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const bellRef = useRef(null);
 
@@ -32,13 +32,7 @@ export function NotificationBell({ className = "" }) {
       : "الإشعارات";
 
   const handleBellClick = () => {
-    const opening = !isNotificationsOpen;
-
-    if (opening) {
-      markAllAsRead();
-    }
-
-    setIsNotificationsOpen(opening);
+    setIsNotificationsOpen((current) => !current);
   };
 
   return (

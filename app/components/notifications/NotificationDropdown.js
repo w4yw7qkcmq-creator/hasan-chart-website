@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppModal } from "../AppModalProvider";
 import { NotificationListItem } from "./NotificationListItem";
 import { useNotifications } from "./NotificationProvider";
@@ -20,11 +20,29 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
   } = useNotifications();
   const { showAppConfirm } = useAppModal();
   const panelRef = useRef(null);
+  const markedReadAfterOpenRef = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
-    void refreshNotifications();
+    if (!open) {
+      markedReadAfterOpenRef.current = false;
+      setRefreshing(false);
+      return;
+    }
+
+    setRefreshing(true);
+    void refreshNotifications().finally(() => {
+      setRefreshing(false);
+    });
   }, [open, refreshNotifications]);
+
+  useEffect(() => {
+    if (!open || refreshing || markedReadAfterOpenRef.current) return;
+    if (notifications.length === 0 && unreadCount === 0) return;
+
+    markedReadAfterOpenRef.current = true;
+    markAllAsRead();
+  }, [open, refreshing, notifications.length, unreadCount, markAllAsRead]);
 
   useEffect(() => {
     if (!open) return;
@@ -49,6 +67,16 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
   }, [open, onClose, anchorRef]);
 
   const visibleItems = notifications.slice(0, 8);
+
+  useEffect(() => {
+    if (!open) return;
+    console.log("BELL_NOTIFICATIONS_RENDERED", {
+      count: visibleItems.length,
+      totalNotifications: notifications.length,
+      unreadCount,
+      loading,
+    });
+  }, [open, visibleItems.length, notifications.length, unreadCount, loading]);
 
   const handleDeleteAll = async () => {
     if (!notifications.length) return;
@@ -93,7 +121,7 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
         </button>
       </div>
 
-      {loading && !visibleItems.length ? (
+      {refreshing && !visibleItems.length ? (
         <div className="notificationDropdown__empty relative z-10 rounded-[20px] border p-4 text-sm font-bold">
           جاري تحميل الإشعارات...
         </div>

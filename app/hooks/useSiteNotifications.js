@@ -126,11 +126,12 @@ export function useSiteNotifications() {
 
   const applyServerSnapshot = useCallback((serverNotifications) => {
     let list = (serverNotifications || []).filter(Boolean);
+    const incomingCount = list.length;
+    let filteredReason = null;
 
     if (clearedAllNotificationsRef.current && list.length > 0) {
-      setNotifications([]);
-      knownIdsRef.current = new Set();
-      return [];
+      clearedAllNotificationsRef.current = false;
+      filteredReason = "cleared-all-reset-by-new-incoming";
     }
 
     if (clearedAllNotificationsRef.current && list.length === 0) {
@@ -138,11 +139,17 @@ export function useSiteNotifications() {
     }
 
     if (Date.now() - markedAllReadAtRef.current < 8000) {
+      filteredReason = "marked-all-read-recently";
       list = list.map((item) => ({ ...item, isRead: true }));
     }
 
     knownIdsRef.current = new Set(list.map((item) => item.id).filter(Boolean));
     setNotifications(list);
+    console.log("BELL_NOTIFICATIONS_FILTERED", {
+      reason: filteredReason || "none",
+      incomingCount,
+      renderedCount: list.length,
+    });
     return list;
   }, []);
 
@@ -310,12 +317,16 @@ export function useSiteNotifications() {
 
   const registerIncomingNotification = useCallback(
     (rawNotification, { bumpUnread = false, animateList = false } = {}) => {
-      if (mutationInFlightRef.current || clearedAllNotificationsRef.current) {
+      if (mutationInFlightRef.current) {
         return null;
       }
 
       const normalized = normalizeNotification(rawNotification);
       if (!normalized?.id) return null;
+
+      if (clearedAllNotificationsRef.current) {
+        clearedAllNotificationsRef.current = false;
+      }
 
       const alreadyKnown = knownIdsRef.current.has(normalized.id);
 
@@ -359,17 +370,6 @@ export function useSiteNotifications() {
         return null;
       }
 
-      if (clearedAllNotificationsRef.current) {
-        if (isPriceAlert) {
-          devLog("PRICE_ALERT_DUPLICATE_SKIPPED", {
-            id: parsedEvent.id || null,
-            reason: "notifications-cleared-this-session",
-            source,
-          });
-        }
-        return null;
-      }
-
       const normalized = registerIncomingNotification(rawRow, {
         bumpUnread: true,
         animateList: true,
@@ -398,6 +398,10 @@ export function useSiteNotifications() {
       }
 
       try {
+        console.log("BELL_NOTIFICATIONS_FETCH_START", {
+          endpoint: buildBellFeedUrl(),
+        });
+
         const response = await fetchWithTimeout(
           buildBellFeedUrl(),
           {
@@ -415,7 +419,6 @@ export function useSiteNotifications() {
         if (mutationEpoch && mutationEpoch !== mutationEpochRef.current) return null;
 
         const serverNotifications = (result.items || []).filter(Boolean);
-        setTrackedUnreadCount(Number(result.unreadCount || 0));
         const previousKnownIds = new Set(knownIdsRef.current);
 
         if (!initializedRef.current) {
@@ -433,12 +436,22 @@ export function useSiteNotifications() {
             }
           });
           applyServerSnapshot(serverNotifications);
+          setTrackedUnreadCount(Number(result.unreadCount || 0));
+          console.log("BELL_NOTIFICATIONS_FETCH_RESULT", {
+            itemCount: serverNotifications.length,
+            unreadCount: Number(result.unreadCount || 0),
+          });
           initializedRef.current = true;
           initialSyncCompleteRef.current = true;
           return serverNotifications;
         }
 
         applyServerSnapshot(serverNotifications);
+        setTrackedUnreadCount(Number(result.unreadCount || 0));
+        console.log("BELL_NOTIFICATIONS_FETCH_RESULT", {
+          itemCount: serverNotifications.length,
+          unreadCount: Number(result.unreadCount || 0),
+        });
 
         if (initialSyncCompleteRef.current) {
           serverNotifications.forEach((item) => {
