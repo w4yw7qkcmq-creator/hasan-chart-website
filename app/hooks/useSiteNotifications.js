@@ -123,6 +123,25 @@ export function useSiteNotifications() {
   const clearedAllNotificationsRef = useRef(false);
   const markedAllReadAtRef = useRef(0);
   const sessionStartedAtRef = useRef(Date.now());
+  const notificationsRef = useRef([]);
+  const trackedUnreadCountRef = useRef(0);
+
+  const logBellNotificationsCleared = useCallback((reason, mutationEpoch = mutationEpochRef.current) => {
+    console.log("BELL_NOTIFICATIONS_CLEARED", {
+      reason,
+      previousLength: notificationsRef.current?.length || 0,
+      mutationEpoch,
+      clearedAll: clearedAllNotificationsRef.current,
+    });
+  }, []);
+
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  useEffect(() => {
+    trackedUnreadCountRef.current = trackedUnreadCount;
+  }, [trackedUnreadCount]);
 
   const applyServerSnapshot = useCallback((serverNotifications) => {
     let list = (serverNotifications || []).filter(Boolean);
@@ -144,7 +163,26 @@ export function useSiteNotifications() {
     }
 
     knownIdsRef.current = new Set(list.map((item) => item.id).filter(Boolean));
+    console.log("BELL_ITEMS_BEFORE_SET", {
+      listLength: Array.isArray(list) ? list.length : -1,
+      ids: Array.isArray(list) ? list.map((item) => item.id) : [],
+      readStates: Array.isArray(list) ? list.map((item) => item.isRead ?? item.is_read) : [],
+      trackedUnreadCount: trackedUnreadCountRef.current,
+      clearedAll: clearedAllNotificationsRef.current,
+    });
+    notificationsRef.current = list;
     setNotifications(list);
+    queueMicrotask(() => {
+      const current = notificationsRef.current || [];
+      const localUnread = countUnreadNotifications(current);
+      console.log("BELL_ITEMS_AFTER_SET", {
+        notificationsLength: current.length,
+        ids: current.map((item) => item.id),
+        trackedUnreadCount: trackedUnreadCountRef.current,
+        localUnread,
+        unreadCount: Math.max(trackedUnreadCountRef.current, localUnread),
+      });
+    });
     console.log("BELL_NOTIFICATIONS_FILTERED", {
       reason: filteredReason || "none",
       incomingCount,
@@ -419,6 +457,12 @@ export function useSiteNotifications() {
         if (mutationEpoch && mutationEpoch !== mutationEpochRef.current) return null;
 
         const serverNotifications = (result.items || []).filter(Boolean);
+        console.log("BELL_FETCH_RESPONSE", {
+          itemCount: serverNotifications.length,
+          unreadCount: Number(result.unreadCount || 0),
+          ids: serverNotifications.map((item) => item.id),
+          readStates: serverNotifications.map((item) => Boolean(item.isRead)),
+        });
         const previousKnownIds = new Set(knownIdsRef.current);
 
         if (!initializedRef.current) {
@@ -485,7 +529,7 @@ export function useSiteNotifications() {
   );
 
   const refetchNotifications = useCallback(async () => {
-    return syncFromServer({ mutationEpoch: mutationEpochRef.current, fresh: true });
+    return syncFromServer({ fresh: true });
   }, [syncFromServer]);
 
   const startFallbackPolling = useCallback(() => {
@@ -498,12 +542,16 @@ export function useSiteNotifications() {
   }, [canSyncNotifications, syncFromServer]);
 
   const handleRealtimeUpdate = useCallback((payload) => {
-    if (!initialSyncCompleteRef.current || mutationInFlightRef.current || clearedAllNotificationsRef.current) {
+    if (!initialSyncCompleteRef.current || mutationInFlightRef.current) {
       return;
     }
 
     const updated = normalizeNotification(payload.new);
     if (!updated?.id) return;
+
+    if (clearedAllNotificationsRef.current) {
+      clearedAllNotificationsRef.current = false;
+    }
 
     knownIdsRef.current.add(updated.id);
 
@@ -526,8 +574,14 @@ export function useSiteNotifications() {
 
     knownIdsRef.current.delete(deletedId);
 
-    setNotifications((current) => current.filter((item) => item.id !== deletedId));
-  }, []);
+    setNotifications((current) => {
+      const next = current.filter((item) => item.id !== deletedId);
+      if (current.length > 0 && next.length === 0) {
+        logBellNotificationsCleared("realtime-delete");
+      }
+      return next;
+    });
+  }, [logBellNotificationsCleared]);
 
   const runNotificationMutation = useCallback(
     async (mutator) => {
@@ -628,7 +682,11 @@ export function useSiteNotifications() {
       setNotifications((current) => {
         const target = current.find((item) => item.id === notificationId);
         wasUnread = isNotificationUnread(target);
-        return current.filter((item) => item.id !== notificationId);
+        const next = current.filter((item) => item.id !== notificationId);
+        if (current.length > 0 && next.length === 0) {
+          logBellNotificationsCleared("delete-notification");
+        }
+        return next;
       });
       knownIdsRef.current.delete(notificationId);
 
@@ -655,11 +713,12 @@ export function useSiteNotifications() {
         }
       });
     },
-    [runNotificationMutation]
+    [logBellNotificationsCleared, runNotificationMutation]
   );
 
   const deleteAllNotifications = useCallback(async () => {
     clearedAllNotificationsRef.current = true;
+    logBellNotificationsCleared("delete-all-notifications");
     setNotifications([]);
     setTrackedUnreadCount(0);
     knownIdsRef.current = new Set();
@@ -684,7 +743,7 @@ export function useSiteNotifications() {
         console.warn("Delete all notifications skipped:", err?.message || err);
       }
     });
-  }, [runNotificationMutation]);
+  }, [logBellNotificationsCleared, runNotificationMutation]);
 
   useEffect(() => {
     registerNotificationCenterBridge({
@@ -711,6 +770,7 @@ export function useSiteNotifications() {
   useEffect(() => {
     if (!authResolved) {
       syncGenerationRef.current += 1;
+      logBellNotificationsCleared("auth-not-resolved");
       setNotifications([]);
       setTrackedUnreadCount(0);
       setActiveToast(null);
@@ -870,6 +930,7 @@ export function useSiteNotifications() {
     clearToastTimers,
     handleRealtimeDelete,
     handleRealtimeUpdate,
+    logBellNotificationsCleared,
     processNotificationCenterEvent,
     startFallbackPolling,
     stopFallbackPolling,
@@ -900,7 +961,13 @@ export function useSiteNotifications() {
 
       if (event.type === "remove" && event.id) {
         knownIdsRef.current.delete(event.id);
-        setNotifications((current) => current.filter((item) => item.id !== event.id));
+        setNotifications((current) => {
+          const next = current.filter((item) => item.id !== event.id);
+          if (current.length > 0 && next.length === 0) {
+            logBellNotificationsCleared("hub-remove-last-item");
+          }
+          return next;
+        });
         return;
       }
 
@@ -914,11 +981,12 @@ export function useSiteNotifications() {
       if (event.type === "clear") {
         clearedAllNotificationsRef.current = true;
         setTrackedUnreadCount(0);
+        logBellNotificationsCleared("hub-clear-event");
         setNotifications([]);
         knownIdsRef.current = new Set();
       }
     });
-  }, [canSyncNotifications, registerIncomingNotification]);
+  }, [canSyncNotifications, logBellNotificationsCleared, registerIncomingNotification]);
 
   const sortedNotifications = useMemo(
     () =>
@@ -933,6 +1001,23 @@ export function useSiteNotifications() {
     const localUnread = countUnreadNotifications(sortedNotifications);
     return Math.max(trackedUnreadCount, localUnread);
   }, [sortedNotifications, trackedUnreadCount]);
+
+  const localUnread = useMemo(
+    () => countUnreadNotifications(sortedNotifications),
+    [sortedNotifications]
+  );
+
+  useEffect(() => {
+    console.log("BELL_NOTIFICATIONS_STATE_CHANGED", {
+      length: notifications.length,
+      ids: notifications.map((item) => item.id),
+      readStates: notifications.map((item) => item.isRead ?? item.is_read),
+      trackedUnreadCount,
+      localUnread,
+      unreadCount,
+      clearedAll: clearedAllNotificationsRef.current,
+    });
+  }, [notifications, trackedUnreadCount, localUnread, unreadCount]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {

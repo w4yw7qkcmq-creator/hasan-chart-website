@@ -38,10 +38,12 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
 
   useEffect(() => {
     if (!open || refreshing || markedReadAfterOpenRef.current) return;
-    if (notifications.length === 0 && unreadCount === 0) return;
+    if (notifications.length === 0) return;
 
-    markedReadAfterOpenRef.current = true;
-    markAllAsRead();
+    if (unreadCount > 0) {
+      markedReadAfterOpenRef.current = true;
+      markAllAsRead();
+    }
   }, [open, refreshing, notifications.length, unreadCount, markAllAsRead]);
 
   useEffect(() => {
@@ -68,16 +70,6 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
 
   const visibleItems = notifications.slice(0, 8);
 
-  useEffect(() => {
-    if (!open) return;
-    console.log("BELL_NOTIFICATIONS_RENDERED", {
-      count: visibleItems.length,
-      totalNotifications: notifications.length,
-      unreadCount,
-      loading,
-    });
-  }, [open, visibleItems.length, notifications.length, unreadCount, loading]);
-
   const handleDeleteAll = async () => {
     if (!notifications.length) return;
 
@@ -93,6 +85,16 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
 
     await deleteAllNotifications();
   };
+
+  console.log("BELL_DROPDOWN_RENDER", {
+    notificationsLength: notifications.length,
+    visibleItemsLength: visibleItems.length,
+    notificationIds: notifications.map((item) => item.id),
+    visibleIds: visibleItems.map((item) => item.id),
+    unreadCount,
+    refreshing,
+    open,
+  });
 
   return (
     <div
@@ -125,7 +127,11 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
         <div className="notificationDropdown__empty relative z-10 rounded-[20px] border p-4 text-sm font-bold">
           جاري تحميل الإشعارات...
         </div>
-      ) : visibleItems.length ? (
+      ) : notifications.length === 0 ? (
+        <div className="notificationDropdown__empty relative z-10 rounded-[20px] border p-4 text-sm font-bold">
+          لا توجد إشعارات حالياً.
+        </div>
+      ) : (
         <div className="relative z-10 max-h-[22rem] space-y-2 overflow-y-auto customScroll">
           {visibleItems.map((notification) => (
             <NotificationListItem
@@ -138,10 +144,6 @@ export function NotificationDropdown({ open, onClose, anchorRef }) {
               onNavigate={onClose}
             />
           ))}
-        </div>
-      ) : (
-        <div className="notificationDropdown__empty relative z-10 rounded-[20px] border p-4 text-sm font-bold">
-          لا توجد إشعارات حالياً.
         </div>
       )}
 
