@@ -15,6 +15,38 @@ const SSE_CONNECT_TIMEOUT_MS = 2500;
 const SSE_RETRY_MS = 3000;
 const POLL_FALLBACK_MS = 12000;
 const BOOTSTRAP_RETRY_MS = 3000;
+const MIN_BOOTSTRAP_GAP_MS = 1500;
+
+let marketPulseBootstrapPromise = null;
+let lastMarketPulseBootstrapAt = 0;
+
+async function fetchMarketPulsePayload() {
+  const now = Date.now();
+
+  if (marketPulseBootstrapPromise) {
+    return marketPulseBootstrapPromise;
+  }
+
+  if (now - lastMarketPulseBootstrapAt < MIN_BOOTSTRAP_GAP_MS) {
+    return null;
+  }
+
+  marketPulseBootstrapPromise = fetchWithTimeout(
+    "/api/market-pulse",
+    { credentials: "omit" },
+    5000
+  )
+    .then(async (response) => {
+      const result = await response.json().catch(() => null);
+      return { response, result };
+    })
+    .finally(() => {
+      marketPulseBootstrapPromise = null;
+      lastMarketPulseBootstrapAt = Date.now();
+    });
+
+  return marketPulseBootstrapPromise;
+}
 
 export function readStoredMarketPulse() {
   if (typeof window === "undefined") return null;
@@ -184,12 +216,10 @@ export function useMarketPulseStream() {
 
     const bootstrapFromApi = async () => {
       try {
-        const response = await fetchWithTimeout(
-          `/api/market-pulse?_=${Date.now()}`,
-          { cache: "no-store", credentials: "omit" },
-          5000
-        );
-        const result = await response.json().catch(() => null);
+        const payload = await fetchMarketPulsePayload();
+        if (!payload) return false;
+
+        const { response, result } = payload;
 
         if (!mountedRef.current || !response.ok || !result?.success || !result?.prices) {
           return false;
@@ -206,9 +236,10 @@ export function useMarketPulseStream() {
     };
 
     const startPollFallback = () => {
-      if (pollTimerRef.current || !mountedRef.current) return;
+      if (pollTimerRef.current || !mountedRef.current || document.hidden) return;
 
       pollTimerRef.current = window.setInterval(() => {
+        if (!mountedRef.current || document.hidden) return;
         void bootstrapFromApi();
       }, POLL_FALLBACK_MS);
     };
@@ -295,8 +326,21 @@ export function useMarketPulseStream() {
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible" || !mountedRef.current) return;
+      if (!mountedRef.current) return;
+
+      if (document.visibilityState === "hidden") {
+        clearPollTimer();
+        clearRetryTimer();
+        closeEventSource();
+        sseLiveRef.current = false;
+        return;
+      }
+
       void bootstrapFromApi();
+
+      if (!sseLiveRef.current) {
+        connectStream();
+      }
     };
 
     const handleSessionReady = () => {
@@ -306,8 +350,14 @@ export function useMarketPulseStream() {
     void bootstrapFromApi();
 
     retryTimerRef.current = window.setInterval(() => {
-      if (!mountedRef.current || hasKnownMarketPrice(pricesRef.current)) {
-        clearRetryTimer();
+      if (
+        !mountedRef.current ||
+        document.hidden ||
+        hasKnownMarketPrice(pricesRef.current)
+      ) {
+        if (hasKnownMarketPrice(pricesRef.current)) {
+          clearRetryTimer();
+        }
         return;
       }
 

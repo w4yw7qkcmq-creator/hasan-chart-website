@@ -201,9 +201,11 @@ export default function NotificationSettingsPage() {
 
     void loadNotificationSettings()
       .then((result) => {
-        console.log("NOTIFICATION_SETTINGS_LOAD_SUCCESS", {
-          channel_preferences: result.settings.channel_preferences,
-        });
+        if (process.env.NODE_ENV !== "production") {
+          console.log("NOTIFICATION_SETTINGS_LOAD_SUCCESS", {
+            channel_preferences: result.settings.channel_preferences,
+          });
+        }
         setSettings(result.settings);
         applyServerNotificationSettings(result.settings);
       })
@@ -275,7 +277,9 @@ export default function NotificationSettingsPage() {
     setMessage("");
 
     try {
-      console.log("NOTIFICATION_SETTINGS_SAVE_START");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("NOTIFICATION_SETTINGS_SAVE_START");
+      }
       const result = await saveNotificationSettings(settings);
       setSettings(result.settings);
       setMessage("تم حفظ إعدادات الإشعارات بنجاح");

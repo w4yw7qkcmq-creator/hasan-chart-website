@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "../components/AuthProvider";
-import PublicServiceLanding from "../components/public-seo/PublicServiceLanding";
+import { useVisibilityRefresh } from "../hooks/useVisibilityRefresh";
+
+const PublicServiceLanding = dynamic(
+  () =>
+    import("../components/public-seo/PublicServiceLanding").then(
+      (mod) => mod.default
+    ),
+  { ssr: false }
+);
 
 const SIGNAL_ACTIVE_MS = 10 * 60 * 1000;
 
@@ -89,8 +98,13 @@ export default function VipSpotPage() {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [statusTick, setStatusTick] = useState(0);
+  const loadInFlightRef = useRef(false);
 
   const loadSignals = async ({ silent = false } = {}) => {
+    if (loadInFlightRef.current && silent) return;
+
+    loadInFlightRef.current = true;
+
     if (!silent) {
       setLoading(true);
     }
@@ -122,6 +136,8 @@ export default function VipSpotPage() {
       console.error("VIP Spot signals error:", error);
       setSignals([]);
     } finally {
+      loadInFlightRef.current = false;
+
       if (!silent) {
         setLoading(false);
       }
@@ -133,19 +149,21 @@ export default function VipSpotPage() {
 
     loadSignals();
 
-    const refreshTimer = setInterval(() => {
-      loadSignals({ silent: true });
-    }, 10000);
-
     const statusTimer = setInterval(() => {
       setStatusTick((value) => value + 1);
     }, 30000);
 
     return () => {
-      clearInterval(refreshTimer);
       clearInterval(statusTimer);
     };
   }, [authResolved, user?.email]);
+
+  useVisibilityRefresh(() => loadSignals({ silent: true }), {
+    enabled: authResolved && Boolean(user?.email),
+    intervalMs: 15000,
+    refreshOnVisible: true,
+    refreshOnFocus: false,
+  });
 
   if (!authResolved) {
     return (
