@@ -34,7 +34,7 @@ const CATEGORY_MARKET_LABELS = {
  * @param {Record<string, unknown>} item
  */
 export function isMetalsNews(item) {
-  const text = `${item?.title || ""} ${item?.content || ""} ${item?.topic_cluster || ""}`.toLowerCase();
+  const text = `${item?.title || ""} ${item?.content || ""}`.toLowerCase();
   return /gold|silver|xau|xag|platinum|copper|metal|precious|ذهب|فضة|معادن|نحاس/.test(text);
 }
 
@@ -42,7 +42,7 @@ export function isMetalsNews(item) {
  * @param {Record<string, unknown>} item
  */
 export function isForexNews(item) {
-  const text = `${item?.title || ""} ${item?.content || ""} ${item?.topic_cluster || ""}`.toLowerCase();
+  const text = `${item?.title || ""} ${item?.content || ""}`.toLowerCase();
   return /forex|eurusd|gbpusd|usdjpy|usdchf|audusd|nzdusd|usdcad|eur\/usd|gbp\/usd|فوركس|اليورو|الجنيه|الين|الدولار/.test(
     text
   );
@@ -52,7 +52,7 @@ export function isForexNews(item) {
  * @param {Record<string, unknown>} item
  */
 export function isOilEnergyNews(item) {
-  const text = `${item?.title || ""} ${item?.content || ""} ${item?.topic_cluster || ""}`.toLowerCase();
+  const text = `${item?.title || ""} ${item?.content || ""}`.toLowerCase();
   return /oil|brent|crude|opec|wti|natural gas|energy|نفط|أوبك|طاقة|هرمز/.test(text);
 }
 
@@ -60,7 +60,7 @@ export function isOilEnergyNews(item) {
  * @param {Record<string, unknown>} item
  */
 export function isGoldCommoditiesNews(item) {
-  const text = `${item?.title || ""} ${item?.content || ""} ${item?.topic_cluster || ""}`.toLowerCase();
+  const text = `${item?.title || ""} ${item?.content || ""}`.toLowerCase();
   return (
     isMetalsNews(item) ||
     /commodit|silver|xag|سلع|ذهب|فضة/.test(text)

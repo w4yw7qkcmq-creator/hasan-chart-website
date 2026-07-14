@@ -95,11 +95,11 @@ export function NewsSearchBar({ value, onChange }) {
 }
 
 export function NewsCard({ item, index, compact = false, priority = false }) {
-  const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
+  const newsImpact = item.impact_level || "MEDIUM";
   const isHighImpact = newsImpact === "HIGH";
   const newsTitle = extractArabicTitle(item);
   const newsContent = makeExcerpt(
-    item.summary || item.description || item.ai_summary || item.content || item.normalized_title
+    item.content || item.title
   );
   const newsImage = resolveNewsImageUrl(item);
   const category = detectNewsCategory(item);

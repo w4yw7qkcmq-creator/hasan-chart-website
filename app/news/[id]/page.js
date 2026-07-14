@@ -77,7 +77,7 @@ function cleanText(text) {
 
 function getNewsTitle(news) {
   const content = cleanText(news?.content || "");
-  const title = cleanText(news?.title || news?.normalized_title || "");
+  const title = cleanText(news?.title || "");
   const arabicSentences = content
     .split(/[.!؟\n]/)
     .map((part) => part.trim())
@@ -194,7 +194,7 @@ export async function generateMetadata({ params }) {
   }
 
   const title = getNewsTitle(news);
-  const description = cleanText(news.content || news.summary || news.description || title).slice(0, 160);
+  const description = cleanText(news.content || title).slice(0, 160);
   const rawImage = getNewsImage(news);
   const reachableImage = await getReachableNewsImage(rawImage);
   const image = reachableImage || `${SITE_URL}/favicon.png`;
@@ -233,7 +233,7 @@ export default async function NewsDetailsPage({ params }) {
   }
 
   const title = getNewsTitle(news);
-  const content = cleanText(news.content || news.summary || news.description || title);
+  const content = cleanText(news.content || title);
   const rawImage = getNewsImage(news);
   const image = await getReachableNewsImage(rawImage);
   const publishedDate = formatNewsDateTime(news.created_at);

@@ -91,7 +91,7 @@ function getNewsImage(item) {
 
 function extractArabicTitle(item) {
   const content = cleanNewsText(item.content || "");
-  const title = cleanNewsText(item.title || item.normalized_title || "");
+  const title = cleanNewsText(item.title || "");
   const arabicSentences = content
     .split(/[.!؟\n]/)
     .map((part) => part.trim())
@@ -121,7 +121,7 @@ function getSourceName(url) {
 }
 
 function detectCategory(item) {
-  const text = `${item.title || ""} ${item.content || ""} ${item.topic_cluster || ""}`.toLowerCase();
+  const text = `${item.title || ""} ${item.content || ""}`.toLowerCase();
 
   if (/bitcoin|btc|crypto|ethereum/.test(text)) return "crypto";
   if (/gold|oil|silver|commodit/.test(text)) return "commodities";
@@ -232,16 +232,16 @@ export default async function CategoryPage({ params }) {
         ) : (
           <div className="grid auto-rows-fr gap-6 md:grid-cols-2 xl:grid-cols-3">
             {news.map((item, index) => {
-              const newsImpact = item.impact_level || item.importance || item.priority || "MEDIUM";
+              const newsImpact = item.impact_level || "MEDIUM";
               const isHighImpact = newsImpact === "HIGH";
               const impactColor = isHighImpact
                 ? "bg-red-500/15 text-red-300 border-red-400/30"
                 : "bg-amber-500/15 text-amber-300 border-amber-400/30";
 
-              const sourceLink = item.source_link || item.link || null;
+              const sourceLink = item.source_link || null;
               const newsTitle = extractArabicTitle(item);
               const newsContent = shortText(
-                item.content || item.summary || item.description || item.ai_summary || item.normalized_title,
+                item.content || item.title,
                 260
               );
               const newsImage = getNewsImage(item);

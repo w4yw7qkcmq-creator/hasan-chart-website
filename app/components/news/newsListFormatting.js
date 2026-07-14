@@ -48,7 +48,7 @@ export function makeExcerpt(text, maxLength = 210) {
 
 export function extractArabicTitle(item) {
   const content = cleanNewsText(item.content || "");
-  const title = cleanNewsText(item.title || item.normalized_title || "");
+  const title = cleanNewsText(item.title || "");
   const arabicSentences = content
     .split(/[.!؟\n]/)
     .map((part) => part.trim())

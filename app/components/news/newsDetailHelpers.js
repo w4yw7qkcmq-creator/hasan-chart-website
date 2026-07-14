@@ -53,7 +53,7 @@ const WATCH_POINTS_BY_TOPIC = {
  * @param {Record<string, unknown>} news
  */
 function buildNewsText(news = {}) {
-  return `${news.title || ""} ${news.content || ""} ${news.slug || ""} ${news.topic_cluster || ""}`.toLowerCase();
+  return `${news.title || ""} ${news.content || ""} ${news.slug || ""}`.toLowerCase();
 }
 
 /**
