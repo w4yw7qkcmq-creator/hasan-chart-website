@@ -75,22 +75,53 @@ export function NewsHubLinks() {
   );
 }
 
-export function NewsSearchBar({ value, onChange }) {
+export function NewsSearchPanel({ value, onChange, selectedCategory, onSelectCategory }) {
   return (
-    <div className="news-page-search" role="search">
-      <label className="news-page-search__label" htmlFor="news-page-search-input">
-        بحث في الأخبار
-      </label>
-      <input
-        id="news-page-search-input"
-        type="search"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="ابحث بالعنوان أو الكلمات المفتاحية…"
-        className="news-page-search__input"
-        dir="rtl"
-      />
-    </div>
+    <section className="news-search-panel" aria-label="بحث وتصفية الأخبار">
+      <div className="news-search-heading">
+        <span className="news-search-heading__title">ابحث في الأخبار</span>
+        <small className="news-search-heading__hint">ابحث بعنوان الخبر أو الكلمات المفتاحية</small>
+      </div>
+
+      <div className="news-search-input-wrapper" role="search">
+        <label className="news-search-input-wrapper__label" htmlFor="news-page-search-input">
+          ابحث في الأخبار
+        </label>
+        <span className="news-search-input-wrapper__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+          </svg>
+        </span>
+        <input
+          id="news-page-search-input"
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="ابحث بعنوان الخبر أو الكلمات المفتاحية..."
+          className="news-search-input-wrapper__input"
+          dir="rtl"
+          enterKeyHint="search"
+        />
+        {value ? (
+          <button
+            type="button"
+            className="news-search-input-wrapper__clear"
+            onClick={() => onChange("")}
+            aria-label="مسح البحث"
+          >
+            ×
+          </button>
+        ) : null}
+      </div>
+
+      <div className="news-category-filters">
+        <NewsCategoryNav
+          selectedCategory={selectedCategory}
+          onSelectCategory={onSelectCategory}
+        />
+      </div>
+    </section>
   );
 }
 

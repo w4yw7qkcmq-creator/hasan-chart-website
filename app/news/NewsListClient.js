@@ -19,11 +19,10 @@ import {
 } from "../components/news/newsListFormatting";
 import {
   NewsCard,
-  NewsCategoryNav,
   NewsEmptyState,
   NewsHighImpactSection,
   NewsHubLinks,
-  NewsSearchBar,
+  NewsSearchPanel,
   NewsSkeletonGrid,
 } from "../components/news/NewsListUi";
 import { useMountedRef } from "../hooks/useMountedRef";
@@ -263,8 +262,9 @@ export default function News() {
         </header>
 
         <NewsHubLinks />
-        <NewsSearchBar value={searchQuery} onChange={setSearchQuery} />
-        <NewsCategoryNav
+        <NewsSearchPanel
+          value={searchQuery}
+          onChange={setSearchQuery}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />
