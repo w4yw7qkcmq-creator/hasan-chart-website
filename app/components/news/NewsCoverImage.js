@@ -1,75 +1,78 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
-import { getNewsImageSources } from "../../../lib/news-images";
+import { normalizeNewsImageUrl } from "../../../lib/news-images";
+import { shouldUnoptimizeImageSrc } from "../../../lib/media-image";
 
 const BLOCKED_SRC_PATTERN =
   /source\.unsplash\.com|images\.unsplash\.com|unsplash\.com\/photo|coindesk\.com/i;
 
 const FALLBACK_IMAGE_SRC = "/favicon.png";
+const FALLBACK_ALT = "شعار HasaN CharT World";
 
 function getSafeImageSrc(src) {
   const value = String(src || "").trim();
-  if (!value || BLOCKED_SRC_PATTERN.test(value)) return null;
-  return value;
+  if (!value || BLOCKED_SRC_PATTERN.test(value)) {
+    return null;
+  }
+
+  if (value.startsWith("/")) {
+    return value;
+  }
+
+  return normalizeNewsImageUrl(value);
 }
 
 function NewsImageCore({
   src,
-  webpSrc,
   alt,
-  loading = "lazy",
-  className,
-  hiddenClassName,
-  showImage,
+  priority = false,
+  sizes,
+  quality = 72,
+  shellClassName = "news-media-image-shell",
+  imageClassName,
+  hidden = false,
   onError,
 }) {
-  if (!src) return null;
-
-  if (webpSrc) {
-    return (
-      <picture>
-        <source srcSet={webpSrc} type="image/webp" />
-        <img
-          src={src}
-          alt={alt}
-          loading={loading}
-          decoding="async"
-          fetchPriority="low"
-          referrerPolicy="no-referrer"
-          onError={onError}
-          className={showImage ? className : hiddenClassName}
-        />
-      </picture>
-    );
+  if (!src || hidden) {
+    return null;
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      loading={loading}
-      decoding="async"
-      fetchPriority="low"
-      referrerPolicy="no-referrer"
-      onError={onError}
-      className={showImage ? className : hiddenClassName}
-    />
+    <div className={shellClassName}>
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes={sizes}
+        quality={quality}
+        priority={priority}
+        fetchPriority={priority ? "high" : "auto"}
+        loading={priority ? undefined : "lazy"}
+        decoding="async"
+        unoptimized={shouldUnoptimizeImageSrc(src)}
+        referrerPolicy="no-referrer"
+        onError={onError}
+        className={imageClassName}
+      />
+    </div>
   );
 }
 
 export function NewsCoverImage({
   src,
   alt,
-  loading = "lazy",
+  priority = false,
+  sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px",
   className = "news-card__image",
   fallbackClassName = "news-card__fallback",
   fallback,
 }) {
   const safeSrc = useMemo(() => getSafeImageSrc(src), [src]);
-  const imageSources = useMemo(() => getNewsImageSources(safeSrc), [safeSrc]);
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(imageSources.src) && !failed;
+  const showImage = Boolean(safeSrc) && !failed;
+  const resolvedAlt = alt || "صورة الخبر";
 
   return (
     <>
@@ -77,24 +80,28 @@ export function NewsCoverImage({
         {fallback}
       </div>
       <NewsImageCore
-        src={imageSources.src}
-        webpSrc={imageSources.webpSrc}
-        alt={alt}
-        loading={loading}
-        className={className}
-        hiddenClassName={`${className} news-card__image--hidden`}
-        showImage={showImage}
+        src={safeSrc}
+        alt={resolvedAlt}
+        priority={priority}
+        sizes={sizes}
+        quality={68}
+        imageClassName={className}
+        hidden={!showImage}
         onError={() => setFailed(true)}
       />
       {failed && safeSrc ? (
-        <img
-          src={FALLBACK_IMAGE_SRC}
-          alt=""
-          aria-hidden="true"
-          loading="lazy"
-          decoding="async"
-          className={`${className} news-card__image--fallback`}
-        />
+        <div className="news-media-image-shell">
+          <Image
+            src={FALLBACK_IMAGE_SRC}
+            alt={FALLBACK_ALT}
+            fill
+            sizes={sizes}
+            quality={60}
+            loading="lazy"
+            decoding="async"
+            className={`${className} news-card__image--fallback`}
+          />
+        </div>
       ) : null}
     </>
   );
@@ -103,14 +110,16 @@ export function NewsCoverImage({
 export function NewsArticleCoverImage({
   src,
   alt,
-  className = "relative z-10 h-full w-full object-cover",
+  priority = true,
+  sizes = "(max-width: 768px) 100vw, (max-width: 1200px) 896px, 896px",
+  className = "news-article-cover-image",
   fallbackClassName = "absolute inset-0 flex items-center justify-center fallback-article-image",
   fallback,
 }) {
   const safeSrc = useMemo(() => getSafeImageSrc(src), [src]);
-  const imageSources = useMemo(() => getNewsImageSources(safeSrc), [safeSrc]);
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(imageSources.src) && !failed;
+  const showImage = Boolean(safeSrc) && !failed;
+  const resolvedAlt = alt || "صورة الخبر";
 
   return (
     <>
@@ -121,24 +130,29 @@ export function NewsArticleCoverImage({
         {fallback}
       </div>
       <NewsImageCore
-        src={imageSources.src}
-        webpSrc={imageSources.webpSrc}
-        alt={alt}
-        loading="lazy"
-        className={className}
-        hiddenClassName="hidden"
-        showImage={showImage}
+        src={safeSrc}
+        alt={resolvedAlt}
+        priority={priority}
+        sizes={sizes}
+        quality={82}
+        shellClassName="news-media-image-shell news-media-image-shell--article"
+        imageClassName={className}
+        hidden={!showImage}
         onError={() => setFailed(true)}
       />
       {failed && safeSrc ? (
-        <img
-          src={FALLBACK_IMAGE_SRC}
-          alt=""
-          aria-hidden="true"
-          loading="lazy"
-          decoding="async"
-          className={`${className} opacity-40`}
-        />
+        <div className="news-media-image-shell news-media-image-shell--article">
+          <Image
+            src={FALLBACK_IMAGE_SRC}
+            alt={FALLBACK_ALT}
+            fill
+            sizes={sizes}
+            quality={60}
+            loading="lazy"
+            decoding="async"
+            className={`${className} opacity-40`}
+          />
+        </div>
       ) : null}
     </>
   );

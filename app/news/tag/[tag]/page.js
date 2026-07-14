@@ -1,15 +1,15 @@
-
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import {
-  buildAbsoluteUrl,
-  PUBLIC_PAGE_METADATA,
-  PRIVATE_PAGE_METADATA,
-  sanitizeJsonLdText,
+  buildNewsCollectionPageJsonLd,
+  buildPrivateMetadata,
+  buildPublicMetadata,
   serializeJsonLd,
-  SITE_URL,
 } from "../../../../lib/seo";
+import { REVALIDATE_PUBLIC_NEWS } from "../../../../lib/public-cache-config";
+import { getCachedNewsPostsPool } from "../../../../lib/server-news-cache";
+
+export const revalidate = REVALIDATE_PUBLIC_NEWS;
 
 const TAG_CONFIG = {
   bitcoin: {
@@ -53,13 +53,6 @@ const TAG_CONFIG = {
     keywords: ["stocks", "nasdaq", "dow", "s&p", "earnings", "أسهم", "ناسداك", "داو"],
   },
 };
-
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-}
 
 function getTagConfig(tag) {
   return TAG_CONFIG[tag] || {
@@ -116,22 +109,13 @@ export async function generateMetadata({ params }) {
   const config = getTagConfig(params.tag);
   const isKnownTag = Boolean(TAG_CONFIG[params.tag]);
 
-  return {
+  return buildPublicMetadata({
+    path: `/news/tag/${params.tag}`,
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
-    robots: isKnownTag ? PUBLIC_PAGE_METADATA.robots : PRIVATE_PAGE_METADATA.robots,
-    alternates: {
-      canonical: buildAbsoluteUrl(`/news/tag/${params.tag}`),
-    },
-    openGraph: {
-      title: `${config.title} | HasaN CharT World`,
-      description: config.description,
-      url: `${SITE_URL}/news/tag/${params.tag}`,
-      siteName: "HasaN CharT World",
-      type: "website",
-      locale: "ar_AR",
-    },
-  };
+    index: isKnownTag,
+    follow: isKnownTag,
+  });
 }
 
 export default async function TagPage({ params }) {
@@ -141,30 +125,15 @@ export default async function TagPage({ params }) {
     notFound();
   }
 
-  const supabase = getSupabaseClient();
-
-  const { data } = await supabase
-    .from("news_posts")
-    .select("id,slug,title,content,created_at,impact_level")
-    .order("created_at", { ascending: false })
-    .limit(500);
+  const data = await getCachedNewsPostsPool();
 
   const news = (data || []).filter((item) => matchesTag(item, config)).slice(0, 120);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "@id": `${SITE_URL}/news/tag/${params.tag}`,
-    url: `${SITE_URL}/news/tag/${params.tag}`,
-    name: sanitizeJsonLdText(config.title, 120),
-    description: sanitizeJsonLdText(config.description, 220),
-    inLanguage: "ar",
-    isPartOf: {
-      "@type": "WebSite",
-      name: "HasaN CharT World",
-      url: SITE_URL,
-    },
-  };
+  const jsonLd = buildNewsCollectionPageJsonLd({
+    path: `/news/tag/${params.tag}`,
+    title: `${config.title} | HasaN CharT World`,
+    description: config.description,
+  });
 
   return (
     <main className="min-h-screen px-4 py-10 text-slate-950" dir="rtl">

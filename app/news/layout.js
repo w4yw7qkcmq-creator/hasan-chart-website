@@ -1,6 +1,6 @@
-import { PUBLIC_PAGE_METADATA } from "../../lib/seo";
+import { REVALIDATE_PUBLIC_NEWS } from "../../lib/public-cache-config";
 
-export const metadata = PUBLIC_PAGE_METADATA;
+export const revalidate = REVALIDATE_PUBLIC_NEWS;
 
 export default function NewsLayout({ children }) {
   return children;

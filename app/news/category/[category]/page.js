@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { resolveNewsImageUrl } from "../../../../lib/news-images";
 import { NewsCoverImage } from "../../../components/news/NewsCoverImage";
 import {
-  buildAbsoluteUrl,
-  PUBLIC_PAGE_METADATA,
-  PRIVATE_PAGE_METADATA,
-  SITE_URL,
+  buildNewsCollectionPageJsonLd,
+  buildPrivateMetadata,
+  buildPublicMetadata,
+  serializeJsonLd,
 } from "../../../../lib/seo";
+import { REVALIDATE_PUBLIC_NEWS } from "../../../../lib/public-cache-config";
+import { getCachedNewsPostsPool } from "../../../../lib/server-news-cache";
+
+export const revalidate = REVALIDATE_PUBLIC_NEWS;
 
 const CATEGORY_CONFIG = {
   geopolitics: {
@@ -62,13 +65,6 @@ const POPULAR_TAGS = [
   { label: "فوركس", href: "/news/tag/forex" },
   { label: "الأسهم", href: "/news/tag/stocks" },
 ];
-
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-}
 
 function cleanNewsText(text) {
   if (!text) return "";
@@ -144,28 +140,14 @@ export async function generateMetadata({ params }) {
   const config = CATEGORY_CONFIG[params.category];
 
   if (!config) {
-    return {
-      title: "التصنيف غير موجود - HasaN CharT World",
-      robots: PRIVATE_PAGE_METADATA.robots,
-    };
+    return buildPrivateMetadata({ title: "التصنيف غير موجود - HasaN CharT World" });
   }
 
-  return {
+  return buildPublicMetadata({
+    path: `/news/category/${params.category}`,
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
-    robots: PUBLIC_PAGE_METADATA.robots,
-    alternates: {
-      canonical: buildAbsoluteUrl(`/news/category/${params.category}`),
-    },
-    openGraph: {
-      title: `${config.title} | HasaN CharT World`,
-      description: config.description,
-      url: `${SITE_URL}/news/category/${params.category}`,
-      siteName: "HasaN CharT World",
-      type: "website",
-      locale: "ar_AR",
-    },
-  };
+  });
 }
 
 export default async function CategoryPage({ params }) {
@@ -175,18 +157,22 @@ export default async function CategoryPage({ params }) {
     notFound();
   }
 
-  const supabase = getSupabaseClient();
-
-  const { data } = await supabase
-    .from("news_posts")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(300);
+  const data = await getCachedNewsPostsPool();
 
   const news = (data || []).filter((item) => detectCategory(item) === params.category);
 
+  const jsonLd = buildNewsCollectionPageJsonLd({
+    path: `/news/category/${params.category}`,
+    title: `${config.title} | HasaN CharT World`,
+    description: config.description,
+  });
+
   return (
     <main className="min-h-screen px-4 py-10 text-slate-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <div className="mx-auto max-w-7xl">
         <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/40 bg-white/55 p-8 text-center shadow-[0_20px_80px_rgba(14,165,233,0.12)] backdrop-blur-xl md:p-12">
           <div className="mx-auto mb-4 inline-flex rounded-full border border-cyan-300/40 bg-cyan-100/70 px-5 py-2 text-sm font-black text-cyan-800">
@@ -280,7 +266,12 @@ export default async function CategoryPage({ params }) {
                   className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/85 text-slate-950 no-underline shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/60 hover:shadow-[0_24px_90px_rgba(14,165,233,0.20)]"
                 >
                   <div className={`relative h-56 overflow-hidden bg-gradient-to-br ${config.gradient}`}>
-                    <NewsCoverImage src={newsImage} alt={newsTitle} fallback={fallbackVisual} />
+                    <NewsCoverImage
+                      src={newsImage}
+                      alt={newsTitle || "صورة الخبر"}
+                      priority={index === 0}
+                      fallback={fallbackVisual}
+                    />
 
                     <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
                     <div className="absolute left-4 top-4 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-slate-700 backdrop-blur">

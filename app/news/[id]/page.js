@@ -1,9 +1,26 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
-import CopyArticleButton from "../../components/CopyArticleButton";
+import dynamic from "next/dynamic";
+import { cache } from "react";
 import { NewsArticleCoverImage } from "../../components/news/NewsCoverImage";
 import NewsServiceLinks from "../../components/news/NewsServiceLinks";
+import NewsRelatedAssets from "../../components/news/NewsRelatedAssets";
+import NewsQuickSummary from "../../components/news/NewsQuickSummary";
+import NewsWatchPoints from "../../components/news/NewsWatchPoints";
+import NewsArticleCtas from "../../components/news/NewsArticleCtas";
+import {
+  getAffectedMarketLabel,
+  getImpactLevelLabel,
+  getNewsArticleCtas,
+  getNewsTopicType,
+  getNewsUpdatedAt,
+  getNewsWatchPoints,
+  formatNewsDateTime,
+  toNewsIsoDateTime,
+} from "../../components/news/newsDetailHelpers";
+import {
+  getRelatedAssetsFromNews,
+} from "../../components/asset-hub/getRelatedAssetsFromNews";
 import Breadcrumbs from "../../components/seo/Breadcrumbs";
 import LinkifiedText from "../../components/seo/LinkifiedText";
 import {
@@ -13,19 +30,38 @@ import {
   resolveNewsImageUrl,
 } from "../../../lib/news-images";
 import {
-  PUBLIC_PAGE_METADATA,
-  sanitizeJsonLdText,
+  buildArticleMetadata,
+  buildBreadcrumbJsonLd,
+  buildNewsArticleJsonLd,
+  buildPrivateMetadata,
   serializeJsonLd,
   SITE_URL,
 } from "../../../lib/seo";
 import { getNewsTopicServiceLinks } from "../../../lib/internal-links";
+import { REVALIDATE_PUBLIC_NEWS } from "../../../lib/public-cache-config";
+import {
+  getCachedNewsPost,
+  getCachedNewsRelatedPool,
+} from "../../../lib/server-news-cache";
 
-function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-}
+const CopyArticleButton = dynamic(() => import("../../components/CopyArticleButton"), {
+  ssr: false,
+  loading: () => null,
+});
+
+export const revalidate = REVALIDATE_PUBLIC_NEWS;
+
+const getNewsArticleForRequest = cache(async (identifier) => {
+  return getCachedNewsPost(identifier);
+});
+
+const getReachableNewsImage = cache(async (rawImage) => {
+  if (!rawImage || isBlockedNewsImageUrl(rawImage)) {
+    return null;
+  }
+
+  return (await isImageReachable(rawImage)) ? rawImage : null;
+});
 
 function cleanText(text) {
   if (!text) return "";
@@ -122,145 +158,75 @@ function detectTags(news = {}) {
   return tags.slice(0, 5);
 }
 
-async function getNewsPost(identifier) {
-  const supabase = getSupabaseClient();
-
-  const { data: slugData, error: slugError } = await supabase
-    .from("news_posts")
-    .select("*")
-    .eq("slug", identifier)
-    .maybeSingle();
-
-  if (!slugError && slugData) return slugData;
-
-  const { data: idData, error: idError } = await supabase
-    .from("news_posts")
-    .select("*")
-    .eq("id", identifier)
-    .maybeSingle();
-
-  if (idError || !idData) return null;
-  return idData;
-}
-
-async function getRelatedNews(currentNews) {
-  const supabase = getSupabaseClient();
+function getRelatedNews(currentNews, pool) {
   const currentCategory = detectCategory(currentNews);
 
-  const { data, error } = await supabase
-    .from("news_posts")
-    .select("id,slug,title,content,created_at,impact_level")
-    .neq("id", currentNews.id)
-    .order("created_at", { ascending: false })
-    .limit(80);
-
-  if (error) {
-    console.error("Related news fetch error:", error.message);
-    return [];
-  }
-
-  const categoryMatches = (data || [])
-    .filter((item) => detectCategory(item) === currentCategory)
+  const categoryMatches = (pool || [])
+    .filter((item) => item.id !== currentNews.id && detectCategory(item) === currentCategory)
     .slice(0, 6);
 
   if (categoryMatches.length > 0) {
     return categoryMatches;
   }
 
-  return (data || []).slice(0, 6);
+  return (pool || []).filter((item) => item.id !== currentNews.id).slice(0, 6);
 }
 
-async function getAdjacentNews(currentNews) {
-  const supabase = getSupabaseClient();
+function getAdjacentNewsFromPool(currentNews, pool) {
+  const sorted = pool || [];
+  const index = sorted.findIndex((item) => item.id === currentNews.id);
 
-  const [{ data: previousData }, { data: nextData }] = await Promise.all([
-    supabase
-      .from("news_posts")
-      .select("id,slug,title,content,created_at")
-      .lt("created_at", currentNews.created_at)
-      .order("created_at", { ascending: false })
-      .limit(1),
-    supabase
-      .from("news_posts")
-      .select("id,slug,title,content,created_at")
-      .gt("created_at", currentNews.created_at)
-      .order("created_at", { ascending: true })
-      .limit(1),
-  ]);
+  if (index < 0) {
+    return { previous: null, next: null };
+  }
 
   return {
-    previous: previousData?.[0] || null,
-    next: nextData?.[0] || null,
+    previous: sorted[index + 1] || null,
+    next: sorted[index - 1] || null,
   };
 }
 
 export async function generateMetadata({ params }) {
-  const news = await getNewsPost(params.id);
+  const news = await getNewsArticleForRequest(params.id);
 
   if (!news) {
-    return {
-      title: "خبر غير موجود - HasaN CharT World",
-      robots: { index: false, follow: false },
-    };
+    return buildPrivateMetadata({ title: "خبر غير موجود - HasaN CharT World" });
   }
 
   const title = getNewsTitle(news);
   const description = cleanText(news.content || news.summary || news.description || title).slice(0, 160);
   const rawImage = getNewsImage(news);
-  const image = rawImage && (await isImageReachable(rawImage)) ? rawImage : `${SITE_URL}/favicon.png`;
-  const url = `${SITE_URL}${getNewsHref(news)}`;
+  const reachableImage = await getReachableNewsImage(rawImage);
+  const image = reachableImage || `${SITE_URL}/favicon.png`;
+  const updatedAtRaw = getNewsUpdatedAt(news);
 
-  const keywords = [
+  return buildArticleMetadata({
+    path: getNewsHref(news),
     title,
-    "أخبار اقتصادية",
-    "أخبار الفوركس",
-    "أخبار العملات الرقمية",
-    "أخبار الأسهم",
-    "أخبار الذهب",
-    "أخبار النفط",
-    "HasaN CharT World",
-  ].join(", ");
-
-  return {
-    title: `${title} - HasaN CharT World`,
     description,
-    keywords,
-    robots: PUBLIC_PAGE_METADATA.robots,
-    alternates: {
-      canonical: url,
-    },
-    openGraph: {
+    keywords: [
       title,
-      description,
-      url,
-      siteName: "HasaN CharT World",
-      type: "article",
-      section: "Economic News",
-      tags: [title, "اقتصاد", "أسواق مالية", "فوركس", "كريبتو"],
-      images: [
-        {
-          url: image,
-          width: 1200,
-          height: 630,
-          alt: title,
-        },
-      ],
-      publishedTime: news.created_at,
-      locale: "ar_AR",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [image],
-    },
-  };
+      "أخبار اقتصادية",
+      "أخبار الفوركس",
+      "أخبار العملات الرقمية",
+      "أخبار الأسهم",
+      "أخبار الذهب",
+      "أخبار النفط",
+      "HasaN CharT World",
+    ],
+    image,
+    publishedTime: news.created_at,
+    modifiedTime: updatedAtRaw || news.created_at,
+  });
 }
 
 export default async function NewsDetailsPage({ params }) {
-  const news = await getNewsPost(params.id);
-  const relatedNews = news ? await getRelatedNews(news) : [];
-  const adjacentNews = news ? await getAdjacentNews(news) : { previous: null, next: null };
+  const [news, newsPool] = await Promise.all([
+    getNewsArticleForRequest(params.id),
+    getCachedNewsRelatedPool(),
+  ]);
+  const relatedNews = news ? getRelatedNews(news, newsPool) : [];
+  const adjacentNews = news ? getAdjacentNewsFromPool(news, newsPool) : { previous: null, next: null };
 
   if (!news) {
     notFound();
@@ -269,14 +235,15 @@ export default async function NewsDetailsPage({ params }) {
   const title = getNewsTitle(news);
   const content = cleanText(news.content || news.summary || news.description || title);
   const rawImage = getNewsImage(news);
-  const image = rawImage && (await isImageReachable(rawImage)) ? rawImage : null;
-  const publishedDate = new Date(news.created_at).toLocaleString("ar-SA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-  });
+  const image = await getReachableNewsImage(rawImage);
+  const publishedDate = formatNewsDateTime(news.created_at);
+  const publishedAtIso = toNewsIsoDateTime(news.created_at);
+  const updatedAtRaw = getNewsUpdatedAt(news);
+  const updatedDate = formatNewsDateTime(updatedAtRaw);
+  const updatedAtIso = toNewsIsoDateTime(updatedAtRaw);
+  const showUpdatedAt =
+    Boolean(updatedAtRaw) &&
+    new Date(updatedAtRaw).getTime() !== new Date(news.created_at).getTime();
   const isHighImpact = news.impact_level === "HIGH";
   const articleUrl = `${SITE_URL}${getNewsHref(news)}`;
   const category = detectCategory(news);
@@ -284,6 +251,12 @@ export default async function NewsDetailsPage({ params }) {
   const categoryVisual = getCategoryVisual(category);
   const newsTags = detectTags(news);
   const topicServiceLinks = getNewsTopicServiceLinks(news);
+  const relatedAssets = getRelatedAssetsFromNews(news);
+  const newsTopicType = getNewsTopicType(news, category);
+  const affectedMarketLabel = getAffectedMarketLabel(relatedAssets, category);
+  const impactLabel = getImpactLevelLabel(news.impact_level);
+  const watchPoints = getNewsWatchPoints(news);
+  const articleCtas = getNewsArticleCtas(relatedAssets.length > 0);
   const newsBreadcrumbs = [
     { label: "الرئيسية", href: "/" },
     { label: "الأخبار", href: "/news" },
@@ -291,72 +264,22 @@ export default async function NewsDetailsPage({ params }) {
     { label: title, href: getNewsHref(news) },
   ];
 
-  const safeTitle = sanitizeJsonLdText(title, 150);
-  const safeDescription = sanitizeJsonLdText(content, 180);
-  const safeCategoryLabel = sanitizeJsonLdText(categoryLabel, 80);
+  const dateModified = updatedAtRaw || news.created_at;
 
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: newsBreadcrumbs.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: sanitizeJsonLdText(item.label, index === newsBreadcrumbs.length - 1 ? 150 : 80),
-      item: `${SITE_URL}${item.href}`,
-    })),
-  };
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(newsBreadcrumbs, getNewsHref(news));
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    "@id": articleUrl,
-    url: articleUrl,
-    inLanguage: "ar",
-    isAccessibleForFree: true,
-    keywords: [
-      safeTitle,
-      "أخبار اقتصادية",
-      "فوركس",
-      "عملات رقمية",
-      "أسواق عالمية",
-    ],
-    articleSection: safeCategoryLabel,
-    wordCount: content.split(/\s+/).filter(Boolean).length,
-    about: {
-      "@type": "Thing",
-      name: safeCategoryLabel,
-    },
-    headline: safeTitle,
-    description: safeDescription,
-    image: image ? [image] : [`${SITE_URL}/favicon.png`],
+  const jsonLd = buildNewsArticleJsonLd({
+    path: getNewsHref(news),
+    title,
+    description: content,
+    content,
+    image: image || `${SITE_URL}/favicon.png`,
     datePublished: news.created_at,
-    dateModified: news.created_at,
-    mainEntityOfPage: {
-      "@type": "WebPage",
-      "@id": articleUrl,
-    },
-    thumbnailUrl: image || `${SITE_URL}/favicon.png`,
-    genre: categoryLabel,
-    isPartOf: {
-      "@type": "WebSite",
-      name: "HasaN CharT World",
-      url: SITE_URL,
-    },
-    author: {
-      "@type": "Organization",
-      name: "HasaN CharT News",
-    },
-    publisher: {
-      "@type": "Organization",
-      name: "HasaN CharT World",
-      logo: {
-        "@type": "ImageObject",
-        url: `${SITE_URL}/favicon.png`,
-        width: 512,
-        height: 512,
-      },
-    },
-  };
+    dateModified,
+    articleSection: categoryLabel,
+    topicLabel: newsTopicType.label,
+    mentions: relatedAssets,
+  });
 
   return (
     <main className="min-h-screen px-4 py-10 text-slate-950">
@@ -368,6 +291,10 @@ export default async function NewsDetailsPage({ params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
+
+      <div className="mx-auto mb-4 max-w-4xl rounded-2xl border border-white/60 bg-white/80 px-5 py-4 shadow-sm backdrop-blur" dir="rtl">
+        <Breadcrumbs items={newsBreadcrumbs} variant="light" />
+      </div>
 
       <div className="mx-auto mb-6 flex max-w-4xl flex-wrap items-center justify-between gap-3" dir="rtl">
         <Link
@@ -416,9 +343,16 @@ export default async function NewsDetailsPage({ params }) {
         </div>
 
         <div className="p-7 md:p-10" dir="rtl">
-          <div className="mb-5">
-            <Breadcrumbs items={newsBreadcrumbs.slice(0, 3)} variant="light" />
-          </div>
+          <NewsQuickSummary
+            newsType={newsTopicType.label}
+            affectedMarket={affectedMarketLabel}
+            impactLabel={impactLabel}
+            publishedAt={publishedDate || "—"}
+            publishedAtIso={publishedAtIso}
+            updatedAt={updatedDate}
+            updatedAtIso={updatedAtIso}
+            showUpdatedAt={showUpdatedAt}
+          />
 
           {newsTags.length > 0 ? (
             <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -433,10 +367,6 @@ export default async function NewsDetailsPage({ params }) {
               ))}
             </div>
           ) : null}
-
-          <div className="mb-5 inline-flex rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">
-            {publishedDate}
-          </div>
 
           <h1 className="mb-7 text-2xl font-black leading-relaxed text-slate-950 md:text-4xl">
             {title}
@@ -453,6 +383,9 @@ export default async function NewsDetailsPage({ params }) {
               ))}
           </div>
 
+          <NewsArticleCtas ctas={articleCtas} />
+          <NewsRelatedAssets assets={relatedAssets} />
+          <NewsWatchPoints points={watchPoints} />
           <NewsServiceLinks links={topicServiceLinks} />
 
           <div className="mt-10 border-t border-slate-200 pt-6 text-center">
