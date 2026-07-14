@@ -1,6 +1,9 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
+import { warmupBybitNetwork } from "../../../lib/bybit-network";
+import { warmupTradingViewNetwork } from "../../../lib/trading-view-network";
+import { useLazyInView } from "../../hooks/useLazyInView";
 
 function LiveChartSectionComponent({
   chartSearch,
@@ -11,11 +14,19 @@ function LiveChartSectionComponent({
   chartSearchError,
   onApplySearch,
 }) {
+  const { ref, isInView } = useLazyInView({ rootMargin: "240px 0px" });
   const [chartLoading, setChartLoading] = useState(true);
 
   useEffect(() => {
     setChartLoading(true);
   }, [chartSymbol, chartInterval]);
+
+  useEffect(() => {
+    if (isInView) {
+      warmupTradingViewNetwork();
+      warmupBybitNetwork();
+    }
+  }, [isInView]);
 
   const chartIntervals = [
     { value: "1", label: "1 دقيقة" },
@@ -42,6 +53,7 @@ function LiveChartSectionComponent({
             <input
               value={chartSearch}
               onChange={(e) => setChartSearch(e.target.value)}
+              onFocus={warmupBybitNetwork}
               onKeyDown={(e) => {
                 if (e.key === "Enter") onApplySearch();
               }}
@@ -81,8 +93,8 @@ function LiveChartSectionComponent({
           ) : null}
         </div>
 
-        <div className="site-live-chart-frame" aria-busy={chartLoading}>
-          {chartLoading ? (
+        <div ref={ref} className="site-live-chart-frame" aria-busy={chartLoading || !isInView}>
+          {!isInView || chartLoading ? (
             <div className="site-live-chart-skeleton" aria-live="polite">
               <div className="site-live-chart-skeleton-bars">
                 <span />
@@ -94,18 +106,24 @@ function LiveChartSectionComponent({
                 <span />
                 <span />
               </div>
-              <p className="site-live-chart-skeleton-text">جاري تحميل الشارت...</p>
+              <p className="site-live-chart-skeleton-text">
+                {isInView ? "جاري تحميل الشارت..." : "سيُحمّل الشارت عند الظهور..."}
+              </p>
             </div>
           ) : null}
 
-          <iframe
-            key={`${chartSymbol}-${chartInterval}`}
-            src={`https://s.tradingview.com/widgetembed/?symbol=BINANCE:${chartSymbol}&interval=${chartInterval}&theme=dark&style=1&locale=ar`}
-            className={`site-live-chart-iframe${chartLoading ? " is-loading" : ""}`}
-            title={`TradingView chart ${chartSymbol}`}
-            loading="lazy"
-            onLoad={() => setChartLoading(false)}
-          />
+          {isInView ? (
+            <iframe
+              key={`${chartSymbol}-${chartInterval}`}
+              src={`https://s.tradingview.com/widgetembed/?symbol=BINANCE:${chartSymbol}&interval=${chartInterval}&theme=dark&style=1&locale=ar`}
+              className={`site-live-chart-iframe${chartLoading ? " is-loading" : ""}`}
+              title={`TradingView chart ${chartSymbol}`}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              fetchPriority="low"
+              onLoad={() => setChartLoading(false)}
+            />
+          ) : null}
         </div>
       </div>
     </section>

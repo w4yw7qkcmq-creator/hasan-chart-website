@@ -1,28 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRequireAuth } from "../hooks/useRequireAuth";
+import StatusBadge from "../components/StatusBadge";
 import { supabase } from "../../lib/supabase";
-
-function StatusBadge({ status }) {
-  const isDone = status === "مكتمل";
-  const isPending = status === "قيد المراجعة" || !status;
-
-  return (
-    <span
-      className={`rounded-full border px-3 py-1 text-xs font-black ${
-        isDone
-          ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
-          : isPending
-          ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
-          : "border-cyan-300/25 bg-cyan-400/10 text-cyan-200"
-      }`}
-    >
-      {status || "قيد المراجعة"}
-    </span>
-  );
-}
 
 function StatCard({ title, value, icon, subtitle }) {
   return (
@@ -106,6 +89,7 @@ export default function MyAnalysisPage() {
   const selectedAnalysisRef = useRef(null);
   const requestsRef = useRef([]);
   const hasLoadedOnceRef = useRef(false);
+  const loadInFlightRef = useRef(false);
   const normalizeRequest = (item) => ({
     id: item.id,
     userEmail: item.user_email || item.userEmail,
@@ -180,6 +164,12 @@ export default function MyAnalysisPage() {
   }, [requests]);
 
   const loadRequests = useCallback(async (user, { background = false } = {}) => {
+    if (loadInFlightRef.current) {
+      return;
+    }
+
+    loadInFlightRef.current = true;
+
     const hasExistingData = requestsRef.current.length > 0 || hasLoadedOnceRef.current;
 
     if (background || hasExistingData) {
@@ -247,7 +237,9 @@ export default function MyAnalysisPage() {
         setReplyNotice(`📩 وصل رد الإدارة على طلب تحليل ${newReply.coin}`);
       }
 
-      console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
+      }
     } catch (err) {
       console.error("Load requests API error:", err);
       if (!hasExistingData) setRequests([]);
@@ -258,6 +250,7 @@ export default function MyAnalysisPage() {
       );
     } finally {
       clearTimeout(timeoutId);
+      loadInFlightRef.current = false;
       setIsLoading(false);
       setIsFetching(false);
     }
@@ -283,7 +276,9 @@ export default function MyAnalysisPage() {
 
       if (!isMounted || !user?.email) return;
 
-      console.log("تحميل طلبات المستخدم:", user);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("تحميل طلبات المستخدم:", user);
+      }
       await loadRequests(user);
 
       if (!isMounted || !user?.email) return;
@@ -318,10 +313,15 @@ export default function MyAnalysisPage() {
           }
         )
         .subscribe((status) => {
-          if (status === "SUBSCRIBED") console.log("My analysis realtime connected");
+          if (process.env.NODE_ENV !== "production" && status === "SUBSCRIBED") {
+            console.log("My analysis realtime connected");
+          }
         });
 
-      refreshInterval = setInterval(refreshIfIdle, 15000);
+      refreshInterval = setInterval(() => {
+        if (document.hidden) return;
+        refreshIfIdle();
+      }, 15000);
       window.addEventListener("focus", refreshIfIdle);
       document.addEventListener("visibilitychange", onVisibilityChange);
     };
@@ -443,11 +443,13 @@ export default function MyAnalysisPage() {
                 {selectedAnalysis.replyImage && (
                   <div className="rounded-[24px] border border-cyan-300/20 bg-cyan-400/10 p-4">
                     <p className="mb-3 text-sm font-bold text-cyan-100">صورة التحليل</p>
-                    <img
+                    <Image
                       src={selectedAnalysis.replyImage}
                       alt="صورة التحليل"
+                      width={1200}
+                      height={900}
                       loading="lazy"
-                      decoding="async"
+                      sizes="(max-width: 768px) 100vw, 800px"
                       className="mx-auto max-h-[74vh] w-full rounded-2xl object-contain"
                     />
                     <button
@@ -467,11 +469,13 @@ export default function MyAnalysisPage() {
                           إغلاق الصورة ✕
                         </button>
 
-                        <img
+                        <Image
                           src={selectedAnalysis.replyImage}
                           alt="صورة التحليل بالحجم الكامل"
+                          width={1600}
+                          height={1200}
                           loading="lazy"
-                          decoding="async"
+                          sizes="100vw"
                           className="h-screen w-full rounded-none object-contain shadow-[0_0_80px_rgba(0,0,0,0.65)] md:h-screen md:w-full"
                         />
                       </div>
@@ -597,7 +601,7 @@ export default function MyAnalysisPage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
                         <h2 className="text-2xl font-black text-white">{req.coin}</h2>
-                        <StatusBadge status={req.status} />
+                        <StatusBadge status={req.status} variant="analysis" />
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-slate-300">

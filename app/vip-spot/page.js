@@ -101,7 +101,9 @@ export default function VipSpotPage() {
   const loadInFlightRef = useRef(false);
 
   const loadSignals = async ({ silent = false } = {}) => {
-    if (loadInFlightRef.current && silent) return;
+    if (loadInFlightRef.current) {
+      return;
+    }
 
     loadInFlightRef.current = true;
 

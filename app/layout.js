@@ -1,5 +1,5 @@
 import "./globals.css";
-import { AppProviders } from "./components/AppProviders";
+import { ClientProviders } from "./components/ClientProviders";
 import RootLayoutShell from "./components/RootLayoutShell";
 import { readThemeFromRequestCookies } from "../lib/theme-server";
 import { THEME_BOOT_SCRIPT, THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
@@ -99,9 +99,9 @@ export default async function RootLayout({ children }) {
           <p className="theme-boot-subtitle">جاري تجهيز الواجهة...</p>
         </div>
         <div id="site-root">
-          <AppProviders initialTheme={theme}>
+          <ClientProviders initialTheme={theme}>
             <RootLayoutShell>{children}</RootLayoutShell>
-          </AppProviders>
+          </ClientProviders>
         </div>
       </body>
     </html>

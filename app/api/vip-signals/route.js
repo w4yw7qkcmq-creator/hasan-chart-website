@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { CACHE_PRIVATE_USER } from "../../../lib/api-response";
 import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
 import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
 import { dispatchUnifiedSiteAlerts } from "../../../lib/site-notification-dispatch.js";
+import { VIP_SIGNALS_LIST_COLUMNS } from "../../../lib/supabase-query-columns";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -152,7 +154,8 @@ export async function GET(request) {
       .from("subscription_requests")
       .select("id,status,expires_at,expired_notice_sent,plan_name,category")
       .eq("user_email", email)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(30);
 
     if (subscriptionError) {
       return NextResponse.json(
@@ -166,14 +169,19 @@ export async function GET(request) {
 
     const rows = Array.isArray(subscriptions) ? subscriptions : [];
 
-    for (const subscription of rows) {
-      if (
+    const expiredCandidates = rows.filter(
+      (subscription) =>
         subscription.status === "مفعل" &&
         subscription.expires_at &&
         new Date(subscription.expires_at).getTime() <= Date.now()
-      ) {
-        await processExpiredSubscription(subscription, email);
-      }
+    );
+
+    if (expiredCandidates.length > 0) {
+      await Promise.all(
+        expiredCandidates.map((subscription) =>
+          processExpiredSubscription(subscription, email)
+        )
+      );
     }
 
     const activeSubscriptions = rows.filter(
@@ -219,9 +227,10 @@ export async function GET(request) {
 
     const { data, error } = await supabase
       .from("vip_signals")
-      .select("*")
+      .select(VIP_SIGNALS_LIST_COLUMNS)
       .eq("signal_type", signalType)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(200);
 
     if (error) {
       return NextResponse.json(
@@ -238,10 +247,18 @@ export async function GET(request) {
       createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
     }));
 
-    return NextResponse.json({
-      success: true,
-      signals,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        signals,
+      },
+      {
+        headers: {
+          "Cache-Control": CACHE_PRIVATE_USER,
+          Vary: "Accept-Encoding",
+        },
+      }
+    );
   } catch (err) {
     return NextResponse.json(
       {

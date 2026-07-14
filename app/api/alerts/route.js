@@ -135,7 +135,7 @@ export async function POST(req) {
           status: "active",
         },
       ])
-      .select()
+      .select("id, coin, target_price, condition, status, created_at, user_email")
       .single();
 
     if (error || !data?.id) {

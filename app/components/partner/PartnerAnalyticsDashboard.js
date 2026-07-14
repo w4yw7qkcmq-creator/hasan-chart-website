@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   formatPartnerMoney,
   serviceTypeLabel,
@@ -47,6 +47,7 @@ export function PartnerAnalyticsDashboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [leaderboardMetric, setLeaderboardMetric] = useState("sales");
   const [error, setError] = useState("");
+  const loadInFlightRef = useRef(false);
 
   const loadLeaderboard = useCallback(async (metric) => {
     if (!PARTNER_LEADERBOARD_UI_ENABLED) return;
@@ -65,6 +66,11 @@ export function PartnerAnalyticsDashboard() {
   }, []);
 
   const loadAll = useCallback(async () => {
+    if (loadInFlightRef.current) {
+      return;
+    }
+
+    loadInFlightRef.current = true;
     setLoading(true);
     setError("");
 
@@ -95,6 +101,7 @@ export function PartnerAnalyticsDashboard() {
     } catch (loadError) {
       setError(loadError?.message || "تعذر تحميل Analytics");
     } finally {
+      loadInFlightRef.current = false;
       setLoading(false);
     }
   }, [leaderboardMetric, loadLeaderboard]);

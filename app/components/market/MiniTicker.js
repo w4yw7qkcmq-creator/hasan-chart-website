@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 function MiniTickerComponent({ symbol, price, feedStatus = "connecting" }) {
   const normalized = price == null || price === "" ? "0" : String(price);
   const hasPrice = normalized !== "0";
@@ -19,4 +21,4 @@ function MiniTickerComponent({ symbol, price, feedStatus = "connecting" }) {
   );
 }
 
-export const MiniTicker = MiniTickerComponent;
+export const MiniTicker = memo(MiniTickerComponent);

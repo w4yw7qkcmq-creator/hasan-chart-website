@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { getSafeTheme, writeThemeCookie } from "../../lib/theme-shared";
 
 const ThemeContext = createContext(null);
@@ -64,7 +64,7 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
     };
   }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme((currentTheme) => {
       const nextTheme = currentTheme === "light" ? "dark" : "light";
       writeThemeCookie(nextTheme);
@@ -76,15 +76,19 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
       document.documentElement.setAttribute("data-theme", nextTheme);
       return nextTheme;
     });
-  };
+  }, []);
 
-  return (
-    <ThemeContext.Provider
-      value={{ theme, initialTheme: resolvedInitialTheme, themeReady, toggleTheme }}
-    >
-      {children}
-    </ThemeContext.Provider>
+  const value = useMemo(
+    () => ({
+      theme,
+      initialTheme: resolvedInitialTheme,
+      themeReady,
+      toggleTheme,
+    }),
+    [theme, resolvedInitialTheme, themeReady, toggleTheme]
   );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

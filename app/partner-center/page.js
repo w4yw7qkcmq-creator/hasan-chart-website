@@ -1,15 +1,13 @@
 "use client";
 
 import "./partner-center-theme.css";
-import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAppModal } from "../components/AppModalProvider";
-import { PartnerQrCode } from "../components/partner/PartnerQrCode";
-import { PartnerAnalyticsDashboard } from "../components/partner/PartnerAnalyticsDashboard";
-import { PartnerRewardsPanel } from "../components/partner/PartnerRewardsPanel";
 import { PartnerMetricSkeletonGrid } from "../components/partner/PartnerLoadingSkeleton";
 import { useRequireAuth } from "../hooks/useRequireAuth";
-import PublicServiceLanding from "../components/public-seo/PublicServiceLanding";
+import { useVisibilityRefresh } from "../hooks/useVisibilityRefresh";
 import {
   MIN_PARTNER_WITHDRAWAL_USDT,
   WITHDRAWAL_NETWORKS,
@@ -20,6 +18,32 @@ import {
   serviceTypeLabel,
   withdrawalStatusLabel,
 } from "../../lib/partner-shared";
+
+const PublicServiceLanding = dynamic(
+  () =>
+    import("../components/public-seo/PublicServiceLanding").then(
+      (mod) => mod.default
+    ),
+  { ssr: false }
+);
+
+const PartnerQrCode = dynamic(
+  () => import("../components/partner/PartnerQrCode").then((mod) => mod.PartnerQrCode),
+  { ssr: false }
+);
+
+const PartnerAnalyticsDashboard = dynamic(
+  () =>
+    import("../components/partner/PartnerAnalyticsDashboard").then(
+      (mod) => mod.PartnerAnalyticsDashboard
+    ),
+  { ssr: false, loading: () => <PartnerMetricSkeletonGrid count={4} /> }
+);
+
+const PartnerRewardsPanel = dynamic(
+  () => import("../components/partner/PartnerRewardsPanel").then((mod) => mod.PartnerRewardsPanel),
+  { ssr: false }
+);
 
 function MetricCard({ title, value, icon, tone = "blue" }) {
   return (
@@ -105,8 +129,15 @@ export default function PartnerCenterPage() {
   const [withdrawNote, setWithdrawNote] = useState("");
   const [withdrawConfirmed, setWithdrawConfirmed] = useState(false);
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+  const loadInFlightRef = useRef(false);
 
   const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+    if (loadInFlightRef.current) {
+      return;
+    }
+
+    loadInFlightRef.current = true;
+
     if (!silent) {
       setLoading(true);
     }
@@ -143,6 +174,7 @@ export default function PartnerCenterPage() {
         message: error?.message || "تعذر تحميل البيانات",
       });
     } finally {
+      loadInFlightRef.current = false;
       if (!silent) {
         setLoading(false);
       }
@@ -154,34 +186,11 @@ export default function PartnerCenterPage() {
     void loadDashboard();
   }, [sessionPending, isAuthenticated, loadDashboard]);
 
-  useEffect(() => {
-    if (sessionPending || !isAuthenticated) return;
-
-    const refreshSilently = () => {
-      void loadDashboard({ silent: true });
-    };
-
-    const intervalId = window.setInterval(() => {
-      if (!document.hidden) {
-        refreshSilently();
-      }
-    }, 30000);
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        refreshSilently();
-      }
-    };
-
-    window.addEventListener("focus", refreshSilently);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshSilently);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [sessionPending, isAuthenticated, loadDashboard]);
+  useVisibilityRefresh(() => loadDashboard({ silent: true }), {
+    enabled: !sessionPending && isAuthenticated,
+    intervalMs: 30000,
+    refreshOnFocus: true,
+  });
 
   const partner = data?.partner;
   const wallet = data?.wallet;
