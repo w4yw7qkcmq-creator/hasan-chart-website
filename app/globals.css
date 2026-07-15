@@ -2970,6 +2970,61 @@ html[data-theme="light"] .user-dashboard-panel__link {
   padding: 0.5rem 1.25rem 1.25rem;
 }
 
+.user-dashboard-panel__footer {
+  margin-top: 1rem;
+}
+
+.user-dashboard-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.18);
+  color: #fecaca;
+}
+
+.user-dashboard-error p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.user-dashboard-list-item--skeleton {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.user-dashboard-skeleton-line {
+  height: 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.22), rgba(148, 163, 184, 0.12));
+  background-size: 200% 100%;
+  animation: user-dashboard-skeleton 1.2s ease-in-out infinite;
+}
+
+.user-dashboard-skeleton-line--title {
+  width: 38%;
+  height: 1rem;
+}
+
+.user-dashboard-skeleton-line--meta {
+  width: 72%;
+}
+
+@keyframes user-dashboard-skeleton {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .user-dashboard-info-rows {
   display: flex;
   flex-direction: column;

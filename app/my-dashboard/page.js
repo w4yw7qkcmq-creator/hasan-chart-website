@@ -19,7 +19,7 @@ async function fetchDashboardBootstrap(signal) {
   }
 
   const request = Promise.all([
-    fetch("/api/alerts", {
+    fetch("/api/alerts?summary=1", {
       method: "GET",
       credentials: "include",
       cache: "no-store",
@@ -138,7 +138,7 @@ function DashboardListItem({ title, meta, badge, children, actions }) {
 
 export default function MyDashboard() {
   const { user, sessionPending, shouldShowLogin } = useRequireAuth();
-  const [myAlerts, setMyAlerts] = useState([]);
+  const [alertCounts, setAlertCounts] = useState({ active: 0, triggered: 0, cancelled: 0 });
   const [myAnalysis, setMyAnalysis] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -182,19 +182,14 @@ export default function MyDashboard() {
 
         if (cancelled) return;
 
-        if (alertsResult?.success && Array.isArray(alertsResult.alerts)) {
-          setMyAlerts(
-            alertsResult.alerts.map((alert) => ({
-              id: alert.id,
-              coin: alert.coin,
-              targetPrice: alert.price,
-              status: alert.status,
-              createdAt: alert.createdAt,
-              condition: alert.condition,
-            }))
-          );
+        if (alertsResult?.success && alertsResult.counts) {
+          setAlertCounts({
+            active: Number(alertsResult.counts.active) || 0,
+            triggered: Number(alertsResult.counts.triggered) || 0,
+            cancelled: Number(alertsResult.counts.cancelled) || 0,
+          });
         } else {
-          setMyAlerts([]);
+          setAlertCounts({ active: 0, triggered: 0, cancelled: 0 });
         }
 
         if (notificationsResult?.success && Array.isArray(notificationsResult.notifications)) {
@@ -203,7 +198,7 @@ export default function MyDashboard() {
       })
       .catch((error) => {
         if (cancelled || error?.name === "AbortError") return;
-        setMyAlerts([]);
+        setAlertCounts({ active: 0, triggered: 0, cancelled: 0 });
       })
       .finally(() => {
         if (!cancelled) setNotificationsLoading(false);
@@ -216,12 +211,13 @@ export default function MyDashboard() {
   }, [sessionPending, shouldShowLogin, user?.email]);
 
   const stats = useMemo(() => {
-    const activeAlerts = myAlerts.filter((item) => item.status === "active").length;
-    const triggeredAlerts = myAlerts.filter((item) => item.status === "triggered").length;
+    const activeAlerts = alertCounts.active;
+    const triggeredAlerts = alertCounts.triggered;
+    const cancelledAlerts = alertCounts.cancelled;
     const pendingAnalysis = myAnalysis.filter((item) => item.status !== "مكتمل").length;
 
-    return { activeAlerts, triggeredAlerts, pendingAnalysis };
-  }, [myAlerts, myAnalysis]);
+    return { activeAlerts, triggeredAlerts, cancelledAlerts, pendingAnalysis };
+  }, [alertCounts, myAnalysis]);
 
   const latestAnalysis = useMemo(() => myAnalysis.slice(0, 4), [myAnalysis]);
 
@@ -591,13 +587,12 @@ export default function MyDashboard() {
             )}
           </DashboardPanel>
 
-          <Link href="/my-alerts" className="user-dashboard-panel user-dashboard-panel--clickable">
+          <section className="user-dashboard-panel">
             <div className="user-dashboard-panel__header">
               <div>
                 <h2 className="user-dashboard-panel__title">إدارة التنبيهات</h2>
-                <p className="user-dashboard-panel__subtitle">متابعة التنبيهات قيد الانتظار والمنفذة</p>
+                <p className="user-dashboard-panel__subtitle">متابعة التنبيهات قيد الانتظار والمنفذة والملغاة</p>
               </div>
-              <span className="user-dashboard-panel__link">فتح</span>
             </div>
             <div className="user-dashboard-panel__body">
               <div className="user-dashboard-info-rows">
@@ -609,9 +604,18 @@ export default function MyDashboard() {
                   <span>تم التنفيذ</span>
                   <strong>{stats.triggeredAlerts}</strong>
                 </div>
+                <div className="user-dashboard-info-row">
+                  <span>ملغاة</span>
+                  <strong>{stats.cancelledAlerts}</strong>
+                </div>
+              </div>
+              <div className="user-dashboard-panel__footer">
+                <Link href="/my-dashboard/alerts" className="user-dashboard-btn user-dashboard-btn--ghost">
+                  عرض جميع التنبيهات
+                </Link>
               </div>
             </div>
-          </Link>
+          </section>
 
           <DashboardPanel
             title="رسائل الإدارة / الردود"

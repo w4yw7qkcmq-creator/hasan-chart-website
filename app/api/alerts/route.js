@@ -39,11 +39,53 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
+    const summary = searchParams.get("summary") === "1";
     const statusFilter = String(searchParams.get("status") || "").trim().toLowerCase();
     const limit = Math.min(Math.max(Number(searchParams.get("limit") || 50), 1), 50);
 
     const userEmail = session.email;
     const supabase = getSupabaseAdmin();
+
+    if (summary) {
+      const countForStatus = (status) =>
+        supabase
+          .from("price_alerts")
+          .select("id", { count: "exact", head: true })
+          .ilike("user_email", userEmail)
+          .eq("status", status);
+
+      const [activeRes, triggeredRes, cancelledRes] = await Promise.all([
+        countForStatus(PRICE_ALERT_STATUS.ACTIVE),
+        countForStatus(PRICE_ALERT_STATUS.TRIGGERED),
+        countForStatus(PRICE_ALERT_STATUS.CANCELLED),
+      ]);
+
+      if (activeRes.error || triggeredRes.error || cancelledRes.error) {
+        throw new Error(
+          activeRes.error?.message ||
+            triggeredRes.error?.message ||
+            cancelledRes.error?.message ||
+            "تعذر تحميل ملخص التنبيهات."
+        );
+      }
+
+      return Response.json(
+        {
+          success: true,
+          counts: {
+            active: activeRes.count || 0,
+            triggered: triggeredRes.count || 0,
+            cancelled: cancelledRes.count || 0,
+          },
+        },
+        {
+          headers: {
+            "Cache-Control": CACHE_PRIVATE_USER,
+            Vary: "Cookie",
+          },
+        }
+      );
+    }
 
     let query = supabase
       .from("price_alerts")
