@@ -64,9 +64,9 @@ function StatusBadge({ status, variant = "dashboard" }) {
   return <span className={`user-dashboard-badge ${badgeClass}`}>{label}</span>;
 }
 
-function DashboardMetricCard({ title, value, subtitle, icon, tone = "blue" }) {
-  return (
-    <div className={`user-dashboard-metric user-dashboard-metric--${tone}`}>
+function DashboardMetricCard({ title, value, subtitle, icon, tone = "blue", href }) {
+  const content = (
+    <>
       <div className="user-dashboard-metric__icon" aria-hidden="true">
         {icon}
       </div>
@@ -75,8 +75,22 @@ function DashboardMetricCard({ title, value, subtitle, icon, tone = "blue" }) {
         <p className="user-dashboard-metric__value">{value}</p>
         <p className="user-dashboard-metric__subtitle">{subtitle}</p>
       </div>
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={`user-dashboard-metric user-dashboard-metric--${tone} user-dashboard-metric--clickable`}
+        aria-label={`${title} - عرض جميع التنبيهات`}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={`user-dashboard-metric user-dashboard-metric--${tone}`}>{content}</div>;
 }
 
 function DashboardPanel({ title, subtitle, action, children }) {
@@ -498,6 +512,7 @@ export default function MyDashboard() {
             subtitle={`${stats.triggeredAlerts} تنبيه مكتمل`}
             icon="🔔"
             tone="cyan"
+            href="/my-dashboard/alerts"
           />
           <DashboardMetricCard
             title="طلبات التحليل"
@@ -587,12 +602,13 @@ export default function MyDashboard() {
             )}
           </DashboardPanel>
 
-          <section className="user-dashboard-panel">
+          <Link href="/my-dashboard/alerts" className="user-dashboard-panel user-dashboard-panel--clickable">
             <div className="user-dashboard-panel__header">
               <div>
                 <h2 className="user-dashboard-panel__title">إدارة التنبيهات</h2>
                 <p className="user-dashboard-panel__subtitle">متابعة التنبيهات قيد الانتظار والمنفذة والملغاة</p>
               </div>
+              <span className="user-dashboard-panel__link">فتح</span>
             </div>
             <div className="user-dashboard-panel__body">
               <div className="user-dashboard-info-rows">
@@ -609,13 +625,8 @@ export default function MyDashboard() {
                   <strong>{stats.cancelledAlerts}</strong>
                 </div>
               </div>
-              <div className="user-dashboard-panel__footer">
-                <Link href="/my-dashboard/alerts" className="user-dashboard-btn user-dashboard-btn--ghost">
-                  عرض جميع التنبيهات
-                </Link>
-              </div>
             </div>
-          </section>
+          </Link>
 
           <DashboardPanel
             title="رسائل الإدارة / الردود"

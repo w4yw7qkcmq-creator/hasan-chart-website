@@ -2732,6 +2732,24 @@ html[data-theme="light"] .user-dashboard-hero__eyebrow {
   }
 }
 
+.user-dashboard-metric--clickable {
+  display: flex;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.user-dashboard-metric--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 55px rgba(0, 102, 255, 0.14);
+}
+
+.user-dashboard-metric--clickable:focus-visible {
+  outline: 2px solid rgba(56, 168, 242, 0.65);
+  outline-offset: 3px;
+}
+
 .user-dashboard-metric {
   display: flex;
   align-items: flex-start;
