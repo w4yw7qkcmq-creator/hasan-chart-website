@@ -5,6 +5,8 @@ import { alertLimiter, RATE_LIMIT_ERROR, userReadLimiter } from "../../../lib/ra
 import {
   mapPriceAlertRow,
   normalizeSymbol,
+  PRICE_ALERT_LIST_COLUMNS,
+  PRICE_ALERT_STATUS,
   resolveAlertCondition,
   trimText,
 } from "../../../lib/price-alert-shared";
@@ -13,7 +15,13 @@ import { logApiError, logApiRequest } from "../../../lib/structured-logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
 
-export async function GET() {
+const ALLOWED_ALERT_STATUSES = new Set([
+  PRICE_ALERT_STATUS.ACTIVE,
+  PRICE_ALERT_STATUS.TRIGGERED,
+  PRICE_ALERT_STATUS.CANCELLED,
+]);
+
+export async function GET(request) {
   try {
     const session = await requireSessionUser();
 
@@ -30,15 +38,27 @@ export async function GET() {
       return rateLimited;
     }
 
+    const { searchParams } = new URL(request.url);
+    const statusFilter = String(searchParams.get("status") || "").trim().toLowerCase();
+    const limit = Math.min(Math.max(Number(searchParams.get("limit") || 50), 1), 50);
+
     const userEmail = session.email;
     const supabase = getSupabaseAdmin();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("price_alerts")
-      .select("id, coin, target_price, condition, status, created_at")
+      .select(PRICE_ALERT_LIST_COLUMNS)
       .ilike("user_email", userEmail)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(limit);
+
+    if (statusFilter && ALLOWED_ALERT_STATUSES.has(statusFilter)) {
+      query = query.eq("status", statusFilter);
+    } else {
+      query = query.in("status", [PRICE_ALERT_STATUS.ACTIVE, PRICE_ALERT_STATUS.TRIGGERED]);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(error.message || "تعذر تحميل التنبيهات.");

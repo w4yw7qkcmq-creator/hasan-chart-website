@@ -7,6 +7,8 @@ import {
 import {
   mapPriceAlertRow,
   normalizeSymbol,
+  PRICE_ALERT_LIST_COLUMNS,
+  PRICE_ALERT_STATUS,
   resolveAlertCondition,
   trimText,
 } from "../../../../lib/price-alert-shared";
@@ -18,7 +20,7 @@ export const maxDuration = 10;
 async function getOwnedAlert({ supabase, alertId, userEmail }) {
   const { data, error } = await supabase
     .from("price_alerts")
-    .select("id, coin, target_price, condition, status, created_at, user_email")
+    .select(PRICE_ALERT_LIST_COLUMNS)
     .eq("id", alertId)
     .ilike("user_email", userEmail)
     .maybeSingle();
@@ -114,7 +116,7 @@ export async function PATCH(req, { params }) {
       .eq("id", alertId)
       .ilike("user_email", session.email)
       .eq("status", "active")
-      .select("id, coin, target_price, condition, status, created_at")
+      .select(PRICE_ALERT_LIST_COLUMNS)
       .maybeSingle();
 
     if (error || !data?.id) {
@@ -206,9 +208,50 @@ export async function DELETE(_req, { params }) {
     logApiRequest({
       route: "/api/alerts/[id]",
       method: "DELETE",
-      event: "PRICE_ALERT_DELETE_START",
+      event: existing.status === PRICE_ALERT_STATUS.ACTIVE
+        ? "PRICE_ALERT_CANCEL_START"
+        : "PRICE_ALERT_DELETE_START",
       alertId,
     });
+
+    if (existing.status === PRICE_ALERT_STATUS.ACTIVE) {
+      const { data, error } = await supabase
+        .from("price_alerts")
+        .update({ status: PRICE_ALERT_STATUS.CANCELLED })
+        .eq("id", alertId)
+        .ilike("user_email", session.email)
+        .eq("status", PRICE_ALERT_STATUS.ACTIVE)
+        .select(PRICE_ALERT_LIST_COLUMNS)
+        .maybeSingle();
+
+      if (error || !data?.id) {
+        logApiError({
+          route: "/api/alerts/[id]",
+          method: "DELETE",
+          event: "PRICE_ALERT_CANCEL_FAILED",
+          alertId,
+          error: error?.message || "MISSING_CANCELLED_ALERT",
+        });
+
+        return Response.json(
+          { success: false, error: error?.message || "فشل إلغاء التنبيه." },
+          { status: 500 }
+        );
+      }
+
+      logApiRequest({
+        route: "/api/alerts/[id]",
+        method: "DELETE",
+        event: "PRICE_ALERT_CANCEL_SUCCESS",
+        alertId,
+      });
+
+      return Response.json({
+        success: true,
+        message: "تم إلغاء التنبيه بنجاح.",
+        alert: mapPriceAlertRow(data),
+      });
+    }
 
     const { error } = await supabase
       .from("price_alerts")

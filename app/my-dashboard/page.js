@@ -223,11 +223,6 @@ export default function MyDashboard() {
     return { activeAlerts, triggeredAlerts, pendingAnalysis };
   }, [myAlerts, myAnalysis]);
 
-  const activeAlertsList = useMemo(
-    () => myAlerts.filter((item) => item.status === "active"),
-    [myAlerts]
-  );
-
   const latestAnalysis = useMemo(() => myAnalysis.slice(0, 4), [myAnalysis]);
 
   const adminReplies = useMemo(
@@ -237,28 +232,6 @@ export default function MyDashboard() {
 
   const subscriptionLabel = user?.subscription_plan || "لا يوجد اشتراك";
   const subscriptionStatus = user?.subscription_status || "غير مفعل";
-
-  const deleteAlert = async (id) => {
-    if (!user) return;
-
-    try {
-      const response = await fetch(`/api/alerts/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-        credentials: "include",
-        cache: "no-store",
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || !result?.success) {
-        return;
-      }
-
-      setMyAlerts((current) => current.filter((alert) => alert.id !== id));
-    } catch {
-      // ignore transient network errors
-    }
-  };
 
   const analyzeCoinWithAI = async () => {
     const symbol = aiSymbol.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -618,39 +591,27 @@ export default function MyDashboard() {
             )}
           </DashboardPanel>
 
-          <DashboardPanel
-            title="التنبيهات النشطة"
-            subtitle="تنبيهاتك السعرية المفعّلة"
-            action={
-              <Link href="/alerts?tab=create" className="user-dashboard-panel__link">
-                تنبيه جديد
-              </Link>
-            }
-          >
-            {activeAlertsList.length > 0 ? (
-              <div className="user-dashboard-list">
-                {activeAlertsList.map((item) => (
-                  <DashboardListItem
-                    key={item.id}
-                    title={item.coin}
-                    meta={`السعر المطلوب: $${item.targetPrice} · ${item.createdAt || ""}`}
-                    badge={<StatusBadge status={item.status} variant="dashboard" />}
-                    actions={
-                      <button
-                        type="button"
-                        onClick={() => deleteAlert(item.id)}
-                        className="user-dashboard-btn user-dashboard-btn--danger"
-                      >
-                        حذف
-                      </button>
-                    }
-                  />
-                ))}
+          <Link href="/my-alerts" className="user-dashboard-panel user-dashboard-panel--clickable">
+            <div className="user-dashboard-panel__header">
+              <div>
+                <h2 className="user-dashboard-panel__title">إدارة التنبيهات</h2>
+                <p className="user-dashboard-panel__subtitle">متابعة التنبيهات قيد الانتظار والمنفذة</p>
               </div>
-            ) : (
-              <DashboardEmptyState message="لا توجد تنبيهات نشطة" icon="🔕" />
-            )}
-          </DashboardPanel>
+              <span className="user-dashboard-panel__link">فتح</span>
+            </div>
+            <div className="user-dashboard-panel__body">
+              <div className="user-dashboard-info-rows">
+                <div className="user-dashboard-info-row">
+                  <span>قيد الانتظار</span>
+                  <strong>{stats.activeAlerts}</strong>
+                </div>
+                <div className="user-dashboard-info-row">
+                  <span>تم التنفيذ</span>
+                  <strong>{stats.triggeredAlerts}</strong>
+                </div>
+              </div>
+            </div>
+          </Link>
 
           <DashboardPanel
             title="رسائل الإدارة / الردود"
