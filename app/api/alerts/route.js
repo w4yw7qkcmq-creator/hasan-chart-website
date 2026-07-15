@@ -1,3 +1,4 @@
+import { CACHE_PRIVATE_USER } from "../../../lib/api-response";
 import { getSupabaseAdmin, requireSessionUser } from "../../../lib/auth-session";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { alertLimiter, RATE_LIMIT_ERROR, userReadLimiter } from "../../../lib/rate-limit";
@@ -45,7 +46,15 @@ export async function GET() {
 
     const alerts = (data || []).map(mapPriceAlertRow);
 
-    return Response.json({ success: true, alerts });
+    return Response.json(
+      { success: true, alerts },
+      {
+        headers: {
+          "Cache-Control": CACHE_PRIVATE_USER,
+          Vary: "Cookie",
+        },
+      }
+    );
   } catch (err) {
     logApiError({
       route: "/api/alerts",
