@@ -9,6 +9,12 @@ import {
   useMarketPulseStream,
 } from "../../hooks/useMarketPulseStream";
 
+const PULSE_SYMBOLS = [
+  { symbol: "BTC", key: "BTCUSDT" },
+  { symbol: "ETH", key: "ETHUSDT" },
+  { symbol: "SOL", key: "SOLUSDT" },
+];
+
 function HomeMarketPulsePanelComponent() {
   const mounted = useClientMounted();
   const { prices, liveFeedStatus } = useMarketPulseStream();
@@ -47,9 +53,14 @@ function HomeMarketPulsePanelComponent() {
       </div>
 
       <div className="space-y-3">
-        <MiniTicker symbol="BTC" price={pulsePrices.BTCUSDT} feedStatus={pulseFeedStatus} />
-        <MiniTicker symbol="ETH" price={pulsePrices.ETHUSDT} feedStatus={pulseFeedStatus} />
-        <MiniTicker symbol="SOL" price={pulsePrices.SOLUSDT} feedStatus={pulseFeedStatus} />
+        {PULSE_SYMBOLS.map((item) => (
+          <MiniTicker
+            key={item.key}
+            symbol={item.symbol}
+            price={pulsePrices[item.key]}
+            feedStatus={pulseFeedStatus}
+          />
+        ))}
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 
 export const MARKET_PULSE_STORAGE_KEY = "hasan-chart-market-pulse-v1";
@@ -16,9 +15,27 @@ const SSE_RETRY_MS = 3000;
 const POLL_FALLBACK_MS = 12000;
 const BOOTSTRAP_RETRY_MS = 3000;
 const MIN_BOOTSTRAP_GAP_MS = 1500;
+const PRICE_UPDATE_BATCH_MS = 75;
 
 let marketPulseBootstrapPromise = null;
 let lastMarketPulseBootstrapAt = 0;
+
+const sharedSubscribers = new Set();
+let sharedPrices = { ...DEFAULT_MARKET_PRICES };
+let sharedLiveFeedStatus = "connecting";
+let sharedConnectionActive = false;
+
+let pollTimer = null;
+let retryTimer = null;
+let streamRetryTimer = null;
+let eventSource = null;
+let sseConnectTimer = null;
+let sseLive = false;
+let batchTimer = null;
+let pendingSnapshot = null;
+let pageLoadCancel = null;
+let visibilityHandlerAttached = false;
+let sessionHandlerAttached = false;
 
 async function fetchMarketPulsePayload() {
   const now = Date.now();
@@ -111,6 +128,79 @@ function mapSnapshotToStatus(snapshot, prices) {
   return "connecting";
 }
 
+function pricesEqual(left, right) {
+  return (
+    left.BTCUSDT === right.BTCUSDT &&
+    left.ETHUSDT === right.ETHUSDT &&
+    left.SOLUSDT === right.SOLUSDT
+  );
+}
+
+function notifySharedSubscribers() {
+  const snapshot = {
+    prices: { ...sharedPrices },
+    liveFeedStatus: sharedLiveFeedStatus,
+  };
+
+  for (const subscriber of sharedSubscribers) {
+    subscriber(snapshot);
+  }
+}
+
+function applySnapshotToSharedState(snapshot) {
+  if (!snapshot?.prices) return false;
+
+  const nextPrices = normalizeMarketPrices(snapshot.prices);
+  const nextStatus = mapSnapshotToStatus(snapshot, nextPrices);
+
+  if (pricesEqual(sharedPrices, nextPrices) && sharedLiveFeedStatus === nextStatus) {
+    return hasKnownMarketPrice(nextPrices);
+  }
+
+  sharedPrices = nextPrices;
+  sharedLiveFeedStatus = nextStatus;
+  writeStoredMarketPulse(nextPrices);
+  notifySharedSubscribers();
+  return hasKnownMarketPrice(nextPrices);
+}
+
+function commitSharedSnapshot(snapshot, { immediate = false } = {}) {
+  if (!snapshot?.prices) return false;
+
+  if (immediate) {
+    if (batchTimer) {
+      window.clearTimeout(batchTimer);
+      batchTimer = null;
+    }
+    pendingSnapshot = null;
+    return applySnapshotToSharedState(snapshot);
+  }
+
+  pendingSnapshot = {
+    ...(pendingSnapshot || {}),
+    ...snapshot,
+    prices: {
+      ...(pendingSnapshot?.prices || sharedPrices),
+      ...snapshot.prices,
+    },
+  };
+
+  if (batchTimer) {
+    return hasKnownMarketPrice(sharedPrices);
+  }
+
+  batchTimer = window.setTimeout(() => {
+    batchTimer = null;
+    const queued = pendingSnapshot;
+    pendingSnapshot = null;
+    if (queued) {
+      applySnapshotToSharedState(queued);
+    }
+  }, PRICE_UPDATE_BATCH_MS);
+
+  return hasKnownMarketPrice(sharedPrices);
+}
+
 function scheduleAfterPageLoad(callback) {
   const run = () => {
     if (typeof window.requestIdleCallback === "function") {
@@ -130,257 +220,283 @@ function scheduleAfterPageLoad(callback) {
   return () => window.removeEventListener("load", run);
 }
 
-export function useMarketPulseStream() {
-  const [prices, setPrices] = useState(() => ({ ...DEFAULT_MARKET_PRICES }));
-  const [liveFeedStatus, setLiveFeedStatus] = useState("connecting");
-  const pricesRef = useRef(prices);
-  const mountedRef = useRef(true);
-  const pollTimerRef = useRef(null);
-  const retryTimerRef = useRef(null);
-  const streamRetryTimerRef = useRef(null);
-  const eventSourceRef = useRef(null);
-  const sseConnectTimerRef = useRef(null);
-  const sseLiveRef = useRef(false);
-  const applySnapshotRef = useRef(() => false);
+function clearPollTimer() {
+  if (pollTimer) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
 
-  useEffect(() => {
-    pricesRef.current = prices;
-  }, [prices]);
+function clearRetryTimer() {
+  if (retryTimer) {
+    window.clearInterval(retryTimer);
+    retryTimer = null;
+  }
+}
+
+function clearStreamRetryTimer() {
+  if (streamRetryTimer) {
+    window.clearTimeout(streamRetryTimer);
+    streamRetryTimer = null;
+  }
+}
+
+function clearSseConnectTimer() {
+  if (sseConnectTimer) {
+    window.clearTimeout(sseConnectTimer);
+    sseConnectTimer = null;
+  }
+}
+
+function closeEventSource() {
+  clearSseConnectTimer();
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+}
+
+async function bootstrapFromApi() {
+  try {
+    const payload = await fetchMarketPulsePayload();
+    if (!payload) return false;
+
+    const { response, result } = payload;
+
+    if (!response.ok || !result?.success || !result?.prices) {
+      return false;
+    }
+
+    return commitSharedSnapshot(
+      {
+        prices: result.prices,
+        status: result.stale ? "stale" : "live",
+        stale: Boolean(result.stale),
+      },
+      { immediate: true }
+    );
+  } catch {
+    return false;
+  }
+}
+
+function startPollFallback() {
+  if (pollTimer || document.hidden) return;
+
+  pollTimer = window.setInterval(() => {
+    if (document.hidden) return;
+    void bootstrapFromApi();
+  }, POLL_FALLBACK_MS);
+}
+
+function markSseLive() {
+  sseLive = true;
+  clearSseConnectTimer();
+  clearStreamRetryTimer();
+  clearPollTimer();
+
+  if (hasKnownMarketPrice(sharedPrices) && sharedLiveFeedStatus !== "live") {
+    sharedLiveFeedStatus = "live";
+    notifySharedSubscribers();
+  }
+}
+
+function scheduleStreamRetry() {
+  clearStreamRetryTimer();
+  if (sseLive) return;
+
+  streamRetryTimer = window.setTimeout(() => {
+    if (!sseLive) {
+      connectStream();
+    }
+  }, SSE_RETRY_MS);
+}
+
+function handleSseFailure() {
+  closeEventSource();
+  sseLive = false;
+
+  if (hasKnownMarketPrice(sharedPrices) && sharedLiveFeedStatus !== "stale") {
+    sharedLiveFeedStatus = "stale";
+    notifySharedSubscribers();
+  }
+
+  scheduleStreamRetry();
+}
+
+function connectStream() {
+  if (typeof window === "undefined") return;
+
+  if (typeof EventSource === "undefined") {
+    startPollFallback();
+    return;
+  }
+
+  closeEventSource();
+  sseLive = false;
+
+  const source = new EventSource("/api/market-stream");
+  eventSource = source;
+  let receivedData = false;
+
+  sseConnectTimer = window.setTimeout(() => {
+    if (!receivedData) {
+      handleSseFailure();
+    }
+  }, SSE_CONNECT_TIMEOUT_MS);
+
+  source.onmessage = (event) => {
+    if (!event?.data) return;
+
+    try {
+      const payload = JSON.parse(event.data);
+      if (!payload?.prices) return;
+
+      receivedData = true;
+      const hasPrices = commitSharedSnapshot(payload);
+
+      if (hasPrices) {
+        markSseLive();
+      }
+    } catch {
+      // Ignore malformed SSE payloads.
+    }
+  };
+
+  source.onerror = () => {
+    handleSseFailure();
+  };
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "hidden") {
+    clearPollTimer();
+    clearRetryTimer();
+    closeEventSource();
+    sseLive = false;
+    return;
+  }
+
+  void bootstrapFromApi();
+
+  if (!sseLive) {
+    connectStream();
+  }
+}
+
+function handleSessionReady() {
+  void bootstrapFromApi();
+}
+
+function startSharedMarketPulseConnection() {
+  if (sharedConnectionActive || typeof window === "undefined") {
+    return;
+  }
+
+  sharedConnectionActive = true;
+
+  const stored = readStoredMarketPulse();
+  if (stored) {
+    const next = normalizeMarketPrices(stored);
+    sharedPrices = next;
+    sharedLiveFeedStatus = hasKnownMarketPrice(next) ? "stale" : "connecting";
+    notifySharedSubscribers();
+  }
+
+  void bootstrapFromApi();
+
+  retryTimer = window.setInterval(() => {
+    if (document.hidden || hasKnownMarketPrice(sharedPrices)) {
+      if (hasKnownMarketPrice(sharedPrices)) {
+        clearRetryTimer();
+      }
+      return;
+    }
+
+    void bootstrapFromApi();
+  }, BOOTSTRAP_RETRY_MS);
+
+  pageLoadCancel = scheduleAfterPageLoad(() => {
+    connectStream();
+  });
+
+  if (!visibilityHandlerAttached) {
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    visibilityHandlerAttached = true;
+  }
+
+  if (!sessionHandlerAttached) {
+    window.addEventListener("hc:session-ready", handleSessionReady);
+    sessionHandlerAttached = true;
+  }
+}
+
+function stopSharedMarketPulseConnection() {
+  if (!sharedConnectionActive) {
+    return;
+  }
+
+  sharedConnectionActive = false;
+  pageLoadCancel?.();
+  pageLoadCancel = null;
+  clearPollTimer();
+  clearRetryTimer();
+  clearStreamRetryTimer();
+  closeEventSource();
+  sseLive = false;
+
+  if (batchTimer) {
+    window.clearTimeout(batchTimer);
+    batchTimer = null;
+  }
+
+  pendingSnapshot = null;
+
+  if (visibilityHandlerAttached) {
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    visibilityHandlerAttached = false;
+  }
+
+  if (sessionHandlerAttached) {
+    window.removeEventListener("hc:session-ready", handleSessionReady);
+    sessionHandlerAttached = false;
+  }
+}
+
+export function useMarketPulseStream() {
+  const [prices, setPrices] = useState(() => ({ ...sharedPrices }));
+  const [liveFeedStatus, setLiveFeedStatus] = useState(sharedLiveFeedStatus);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
 
-    const clearPollTimer = () => {
-      if (pollTimerRef.current) {
-        window.clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-    };
-
-    const clearRetryTimer = () => {
-      if (retryTimerRef.current) {
-        window.clearInterval(retryTimerRef.current);
-        retryTimerRef.current = null;
-      }
-    };
-
-    const clearStreamRetryTimer = () => {
-      if (streamRetryTimerRef.current) {
-        window.clearTimeout(streamRetryTimerRef.current);
-        streamRetryTimerRef.current = null;
-      }
-    };
-
-    const clearSseConnectTimer = () => {
-      if (sseConnectTimerRef.current) {
-        window.clearTimeout(sseConnectTimerRef.current);
-        sseConnectTimerRef.current = null;
-      }
-    };
-
-    const closeEventSource = () => {
-      clearSseConnectTimer();
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-    };
-
-    const applySnapshot = (snapshot) => {
-      if (!mountedRef.current || !snapshot?.prices) return false;
-
-      const next = normalizeMarketPrices(snapshot.prices);
-      const nextStatus = mapSnapshotToStatus(snapshot, next);
-
-      flushSync(() => {
-        setPrices(next);
-        setLiveFeedStatus(nextStatus);
-      });
-
-      pricesRef.current = next;
-      writeStoredMarketPulse(next);
-      return hasKnownMarketPrice(next);
-    };
-
-    applySnapshotRef.current = applySnapshot;
-
-    const stored = readStoredMarketPulse();
-    if (stored) {
-      const next = normalizeMarketPrices(stored);
-      flushSync(() => {
-        setPrices(next);
-        setLiveFeedStatus(hasKnownMarketPrice(next) ? "stale" : "connecting");
-      });
-      pricesRef.current = next;
-    }
-
-    const bootstrapFromApi = async () => {
-      try {
-        const payload = await fetchMarketPulsePayload();
-        if (!payload) return false;
-
-        const { response, result } = payload;
-
-        if (!mountedRef.current || !response.ok || !result?.success || !result?.prices) {
-          return false;
-        }
-
-        return applySnapshot({
-          prices: result.prices,
-          status: result.stale ? "stale" : "live",
-          stale: Boolean(result.stale),
-        });
-      } catch {
-        return false;
-      }
-    };
-
-    const startPollFallback = () => {
-      if (pollTimerRef.current || !mountedRef.current || document.hidden) return;
-
-      pollTimerRef.current = window.setInterval(() => {
-        if (!mountedRef.current || document.hidden) return;
-        void bootstrapFromApi();
-      }, POLL_FALLBACK_MS);
-    };
-
-    const markSseLive = () => {
-      sseLiveRef.current = true;
-      clearSseConnectTimer();
-      clearStreamRetryTimer();
-      clearPollTimer();
-
-      if (hasKnownMarketPrice(pricesRef.current)) {
-        flushSync(() => {
-          setLiveFeedStatus("live");
-        });
-      }
-    };
-
-    const scheduleStreamRetry = () => {
-      clearStreamRetryTimer();
-      if (!mountedRef.current || sseLiveRef.current) return;
-
-      streamRetryTimerRef.current = window.setTimeout(() => {
-        if (mountedRef.current && !sseLiveRef.current) {
-          connectStream();
-        }
-      }, SSE_RETRY_MS);
-    };
-
-    const handleSseFailure = () => {
-      closeEventSource();
-      sseLiveRef.current = false;
-
-      if (hasKnownMarketPrice(pricesRef.current)) {
-        flushSync(() => {
-          setLiveFeedStatus("stale");
-        });
-      }
-
-      scheduleStreamRetry();
-    };
-
-    const connectStream = () => {
+    const handleSharedUpdate = (snapshot) => {
       if (!mountedRef.current) return;
 
-      if (typeof EventSource === "undefined") {
-        startPollFallback();
-        return;
-      }
-
-      closeEventSource();
-      sseLiveRef.current = false;
-
-      const source = new EventSource("/api/market-stream");
-      eventSourceRef.current = source;
-      let receivedData = false;
-
-      sseConnectTimerRef.current = window.setTimeout(() => {
-        if (!mountedRef.current || receivedData) return;
-        handleSseFailure();
-      }, SSE_CONNECT_TIMEOUT_MS);
-
-      source.onmessage = (event) => {
-        if (!mountedRef.current || !event?.data) return;
-
-        try {
-          const payload = JSON.parse(event.data);
-          if (!payload?.prices) return;
-
-          receivedData = true;
-          const hasPrices = applySnapshotRef.current(payload);
-
-          if (hasPrices) {
-            markSseLive();
-          }
-        } catch {
-          // Ignore malformed SSE payloads.
-        }
-      };
-
-      source.onerror = () => {
-        if (!mountedRef.current) return;
-        handleSseFailure();
-      };
+      setPrices((current) => (pricesEqual(current, snapshot.prices) ? current : { ...snapshot.prices }));
+      setLiveFeedStatus((current) =>
+        current === snapshot.liveFeedStatus ? current : snapshot.liveFeedStatus
+      );
     };
 
-    const handleVisibilityChange = () => {
-      if (!mountedRef.current) return;
-
-      if (document.visibilityState === "hidden") {
-        clearPollTimer();
-        clearRetryTimer();
-        closeEventSource();
-        sseLiveRef.current = false;
-        return;
-      }
-
-      void bootstrapFromApi();
-
-      if (!sseLiveRef.current) {
-        connectStream();
-      }
-    };
-
-    const handleSessionReady = () => {
-      void bootstrapFromApi();
-    };
-
-    void bootstrapFromApi();
-
-    retryTimerRef.current = window.setInterval(() => {
-      if (
-        !mountedRef.current ||
-        document.hidden ||
-        hasKnownMarketPrice(pricesRef.current)
-      ) {
-        if (hasKnownMarketPrice(pricesRef.current)) {
-          clearRetryTimer();
-        }
-        return;
-      }
-
-      void bootstrapFromApi();
-    }, BOOTSTRAP_RETRY_MS);
-
-    const cancelPageLoadSchedule = scheduleAfterPageLoad(() => {
-      if (!mountedRef.current) return;
-      connectStream();
+    sharedSubscribers.add(handleSharedUpdate);
+    handleSharedUpdate({
+      prices: sharedPrices,
+      liveFeedStatus: sharedLiveFeedStatus,
     });
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("hc:session-ready", handleSessionReady);
+    if (sharedSubscribers.size === 1) {
+      startSharedMarketPulseConnection();
+    }
 
     return () => {
       mountedRef.current = false;
-      cancelPageLoadSchedule();
-      clearPollTimer();
-      clearRetryTimer();
-      clearStreamRetryTimer();
-      closeEventSource();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("hc:session-ready", handleSessionReady);
+      sharedSubscribers.delete(handleSharedUpdate);
+
+      if (sharedSubscribers.size === 0) {
+        stopSharedMarketPulseConnection();
+      }
     };
   }, []);
 

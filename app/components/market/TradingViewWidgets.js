@@ -8,6 +8,10 @@ import {
 } from "../../../lib/trading-view-network";
 import { useLazyInView } from "../../hooks/useLazyInView";
 
+function tradingViewWidgetPropsAreEqual(prev, next) {
+  return prev.symbol === next.symbol && prev.height === next.height;
+}
+
 function TradingViewWidgetComponent({ symbol, height = "120" }) {
   const containerRef = useRef(null);
   const mountedSymbolRef = useRef(null);
@@ -129,7 +133,15 @@ function TradingViewWidgetComponent({ symbol, height = "120" }) {
   );
 }
 
-export const TradingViewWidget = memo(TradingViewWidgetComponent);
+export const TradingViewWidget = memo(TradingViewWidgetComponent, tradingViewWidgetPropsAreEqual);
+
+function tradingViewPricePropsAreEqual(prev, next) {
+  return (
+    prev.title === next.title &&
+    prev.symbol === next.symbol &&
+    prev.tvSymbol === next.tvSymbol
+  );
+}
 
 function TradingViewPriceComponent({ title, symbol, tvSymbol }) {
   return (
@@ -141,7 +153,16 @@ function TradingViewPriceComponent({ title, symbol, tvSymbol }) {
   );
 }
 
-export const TradingViewPrice = memo(TradingViewPriceComponent);
+export const TradingViewPrice = memo(TradingViewPriceComponent, tradingViewPricePropsAreEqual);
+
+function marketWindowPropsAreEqual(prev, next) {
+  return (
+    prev.title === next.title &&
+    prev.label === next.label &&
+    prev.symbol === next.symbol &&
+    prev.widgetHeight === next.widgetHeight
+  );
+}
 
 function MarketWindowComponent({ title, label, symbol, widgetHeight = "120" }) {
   return (
@@ -153,4 +174,4 @@ function MarketWindowComponent({ title, label, symbol, widgetHeight = "120" }) {
   );
 }
 
-export const MarketWindow = memo(MarketWindowComponent);
+export const MarketWindow = memo(MarketWindowComponent, marketWindowPropsAreEqual);

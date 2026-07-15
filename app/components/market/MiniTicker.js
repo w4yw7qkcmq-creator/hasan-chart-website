@@ -2,6 +2,14 @@
 
 import { memo } from "react";
 
+function miniTickerPropsAreEqual(prev, next) {
+  return (
+    prev.symbol === next.symbol &&
+    prev.price === next.price &&
+    prev.feedStatus === next.feedStatus
+  );
+}
+
 function MiniTickerComponent({ symbol, price, feedStatus = "connecting" }) {
   const normalized = price == null || price === "" ? "0" : String(price);
   const hasPrice = normalized !== "0";
@@ -21,4 +29,4 @@ function MiniTickerComponent({ symbol, price, feedStatus = "connecting" }) {
   );
 }
 
-export const MiniTicker = memo(MiniTickerComponent);
+export const MiniTicker = memo(MiniTickerComponent, miniTickerPropsAreEqual);
