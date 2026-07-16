@@ -8,6 +8,7 @@
     "start": "next start",
     "start:worker": "node worker/index.js",
     "start:worker:news": "node worker/news-worker.js",
+    "subscription-worker": "node worker/subscription-maintenance-worker.js",
     "install:worker": "npm install --prefix worker"
   },
   "dependencies": {

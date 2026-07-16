@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyCronSecret } from "../../../lib/admin-auth";
-import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
-import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
-import { dispatchUnifiedSiteAlerts } from "../../../lib/site-notification-dispatch.js";
+import {
+  buildMaintenanceResponse,
+  isSubscriptionMaintenanceWorkerEnabled,
+  runSubscriptionMaintenance,
+} from "../../../lib/subscription-expiry-shared.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -15,75 +17,6 @@ const supabase = createClient(
     },
   }
 );
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function getDaysUntilExpiry(expiresAt) {
-  if (!expiresAt) return null;
-
-  const expiresTime = new Date(expiresAt).getTime();
-  if (!Number.isFinite(expiresTime)) return null;
-
-  return Math.ceil((expiresTime - Date.now()) / DAY_MS);
-}
-
-async function queueRenewalReminder({ email, planName, daysLeft }) {
-  const title =
-    daysLeft === 1
-      ? "باقي يوم واحد على انتهاء اشتراكك ⏳"
-      : "باقي 3 أيام على انتهاء اشتراكك ⏳";
-
-  const message =
-    daysLeft === 1
-      ? `باقي يوم واحد على انتهاء ${planName}. يمكنك التجديد من صفحة الباقات.`
-      : `باقي 3 أيام على انتهاء ${planName}. يمكنك التجديد من صفحة الباقات.`;
-
-  await dispatchUnifiedSiteAlerts(supabase, {
-    preset: "subscription_renewal",
-    userEmail: email,
-    title,
-    message,
-    metadata: { planName, daysLeft, variant: "reminder" },
-    sendEmail: () =>
-      sendTemplateEmail({
-        to: email,
-        subject: title,
-        title,
-        content: buildSubscriptionExpiryEmailContent({
-          planName,
-          message,
-          variant: "reminder",
-        }),
-        actionText: "تجديد الاشتراك",
-        actionUrl: `${getSiteUrl()}/subscriptions`,
-      }),
-  });
-}
-
-async function queueExpiredNotice({ email, planName }) {
-  const title = "انتهى اشتراكك ⚠️";
-  const message = `انتهت صلاحية ${planName}. اضغط لتجديد اشتراكك من صفحة الباقات.`;
-
-  await dispatchUnifiedSiteAlerts(supabase, {
-    preset: "subscription_expiry",
-    userEmail: email,
-    title,
-    message,
-    metadata: { planName, variant: "expired" },
-    sendEmail: () =>
-      sendTemplateEmail({
-        to: email,
-        subject: "انتهاء الاشتراك - HasaN CharT World",
-        title,
-        content: buildSubscriptionExpiryEmailContent({
-          planName,
-          variant: "expired",
-        }),
-        actionText: "تجديد الاشتراك",
-        actionUrl: `${getSiteUrl()}/subscriptions`,
-      }),
-  });
-}
 
 export async function GET(request) {
   try {
@@ -99,73 +32,33 @@ export async function GET(request) {
       );
     }
 
-    const now = new Date().toISOString();
-
-    const { data: activeSubscriptions, error: activeError } = await supabase
-      .from("subscription_requests")
-      .select(
-        "id,user_email,plan_name,expires_at,expired_notice_sent,reminder_3d_sent"
-      )
-      .eq("status", "مفعل")
-      .not("expires_at", "is", null);
-
-    if (activeError) {
-      throw new Error(activeError.message);
+    if (isSubscriptionMaintenanceWorkerEnabled()) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        delegated: true,
+        reason: "SUBSCRIPTION_MAINTENANCE_WORKER_ENABLED",
+        checked: 0,
+        expiringSoon: 0,
+        expired: 0,
+        profilesUpdated: 0,
+        requestsUpdated: 0,
+        emailsSent: 0,
+        siteNotificationsCreated: 0,
+        skippedAlreadyProcessed: 0,
+        failed: 0,
+        durationMs: 0,
+        remindersSent: 0,
+        expiredProcessed: 0,
+        now: new Date().toISOString(),
+      });
     }
 
-    let remindersSent = 0;
-    let expiredProcessed = 0;
-
-    for (const subscription of activeSubscriptions || []) {
-      const email = String(subscription.user_email || "").trim().toLowerCase();
-      const planName = subscription.plan_name || "اشتراك VIP";
-      const daysLeft = getDaysUntilExpiry(subscription.expires_at);
-
-      if (!email || daysLeft === null) continue;
-
-      if (daysLeft <= 0) {
-        await supabase
-          .from("subscription_requests")
-          .update({
-            status: "منتهي",
-            expired_notice_sent: true,
-          })
-          .eq("id", subscription.id);
-
-        await supabase
-          .from("profiles")
-          .update({
-            subscription_status: "منتهي",
-            subscription_plan: null,
-          })
-          .eq("email", email);
-
-        if (!subscription.expired_notice_sent) {
-          await queueExpiredNotice({ email, planName });
-        }
-
-        expiredProcessed += 1;
-        continue;
-      }
-
-      if (daysLeft === 3 && !subscription.reminder_3d_sent) {
-        await queueRenewalReminder({ email, planName, daysLeft: 3 });
-
-        await supabase
-          .from("subscription_requests")
-          .update({ reminder_3d_sent: true })
-          .eq("id", subscription.id);
-
-        remindersSent += 1;
-      }
-    }
+    const summary = await runSubscriptionMaintenance(supabase);
 
     return NextResponse.json({
-      success: true,
-      checked: activeSubscriptions?.length || 0,
-      remindersSent,
-      expiredProcessed,
-      now,
+      ...buildMaintenanceResponse(summary),
+      now: new Date().toISOString(),
     });
   } catch (error) {
     return NextResponse.json(

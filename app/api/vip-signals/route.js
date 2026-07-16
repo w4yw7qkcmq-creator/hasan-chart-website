@@ -1,11 +1,14 @@
+import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { CACHE_PRIVATE_USER } from "../../../lib/api-response";
-import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
-import { buildSubscriptionExpiryEmailContent } from "../../../lib/email-layout.js";
-import { dispatchUnifiedSiteAlerts } from "../../../lib/site-notification-dispatch.js";
-import { VIP_SIGNALS_LIST_COLUMNS } from "../../../lib/supabase-query-columns";
+import { withInFlightDedup } from "../../../lib/server-read-cache";
+import {
+  VIP_SIGNALS_DEFAULT_LIMIT,
+  VIP_SIGNALS_LIST_COLUMNS,
+  VIP_SIGNALS_MAX_LIMIT,
+} from "../../../lib/supabase-query-columns";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -86,57 +89,142 @@ const isSubscriptionExpired = (subscription) => {
   return false;
 };
 
-const processExpiredSubscription = async (subscription, email) => {
-  if (
-    !subscription ||
-    !subscription.expires_at ||
-    new Date(subscription.expires_at).getTime() > Date.now() ||
-    subscription.expired_notice_sent
-  ) {
-    return;
+function hashUserKey(email) {
+  return createHash("sha256").update(String(email || "")).digest("hex").slice(0, 16);
+}
+
+function parsePagination(searchParams) {
+  const requestedLimit = Number.parseInt(
+    String(searchParams.get("limit") || VIP_SIGNALS_DEFAULT_LIMIT),
+    10
+  );
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), VIP_SIGNALS_MAX_LIMIT)
+    : VIP_SIGNALS_DEFAULT_LIMIT;
+
+  const requestedOffset = Number.parseInt(String(searchParams.get("offset") || "0"), 10);
+  let offset = Number.isFinite(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+
+  const requestedPage = Number.parseInt(String(searchParams.get("page") || "0"), 10);
+  if (Number.isFinite(requestedPage) && requestedPage > 0) {
+    offset = (requestedPage - 1) * limit;
   }
 
-  const planName = subscription.plan_name || "اشتراك VIP";
-  const title = "انتهى اشتراكك ⚠️";
-  const message = `انتهت صلاحية ${planName}. يمكنك التجديد من صفحة الباقات.`;
+  return { limit, offset };
+}
 
-  await supabase
-    .from("subscription_requests")
-    .update({
-      status: "منتهي",
-      expired_notice_sent: true,
-    })
-    .eq("id", subscription.id);
+function mapSignalRows(rows) {
+  return (rows || []).map((item) => ({
+    ...item,
+    createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
+  }));
+}
 
-  await dispatchUnifiedSiteAlerts(supabase, {
-    preset: "subscription_expiry",
-    userEmail: email,
-    title,
-    message,
-    metadata: {
-      planName,
-      subscriptionId: subscription.id,
-      variant: "expired",
+async function loadVipSignalsForUser({ email, signalType, limit, offset }) {
+  const rangeEnd = offset + limit;
+
+  const [subscriptionResult, signalsResult] = await Promise.all([
+    supabase
+      .from("subscription_requests")
+      .select("id,status,expires_at,expired_notice_sent,plan_name,category")
+      .eq("user_email", email)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    supabase
+      .from("vip_signals")
+      .select(VIP_SIGNALS_LIST_COLUMNS)
+      .eq("signal_type", signalType)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(offset, rangeEnd),
+  ]);
+
+  if (subscriptionResult.error) {
+    return {
+      status: 500,
+      body: {
+        success: false,
+        error: subscriptionResult.error.message,
+      },
+    };
+  }
+
+  const rows = Array.isArray(subscriptionResult.data) ? subscriptionResult.data : [];
+
+  const activeSubscriptions = rows.filter(
+    (subscription) => subscription.status === "مفعل" && !isSubscriptionExpired(subscription)
+  );
+
+  const hasMatchingPlan = activeSubscriptions.some((subscription) =>
+    matchesSignalSubscription(
+      `${subscription.plan_name || ""} ${subscription.category || ""}`,
+      signalType
+    )
+  );
+
+  if (!hasMatchingPlan) {
+    const hadAnySubscription = rows.length > 0;
+    const subscriptionExpired =
+      hadAnySubscription &&
+      !activeSubscriptions.some((subscription) =>
+        matchesSignalSubscription(
+          `${subscription.plan_name || ""} ${subscription.category || ""}`,
+          signalType
+        )
+      ) &&
+      rows.some(
+        (subscription) =>
+          matchesSignalSubscription(
+            `${subscription.plan_name || ""} ${subscription.category || ""}`,
+            signalType
+          ) && isSubscriptionExpired(subscription)
+      );
+
+    return {
+      status: 403,
+      body: {
+        success: false,
+        subscriptionExpired:
+          subscriptionExpired || (hadAnySubscription && activeSubscriptions.length === 0),
+        error: "لا يوجد اشتراك VIP فعال للوصول إلى هذه التوصيات.",
+        signals: [],
+      },
+    };
+  }
+
+  if (signalsResult.error) {
+    return {
+      status: 500,
+      body: {
+        success: false,
+        error: signalsResult.error.message,
+      },
+    };
+  }
+
+  const fetchedRows = Array.isArray(signalsResult.data) ? signalsResult.data : [];
+  const hasMore = fetchedRows.length > limit;
+  const pageRows = hasMore ? fetchedRows.slice(0, limit) : fetchedRows;
+
+  return {
+    status: 200,
+    body: {
+      success: true,
+      signals: mapSignalRows(pageRows),
+      pagination: {
+        limit,
+        offset,
+        hasMore,
+      },
     },
-    sendEmail: () =>
-      sendTemplateEmail({
-        to: email,
-        subject: "انتهاء الاشتراك - HasaN CharT World",
-        title,
-        content: buildSubscriptionExpiryEmailContent({
-          planName,
-          variant: "expired",
-        }),
-        actionText: "تجديد الاشتراك",
-        actionUrl: `${getSiteUrl()}/subscriptions`,
-      }),
-  });
-};
+  };
+}
 
 export async function GET(request) {
   try {
     const url = new URL(request.url);
     const signalType = normalizeSignalType(url.searchParams.get("type"));
+    const { limit, offset } = parsePagination(url.searchParams);
 
     const email = await getAuthenticatedEmail();
 
@@ -150,115 +238,18 @@ export async function GET(request) {
       );
     }
 
-    const { data: subscriptions, error: subscriptionError } = await supabase
-      .from("subscription_requests")
-      .select("id,status,expires_at,expired_notice_sent,plan_name,category")
-      .eq("user_email", email)
-      .order("created_at", { ascending: false })
-      .limit(30);
-
-    if (subscriptionError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: subscriptionError.message,
-        },
-        { status: 500 }
-      );
-    }
-
-    const rows = Array.isArray(subscriptions) ? subscriptions : [];
-
-    const expiredCandidates = rows.filter(
-      (subscription) =>
-        subscription.status === "مفعل" &&
-        subscription.expires_at &&
-        new Date(subscription.expires_at).getTime() <= Date.now()
+    const dedupKey = `vip-signals:${hashUserKey(email)}:${signalType}:${limit}:${offset}`;
+    const result = await withInFlightDedup(dedupKey, () =>
+      loadVipSignalsForUser({ email, signalType, limit, offset })
     );
 
-    if (expiredCandidates.length > 0) {
-      await Promise.all(
-        expiredCandidates.map((subscription) =>
-          processExpiredSubscription(subscription, email)
-        )
-      );
-    }
-
-    const activeSubscriptions = rows.filter(
-      (subscription) =>
-        subscription.status === "مفعل" && !isSubscriptionExpired(subscription)
-    );
-
-    const hasMatchingPlan = activeSubscriptions.some((subscription) =>
-      matchesSignalSubscription(
-        `${subscription.plan_name || ""} ${subscription.category || ""}`,
-        signalType
-      )
-    );
-
-    if (!hasMatchingPlan) {
-      const hadAnySubscription = rows.length > 0;
-      const subscriptionExpired =
-        hadAnySubscription &&
-        !activeSubscriptions.some((subscription) =>
-          matchesSignalSubscription(
-            `${subscription.plan_name || ""} ${subscription.category || ""}`,
-            signalType
-          )
-        ) &&
-        rows.some(
-          (subscription) =>
-            matchesSignalSubscription(
-              `${subscription.plan_name || ""} ${subscription.category || ""}`,
-              signalType
-            ) && isSubscriptionExpired(subscription)
-        );
-
-      return NextResponse.json(
-        {
-          success: false,
-          subscriptionExpired: subscriptionExpired || (hadAnySubscription && activeSubscriptions.length === 0),
-          error: "لا يوجد اشتراك VIP فعال للوصول إلى هذه التوصيات.",
-          signals: [],
-        },
-        { status: 403 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("vip_signals")
-      .select(VIP_SIGNALS_LIST_COLUMNS)
-      .eq("signal_type", signalType)
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message,
-        },
-        { status: 500 }
-      );
-    }
-
-    const signals = (data || []).map((item) => ({
-      ...item,
-      createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
-    }));
-
-    return NextResponse.json(
-      {
-        success: true,
-        signals,
+    return NextResponse.json(result.body, {
+      status: result.status,
+      headers: {
+        "Cache-Control": CACHE_PRIVATE_USER,
+        Vary: "Cookie, Accept-Encoding",
       },
-      {
-        headers: {
-          "Cache-Control": CACHE_PRIVATE_USER,
-          Vary: "Accept-Encoding",
-        },
-      }
-    );
+    });
   } catch (err) {
     return NextResponse.json(
       {
