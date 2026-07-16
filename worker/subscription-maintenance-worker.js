@@ -1,7 +1,3 @@
-const http = require("http");
-const crypto = require("crypto");
-const path = require("path");
-
 const SERVICE_NAME = "hasan-chart-subscription-maintenance-worker";
 const WORKER_ENTRY = "worker/subscription-maintenance-worker.js";
 const HOST = "0.0.0.0";
@@ -18,20 +14,50 @@ function logBoot(event, extra = {}) {
       service: SERVICE_NAME,
       workerEntry: WORKER_ENTRY,
       timestamp: new Date().toISOString(),
+      pid: process.pid,
       ...extra,
     })
   );
 }
 
+process.on("uncaughtException", (error) => {
+  logBoot("UNCAUGHT_EXCEPTION", {
+    error: error?.message || String(error),
+    stack: error?.stack || null,
+  });
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logBoot("UNHANDLED_REJECTION", {
+    error: reason?.message || String(reason),
+    stack: reason?.stack || null,
+  });
+  process.exit(1);
+});
+
+logBoot("BEFORE_REQUIRE", { modules: ["http", "crypto", "path"] });
+const http = require("http");
+const crypto = require("crypto");
+const path = require("path");
+logBoot("AFTER_REQUIRE", { modules: ["http", "crypto", "path"] });
+
 function loadRuntimeModules() {
+  logBoot("BEFORE_REQUIRE", { module: "dotenv" });
+
   try {
     require("dotenv").config({ path: path.join(__dirname, "../.env.local") });
     require("dotenv").config();
-  } catch {
-    // dotenv optional when env vars are injected by the platform.
+    logBoot("AFTER_REQUIRE", { module: "dotenv" });
+  } catch (error) {
+    logBoot("REQUIRE_DOTENV_SKIPPED", {
+      error: error?.message || String(error),
+    });
   }
 
+  logBoot("BEFORE_REQUIRE", { module: "./subscription-expiry-shared.js" });
   ({ runSubscriptionMaintenance, buildMaintenanceResponse } = require("./subscription-expiry-shared.js"));
+  logBoot("AFTER_REQUIRE", { module: "./subscription-expiry-shared.js" });
 }
 
 function getSupabaseUrl() {
@@ -43,7 +69,9 @@ function getSupabaseUrl() {
 }
 
 function createSupabaseClient() {
+  logBoot("BEFORE_REQUIRE", { module: "@supabase/supabase-js" });
   const { createClient } = require("@supabase/supabase-js");
+  logBoot("AFTER_REQUIRE", { module: "@supabase/supabase-js" });
   const supabaseUrl = getSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
@@ -161,6 +189,7 @@ function isWorkerFeatureEnabled() {
 }
 
 async function handleHealth(_req, res) {
+  logBoot("ROUTE_HEALTH_ENTER");
   sendJson(res, 200, {
     success: true,
     status: "online",
@@ -172,6 +201,10 @@ async function handleHealth(_req, res) {
 }
 
 async function handleRun(req, res) {
+  logBoot("ROUTE_RUN_ENTER", {
+    method: req.method,
+    url: req.url,
+  });
   const authCheck = verifyCronSecret(req);
 
   if (!authCheck.ok) {
@@ -245,7 +278,9 @@ async function handleRun(req, res) {
 }
 
 function createHttpServer() {
-  return http.createServer(async (req, res) => {
+  logBoot("BEFORE_CREATE_SERVER");
+
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     const pathname = url.pathname;
 
@@ -271,6 +306,9 @@ function createHttpServer() {
       });
     }
   });
+
+  logBoot("AFTER_CREATE_SERVER");
+  return server;
 }
 
 function startServer() {
@@ -301,6 +339,11 @@ function startServer() {
   logBoot("BEFORE_LISTEN", { port: PORT, host: HOST });
 
   server.listen(PORT, HOST, () => {
+    logBoot("subscription-maintenance:boot", {
+      port: PORT,
+      host: HOST,
+      workerEnabledEnv: process.env.SUBSCRIPTION_MAINTENANCE_WORKER_ENABLED || "false",
+    });
     logBoot("LISTENING_ON_PORT", {
       port: PORT,
       host: HOST,
@@ -314,19 +357,5 @@ function startServer() {
 
   return server;
 }
-
-process.on("uncaughtException", (error) => {
-  logBoot("UNCAUGHT_EXCEPTION", {
-    error: error?.message || String(error),
-  });
-  process.exit(1);
-});
-
-process.on("unhandledRejection", (reason) => {
-  logBoot("UNHANDLED_REJECTION", {
-    error: reason?.message || String(reason),
-  });
-  process.exit(1);
-});
 
 startServer();
