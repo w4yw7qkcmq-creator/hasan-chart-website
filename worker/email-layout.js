@@ -263,6 +263,33 @@ ${buildEmailFooter({ siteUrl })}
   `.trim();
 }
 
+function buildEmailParagraph(text, { muted = false } = {}) {
+  const color = muted ? "#94a3b8" : "#e2e8f0";
+
+  return `<p dir="rtl" style="margin:0 0 14px;color:${color};font-size:16px;line-height:2;font-family:${EMAIL_BRAND.fontFamily};">${escapeEmailHtml(text)}</p>`;
+}
+
+function buildSubscriptionExpiryEmailContent({ planName, message, variant = "reminder" }) {
+  const safePlan = escapeEmailHtml(planName || "اشتراك VIP");
+  const safeMessage = escapeEmailHtml(message || "");
+
+  if (variant === "expired") {
+    return `
+${buildEmailParagraph("انتهت صلاحية الباقة التالية:")}
+${buildEmailHighlightCard({ label: "الباقة", value: safePlan, valueColor: "#fca5a5" })}
+${buildEmailParagraph("تم إيقاف الوصول إلى خدمات VIP بسبب انتهاء مدة الاشتراك.")}
+${buildEmailParagraph("يمكنك تجديد الاشتراك للعودة إلى التوصيات والخدمات المميزة.")}
+    `.trim();
+  }
+
+  return `
+${buildEmailParagraph("مرحباً،")}
+${buildEmailParagraph(safeMessage)}
+${buildEmailHighlightCard({ label: "الباقة", value: safePlan })}
+${buildEmailParagraph("للاستمرار بالوصول إلى توصيات VIP والخدمات المميزة، يمكنك تجديد اشتراكك الآن.")}
+  `.trim();
+}
+
 function buildPriceAlertEmailLayoutHtml({
   coinLabel,
   conditionLabel,
@@ -302,9 +329,11 @@ module.exports = {
   EMAIL_LAYOUT_VERSION,
   EMAIL_BRAND,
   escapeEmailHtml,
+  buildEmailParagraph,
   buildEmailHighlightCard,
   buildEmailDetailRows,
   buildEmailActionButton,
   buildUnifiedEmailLayout,
+  buildSubscriptionExpiryEmailContent,
   buildPriceAlertEmailLayoutHtml,
 };

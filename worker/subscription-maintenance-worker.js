@@ -11,20 +11,16 @@ try {
 
 const { createClient } = require("@supabase/supabase-js");
 
+const {
+  runSubscriptionMaintenance,
+  buildMaintenanceResponse,
+} = require("./subscription-expiry-shared.js");
+
 const SERVICE_NAME = "hasan-chart-subscription-maintenance-worker";
 const WORKER_ENTRY = "worker/subscription-maintenance-worker.js";
 const PORT = Number(process.env.PORT || 3099);
 
 let maintenanceInFlight = false;
-let sharedModulePromise = null;
-
-function loadSharedModule() {
-  if (!sharedModulePromise) {
-    sharedModulePromise = import("../lib/subscription-expiry-shared.js");
-  }
-
-  return sharedModulePromise;
-}
 
 function getSupabaseUrl() {
   return (
@@ -198,9 +194,8 @@ async function handleRun(req, res) {
   try {
     const body = await readJsonBody(req);
     const dryRun = parseDryRun(req, body);
-    const shared = await loadSharedModule();
     const supabase = createSupabaseClient();
-    const summary = await shared.runSubscriptionMaintenance(supabase, { dryRun });
+    const summary = await runSubscriptionMaintenance(supabase, { dryRun });
 
     console.log("subscription-maintenance:run-complete", {
       dryRun,
@@ -213,7 +208,7 @@ async function handleRun(req, res) {
       failed: summary.failed,
     });
 
-    sendJson(res, 200, shared.buildMaintenanceResponse(summary));
+    sendJson(res, 200, buildMaintenanceResponse(summary));
   } catch (error) {
     console.error("subscription-maintenance:run-error", {
       error: error?.message || String(error),
