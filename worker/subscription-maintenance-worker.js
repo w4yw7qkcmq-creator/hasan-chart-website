@@ -2,25 +2,37 @@ const http = require("http");
 const crypto = require("crypto");
 const path = require("path");
 
-try {
-  require("dotenv").config({ path: path.join(__dirname, "../.env.local") });
-  require("dotenv").config();
-} catch {
-  // dotenv optional when env vars are injected by the platform.
-}
-
-const { createClient } = require("@supabase/supabase-js");
-
-const {
-  runSubscriptionMaintenance,
-  buildMaintenanceResponse,
-} = require("./subscription-expiry-shared.js");
-
 const SERVICE_NAME = "hasan-chart-subscription-maintenance-worker";
 const WORKER_ENTRY = "worker/subscription-maintenance-worker.js";
+const HOST = "0.0.0.0";
 const PORT = Number(process.env.PORT || 3099);
 
 let maintenanceInFlight = false;
+let runSubscriptionMaintenance;
+let buildMaintenanceResponse;
+
+function logBoot(event, extra = {}) {
+  console.log(
+    JSON.stringify({
+      event,
+      service: SERVICE_NAME,
+      workerEntry: WORKER_ENTRY,
+      timestamp: new Date().toISOString(),
+      ...extra,
+    })
+  );
+}
+
+function loadRuntimeModules() {
+  try {
+    require("dotenv").config({ path: path.join(__dirname, "../.env.local") });
+    require("dotenv").config();
+  } catch {
+    // dotenv optional when env vars are injected by the platform.
+  }
+
+  ({ runSubscriptionMaintenance, buildMaintenanceResponse } = require("./subscription-expiry-shared.js"));
+}
 
 function getSupabaseUrl() {
   return (
@@ -31,6 +43,7 @@ function getSupabaseUrl() {
 }
 
 function createSupabaseClient() {
+  const { createClient } = require("@supabase/supabase-js");
   const supabaseUrl = getSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
@@ -197,23 +210,29 @@ async function handleRun(req, res) {
     const supabase = createSupabaseClient();
     const summary = await runSubscriptionMaintenance(supabase, { dryRun });
 
-    console.log("subscription-maintenance:run-complete", {
-      dryRun,
-      durationMs: summary.durationMs,
-      checked: summary.checked,
-      expired: summary.expired,
-      expiringSoon: summary.expiringSoon,
-      emailsSent: summary.emailsSent,
-      siteNotificationsCreated: summary.siteNotificationsCreated,
-      failed: summary.failed,
-    });
+    console.log(
+      JSON.stringify({
+        event: "subscription-maintenance:run-complete",
+        dryRun,
+        durationMs: summary.durationMs,
+        checked: summary.checked,
+        expired: summary.expired,
+        expiringSoon: summary.expiringSoon,
+        emailsSent: summary.emailsSent,
+        siteNotificationsCreated: summary.siteNotificationsCreated,
+        failed: summary.failed,
+      })
+    );
 
     sendJson(res, 200, buildMaintenanceResponse(summary));
   } catch (error) {
-    console.error("subscription-maintenance:run-error", {
-      error: error?.message || String(error),
-      durationMs: Date.now() - startedAt,
-    });
+    console.error(
+      JSON.stringify({
+        event: "subscription-maintenance:run-error",
+        error: error?.message || String(error),
+        durationMs: Date.now() - startedAt,
+      })
+    );
 
     sendJson(res, 500, {
       success: false,
@@ -225,41 +244,89 @@ async function handleRun(req, res) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-  const pathname = url.pathname;
+function createHttpServer() {
+  return http.createServer(async (req, res) => {
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const pathname = url.pathname;
 
-  try {
-    if (req.method === "GET" && pathname === "/health") {
-      await handleHealth(req, res);
-      return;
+    try {
+      if (req.method === "GET" && pathname === "/health") {
+        await handleHealth(req, res);
+        return;
+      }
+
+      if ((req.method === "GET" || req.method === "POST") && pathname === "/run") {
+        await handleRun(req, res);
+        return;
+      }
+
+      sendJson(res, 404, {
+        success: false,
+        error: "Not found.",
+      });
+    } catch (error) {
+      sendJson(res, 500, {
+        success: false,
+        error: error?.message || "Server error.",
+      });
     }
+  });
+}
 
-    if ((req.method === "GET" || req.method === "POST") && pathname === "/run") {
-      await handleRun(req, res);
-      return;
-    }
+function startServer() {
+  logBoot("BOOT_START", {
+    port: PORT,
+    host: HOST,
+    cwd: process.cwd(),
+    nodeEnv: process.env.NODE_ENV || "development",
+    workerEnabledEnv: process.env.SUBSCRIPTION_MAINTENANCE_WORKER_ENABLED || "false",
+  });
 
-    sendJson(res, 404, {
-      success: false,
-      error: "Not found.",
-    });
-  } catch (error) {
-    sendJson(res, 500, {
-      success: false,
-      error: error?.message || "Server error.",
-    });
-  }
-});
+  loadRuntimeModules();
 
-server.listen(PORT, () => {
-  console.log(
-    JSON.stringify({
-      event: "subscription-maintenance:boot",
-      service: SERVICE_NAME,
-      workerEntry: WORKER_ENTRY,
+  const server = createHttpServer();
+
+  logBoot("SERVER_CREATED");
+
+  server.on("error", (error) => {
+    logBoot("SERVER_LISTEN_ERROR", {
       port: PORT,
-      workerEnabledEnv: process.env.SUBSCRIPTION_MAINTENANCE_WORKER_ENABLED || "false",
-    })
-  );
+      host: HOST,
+      error: error?.message || String(error),
+      code: error?.code || null,
+    });
+    process.exit(1);
+  });
+
+  logBoot("BEFORE_LISTEN", { port: PORT, host: HOST });
+
+  server.listen(PORT, HOST, () => {
+    logBoot("LISTENING_ON_PORT", {
+      port: PORT,
+      host: HOST,
+      message: `Worker listening on port ${PORT}`,
+    });
+    logBoot("HEALTH_READY", {
+      healthPath: "/health",
+      runPath: "/run",
+    });
+  });
+
+  return server;
+}
+
+process.on("uncaughtException", (error) => {
+  logBoot("UNCAUGHT_EXCEPTION", {
+    error: error?.message || String(error),
+  });
+  process.exit(1);
 });
+
+process.on("unhandledRejection", (reason) => {
+  logBoot("UNHANDLED_REJECTION", {
+    error: reason?.message || String(reason),
+  });
+  process.exit(1);
+});
+
+startServer();
