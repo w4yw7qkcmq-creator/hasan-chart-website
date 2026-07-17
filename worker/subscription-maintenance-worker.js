@@ -188,6 +188,14 @@ function isWorkerFeatureEnabled() {
   return value === "1" || value === "true" || value === "yes";
 }
 
+function isOneShotMode() {
+  const value = String(process.env.SUBSCRIPTION_WORKER_ONESHOT || "")
+    .trim()
+    .toLowerCase();
+
+  return value === "1" || value === "true" || value === "yes";
+}
+
 async function handleHealth(_req, res) {
   logBoot("ROUTE_HEALTH_ENTER");
   sendJson(res, 200, {
@@ -311,6 +319,41 @@ function createHttpServer() {
   return server;
 }
 
+async function runOneShotCron() {
+  logBoot("SUBSCRIPTION_MAINTENANCE_CRON_STARTED", {
+    cwd: process.cwd(),
+    nodeEnv: process.env.NODE_ENV || "development",
+    workerEnabledEnv: process.env.SUBSCRIPTION_MAINTENANCE_WORKER_ENABLED || "false",
+  });
+
+  try {
+    loadRuntimeModules();
+
+    if (!isWorkerFeatureEnabled()) {
+      logBoot("SUBSCRIPTION_MAINTENANCE_CRON_FINISHED", {
+        success: true,
+        skipped: true,
+        reason: "SUBSCRIPTION_MAINTENANCE_WORKER_DISABLED",
+      });
+      process.exit(0);
+      return;
+    }
+
+    const supabase = createSupabaseClient();
+    const summary = await runSubscriptionMaintenance(supabase, { dryRun: false });
+    const response = buildMaintenanceResponse(summary);
+
+    logBoot("SUBSCRIPTION_MAINTENANCE_CRON_FINISHED", response);
+    process.exit(0);
+  } catch (error) {
+    logBoot("SUBSCRIPTION_MAINTENANCE_CRON_FAILED", {
+      error: error?.message || String(error),
+      stack: error?.stack || null,
+    });
+    process.exit(1);
+  }
+}
+
 function startServer() {
   logBoot("BOOT_START", {
     port: PORT,
@@ -358,4 +401,8 @@ function startServer() {
   return server;
 }
 
-startServer();
+if (isOneShotMode()) {
+  runOneShotCron();
+} else {
+  startServer();
+}
