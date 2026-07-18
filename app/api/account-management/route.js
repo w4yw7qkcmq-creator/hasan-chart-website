@@ -6,13 +6,8 @@ import { getSiteUrl, buildEmailLayout } from "../../../lib/email";
 import { buildAdminAccountRequestEmailContent } from "../../../lib/email-layout.js";
 import { dispatchTransactionalEmail } from "../../../lib/email-dispatch.js";
 import { dispatchAdminSiteNotification } from "../../../lib/site-notification-dispatch.js";
-import { readJsonBody } from "../../../lib/request-body";
-import { getSupabaseAdmin } from "../../../lib/supabase-admin";
-import { nullIfEmptyText } from "../../../lib/text-sanitize";
-import {
-  sanitizeUploadFileName,
-  validateScreenshotMetadata,
-} from "../../../lib/upload-validation";
+import { getSupabaseAdmin } from "../../../lib/auth-session.js";
+import { sanitizeText } from "../../../lib/partner-security.js";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_REPLY_TO || "support@hasanchartworld.com";
 const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
@@ -153,7 +148,7 @@ export async function POST(request) {
       );
     }
 
-    const body = await readJsonBody(request);
+    const body = await request.json().catch(() => null);
 
     if (!body || typeof body !== "object") {
       return NextResponse.json(
@@ -162,34 +157,53 @@ export async function POST(request) {
       );
     }
 
-    const platform = nullIfEmptyText(body.platform, 80);
-    const accountType = nullIfEmptyText(body.accountType, 80);
-    const capital = nullIfEmptyText(body.capital, 80);
-    const notes = nullIfEmptyText(body.notes, 2000);
-    const contactMethod = nullIfEmptyText(body.contactMethod, 120);
+    const platform = sanitizeText(body.platform, 80) || null;
+    const accountType = sanitizeText(body.accountType, 80) || null;
+    const capital = sanitizeText(body.capital, 80) || null;
+    const notes = sanitizeText(body.notes, 2000) || null;
+    const contactMethod = sanitizeText(body.contactMethod, 120) || null;
 
-    const apiKey = nullIfEmptyText(body.apiKey, 1000);
-    const secretKey = nullIfEmptyText(body.secretKey, 2000);
-    const tradingPassword = nullIfEmptyText(body.tradingPassword || body.password, 2000);
+    const apiKey = sanitizeText(body.apiKey, 1000) || null;
+    const secretKey = sanitizeText(body.secretKey, 2000) || null;
+    const tradingPassword =
+      sanitizeText(body.tradingPassword || body.password, 2000) || null;
 
-    const screenshotFileName = sanitizeUploadFileName(body.screenshotFileName, 255);
-    const screenshotMimeType = String(body.screenshotMimeType || "").trim().toLowerCase();
+    const screenshotFileName = sanitizeText(body.screenshotFileName, 255) || null;
+    const screenshotMimeType = sanitizeText(body.screenshotMimeType, 120) || null;
     const screenshotSize = Number(body.screenshotSize || 0);
-    const screenshotCheck = validateScreenshotMetadata({
-      fileName: screenshotFileName,
-      mimeType: screenshotMimeType,
-      size: screenshotSize,
-    });
 
-    if (!screenshotCheck.ok) {
-      const screenshotError =
-        screenshotCheck.code === "UPLOAD_TOO_LARGE"
-          ? "الحد الأقصى لحجم الصورة هو 15MB."
-          : screenshotCheck.code === "DANGEROUS_UPLOAD_FILE"
-            ? "نوع الملف غير مسموح."
-            : "صيغة الملف المرفوع غير صالحة.";
+    if (Number.isNaN(screenshotSize) || screenshotSize < 0) {
+      return NextResponse.json(
+        { error: "حجم الصورة غير صالح" },
+        { status: 400 }
+      );
+    }
 
-      return NextResponse.json({ error: screenshotError }, { status: 400 });
+    if (screenshotFileName || screenshotMimeType || screenshotSize) {
+      const allowedMimeTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
+
+      if (!allowedMimeTypes.includes(screenshotMimeType)) {
+        return NextResponse.json(
+          {
+            error: "يسمح فقط برفع صور JPG أو PNG أو WEBP.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (screenshotSize > 15 * 1024 * 1024) {
+        return NextResponse.json(
+          {
+            error: "الحد الأقصى لحجم الصورة هو 15MB.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     if (!platform || !capital) {

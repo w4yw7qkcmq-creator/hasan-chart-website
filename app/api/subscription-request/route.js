@@ -9,7 +9,35 @@ import { getSiteUrl, buildEmailLayout } from "../../../lib/email";
 import { buildAdminSubscriptionRequestEmailContent } from "../../../lib/email-layout.js";
 import { dispatchTransactionalEmail } from "../../../lib/email-dispatch.js";
 import { dispatchAdminSiteNotification } from "../../../lib/site-notification-dispatch.js";
-import { validateDataUrlImage } from "../../../lib/upload-validation";
+
+const MAX_PAYMENT_PROOF_DATA_URL_BYTES = 6 * 1024 * 1024;
+
+function validateDataUrlImage(dataUrl) {
+  const raw = String(dataUrl || "").trim();
+
+  if (!raw) {
+    return { ok: false, code: "EMPTY_UPLOAD" };
+  }
+
+  if (/[<>`]/.test(raw) || /^javascript:/i.test(raw)) {
+    return { ok: false, code: "INVALID_UPLOAD_FORMAT" };
+  }
+
+  const match = raw.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i);
+
+  if (!match) {
+    return { ok: false, code: "INVALID_UPLOAD_FORMAT" };
+  }
+
+  const base64 = match[2].replace(/\s/g, "");
+  const approxBytes = Math.ceil((base64.length * 3) / 4);
+
+  if (approxBytes > MAX_PAYMENT_PROOF_DATA_URL_BYTES) {
+    return { ok: false, code: "UPLOAD_TOO_LARGE" };
+  }
+
+  return { ok: true };
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
