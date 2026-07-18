@@ -3,8 +3,9 @@ import { CACHE_NO_STORE } from "../../../../lib/api-response";
 import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-dispatch";
 import { dispatchUnifiedSiteAlerts } from "../../../../lib/site-notification-dispatch.js";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
-import { getSiteUrl, sendTemplateEmail } from "../../../../lib/email";
+import { getSiteUrl, buildEmailLayout, sendTemplateEmail } from "../../../../lib/email";
 import { buildEmailParagraph, buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
+import { dispatchTransactionalEmail } from "../../../../lib/email-dispatch.js";
 import {
   adminMutationLimiter,
   adminReadLimiter,
@@ -277,6 +278,11 @@ const ADMIN_STATUS_ROW_SELECT = {
 
 function getAdminStatusRowSelect(tableName) {
   return ADMIN_STATUS_ROW_SELECT[String(tableName || "").trim()] || "id";
+}
+
+function isAccountManagementApprovedStatus(status) {
+  const normalized = String(status || "").trim();
+  return normalized === "نشط" || normalized === "تمت المراجعة";
 }
 
 async function resolveAccountManagementEmail(supabase, row) {
@@ -599,7 +605,7 @@ export async function POST(request) {
 
       if (
         targetTableConfig.table === "account_management_requests" &&
-        newStatus === "نشط"
+        isAccountManagementApprovedStatus(newStatus)
       ) {
         const userEmail = await resolveAccountManagementEmail(supabase, existingRow);
         const platformLabel = String(existingRow?.platform || "المنصة").trim();
@@ -616,17 +622,46 @@ export async function POST(request) {
               platform: existingRow?.platform || null,
               notification_key: "account_management",
             },
-            sendEmail: () =>
-              sendTemplateEmail({
-                to: userEmail,
-                subject: "تم قبول طلب إدارة حسابك ✅",
-                title: "تم قبول طلب إدارة حسابك ✅",
-                content: buildEmailParagraph(
-                  `تم تفعيل طلب إدارة حسابك على ${platformLabel}. يمكنك متابعة التفاصيل من لوحة التحكم.`
-                ),
-                actionText: "فتح لوحة التحكم",
-                actionUrl: `${getSiteUrl()}/my-dashboard`,
-              }),
+          });
+
+          const title = "تم قبول طلب إدارة حسابك ✅";
+          const content = buildEmailParagraph(
+            `تم تفعيل طلب إدارة حسابك على ${platformLabel}. يمكنك متابعة التفاصيل من لوحة التحكم.`
+          );
+          const actionText = "فتح لوحة التحكم";
+          const actionUrl = `${getSiteUrl()}/my-dashboard`;
+
+          console.log("ACCOUNT_MANAGEMENT_APPROVED_EMAIL_DISPATCH_STARTED", {
+            requestId,
+            userEmail,
+            status: newStatus,
+          });
+
+          const emailDispatchResult = await dispatchTransactionalEmail({
+            idempotencyKey: `account_mgmt_approved:${requestId}`,
+            recipientEmail: userEmail,
+            subject: title,
+            html: buildEmailLayout({ title, content, actionText, actionUrl }),
+            messageType: "account_management_approved",
+            recordId: requestId,
+            metadata: {
+              source: "account_management_approved",
+              accountManagementRequestId: requestId,
+              userEmail,
+              platform: existingRow?.platform || null,
+            },
+          });
+
+          console.log("ACCOUNT_MANAGEMENT_APPROVED_EMAIL_DISPATCH_RESULT", {
+            requestId,
+            userEmail,
+            status: newStatus,
+            success: emailDispatchResult?.success === true,
+            mode: emailDispatchResult?.mode || null,
+            enqueued: Boolean(emailDispatchResult?.enqueued),
+            duplicate: Boolean(emailDispatchResult?.duplicate),
+            outboxId: emailDispatchResult?.record?.id || null,
+            error: emailDispatchResult?.error || null,
           });
         }
 
