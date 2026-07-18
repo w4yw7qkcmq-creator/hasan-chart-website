@@ -3,10 +3,11 @@ import { CACHE_NO_STORE } from "../../../../lib/api-response";
 import { dispatchAnalysisReplyAlerts, resolveAnalysisReplyRecipientEmail } from "../../../../lib/analysis-reply-dispatch";
 import { dispatchUnifiedSiteAlerts } from "../../../../lib/site-notification-dispatch.js";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
-import { getSiteUrl, buildEmailLayout, sendTemplateEmail } from "../../../../lib/email";
+import { getSiteUrl, buildEmailLayout } from "../../../../lib/email";
 import { buildEmailParagraph, buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
 import { dispatchTransactionalEmail } from "../../../../lib/email-dispatch.js";
 import { dispatchSubscriptionActivatedEmail } from "../../../../lib/subscription-activated-dispatch.js";
+import { dispatchVipSignalEmail } from "../../../../lib/vip-signal-email-dispatch.js";
 import {
   adminMutationLimiter,
   adminReadLimiter,
@@ -482,31 +483,37 @@ async function notifyVipSubscribers(supabase, signal) {
     const dispatchResults = [];
 
     for (const email of recipientEmails) {
-      dispatchResults.push(
-        await dispatchUnifiedSiteAlerts(supabase, {
-          preset: "vip_signal",
-          userEmail: email,
-          title: notificationTitle,
-          message: notificationMessage,
-          type: siteType,
-          url: signalPagePath,
-          metadata: {
-            signalId: signalId || null,
-            signalType: normalizedSignalType,
-            coin,
-            notification_key: "vip_signal",
-          },
-          sendEmail: () =>
-            sendTemplateEmail({
-              to: email,
-              subject,
-              title: notificationTitle,
-              content: emailContent,
-              actionText: "فتح صفحة التوصيات",
-              actionUrl: signalPageUrl,
-            }),
-        })
-      );
+      const emailResult = await dispatchVipSignalEmail({
+        signalId: signalId || null,
+        recipientEmail: email,
+        signalType: normalizedSignalType,
+        coin,
+        subject,
+        title: notificationTitle,
+        content: emailContent,
+        actionText: "فتح صفحة التوصيات",
+        actionUrl: signalPageUrl,
+      });
+
+      const alertResult = await dispatchUnifiedSiteAlerts(supabase, {
+        preset: "vip_signal",
+        userEmail: email,
+        title: notificationTitle,
+        message: notificationMessage,
+        type: siteType,
+        url: signalPagePath,
+        metadata: {
+          signalId: signalId || null,
+          signalType: normalizedSignalType,
+          coin,
+          notification_key: "vip_signal",
+        },
+      });
+
+      dispatchResults.push({
+        ...alertResult,
+        emailResult,
+      });
     }
 
     console.log("VIP signal dispatch summary:", {
