@@ -10,6 +10,7 @@
 import { randomUUID } from "crypto";
 import {
   buildAnalysisReplyIdempotencyKey,
+  dispatchAnalysisReplyAlerts,
   sendAnalysisReplyEmail,
 } from "../lib/analysis-reply-dispatch.js";
 import {
@@ -154,6 +155,37 @@ async function testAnalysisReplyEnqueuePath() {
   });
 }
 
+async function testAnalysisReplyAlertsEmailWhenNotificationThrows() {
+  let emailDispatchCalls = 0;
+
+  const result = await dispatchAnalysisReplyAlerts(
+    {
+      supabase: {
+        from() {
+          throw new Error("notification settings lookup failed");
+        },
+      },
+      userEmail: TEST_EMAIL,
+      coin: "BTC",
+      reply: "Reply should still enqueue",
+      requestId: ANALYSIS_REQUEST_ID,
+    },
+    {
+      sendAnalysisReplyEmail: async () => {
+        emailDispatchCalls += 1;
+        return {
+          sent: true,
+          mode: "outbox",
+          record: { id: randomUUID(), status: "pending" },
+        };
+      },
+    }
+  );
+
+  assert(emailDispatchCalls === 1, "Email dispatch should run before notification handling");
+  assert(result.emailResult?.sent === true, "Email result should succeed independently");
+}
+
 async function testAccountManagementApprovedDispatch() {
   await withEnv("EMAIL_QUEUE_WORKER_ENABLED", "false", async () => {
     let directCalls = 0;
@@ -246,6 +278,7 @@ async function main() {
   await testAnalysisReplyRequiresRequestId();
   await testAnalysisReplyDirectPath();
   await testAnalysisReplyEnqueuePath();
+  await testAnalysisReplyAlertsEmailWhenNotificationThrows();
   await testAccountManagementApprovedDispatch();
   await testAccountManagementApprovedDuplicate();
 

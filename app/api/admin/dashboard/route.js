@@ -1,6 +1,6 @@
 import { verifyAdminSession } from "../../../../lib/admin-auth";
 import { CACHE_NO_STORE } from "../../../../lib/api-response";
-import { dispatchAnalysisReplyAlerts } from "../../../../lib/analysis-reply-dispatch";
+import { dispatchAnalysisReplyAlerts, resolveAnalysisReplyRecipientEmail } from "../../../../lib/analysis-reply-dispatch";
 import { dispatchUnifiedSiteAlerts } from "../../../../lib/site-notification-dispatch.js";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, buildEmailLayout, sendTemplateEmail } from "../../../../lib/email";
@@ -791,9 +791,25 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر إرسال الرد");
       }
 
+      const resolvedRecipientEmail = resolveAnalysisReplyRecipientEmail(
+        existingRequest?.user_email
+      );
+
+      console.log("ANALYSIS_REPLY_DISPATCH_STARTED", {
+        requestId,
+        action: "send-analysis-reply",
+        hasExistingRequest: Boolean(existingRequest),
+      });
+
+      console.log("ANALYSIS_REPLY_RECIPIENT_RESOLVED", {
+        requestId,
+        userEmail: resolvedRecipientEmail || null,
+        hasRecipient: Boolean(resolvedRecipientEmail),
+      });
+
       const alertResult = await dispatchAnalysisReplyAlerts({
         supabase,
-        userEmail: existingRequest?.user_email,
+        userEmail: resolvedRecipientEmail,
         coin: existingRequest?.coin,
         reply,
         requestId,
