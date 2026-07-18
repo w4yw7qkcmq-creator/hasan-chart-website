@@ -1,50 +1,56 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { accountManagementLimiter, RATE_LIMIT_ERROR } from "../../../lib/rate-limit";
-import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { getSiteUrl, buildEmailLayout } from "../../../lib/email";
 import { buildAdminAccountRequestEmailContent } from "../../../lib/email-layout.js";
+import { dispatchTransactionalEmail } from "../../../lib/email-dispatch.js";
 import { dispatchAdminSiteNotification } from "../../../lib/site-notification-dispatch.js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
+import { readJsonBody } from "../../../lib/request-body";
+import { getSupabaseAdmin } from "../../../lib/supabase-admin";
+import { nullIfEmptyText } from "../../../lib/text-sanitize";
+import {
+  sanitizeUploadFileName,
+  validateScreenshotMetadata,
+} from "../../../lib/upload-validation";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_REPLY_TO || "support@hasanchartworld.com";
+const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
 
 async function sendAdminAccountRequestEmail({
+  accountManagementRequestId,
   email,
   platform,
   capital,
   accountType,
   contactMethod,
 }) {
-  await sendTemplateEmail({
-    to: ADMIN_EMAIL,
-    subject: "طلب إدارة حساب جديد - HasaN CharT World",
-    title: "طلب إدارة حساب جديد 📂",
-    content: buildAdminAccountRequestEmailContent({
-      email,
-      platform,
-      capital,
-      accountType,
-      contactMethod,
-    }),
-    actionText: "فتح لوحة الإدارة",
-    actionUrl: `${getSiteUrl()}/admin`,
-  });
-}
-
-function getAdminSupabase() {
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase server configuration");
+  if (!accountManagementRequestId) {
+    throw new Error("accountManagementRequestId is required");
   }
 
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+  const title = "طلب إدارة حساب جديد 📂";
+  const content = buildAdminAccountRequestEmailContent({
+    email,
+    platform,
+    capital,
+    accountType,
+    contactMethod,
+  });
+  const actionText = "فتح لوحة الإدارة";
+  const actionUrl = `${getSiteUrl()}/admin`;
+
+  return dispatchTransactionalEmail({
+    idempotencyKey: `admin_account_mgmt_req:${accountManagementRequestId}`,
+    recipientEmail: ADMIN_EMAIL,
+    subject: "طلب إدارة حساب جديد - HasaN CharT World",
+    html: buildEmailLayout({ title, content, actionText, actionUrl }),
+    messageType: "admin_account_management_request",
+    recordId: accountManagementRequestId,
+    metadata: {
+      source: "account_management_request",
+      accountManagementRequestId,
+      userEmail: email,
     },
   });
 }
@@ -76,22 +82,9 @@ function encryptValue(value) {
   ].join(":");
 }
 
-function sanitizeText(value, maxLength = 2000) {
-  if (!value) return null;
-  return String(value).trim().slice(0, maxLength);
-}
-
-async function safeJson(request) {
-  try {
-    return await request.json();
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request) {
   try {
-    const supabase = getAdminSupabase();
+    const supabase = getSupabaseAdmin();
     const cookieStore = await cookies();
     const token = cookieStore.get("hc_access_token")?.value;
 
@@ -160,7 +153,7 @@ export async function POST(request) {
       );
     }
 
-    const body = await safeJson(request);
+    const body = await readJsonBody(request);
 
     if (!body || typeof body !== "object") {
       return NextResponse.json(
@@ -169,52 +162,34 @@ export async function POST(request) {
       );
     }
 
-    const platform = sanitizeText(body.platform, 80);
-    const accountType = sanitizeText(body.accountType, 80);
-    const capital = sanitizeText(body.capital, 80);
-    const notes = sanitizeText(body.notes, 2000);
-    const contactMethod = sanitizeText(body.contactMethod, 120);
+    const platform = nullIfEmptyText(body.platform, 80);
+    const accountType = nullIfEmptyText(body.accountType, 80);
+    const capital = nullIfEmptyText(body.capital, 80);
+    const notes = nullIfEmptyText(body.notes, 2000);
+    const contactMethod = nullIfEmptyText(body.contactMethod, 120);
 
-    const apiKey = sanitizeText(body.apiKey, 1000);
-    const secretKey = sanitizeText(body.secretKey, 2000);
-    const tradingPassword = sanitizeText(body.tradingPassword || body.password, 2000);
+    const apiKey = nullIfEmptyText(body.apiKey, 1000);
+    const secretKey = nullIfEmptyText(body.secretKey, 2000);
+    const tradingPassword = nullIfEmptyText(body.tradingPassword || body.password, 2000);
 
-    const screenshotFileName = sanitizeText(body.screenshotFileName, 255);
-    const screenshotMimeType = sanitizeText(body.screenshotMimeType, 120);
+    const screenshotFileName = sanitizeUploadFileName(body.screenshotFileName, 255);
+    const screenshotMimeType = String(body.screenshotMimeType || "").trim().toLowerCase();
     const screenshotSize = Number(body.screenshotSize || 0);
+    const screenshotCheck = validateScreenshotMetadata({
+      fileName: screenshotFileName,
+      mimeType: screenshotMimeType,
+      size: screenshotSize,
+    });
 
-    if (Number.isNaN(screenshotSize) || screenshotSize < 0) {
-      return NextResponse.json(
-        { error: "حجم الصورة غير صالح" },
-        { status: 400 }
-      );
-    }
+    if (!screenshotCheck.ok) {
+      const screenshotError =
+        screenshotCheck.code === "UPLOAD_TOO_LARGE"
+          ? "الحد الأقصى لحجم الصورة هو 15MB."
+          : screenshotCheck.code === "DANGEROUS_UPLOAD_FILE"
+            ? "نوع الملف غير مسموح."
+            : "صيغة الملف المرفوع غير صالحة.";
 
-    if (screenshotFileName || screenshotMimeType || screenshotSize) {
-      const allowedMimeTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/webp",
-      ];
-
-      if (!allowedMimeTypes.includes(screenshotMimeType)) {
-        return NextResponse.json(
-          {
-            error: "يسمح فقط برفع صور JPG أو PNG أو WEBP.",
-          },
-          { status: 400 }
-        );
-      }
-
-      if (screenshotSize > 15 * 1024 * 1024) {
-        return NextResponse.json(
-          {
-            error: "الحد الأقصى لحجم الصورة هو 15MB.",
-          },
-          { status: 400 }
-        );
-      }
+      return NextResponse.json({ error: screenshotError }, { status: 400 });
     }
 
     if (!platform || !capital) {
@@ -228,7 +203,7 @@ export async function POST(request) {
     const encryptedSecretKey = encryptValue(secretKey);
     const encryptedTradingPassword = encryptValue(tradingPassword);
 
-    const { error: insertError } = await supabase
+    const { data: insertedRequest, error: insertError } = await supabase
       .from("account_management_requests")
       .insert({
         user_id: user.id,
@@ -242,7 +217,9 @@ export async function POST(request) {
         secret_key_encrypted: encryptedSecretKey,
         trading_password_encrypted: encryptedTradingPassword,
         status: "جديد",
-      });
+      })
+      .select("id")
+      .single();
 
     if (insertError) {
       console.error("Account management insert error:", insertError?.message || insertError);
@@ -271,6 +248,7 @@ export async function POST(request) {
 
     try {
       const emailResult = await sendAdminAccountRequestEmail({
+        accountManagementRequestId: insertedRequest.id,
         email: user.email,
         platform,
         capital,

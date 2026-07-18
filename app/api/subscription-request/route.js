@@ -5,9 +5,11 @@ import {
   RATE_LIMIT_ERROR,
   subscriptionRequestLimiter,
 } from "../../../lib/rate-limit";
-import { getSiteUrl, sendTemplateEmail } from "../../../lib/email";
+import { getSiteUrl, buildEmailLayout } from "../../../lib/email";
 import { buildAdminSubscriptionRequestEmailContent } from "../../../lib/email-layout.js";
+import { dispatchTransactionalEmail } from "../../../lib/email-dispatch.js";
 import { dispatchAdminSiteNotification } from "../../../lib/site-notification-dispatch.js";
+import { validateDataUrlImage } from "../../../lib/upload-validation";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -22,7 +24,20 @@ const supabase = createClient(
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_REPLY_TO || "support@hasanchartworld.com";
 
-async function sendAdminSubscriptionRequestEmail({ userEmail, username, planName, category, price, telegramUsername, paymentProof }) {
+async function sendAdminSubscriptionRequestEmail({
+  subscriptionRequestId,
+  userEmail,
+  username,
+  planName,
+  category,
+  price,
+  telegramUsername,
+  paymentProof,
+}) {
+  if (!subscriptionRequestId) {
+    throw new Error("subscriptionRequestId is required");
+  }
+
   const isInlinePaymentProof = String(paymentProof || "").startsWith("data:image");
   const paymentProofHtml = isInlinePaymentProof
     ? "صورة إثبات الدفع محفوظة داخل الطلب ويمكن عرضها من لوحة الإدارة."
@@ -30,21 +45,33 @@ async function sendAdminSubscriptionRequestEmail({ userEmail, username, planName
     ? `<a href="${paymentProof}" style="color:#67e8f9;font-weight:800;text-decoration:none">فتح صورة إثبات الدفع</a>`
     : "غير مرفق";
 
-  await sendTemplateEmail({
-    to: ADMIN_EMAIL,
+  const title = "طلب اشتراك جديد 💳";
+  const content = buildAdminSubscriptionRequestEmailContent({
+    planName,
+    category,
+    price,
+    userEmail,
+    username,
+    telegramUsername,
+    paymentProofHtml,
+  });
+  const actionText = "فتح لوحة الإدارة";
+  const actionUrl = `${getSiteUrl()}/admin`;
+
+  return dispatchTransactionalEmail({
+    idempotencyKey: `admin_sub_req:${subscriptionRequestId}`,
+    recipientEmail: ADMIN_EMAIL,
     subject: "طلب اشتراك جديد - HasaN CharT World",
-    title: "طلب اشتراك جديد 💳",
-    content: buildAdminSubscriptionRequestEmailContent({
-      planName,
-      category,
-      price,
+    html: buildEmailLayout({ title, content, actionText, actionUrl }),
+    messageType: "admin_subscription_request",
+    recordId: subscriptionRequestId,
+    metadata: {
+      source: "subscription_request",
+      subscriptionRequestId,
       userEmail,
-      username,
-      telegramUsername,
-      paymentProofHtml,
-    }),
-    actionText: "فتح لوحة الإدارة",
-    actionUrl: `${getSiteUrl()}/admin`,
+      category,
+      planName,
+    },
   });
 }
 
@@ -81,7 +108,7 @@ export async function POST(request) {
     const planName = String(body.plan_name || "").trim();
     const category = String(body.category || "").trim();
     const price = String(body.price || "").trim();
-    const telegramUsername = String(body.telegram_username || "").trim();
+    const telegramUsername = String(body.telegram_username || "").trim().slice(0, 64);
     const paymentProof = String(body.payment_proof || "").trim();
 
     if (!planName || !category || !price || !telegramUsername || !paymentProof) {
@@ -94,24 +121,43 @@ export async function POST(request) {
       );
     }
 
-    const { error } = await supabase.from("subscription_requests").insert([
-      {
-        user_email: userEmail,
-        username,
-        plan_name: planName,
-        category,
-        price,
-        telegram_username: telegramUsername,
-        payment_proof: paymentProof,
-        status: "بانتظار المراجعة",
-      },
-    ]);
+    const paymentProofCheck = validateDataUrlImage(paymentProof);
+
+    if (!paymentProofCheck.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            paymentProofCheck.code === "UPLOAD_TOO_LARGE"
+              ? "حجم إثبات الدفع كبير جداً"
+              : "صيغة إثبات الدفع غير صالحة",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: insertedRequest, error } = await supabase
+      .from("subscription_requests")
+      .insert([
+        {
+          user_email: userEmail,
+          username,
+          plan_name: planName,
+          category,
+          price,
+          telegram_username: telegramUsername,
+          payment_proof: paymentProof,
+          status: "بانتظار المراجعة",
+        },
+      ])
+      .select("id")
+      .single();
 
     if (error) {
       return NextResponse.json(
         {
           success: false,
-          error: error.message,
+          error: "تعذر إرسال طلب الاشتراك حالياً",
         },
         { status: 500 }
       );
@@ -135,6 +181,7 @@ export async function POST(request) {
 
     try {
       const emailResult = await sendAdminSubscriptionRequestEmail({
+        subscriptionRequestId: insertedRequest.id,
         userEmail,
         username,
         planName,
