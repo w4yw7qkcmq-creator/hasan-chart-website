@@ -6,6 +6,7 @@ import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, buildEmailLayout, sendTemplateEmail } from "../../../../lib/email";
 import { buildEmailParagraph, buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
 import { dispatchTransactionalEmail } from "../../../../lib/email-dispatch.js";
+import { dispatchSubscriptionActivatedEmail } from "../../../../lib/subscription-activated-dispatch.js";
 import {
   adminMutationLimiter,
   adminReadLimiter,
@@ -871,49 +872,47 @@ export async function POST(request) {
         throw new Error(error.message || "تعذر تحديث طلب الاشتراك");
       }
 
-      if (newStatus === "مفعل" && userEmail) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({
-            subscription_plan: planName || "اشتراك مفعل",
-            subscription_status: "نشط",
-          })
-          .eq("email", userEmail);
-
-        if (profileError) {
-          throw new Error(
-            profileError.message || "تم تحديث الطلب لكن تعذر تفعيل اشتراك المستخدم"
-          );
-        }
-
-        await dispatchUnifiedSiteAlerts(supabase, {
-          preset: "system",
-          userEmail,
-          title: "تم تفعيل اشتراكك بنجاح 🎉",
-          message: `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`,
-          url: "/subscriptions",
-          metadata: {
-            requestId,
-            planName: planName || null,
-            expiresAt: activationDates.expiresAt,
-            notification_key: "system",
-          },
-          sendEmail: () =>
-            sendTemplateEmail({
-              to: userEmail,
-              subject: "تم تفعيل اشتراكك بنجاح 🎉",
-              title: "تم تفعيل اشتراكك بنجاح 🎉",
-              content: buildEmailParagraph(
-                `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`
-              ),
-              actionText: "عرض الباقات",
-              actionUrl: `${getSiteUrl()}/subscriptions`,
-            }),
-        });
-
-        await onPartnerSubscriptionActivated(supabase, {
+      if (newStatus === "مفعل") {
+        const emailDispatchResult = await dispatchSubscriptionActivatedEmail({
           subscriptionRequestId: requestId,
+          recipientEmail: userEmail,
+          planName,
+          expiresAt: activationDates?.expiresAt || null,
         });
+
+        if (userEmail) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .update({
+              subscription_plan: planName || "اشتراك مفعل",
+              subscription_status: "نشط",
+            })
+            .eq("email", userEmail);
+
+          if (profileError) {
+            throw new Error(
+              profileError.message || "تم تحديث الطلب لكن تعذر تفعيل اشتراك المستخدم"
+            );
+          }
+
+          await dispatchUnifiedSiteAlerts(supabase, {
+            preset: "system",
+            userEmail,
+            title: "تم تفعيل اشتراكك بنجاح 🎉",
+            message: `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`,
+            url: "/subscriptions",
+            metadata: {
+              requestId,
+              planName: planName || null,
+              expiresAt: activationDates.expiresAt,
+              notification_key: "system",
+            },
+          });
+
+          await onPartnerSubscriptionActivated(supabase, {
+            subscriptionRequestId: requestId,
+          });
+        }
       }
 
       await writeAdminLog(supabase, {
