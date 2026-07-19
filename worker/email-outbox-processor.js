@@ -490,7 +490,9 @@ async function runEmailQueueCron(supabase, options = {}) {
     staleMarkedFailed: staleSummary.markedFailed,
   };
 
-  logEmailQueueEvent("EMAIL_QUEUE_CRON_FINISHED", { summary });
+  if (!options.skipCronFinishedLog) {
+    logEmailQueueEvent("EMAIL_QUEUE_CRON_FINISHED", { summary });
+  }
 
   return {
     success: true,

@@ -3,6 +3,12 @@ const path = require("path");
 const SERVICE_NAME = "hasan-chart-email-queue-worker";
 const WORKER_ENTRY = "worker/email-queue-worker.js";
 
+const {
+  isOneShotMode,
+  getPersistentWorkerConfig,
+  runPersistentEmailQueueLoop,
+} = require("./email-queue-persistent-loop.js");
+
 function logBoot(event, extra = {}) {
   console.log(
     JSON.stringify({
@@ -15,24 +21,6 @@ function logBoot(event, extra = {}) {
     })
   );
 }
-
-process.on("uncaughtException", (error) => {
-  logBoot("EMAIL_QUEUE_CRON_FAILED", {
-    level: "error",
-    error: error?.message || String(error),
-    stack: error?.stack || null,
-  });
-  process.exit(1);
-});
-
-process.on("unhandledRejection", (reason) => {
-  logBoot("EMAIL_QUEUE_CRON_FAILED", {
-    level: "error",
-    error: reason?.message || String(reason),
-    stack: reason?.stack || null,
-  });
-  process.exit(1);
-});
 
 function loadEnv() {
   try {
@@ -90,58 +78,113 @@ function validateRuntimeEnv() {
   }
 }
 
-function isOneShotMode() {
-  const value = String(process.env.EMAIL_QUEUE_WORKER_ONESHOT || "")
-    .trim()
-    .toLowerCase();
-
-  return value === "1" || value === "true" || value === "yes";
-}
-
 async function runOneShotCron() {
-  loadEnv();
-
   const {
     isEmailQueueWorkerEnabled,
     logEmailQueueEvent,
     runEmailQueueCron,
   } = require("./email-outbox-processor.js");
 
-  try {
-    if (!isEmailQueueWorkerEnabled()) {
-      logEmailQueueEvent("EMAIL_QUEUE_WORKER_SKIPPED");
-      process.exit(0);
+  if (!isEmailQueueWorkerEnabled()) {
+    logEmailQueueEvent("EMAIL_QUEUE_WORKER_SKIPPED");
+    process.exit(0);
+    return;
+  }
+
+  logEmailQueueEvent("EMAIL_QUEUE_CRON_STARTED", {
+    cwd: process.cwd(),
+    nodeEnv: process.env.NODE_ENV || "development",
+    workerEnabledEnv: process.env.EMAIL_QUEUE_WORKER_ENABLED || "false",
+  });
+
+  validateRuntimeEnv();
+
+  const supabase = createSupabaseClient();
+  await runEmailQueueCron(supabase, { skipCronStartLog: true });
+
+  process.exit(0);
+}
+
+async function runPersistentWorker() {
+  const {
+    isEmailQueueWorkerEnabled,
+    logEmailQueueEvent,
+    runEmailQueueCron,
+  } = require("./email-outbox-processor.js");
+
+  if (!isEmailQueueWorkerEnabled()) {
+    logEmailQueueEvent("EMAIL_QUEUE_WORKER_SKIPPED");
+    process.exit(0);
+    return;
+  }
+
+  validateRuntimeEnv();
+
+  const supabase = createSupabaseClient();
+  const config = getPersistentWorkerConfig();
+  let shutdownRequested = false;
+
+  const handleShutdownSignal = (signal) => {
+    if (shutdownRequested) {
       return;
     }
 
-    logEmailQueueEvent("EMAIL_QUEUE_CRON_STARTED", {
-      cwd: process.cwd(),
-      nodeEnv: process.env.NODE_ENV || "development",
-      workerEnabledEnv: process.env.EMAIL_QUEUE_WORKER_ENABLED || "false",
-    });
+    shutdownRequested = true;
+    logBoot("EMAIL_QUEUE_PERSISTENT_SHUTDOWN_SIGNAL", { signal });
+  };
 
-    validateRuntimeEnv();
+  process.on("SIGTERM", handleShutdownSignal);
+  process.on("SIGINT", handleShutdownSignal);
 
-    const supabase = createSupabaseClient();
-    await runEmailQueueCron(supabase, { skipCronStartLog: true });
+  await runPersistentEmailQueueLoop({
+    config,
+    shouldStop: () => shutdownRequested,
+    runCycle: () =>
+      runEmailQueueCron(supabase, {
+        skipCronStartLog: true,
+        skipCronFinishedLog: true,
+      }),
+  });
 
-    process.exit(0);
-  } catch (error) {
-    logEmailQueueEvent("EMAIL_QUEUE_CRON_FAILED", {
+  process.exit(0);
+}
+
+function registerFatalHandlers(mode) {
+  process.on("uncaughtException", (error) => {
+    logBoot(mode === "oneshot" ? "EMAIL_QUEUE_CRON_FAILED" : "EMAIL_QUEUE_PERSISTENT_WORKER_FAILED", {
       level: "error",
       error: error?.message || String(error),
+      stack: error?.stack || null,
     });
     process.exit(1);
-  }
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    logBoot(mode === "oneshot" ? "EMAIL_QUEUE_CRON_FAILED" : "EMAIL_QUEUE_PERSISTENT_WORKER_FAILED", {
+      level: "error",
+      error: reason?.message || String(reason),
+      stack: reason?.stack || null,
+    });
+    process.exit(1);
+  });
 }
 
-if (!isOneShotMode()) {
-  logBoot("EMAIL_QUEUE_WORKER_ONESHOT_REQUIRED", {
+async function main() {
+  loadEnv();
+  registerFatalHandlers(isOneShotMode() ? "oneshot" : "persistent");
+
+  if (isOneShotMode()) {
+    await runOneShotCron();
+    return;
+  }
+
+  await runPersistentWorker();
+}
+
+main().catch((error) => {
+  logBoot("EMAIL_QUEUE_WORKER_BOOT_FAILED", {
     level: "error",
-    error:
-      "Email queue worker must run in one-shot mode. Set EMAIL_QUEUE_WORKER_ONESHOT=true.",
+    error: error?.message || String(error),
   });
   process.exit(1);
-} else {
-  runOneShotCron();
-}
+});

@@ -9,6 +9,7 @@
     "start:news": "node news-worker.js",
     "start:subscription": "node subscription-maintenance-worker.js",
     "subscription-cron": "SUBSCRIPTION_WORKER_ONESHOT=true node subscription-maintenance-worker.js",
+    "email-queue-worker": "EMAIL_QUEUE_WORKER_ONESHOT=false node email-queue-worker.js",
     "email-queue-cron": "EMAIL_QUEUE_WORKER_ONESHOT=true node email-queue-worker.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:alert-logs": "node scripts/verify-alert-logs.js"
