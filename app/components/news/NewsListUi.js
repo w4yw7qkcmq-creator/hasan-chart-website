@@ -140,24 +140,16 @@ export function NewsCard({ item, index, compact = false, priority = false }) {
   const categoryLabel =
     category === "commodities" && isMetalsNews(item) ? "المعادن" : visual.label;
 
-  const fallbackVisual = (
-    <div className="news-card__fallback-inner">
-      <span className="news-card__fallback-icon" aria-hidden="true">
-        {visual.icon}
-      </span>
-      <span className="news-card__fallback-label">{categoryLabel}</span>
-      <span className="news-card__fallback-sub">{visual.subtitle}</span>
-    </div>
-  );
-
   return (
     <article className={`news-card ${compact ? "news-card--compact" : ""}`}>
       <div className={`news-card__media news-card__media--${category}`}>
         <NewsCoverImage
           src={newsImage}
           alt={newsTitle}
+          title={newsTitle}
+          category={category}
+          item={item}
           priority={priority}
-          fallback={fallbackVisual}
         />
         <div className="news-card__media-overlay" aria-hidden="true" />
         <div className="news-card__badges">

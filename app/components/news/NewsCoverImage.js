@@ -2,18 +2,17 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { normalizeNewsImageUrl } from "../../../lib/news-images";
+import {
+  isBlockedNewsImageUrl,
+  isSiteBrandingNewsImageUrl,
+  normalizeNewsImageUrl,
+} from "../../../lib/news-images";
 import { shouldUnoptimizeImageSrc } from "../../../lib/media-image";
-
-const BLOCKED_SRC_PATTERN =
-  /source\.unsplash\.com|images\.unsplash\.com|unsplash\.com\/photo|coindesk\.com/i;
-
-const FALLBACK_IMAGE_SRC = "/favicon.png";
-const FALLBACK_ALT = "شعار HasaN CharT World";
+import { NewsCategoryFallbackCover } from "./NewsCategoryFallbackCover";
 
 function getSafeImageSrc(src) {
   const value = String(src || "").trim();
-  if (!value || BLOCKED_SRC_PATTERN.test(value)) {
+  if (!value || isBlockedNewsImageUrl(value) || isSiteBrandingNewsImageUrl(value)) {
     return null;
   }
 
@@ -63,22 +62,32 @@ function NewsImageCore({
 export function NewsCoverImage({
   src,
   alt,
+  title = "",
+  category = null,
+  item = null,
   priority = false,
   sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px",
   className = "news-card__image",
   fallbackClassName = "news-card__fallback",
-  fallback,
 }) {
   const safeSrc = useMemo(() => getSafeImageSrc(src), [src]);
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(safeSrc) && !failed;
-  const resolvedAlt = alt || "صورة الخبر";
+  const resolvedAlt = alt || title || "صورة الخبر";
+  const fallbackTitle = title || alt || "";
 
   return (
     <>
-      <div className={`${fallbackClassName} ${showImage ? "news-card__fallback--hidden" : ""}`}>
-        {fallback}
-      </div>
+      {!showImage ? (
+        <div className={fallbackClassName}>
+          <NewsCategoryFallbackCover
+            item={item}
+            category={category}
+            title={fallbackTitle}
+            variant="card"
+          />
+        </div>
+      ) : null}
       <NewsImageCore
         src={safeSrc}
         alt={resolvedAlt}
@@ -89,20 +98,6 @@ export function NewsCoverImage({
         hidden={!showImage}
         onError={() => setFailed(true)}
       />
-      {failed && safeSrc ? (
-        <div className="news-media-image-shell">
-          <Image
-            src={FALLBACK_IMAGE_SRC}
-            alt={FALLBACK_ALT}
-            fill
-            sizes={sizes}
-            quality={60}
-            loading="lazy"
-            decoding="async"
-            className={`${className} news-card__image--fallback`}
-          />
-        </div>
-      ) : null}
     </>
   );
 }
@@ -110,25 +105,32 @@ export function NewsCoverImage({
 export function NewsArticleCoverImage({
   src,
   alt,
+  title = "",
+  category = null,
+  item = null,
   priority = true,
   sizes = "(max-width: 768px) 100vw, (max-width: 1200px) 896px, 896px",
   className = "news-article-cover-image",
-  fallbackClassName = "absolute inset-0 flex items-center justify-center fallback-article-image",
-  fallback,
+  fallbackClassName = "absolute inset-0 z-[15]",
 }) {
   const safeSrc = useMemo(() => getSafeImageSrc(src), [src]);
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(safeSrc) && !failed;
-  const resolvedAlt = alt || "صورة الخبر";
+  const resolvedAlt = alt || title || "صورة الخبر";
+  const fallbackTitle = title || alt || "";
 
   return (
     <>
-      <div
-        className={`${fallbackClassName} ${showImage ? "hidden" : "flex"}`}
-        style={{ zIndex: 15 }}
-      >
-        {fallback}
-      </div>
+      {!showImage ? (
+        <div className={fallbackClassName}>
+          <NewsCategoryFallbackCover
+            item={item}
+            category={category}
+            title={fallbackTitle}
+            variant="article"
+          />
+        </div>
+      ) : null}
       <NewsImageCore
         src={safeSrc}
         alt={resolvedAlt}
@@ -140,20 +142,6 @@ export function NewsArticleCoverImage({
         hidden={!showImage}
         onError={() => setFailed(true)}
       />
-      {failed && safeSrc ? (
-        <div className="news-media-image-shell news-media-image-shell--article">
-          <Image
-            src={FALLBACK_IMAGE_SRC}
-            alt={FALLBACK_ALT}
-            fill
-            sizes={sizes}
-            quality={60}
-            loading="lazy"
-            decoding="async"
-            className={`${className} opacity-40`}
-          />
-        </div>
-      ) : null}
     </>
   );
 }

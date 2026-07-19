@@ -38,9 +38,9 @@ function DeferredNotificationUi() {
   );
 }
 
-export function ClientProviders({ children, initialTheme }) {
+export function ClientProviders({ children }) {
   return (
-    <ThemeProvider initialTheme={initialTheme}>
+    <ThemeProvider>
       <AuthProvider>
         <NotificationProvider>
           <AppModalProvider>

@@ -1,8 +1,9 @@
 import "./globals.css";
-import { ClientProviders } from "./components/ClientProviders";
-import RootLayoutShell from "./components/RootLayoutShell";
-import { readThemeFromRequestCookies } from "../lib/theme-server";
-import { THEME_BOOT_SCRIPT, THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
+import {
+  THEME_BOOT_SCRIPT,
+  THEME_COOKIE_BOOT_SCRIPT,
+  THEME_CRITICAL_CSS,
+} from "../lib/theme-critical-styles";
 import {
   SITE_ORGANIZATION_NAME,
   buildPublicMetadata,
@@ -51,9 +52,14 @@ export const metadata = {
     title: SITE_ORGANIZATION_NAME,
   },
   icons: {
-    icon: [{ url: "/favicon.png", type: "image/png", sizes: "1024x1024" }],
-    shortcut: "/favicon.png",
-    apple: [{ url: "/favicon.png", sizes: "1024x1024" }],
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/favicon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/favicon-32.png",
+    apple: [{ url: "/favicon-192.png", sizes: "192x192", type: "image/png" }],
   },
 };
 
@@ -61,19 +67,22 @@ export const viewport = {
   themeColor: "#020617",
 };
 
-export default async function RootLayout({ children }) {
-  const theme = await readThemeFromRequestCookies();
+export default function RootLayout({ children }) {
   const supabaseOrigin = getSupabaseOrigin();
 
   return (
     <html
       lang="ar"
       dir="rtl"
-      data-theme={theme}
+      data-theme="dark"
       className="theme-pending"
       suppressHydrationWarning
     >
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_COOKIE_BOOT_SCRIPT }} />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+        <link rel="apple-touch-icon" href="/favicon-192.png" sizes="192x192" />
         <link rel="dns-prefetch" href="https://s3.tradingview.com" />
         <link rel="dns-prefetch" href="https://s.tradingview.com" />
         {supabaseOrigin ? <link rel="dns-prefetch" href={supabaseOrigin} /> : null}
@@ -98,11 +107,7 @@ export default async function RootLayout({ children }) {
           <p className="theme-boot-title">HasaN CharT World</p>
           <p className="theme-boot-subtitle">جاري تجهيز الواجهة...</p>
         </div>
-        <div id="site-root">
-          <ClientProviders initialTheme={theme}>
-            <RootLayoutShell>{children}</RootLayoutShell>
-          </ClientProviders>
-        </div>
+        <div id="site-root">{children}</div>
       </body>
     </html>
   );

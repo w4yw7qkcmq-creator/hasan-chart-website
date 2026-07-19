@@ -1,6 +1,6 @@
 "use client";
 
-import { getAdminStatusKey, getAdminStatusLabel } from "../admin/admin-dashboard-helpers";
+import { getAdminStatusKey, getAdminStatusLabel } from "../(app)/admin/admin-dashboard-helpers";
 
 const PARTNER_STATUS_CLASS = {
   pending: "admin-badge--pending",
