@@ -2,6 +2,15 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import {
+  ADMIN_SECTION_EMPTY_MESSAGE,
+  ADMIN_SECTION_NOT_ENABLED_MESSAGE,
+  ADMIN_SECTION_PHASE_MESSAGE,
+} from "../../../../lib/admin-user-management-shared";
+import { TIMELINE_FILTER_OPTIONS } from "./admin-user-management-ux-helpers";
+import AdminPaymentProofModal from "./AdminPaymentProofModal";
+import { adminFetch } from "../../../../lib/admin-fetch";
+import { fetchPaymentProof } from "../../../../lib/admin-financial-center-client";
 
 function formatDateTime(value) {
   if (!value) return "—";
@@ -58,6 +67,75 @@ function SectionSkeleton({ rows = 4 }) {
   );
 }
 
+function SectionNotEnabledState({ message, detail }) {
+  return (
+    <div className="admin-user-section-state admin-user-section-state--disabled">
+      <span className="admin-user-section-state__icon" aria-hidden="true">
+        🚧
+      </span>
+      <p className="admin-user-section-state__title">{message || ADMIN_SECTION_NOT_ENABLED_MESSAGE}</p>
+      <p className="admin-user-section-state__detail">{detail || ADMIN_SECTION_PHASE_MESSAGE}</p>
+    </div>
+  );
+}
+
+function SectionErrorState({ message, onRetry }) {
+  return (
+    <div className="admin-user-section-state admin-user-section-state--error">
+      <span className="admin-user-section-state__icon" aria-hidden="true">
+        ⚠️
+      </span>
+      <p className="admin-user-section-state__title">{message || "تعذر تحميل هذا القسم."}</p>
+      <button type="button" className="admin-btn-surface mt-4 px-5 py-3" onClick={onRetry}>
+        إعادة المحاولة
+      </button>
+    </div>
+  );
+}
+
+function SectionEmptyDataState({ icon = "📭", message = ADMIN_SECTION_EMPTY_MESSAGE }) {
+  return (
+    <div className="admin-user-section-state admin-user-section-state--empty">
+      <span className="admin-user-section-state__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <p className="admin-user-section-state__title">{message}</p>
+    </div>
+  );
+}
+
+function isSectionUnavailable(data) {
+  return data?.available === false;
+}
+
+function renderSectionFrame(section, { sectionState, data, onRefreshSection, children, skeletonRows = 4 }) {
+  const state = sectionState?.[section];
+
+  if (state?.loading) {
+    return <SectionSkeleton rows={skeletonRows} />;
+  }
+
+  if (isSectionUnavailable(data) || state?.errorKind === "not_enabled") {
+    return (
+      <SectionNotEnabledState
+        message={data?.message || state?.error}
+        detail={data?.detail || state?.detail}
+      />
+    );
+  }
+
+  if (state?.error) {
+    return (
+      <SectionErrorState
+        message={state.error}
+        onRetry={() => onRefreshSection(section)}
+      />
+    );
+  }
+
+  return children;
+}
+
 function PaginationBar({ pagination, onPageChange }) {
   if (!pagination || pagination.totalPages <= 1) return null;
 
@@ -99,6 +177,14 @@ function UserHeroCard({ user, stats }) {
         </div>
       </div>
       <div className="admin-user-hero__meta">
+        <div>
+          <p className="admin-user-hero__meta-label">Telegram</p>
+          <p className="admin-user-hero__meta-value">{user.telegram || "—"}</p>
+        </div>
+        <div>
+          <p className="admin-user-hero__meta-label">الدور</p>
+          <p className="admin-user-hero__meta-value">{user.role || "user"}</p>
+        </div>
         <div>
           <p className="admin-user-hero__meta-label">تاريخ التسجيل</p>
           <p className="admin-user-hero__meta-value">{formatDateTime(user.createdAt)}</p>
@@ -156,6 +242,9 @@ const MANAGEMENT_ACTIONS = [
 export default function AdminUserDrawerShell({
   activeTab,
   tabs,
+  layoutMode = "drawer",
+  drawerViewMode = "drawer",
+  onDrawerViewModeChange,
   onTabChange,
   onClose,
   overview,
@@ -179,10 +268,37 @@ export default function AdminUserDrawerShell({
   onAddNote,
   onUpdateNote,
   onDeleteNote,
+  onTogglePinNote,
+  activityFilter = "all",
+  onActivityFilterChange,
 }) {
   const user = overview?.user;
   const [noteDraft, setNoteDraft] = useState("");
   const [manualExpiry, setManualExpiry] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState("");
+  const [editingNoteText, setEditingNoteText] = useState("");
+  const [proofPreview, setProofPreview] = useState(null);
+  const [proofLoadingId, setProofLoadingId] = useState("");
+
+  const openPaymentProof = async (requestId) => {
+    if (!requestId || proofLoadingId) return;
+    setProofLoadingId(String(requestId));
+    try {
+      const proof = await fetchPaymentProof(adminFetch, requestId);
+      setProofPreview({
+        ...proof,
+        planName: proof.planName || proof.plan,
+      });
+    } catch {
+      setProofPreview({
+        planName: "طلب اشتراك",
+        proof: "",
+        isInline: false,
+      });
+    } finally {
+      setProofLoadingId("");
+    }
+  };
 
   const subscriptionActions = useMemo(
     () => [
@@ -196,27 +312,49 @@ export default function AdminUserDrawerShell({
 
   const isSelfTarget = String(currentAdminUserId || "") === String(user?.id || user?.uid || "");
 
-  const renderSectionError = (section) =>
-    sectionState?.[section]?.error ? (
-      <div className="text-center">
-        <p className="font-black text-red-200">{sectionState[section].error}</p>
-        <button type="button" className="admin-btn-surface mt-4 px-5 py-3" onClick={() => onRefreshSection(section)}>
-          إعادة المحاولة
-        </button>
-      </div>
-    ) : null;
+  const isPageLayout = layoutMode === "page";
+  const isFullscreen = !isPageLayout && drawerViewMode === "fullscreen";
 
   return (
-    <aside className="admin-user-drawer admin-user-drawer--wide" aria-label="إدارة المستخدم">
+    <aside
+      className={`admin-user-drawer admin-user-drawer--wide ${
+        isPageLayout ? "admin-user-center-shell admin-user-center-shell--page" : ""
+      } ${isFullscreen ? "admin-user-drawer--fullscreen" : ""}`}
+      aria-label="إدارة المستخدم"
+    >
+      {!isPageLayout ? (
       <div className="admin-user-drawer__header">
         <div>
-          <p className="admin-user-hero__eyebrow">مركز تحكم المستخدم</p>
+          <p className="admin-user-hero__eyebrow">مركز CRM للمستخدم</p>
           <h3 className="admin-heading text-2xl">{user?.username || user?.email || "المستخدم"}</h3>
         </div>
-        <button type="button" className="admin-user-drawer__close" onClick={onClose}>
-          ✕
-        </button>
+        <div className="admin-user-drawer__header-actions">
+          <div className="admin-user-drawer__view-toggle" role="group" aria-label="نمط العرض">
+            <button
+              type="button"
+              className={`admin-user-drawer__view-toggle-btn ${drawerViewMode === "drawer" ? "is-active" : ""}`}
+              onClick={() => onDrawerViewModeChange?.("drawer")}
+              title="عرض جانبي — Drawer"
+              aria-pressed={drawerViewMode === "drawer"}
+            >
+              Drawer
+            </button>
+            <button
+              type="button"
+              className={`admin-user-drawer__view-toggle-btn ${isFullscreen ? "is-active" : ""}`}
+              onClick={() => onDrawerViewModeChange?.("fullscreen")}
+              title="ملء الشاشة — Full Screen"
+              aria-pressed={isFullscreen}
+            >
+              Full Screen
+            </button>
+          </div>
+          <button type="button" className="admin-user-drawer__close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
       </div>
+      ) : null}
 
       <div className="admin-user-drawer__tabs admin-user-drawer__tabs--scroll" role="tablist">
         {tabs.map((tab) => (
@@ -236,16 +374,23 @@ export default function AdminUserDrawerShell({
 
       <div className="admin-user-drawer__body">
         {activeTab === "overview" &&
-          (sectionState?.overview?.loading && !overview ? (
-            <SectionSkeleton rows={8} />
-          ) : renderSectionError("overview") || <UserHeroCard user={user} stats={overview?.stats} />)}
+          renderSectionFrame("overview", {
+            sectionState,
+            data: overview,
+            onRefreshSection,
+            skeletonRows: 8,
+            children: <UserHeroCard user={user} stats={overview?.stats} />,
+          })}
 
         {activeTab === "services" &&
-          (sectionState?.services?.loading && !services ? (
-            <SectionSkeleton />
-          ) : renderSectionError("services") || (
-            <div className="admin-user-services-grid">
-              {(services?.services || []).map((service) => (
+          renderSectionFrame("services", {
+            sectionState,
+            data: services,
+            onRefreshSection,
+            children:
+              (services?.services || []).length > 0 ? (
+                <div className="admin-user-services-grid">
+                  {(services?.services || []).map((service) => (
                 <article key={service.key} className="admin-user-service-tile">
                   <div className="admin-user-service-tile__head">
                     <div className="admin-user-service-tile__title">
@@ -302,16 +447,23 @@ export default function AdminUserDrawerShell({
                   </div>
                 </article>
               ))}
-            </div>
-          ))}
+                </div>
+              ) : (
+                <SectionEmptyDataState icon="🧩" />
+              ),
+          })}
 
         {activeTab === "subscriptions" &&
-          (sectionState?.subscriptions?.loading && !subscriptions ? (
-            <SectionSkeleton rows={6} />
-          ) : renderSectionError("subscriptions") || (
-            <>
-              <div className="admin-user-services-grid">
-                {(subscriptions?.subscriptions || []).map((sub) => (
+          renderSectionFrame("subscriptions", {
+            sectionState,
+            data: subscriptions,
+            onRefreshSection,
+            skeletonRows: 6,
+            children:
+              (subscriptions?.subscriptions || []).length > 0 ? (
+                <>
+                  <div className="admin-user-services-grid">
+                    {(subscriptions?.subscriptions || []).map((sub) => (
                   <article key={sub.id} className="admin-user-service-tile">
                     <div className="admin-user-service-tile__head">
                       <div>
@@ -378,86 +530,176 @@ export default function AdminUserDrawerShell({
                     </div>
                   </article>
                 ))}
-              </div>
-              <PaginationBar
-                pagination={subscriptions?.pagination}
-                onPageChange={(page) => onPageChange("subscriptions", page)}
-              />
-            </>
-          ))}
+                  </div>
+                  <PaginationBar
+                    pagination={subscriptions?.pagination}
+                    onPageChange={(page) => onPageChange("subscriptions", page)}
+                  />
+                </>
+              ) : (
+                <SectionEmptyDataState icon="💳" />
+              ),
+          })}
 
         {activeTab === "payments" &&
-          (sectionState?.payments?.loading && !payments ? (
-            <SectionSkeleton />
-          ) : renderSectionError("payments") || (
-            <div className="admin-user-empty-state">
-              <span>💰</span>
-              <p>{payments?.message || "لا توجد مدفوعات مسجلة لهذا المستخدم."}</p>
-            </div>
-          ))}
-
-        {activeTab === "notifications" &&
-          (sectionState?.notifications?.loading && !notifications ? (
-            <SectionSkeleton />
-          ) : renderSectionError("notifications") || (
-            <>
-              <div className="admin-user-note-form">
-                <p className="text-sm text-slate-400">إرسال إشعار خاص — Placeholder (المرحلة 3C)</p>
-              </div>
-              <div className="mt-4 space-y-3">
-                {(notifications?.notifications || []).map((row) => (
-                  <article key={row.id} className="admin-user-service-tile">
-                    <div className="flex justify-between gap-3">
-                      <h5 className="font-black">{row.title}</h5>
-                      <span className="text-xs font-bold">{row.isRead ? "مقروء" : "غير مقروء"}</span>
+          renderSectionFrame("payments", {
+            sectionState,
+            data: payments,
+            onRefreshSection,
+            children: (
+              <>
+                <p className="admin-user-payments-disclaimer">{payments?.disclaimer}</p>
+                {(payments?.reviews || []).length > 0 ? (
+                  <>
+                    <div className="admin-table-wrap mt-4 overflow-x-auto">
+                      <table className="admin-user-table">
+                        <thead>
+                          <tr>
+                            <th>الخطة</th>
+                            <th>السعر</th>
+                            <th>حالة المراجعة</th>
+                            <th>تاريخ الطلب</th>
+                            <th>تاريخ التفعيل</th>
+                            <th>إثبات</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(payments?.reviews || []).map((review) => (
+                            <tr key={review.id}>
+                              <td>{review.plan || "—"}</td>
+                              <td>{review.priceRaw || "—"}</td>
+                              <td>{review.status}</td>
+                              <td>{formatDateTime(review.submittedAt)}</td>
+                              <td>{formatDateTime(review.confirmedAt)}</td>
+                              <td>{review.proofAvailable ? (
+                                <button
+                                  type="button"
+                                  className="admin-user-manage-btn"
+                                  disabled={proofLoadingId === String(review.requestId)}
+                                  onClick={() => void openPaymentProof(review.requestId)}
+                                >
+                                  {proofLoadingId === String(review.requestId) ? "..." : "معاينة"}
+                                </button>
+                              ) : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <p className="mt-2 text-sm text-slate-300">{row.message}</p>
-                    <p className="mt-2 text-xs text-slate-500">{row.type} — {formatDateTime(row.createdAt)}</p>
-                  </article>
-                ))}
-              </div>
-              <PaginationBar pagination={notifications?.pagination} onPageChange={(page) => onPageChange("notifications", page)} />
-            </>
-          ))}
-
-        {activeTab === "emails" &&
-          (sectionState?.emails?.loading && !emails ? (
-            <SectionSkeleton />
-          ) : renderSectionError("emails") || (
-            <>
-              <div className="space-y-3">
-                {(emails?.emails || []).map((row) => (
-                  <article key={row.id} className="admin-user-service-tile">
-                    <div className="flex justify-between gap-3">
-                      <h5 className="font-black">{row.subject || row.messageType}</h5>
-                      <span className="text-xs font-bold">{row.status}</span>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-400">
-                      {row.messageType} — {formatDateTime(row.createdAt)} — {row.sentAt ? `أُرسل: ${formatDateTime(row.sentAt)}` : "لم يُرسل بعد"}
+                    <p className="mt-3 text-xs font-bold text-amber-700/90">
+                      وجود إثبات دفع لا يعني أن العملية مؤكدة.
                     </p>
-                    {row.error ? <p className="mt-1 text-xs text-red-300">{row.error}</p> : null}
-                    <button
-                      type="button"
-                      disabled
-                      className="admin-user-action-btn mt-3 opacity-60"
-                      title="Placeholder — لا يوجد مسار retry آمن حالياً"
-                    >
-                      إعادة محاولة (Placeholder)
-                    </button>
-                  </article>
-                ))}
+                    <PaginationBar
+                      pagination={payments?.pagination}
+                      onPageChange={(page) => onPageChange("payments", page)}
+                    />
+                  </>
+                ) : (
+                  <SectionEmptyDataState icon="💰" message="لا توجد طلبات بإثبات دفع لهذا المستخدم." />
+                )}
+              </>
+            ),
+          })}
+
+        {activeTab === "communications" &&
+          renderSectionFrame("notifications", {
+            sectionState,
+            data: notifications,
+            onRefreshSection: () => {
+              onRefreshSection("notifications");
+              onRefreshSection("emails");
+            },
+            children: (
+              <div className="space-y-6">
+                <section>
+                  <h4 className="admin-heading text-lg">الإشعارات</h4>
+                  {(notifications?.notifications || []).length > 0 ? (
+                    <>
+                      <div className="mt-3 space-y-3">
+                        {(notifications?.notifications || []).map((row) => (
+                          <article key={row.id} className="admin-user-service-tile">
+                            <div className="flex justify-between gap-3">
+                              <h5 className="font-black">{row.title}</h5>
+                              <span className={`admin-user-status ${row.isRead ? "admin-user-status--active" : ""}`}>
+                                {row.isRead ? "مقروء" : "غير مقروء"}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm text-slate-600">{row.message}</p>
+                            <p className="mt-2 text-xs text-slate-500">{row.type} — {formatDateTime(row.createdAt)}</p>
+                          </article>
+                        ))}
+                      </div>
+                      <PaginationBar
+                        pagination={notifications?.pagination}
+                        onPageChange={(page) => onPageChange("notifications", page)}
+                      />
+                    </>
+                  ) : (
+                    <div className="mt-3">
+                      <SectionEmptyDataState icon="📣" message="لا توجد إشعارات لهذا المستخدم." />
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h4 className="admin-heading text-lg">البريد الإلكتروني</h4>
+                  {(emails?.emails || []).length > 0 ? (
+                    <>
+                      <div className="mt-3 space-y-3">
+                        {(emails?.emails || []).map((row) => (
+                          <article key={row.id} className="admin-user-service-tile">
+                            <div className="flex justify-between gap-3">
+                              <h5 className="font-black">{row.subject || row.messageType}</h5>
+                              <span className="admin-user-status">{row.status}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500">
+                              {row.messageType} — {formatDateTime(row.createdAt)}
+                              {row.sentAt ? ` — أُرسل: ${formatDateTime(row.sentAt)}` : " — لم يُرسل بعد"}
+                            </p>
+                            {row.error ? <p className="mt-1 text-xs text-amber-700">فشل إرسال الرسالة</p> : null}
+                          </article>
+                        ))}
+                      </div>
+                      <PaginationBar pagination={emails?.pagination} onPageChange={(page) => onPageChange("emails", page)} />
+                    </>
+                  ) : (
+                    <div className="mt-3">
+                      <SectionEmptyDataState icon="✉️" message="لا توجد رسائل بريد مسجلة." />
+                    </div>
+                  )}
+                </section>
               </div>
-              <PaginationBar pagination={emails?.pagination} onPageChange={(page) => onPageChange("emails", page)} />
-            </>
-          ))}
+            ),
+          })}
 
         {activeTab === "activity" &&
-          (sectionState?.activity?.loading && !activity ? (
-            <SectionSkeleton rows={6} />
-          ) : renderSectionError("activity") || (
-            <>
-              <ol className="admin-user-timeline">
-                {(activity?.events || []).map((event) => (
+          renderSectionFrame("activity", {
+            sectionState,
+            data: activity,
+            onRefreshSection,
+            skeletonRows: 6,
+            children:
+              (activity?.events || []).length > 0 ? (
+                <>
+                  <div className="admin-user-timeline-filters">
+                    {TIMELINE_FILTER_OPTIONS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`admin-user-timeline-filters__btn ${
+                          activityFilter === item.id ? "is-active" : ""
+                        }`}
+                        onClick={() => onActivityFilterChange?.(item.id)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  { (activity?.events || []).length > 0 ? (
+                    <>
+                      <ol className="admin-user-timeline">
+                        {(activity?.events || []).map((event) => (
                   <li key={event.id} className="admin-user-timeline__item">
                     <div className="admin-user-timeline__icon">{event.icon}</div>
                     <div className="admin-user-timeline__content">
@@ -472,59 +714,118 @@ export default function AdminUserDrawerShell({
                     </div>
                   </li>
                 ))}
-              </ol>
-              <PaginationBar pagination={activity?.pagination} onPageChange={(page) => onPageChange("activity", page)} />
-            </>
-          ))}
+                      </ol>
+                      <PaginationBar pagination={activity?.pagination} onPageChange={(page) => onPageChange("activity", page)} />
+                    </>
+                  ) : (
+                    <SectionEmptyDataState icon="🕒" message="لا توجد أحداث ضمن هذا الفلتر." />
+                  )}
+                </>
+              ) : (
+                <SectionEmptyDataState icon="🕒" />
+              ),
+          })}
 
         {activeTab === "notes" &&
-          (sectionState?.notes?.loading && !notes ? (
-            <SectionSkeleton />
-          ) : renderSectionError("notes") || (
-            <>
-              {notes?.available === false ? (
-                <div className="admin-user-empty-state"><p>{notes.message}</p></div>
-              ) : (
-                <>
-                  <div className="admin-user-note-form">
-                    <textarea className="admin-field min-h-24" placeholder="ملاحظة داخلية..." value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} />
-                    <button type="button" className="admin-user-action-btn" onClick={() => { void onAddNote(noteDraft).then(() => setNoteDraft("")); }}>
-                      إضافة ملاحظة
-                    </button>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {(notes?.notes || []).map((note) => (
-                      <article key={note.id} className="admin-user-service-tile">
-                        <p className="text-sm">{note.note}</p>
-                        <p className="mt-2 text-xs text-slate-500">{note.admin_email || "مدير"} — {formatDateTime(note.created_at)}</p>
-                        <div className="mt-3 flex gap-2">
-                          <button type="button" className="admin-user-action-btn" onClick={() => {
-                            const next = window.prompt("تعديل الملاحظة", note.note);
-                            if (next) void onUpdateNote(note.id, next);
-                          }}>
-                            تعديل
-                          </button>
-                          <button type="button" className="admin-user-action-btn admin-user-action-btn--danger" onClick={() => {
-                            if (window.confirm("حذف هذه الملاحظة؟")) void onDeleteNote(note.id);
-                          }}>
-                            حذف
-                          </button>
-                        </div>
+          renderSectionFrame("notes", {
+            sectionState,
+            data: notes,
+            onRefreshSection,
+            children: (
+              <>
+                <div className="admin-user-note-form">
+                  <textarea className="admin-field min-h-24" placeholder="ملاحظة داخلية..." value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} />
+                  <button type="button" className="admin-user-action-btn" onClick={() => { void onAddNote(noteDraft).then(() => setNoteDraft("")); }}>
+                    إضافة ملاحظة
+                  </button>
+                </div>
+                {(notes?.notes || []).length > 0 ? (
+                  <>
+                    <div className="mt-4 space-y-3">
+                      {(notes?.notes || []).map((note) => (
+                      <article key={note.id} className={`admin-user-service-tile ${note.is_pinned ? "is-pinned" : ""}`}>
+                        {editingNoteId === note.id ? (
+                          <>
+                            <textarea
+                              className="admin-field min-h-20 w-full"
+                              value={editingNoteText}
+                              onChange={(event) => setEditingNoteText(event.target.value)}
+                            />
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                className="admin-user-action-btn"
+                                onClick={() => {
+                                  void onUpdateNote(note.id, editingNoteText).then(() => {
+                                    setEditingNoteId("");
+                                    setEditingNoteText("");
+                                  });
+                                }}
+                              >
+                                حفظ
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-user-action-btn"
+                                onClick={() => {
+                                  setEditingNoteId("");
+                                  setEditingNoteText("");
+                                }}
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm">{note.note}</p>
+                            <p className="mt-2 text-xs text-slate-500">{note.admin_email || "مدير"} — {formatDateTime(note.created_at)}</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {onTogglePinNote ? (
+                                <button type="button" className="admin-user-action-btn" onClick={() => void onTogglePinNote(note.id, !note.is_pinned)}>
+                                  {note.is_pinned ? "إلغاء التثبيت" : "تثبيت"}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="admin-user-action-btn"
+                                onClick={() => {
+                                  setEditingNoteId(note.id);
+                                  setEditingNoteText(note.note);
+                                }}
+                              >
+                                تعديل
+                              </button>
+                              <button type="button" className="admin-user-action-btn admin-user-action-btn--danger" onClick={() => {
+                                if (window.confirm("حذف هذه الملاحظة؟")) void onDeleteNote(note.id);
+                              }}>
+                                حذف
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </article>
                     ))}
+                    </div>
+                    <PaginationBar pagination={notes?.pagination} onPageChange={(page) => onPageChange("notes", page)} />
+                  </>
+                ) : (
+                  <div className="mt-4">
+                    <SectionEmptyDataState icon="📝" />
                   </div>
-                  <PaginationBar pagination={notes?.pagination} onPageChange={(page) => onPageChange("notes", page)} />
-                </>
-              )}
-            </>
-          ))}
+                )}
+              </>
+            ),
+          })}
 
         {activeTab === "management" &&
-          (sectionState?.management?.loading && !management ? (
-            <SectionSkeleton />
-          ) : renderSectionError("management") || (
-            <>
-              <div className="admin-user-actions-grid">
+          renderSectionFrame("management", {
+            sectionState,
+            data: management,
+            onRefreshSection,
+            children: (
+              <>
+                <div className="admin-user-actions-grid">
               {MANAGEMENT_ACTIONS.map((item) => {
                 const selfBlocked =
                   isSelfTarget &&
@@ -552,38 +853,45 @@ export default function AdminUserDrawerShell({
 
               <div className="mt-8">
                 <h4 className="admin-user-drawer__section-title">سجل التدقيق الإداري</h4>
-                {sectionState?.audit?.loading && !audit ? (
-                  <SectionSkeleton rows={3} />
-                ) : (
-                  <div className="mt-4 space-y-3">
-                    {(audit?.logs || []).length ? (
-                      audit.logs.map((log) => (
-                        <article key={log.id} className="admin-user-service-tile">
-                          <div className="flex justify-between gap-3">
-                            <h5 className="font-black">{log.action}</h5>
-                            <span className="text-xs font-bold">{formatDateTime(log.created_at)}</span>
-                          </div>
-                          <p className="mt-2 text-xs text-slate-400">
-                            {log.admin_email || "مدير"} — {log.entity_type || "—"}
-                            {log.entity_id ? ` #${log.entity_id}` : ""}
-                          </p>
-                        </article>
-                      ))
+                {renderSectionFrame("audit", {
+                  sectionState,
+                  data: audit,
+                  onRefreshSection,
+                  skeletonRows: 3,
+                  children:
+                    (audit?.logs || []).length > 0 ? (
+                      <>
+                        <div className="mt-4 space-y-3">
+                          {audit.logs.map((log) => (
+                            <article key={log.id} className="admin-user-service-tile">
+                              <div className="flex justify-between gap-3">
+                                <h5 className="font-black">{log.action}</h5>
+                                <span className="text-xs font-bold">{formatDateTime(log.created_at)}</span>
+                              </div>
+                              <p className="mt-2 text-xs text-slate-400">
+                                {log.admin_email || "مدير"} — {log.entity_type || "—"}
+                                {log.entity_id ? ` #${log.entity_id}` : ""}
+                              </p>
+                            </article>
+                          ))}
+                        </div>
+                        <PaginationBar
+                          pagination={audit?.pagination}
+                          onPageChange={(page) => onPageChange("audit", page)}
+                        />
+                      </>
                     ) : (
-                      <div className="admin-user-empty-state">
-                        <p>{audit?.message || "لا توجد سجلات تدقيق بعد."}</p>
+                      <div className="mt-4">
+                        <SectionEmptyDataState icon="🛡️" message={audit?.message || ADMIN_SECTION_EMPTY_MESSAGE} />
                       </div>
-                    )}
-                  </div>
-                )}
-                <PaginationBar
-                  pagination={audit?.pagination}
-                  onPageChange={(page) => onPageChange("audit", page)}
-                />
+                    ),
+                })}
               </div>
             </>
-          ))}
+            ),
+          })}
       </div>
+      <AdminPaymentProofModal proof={proofPreview} onClose={() => setProofPreview(null)} />
     </aside>
   );
 }

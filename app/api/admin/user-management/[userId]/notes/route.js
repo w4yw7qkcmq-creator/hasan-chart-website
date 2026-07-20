@@ -3,6 +3,11 @@ import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
 import { writeAdminAuditLog } from "../../../../../../lib/admin-audit-log";
 import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
 import { loadAdminUserNotesSection } from "../../../../../../lib/admin-user-management-sections";
+import {
+  buildUnavailableSectionPayload,
+  isMissingDatabaseResourceError,
+  sanitizeAdminUserFacingError,
+} from "../../../../../../lib/admin-user-management-shared";
 import { adminMutationLimiter, adminReadLimiter } from "../../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +36,17 @@ export async function GET(request, context) {
       headers: { "Cache-Control": CACHE_NO_STORE },
     });
   } catch (error) {
+    if (isMissingDatabaseResourceError(error)) {
+      const { searchParams } = new URL(request.url);
+      const page = Number(searchParams.get("page") || 1);
+      return Response.json(buildUnavailableSectionPayload("notes", page), {
+        headers: { "Cache-Control": CACHE_NO_STORE },
+      });
+    }
+
+    const sanitized = sanitizeAdminUserFacingError(error, { fallback: "تعذر تحميل الملاحظات" });
     return Response.json(
-      { success: false, error: error?.message || "تعذر تحميل الملاحظات" },
+      { success: false, error: sanitized.message, errorKind: sanitized.kind },
       { status: error?.status || 500 }
     );
   }
@@ -85,9 +99,10 @@ export async function POST(request, context) {
 
     return Response.json({ success: true, note: data });
   } catch (error) {
+    const sanitized = sanitizeAdminUserFacingError(error, { fallback: "تعذر إضافة الملاحظة" });
     return Response.json(
-      { success: false, error: error?.message || "تعذر إضافة الملاحظة" },
-      { status: error?.status || 500 }
+      { success: false, error: sanitized.message, errorKind: sanitized.kind },
+      { status: isMissingDatabaseResourceError(error) ? 503 : error?.status || 500 }
     );
   }
 }
@@ -109,10 +124,19 @@ export async function PATCH(request, context) {
     const userId = String(params?.userId || "").trim();
     const body = await request.json().catch(() => ({}));
     const noteId = String(body?.noteId || "").trim();
-    const note = String(body?.note || "").trim();
+    const note = body?.note !== undefined ? String(body.note || "").trim() : undefined;
+    const isPinned = typeof body?.isPinned === "boolean" ? body.isPinned : undefined;
 
-    if (!noteId || !note) {
-      return Response.json({ success: false, error: "معرّف الملاحظة والنص مطلوبان" }, { status: 400 });
+    if (!noteId) {
+      return Response.json({ success: false, error: "معرّف الملاحظة مطلوب" }, { status: 400 });
+    }
+
+    if (note === undefined && isPinned === undefined) {
+      return Response.json({ success: false, error: "لا يوجد تحديث لإرساله" }, { status: 400 });
+    }
+
+    if (note !== undefined && !note) {
+      return Response.json({ success: false, error: "نص الملاحظة مطلوب" }, { status: 400 });
     }
 
     const { data: before } = await adminCheck.supabase
@@ -125,10 +149,14 @@ export async function PATCH(request, context) {
 
     const { data, error } = await adminCheck.supabase
       .from("admin_user_notes")
-      .update({ note, updated_at: new Date().toISOString() })
+      .update({
+        ...(note !== undefined ? { note } : {}),
+        ...(isPinned !== undefined ? { is_pinned: isPinned } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", noteId)
       .eq("user_id", userId)
-      .select("id,user_id,admin_user_id,admin_email,note,created_at,updated_at")
+      .select("id,user_id,admin_user_id,admin_email,note,is_pinned,created_at,updated_at")
       .single();
 
     if (error) throw error;
@@ -146,9 +174,10 @@ export async function PATCH(request, context) {
 
     return Response.json({ success: true, note: data });
   } catch (error) {
+    const sanitized = sanitizeAdminUserFacingError(error, { fallback: "تعذر تحديث الملاحظة" });
     return Response.json(
-      { success: false, error: error?.message || "تعذر تحديث الملاحظة" },
-      { status: error?.status || 500 }
+      { success: false, error: sanitized.message, errorKind: sanitized.kind },
+      { status: isMissingDatabaseResourceError(error) ? 503 : error?.status || 500 }
     );
   }
 }
@@ -205,9 +234,10 @@ export async function DELETE(request, context) {
 
     return Response.json({ success: true });
   } catch (error) {
+    const sanitized = sanitizeAdminUserFacingError(error, { fallback: "تعذر حذف الملاحظة" });
     return Response.json(
-      { success: false, error: error?.message || "تعذر حذف الملاحظة" },
-      { status: error?.status || 500 }
+      { success: false, error: sanitized.message, errorKind: sanitized.kind },
+      { status: isMissingDatabaseResourceError(error) ? 503 : error?.status || 500 }
     );
   }
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { adminFetch } from "../../../../lib/admin-fetch";
@@ -16,6 +18,7 @@ const TABS = [
   { id: "subscriptions", label: "الاشتراكات", icon: "💳" },
   { id: "payment-reviews", label: "إثباتات الدفع", icon: "🧾" },
   { id: "revenue", label: "الإيرادات", icon: "📈" },
+  { id: "referrals", label: "الإحالات والسحوبات", icon: "🤝", future: true },
 ];
 
 const STATUS_OPTIONS = [
@@ -99,7 +102,20 @@ function ProofModal({ proof, onClose }) {
   );
 }
 
-export default function FinancialCenterPanel({ onNavigateTab, onOpenUser }) {
+export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standalone = false }) {
+  const router = useRouter();
+
+  const openUser = useCallback(
+    (userId) => {
+      if (!userId) return;
+      if (standalone || !onOpenUser) {
+        router.push(`/admin/users/${encodeURIComponent(userId)}`);
+        return;
+      }
+      onOpenUser(userId);
+    },
+    [onOpenUser, router, standalone]
+  );
   const [activeTab, setActiveTab] = useState("overview");
   const [overview, setOverview] = useState(null);
   const [recentActive, setRecentActive] = useState([]);
@@ -140,6 +156,13 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser }) {
       setError("");
 
       try {
+        if (tab === "referrals") {
+          if (controller.signal.aborted) return;
+          loadedTabsRef.current.add(tab);
+          setLoading(false);
+          return;
+        }
+
         if (tab === "overview") {
           const result = await fetchFinancialCenterSection(adminFetch, "overview", { signal: controller.signal });
           if (controller.signal.aborted) return;
@@ -388,7 +411,7 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser }) {
                           <p className="font-black">{item.username || item.userEmail}</p>
                           <p className="text-xs text-slate-500">{item.plan}</p>
                         </div>
-                        <button type="button" className="admin-user-manage-btn" onClick={() => onOpenUser?.(item.userId)}>
+                        <button type="button" className="admin-user-manage-btn" onClick={() => openUser(item.userId)}>
                           CRM
                         </button>
                       </div>
@@ -478,7 +501,7 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser }) {
                       <td>{item.paymentProofAvailable ? "نعم" : "لا"}</td>
                       <td>
                         {item.userId ? (
-                          <button type="button" className="admin-user-manage-btn" onClick={() => onOpenUser?.(item.userId)}>
+                          <button type="button" className="admin-user-manage-btn" onClick={() => openUser(item.userId)}>
                             CRM
                           </button>
                         ) : null}
@@ -614,6 +637,19 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser }) {
               </div>
             </>
           ) : null}
+        </div>
+      ) : null}
+
+      {activeTab === "referrals" ? (
+        <div className="admin-section p-6 md:p-8">
+          <h3 className="admin-heading text-2xl">الإحالات والسحوبات</h3>
+          <p className="mt-3 max-w-2xl text-sm font-bold leading-7 text-slate-500">
+            هذا التبويب مخصص لربط بيانات الشركاء والسحوبات بالمركز المالي في مرحلة لاحقة. حاليًا يمكنك
+            إدارة الشركاء من صفحة الشركاء دون تغيير منطق العمولات.
+          </p>
+          <Link href="/admin/partners" className="admin-hub-card__cta mt-6 inline-flex">
+            فتح إدارة الشركاء والسحوبات
+          </Link>
         </div>
       ) : null}
 

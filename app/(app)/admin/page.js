@@ -193,26 +193,20 @@ const DailyAnalysisPublishPanel = dynamic(
   }
 );
 
-const AdminUserManagementPanel = dynamic(
-  () => import("./components/AdminUserManagementPanel"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-8 text-center text-sm text-slate-300">
-        جاري تحميل إدارة المستخدمين...
-      </div>
-    ),
-  }
-);
-
-const FinancialCenterPanel = dynamic(() => import("./components/FinancialCenterPanel"), {
+const AdminHubCards = dynamic(() => import("./components/AdminHubCards"), {
   ssr: false,
   loading: () => (
-    <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-8 text-center text-sm text-slate-300">
-      جاري تحميل المركز المالي...
-    </div>
+    <section className="admin-hub-grid">
+      <div className="admin-hub-card admin-hub-card--skeleton animate-pulse h-48" />
+      <div className="admin-hub-card admin-hub-card--skeleton animate-pulse h-48" />
+    </section>
   ),
 });
+
+const AdminUserQuickPreviewDrawer = dynamic(
+  () => import("./components/AdminUserQuickPreviewDrawer"),
+  { ssr: false }
+);
 
 const AdminActivityFeed = dynamic(() => import("./components/AdminActivityFeed"), {
   ssr: false,
@@ -245,6 +239,7 @@ export default function AdminPage() {
   const [accountSearch, setAccountSearch] = useState("");
   const [activeAdminTab, setActiveAdminTab] = useState("overview");
   const [pendingDrawerUserId, setPendingDrawerUserId] = useState("");
+  const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
   const [activityFeedEvents, setActivityFeedEvents] = useState([]);
   const [activityFeedPartialFailure, setActivityFeedPartialFailure] = useState(false);
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
@@ -770,15 +765,18 @@ export default function AdminPage() {
     const tab = params.get("tab");
     const userId = params.get("userId");
     if (tab) setActiveAdminTab(tab);
-    if (userId) setPendingDrawerUserId(userId);
+    if (userId) {
+      setPendingDrawerUserId(userId);
+      setPreviewDrawerOpen(true);
+    }
   }, []);
 
   useEffect(() => {
     const onOpenUser = (event) => {
       const userId = event.detail?.userId;
       if (!userId) return;
-      setActiveAdminTab("user-management");
       setPendingDrawerUserId(userId);
+      setPreviewDrawerOpen(true);
     };
 
     window.addEventListener("admin:open-user", onOpenUser);
@@ -792,12 +790,16 @@ export default function AdminPage() {
         void refreshGlobalSections();
         return;
       }
+      if (item.href) {
+        router.push(item.href);
+        return;
+      }
       if (item.tab) setActiveAdminTab(item.tab);
     };
 
     window.addEventListener("admin:command", onCommand);
     return () => window.removeEventListener("admin:command", onCommand);
-  }, [refreshGlobalSections]);
+  }, [refreshGlobalSections, router]);
 
   useEffect(() => {
     if (!authResolved || !profileReady || !user?.email || !isAdmin) {
@@ -1076,6 +1078,7 @@ export default function AdminPage() {
 
     if (event.targetUserId) {
       setPendingDrawerUserId(event.targetUserId);
+      setPreviewDrawerOpen(true);
     }
   }, [router]);
 
@@ -1842,6 +1845,8 @@ export default function AdminPage() {
         </section>
         )}
 
+        <AdminHubCards />
+
         {activityFeedPending ? (
           <AdminActivityFeed loading />
         ) : sectionStates["activity-feed"].error ? (
@@ -1859,24 +1864,6 @@ export default function AdminPage() {
           />
         )}
           </div>
-        )}
-
-        {activeAdminTab === "financial-center" && (
-          <FinancialCenterPanel
-            onNavigateTab={(tab) => setActiveAdminTab(tab)}
-            onOpenUser={(userId) => {
-              if (!userId) return;
-              setPendingDrawerUserId(userId);
-              setActiveAdminTab("user-management");
-            }}
-          />
-        )}
-
-        {activeAdminTab === "user-management" && (
-          <AdminUserManagementPanel
-            openUserId={pendingDrawerUserId}
-            onOpenUserHandled={() => setPendingDrawerUserId("")}
-          />
         )}
 
         {activeAdminTab === "vip" && (
@@ -2491,6 +2478,15 @@ export default function AdminPage() {
         </section>
         ))}
       </div>
+
+      <AdminUserQuickPreviewDrawer
+        open={previewDrawerOpen}
+        userId={pendingDrawerUserId}
+        onClose={() => {
+          setPreviewDrawerOpen(false);
+          setPendingDrawerUserId("");
+        }}
+      />
     </main>
   );
 }

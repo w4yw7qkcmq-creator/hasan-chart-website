@@ -25,6 +25,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const page = Number(searchParams.get("page") || 1);
+    const pageSize = Number(searchParams.get("pageSize") || 0);
     const search = String(searchParams.get("search") || "");
     const sort = String(searchParams.get("sort") || "created_at").trim().toLowerCase();
     const order = String(searchParams.get("order") || "desc").trim().toLowerCase();
@@ -33,6 +34,7 @@ export async function GET(request) {
 
     const payload = await loadAdminUserList(adminCheck.supabase, {
       page,
+      pageSize: pageSize > 0 ? pageSize : undefined,
       search,
       sort: sort === "last_sign_in" ? "last_sign_in" : "created_at",
       order: order === "asc" ? "asc" : "desc",
