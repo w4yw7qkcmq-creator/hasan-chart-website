@@ -83,7 +83,6 @@ export function NewsCoverImage({
           <NewsCategoryFallbackCover
             item={item}
             category={category}
-            title={fallbackTitle}
             variant="card"
           />
         </div>
@@ -126,7 +125,6 @@ export function NewsArticleCoverImage({
           <NewsCategoryFallbackCover
             item={item}
             category={category}
-            title={fallbackTitle}
             variant="article"
           />
         </div>

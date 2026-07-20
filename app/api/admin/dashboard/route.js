@@ -13,8 +13,13 @@ import {
   adminReadLimiter,
 } from "../../../../lib/rate-limit";
 import { invalidateReadCache, withReadCache } from "../../../../lib/server-read-cache";
-import { buildAdminNotificationsFeed } from "../../../../lib/admin-notifications-feed";
-import { formatPartnerMoney } from "../../../../lib/partner-shared";
+import {
+  ADMIN_DASHBOARD_PAGE_SIZE,
+  ADMIN_DASHBOARD_SECTIONS,
+  ADMIN_DASHBOARD_SECTION_CACHE_MS,
+  ADMIN_DASHBOARD_STATS_CACHE_MS,
+  loadAdminDashboardSection,
+} from "../../../../lib/admin-dashboard-sections";
 import {
   onPartnerAccountManagementActivated,
   onPartnerSubscriptionActivated,
@@ -22,36 +27,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function sanitizeAccountRequest(item) {
-  return {
-    id: item.id,
-    user_id: item.user_id,
-    email: item.email,
-    platform: item.platform,
-    account_type: item.account_type,
-    capital: item.capital,
-    contact_method: item.contact_method,
-    notes: item.notes,
-    status: item.status,
-    created_at: item.created_at,
-    has_sensitive_keys: Boolean(
-      item.api_key_encrypted ||
-        item.secret_key_encrypted ||
-        item.trading_password_encrypted
-    ),
-  };
-}
-
-function buildAdminDashboardNotifications({
-  analysis = [],
-  subscriptions = [],
-  accounts = [],
-  withdrawals = [],
-}) {
-  return buildAdminNotificationsFeed({ analysis, subscriptions, accounts, withdrawals });
-}
-
-export async function GET() {
+export async function GET(request) {
   try {
     const adminCheck = await verifyAdminSession();
 
@@ -69,99 +45,30 @@ export async function GET() {
     if (rateLimited) return rateLimited;
 
     const adminEmail = String(adminCheck.user?.email || "admin").toLowerCase();
-    const { data: dashboardPayload } = await withReadCache(
-      `admin-dashboard:${adminEmail}`,
-      12_000,
-      async () => {
-        const supabase = adminCheck.supabase;
+    const { searchParams } = new URL(request.url);
+    const section = String(searchParams.get("section") || "stats").trim().toLowerCase();
+    const limit = Number(searchParams.get("limit") || ADMIN_DASHBOARD_PAGE_SIZE);
 
-        const [analysis, accounts, subscriptions, profiles, pendingWithdrawals] = await Promise.all([
-      supabase
-        .from("analysis_requests")
-        .select(
-          "id,user_email,username,coin,frame,status,reply,reply_image,created_at,job_status,completed_at,error_message"
-        )
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase
-        .from("account_management_requests")
-        .select(
-          "id,user_id,email,platform,account_type,capital,contact_method,notes,status,created_at,api_key_encrypted,secret_key_encrypted,trading_password_encrypted"
-        )
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase
-        .from("subscription_requests")
-        .select(
-          "id,user_email,username,plan_name,category,price,telegram_username,payment_proof,status,started_at,expires_at,created_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase
-        .from("profiles")
-        .select(
-          "id,email,username,telegram,role,subscription_plan,subscription_status,created_at"
-        )
-        .limit(500),
-      supabase
-        .from("partner_withdrawals")
-        .select("id, partner_id, amount, currency, status, created_at, partners(user_id)")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(20),
-    ]);
-
-    const tableErrors = {
-      analysis: analysis.error?.message || null,
-      accounts: accounts.error?.message || null,
-      subscriptions: subscriptions.error?.message || null,
-      profiles: profiles.error?.message || null,
-    };
-
-    if (analysis.error || accounts.error || subscriptions.error || profiles.error) {
-      console.error("Admin dashboard data load warning:", tableErrors);
+    if (!ADMIN_DASHBOARD_SECTIONS.has(section)) {
+      return Response.json(
+        { success: false, error: "قسم غير مدعوم" },
+        { status: 400 }
+      );
     }
 
-    console.log("Admin dashboard counts:", {
-      analysis: analysis.data?.length || 0,
-      accounts: accounts.data?.length || 0,
-      subscriptions: subscriptions.data?.length || 0,
-      profiles: profiles.data?.length || 0,
-    });
+    const cacheTtl =
+      section === "stats" ? ADMIN_DASHBOARD_STATS_CACHE_MS : ADMIN_DASHBOARD_SECTION_CACHE_MS;
 
-    const adminNotifications = buildAdminDashboardNotifications({
-      analysis: analysis.error ? [] : analysis.data || [],
-      subscriptions: subscriptions.error ? [] : subscriptions.data || [],
-      accounts: accounts.error ? [] : accounts.data || [],
-      withdrawals: pendingWithdrawals.error
-        ? []
-        : (pendingWithdrawals.data || []).map((row) => ({
-            id: row.id,
-            status: row.status,
-            amount: row.amount,
-            amountLabel: formatPartnerMoney(row.amount),
-            created_at: row.created_at,
-            partner_email: null,
-            partnerLabel: row.partner_id ? `شريك #${String(row.partner_id).slice(0, 8)}` : "شريك",
-          })),
-    });
-
-        return {
-          success: true,
-          analysis_requests: analysis.error ? [] : analysis.data || [],
-          account_management_requests: accounts.error
-            ? []
-            : (accounts.data || []).map(sanitizeAccountRequest),
-          subscription_requests: subscriptions.error ? [] : subscriptions.data || [],
-          profiles: profiles.error ? [] : profiles.data || [],
-          table_errors: tableErrors,
-          admin_notifications: adminNotifications,
-          admin_notifications_count: adminNotifications.length,
-        };
-      }
+    const { data: sectionPayload } = await withReadCache(
+      `admin-dashboard:${adminEmail}:${section}`,
+      cacheTtl,
+      async () =>
+        loadAdminDashboardSection(adminCheck.supabase, section, {
+          limit,
+        })
     );
 
-    return Response.json(dashboardPayload, {
+    return Response.json(sectionPayload, {
       headers: {
         "Cache-Control": CACHE_NO_STORE,
         Vary: "Accept-Encoding",
@@ -173,9 +80,9 @@ export async function GET() {
     return Response.json(
       {
         success: false,
-        error: "حدث خطأ أثناء تحميل البيانات",
+        error: error?.message || "حدث خطأ أثناء تحميل البيانات",
       },
-      { status: 500 }
+      { status: error?.status || 500 }
     );
   }
 }
@@ -549,9 +456,7 @@ export async function POST(request) {
     const supabase = adminCheck.supabase;
     const adminUser = adminCheck.user;
     const invalidateDashboardCache = () => {
-      invalidateReadCache(
-        `admin-dashboard:${String(adminUser?.email || "admin").toLowerCase()}`
-      );
+      invalidateReadCache(`admin-dashboard:${String(adminUser?.email || "admin").toLowerCase()}:`);
     };
 
     const payload = await request.json();

@@ -38,8 +38,146 @@ import AdminOverviewNavLink from "./components/AdminOverviewNavLink";
 import AdminStat from "./components/AdminStat";
 import StatusBadge from "./components/StatusBadge";
 import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
+import {
+  ADMIN_SHELL_SECTIONS,
+  createAdminSectionState,
+  fetchAdminDashboardSection,
+  getAdminTabRefreshSections,
+  getCachedAdminSection,
+  invalidateAdminSectionCache,
+  isAdminSectionCacheFresh,
+  logAdminSectionLoad,
+  mapAdminTabToSections,
+  setCachedAdminSection,
+} from "../../../lib/admin-dashboard-client";
 
 const AppModal = dynamic(() => import("../../components/AppModal"), { ssr: false });
+
+function AdminQuickStatsSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="admin-stat-chip animate-pulse">
+          <div className="h-3 w-24 rounded bg-slate-200/70" />
+          <div className="mt-3 h-8 w-12 rounded-lg bg-slate-300/70" />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function AdminStatsGridSkeleton() {
+  return (
+    <section className="order-1 grid gap-5 md:grid-cols-2 xl:grid-cols-6">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div
+          key={index}
+          className="relative animate-pulse overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-3">
+              <div className="h-3 w-24 rounded bg-white/15" />
+              <div className="h-9 w-16 rounded-lg bg-white/20" />
+              <div className="h-3 w-32 rounded bg-white/10" />
+            </div>
+            <div className="h-14 w-14 rounded-2xl bg-white/10" />
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function AdminRecentItemsSkeleton() {
+  return (
+    <section className="order-3 admin-section animate-pulse p-5 md:p-6">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div className="space-y-2">
+          <div className="h-6 w-44 rounded bg-white/15" />
+          <div className="h-3 w-64 rounded bg-white/10" />
+        </div>
+        <div className="h-8 w-20 rounded-full bg-white/10" />
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div
+            key={index}
+            className="rounded-2xl border border-cyan-300/15 bg-white/[0.04] p-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="h-11 w-11 shrink-0 rounded-2xl bg-white/10" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-4/5 rounded bg-white/15" />
+                <div className="h-3 w-full rounded bg-white/10" />
+                <div className="h-2.5 w-20 rounded bg-white/10" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AdminRequestsPanelSkeleton() {
+  return (
+    <div className="animate-pulse space-y-5">
+      <section className="admin-section p-4 md:p-5">
+        <div className="flex flex-wrap gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-11 w-36 rounded-2xl bg-white/10" />
+          ))}
+        </div>
+        <div className="mt-4 h-12 rounded-2xl bg-white/10" />
+      </section>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className="admin-section min-h-[18rem] rounded-[28px] border border-cyan-300/10 bg-white/[0.04] p-5"
+          >
+            <div className="space-y-4">
+              <div className="h-7 w-2/5 rounded bg-white/15" />
+              <div className="flex flex-wrap gap-2">
+                <div className="h-8 w-24 rounded-full bg-white/10" />
+                <div className="h-8 w-20 rounded-full bg-white/10" />
+              </div>
+              <div className="h-24 rounded-2xl bg-white/[0.06]" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="h-11 rounded-2xl bg-white/10" />
+                <div className="h-11 rounded-2xl bg-white/10" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+function AdminSectionRefreshingIndicator({ visible }) {
+  if (!visible) return null;
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-black text-cyan-100">
+      ⟳ تحديث
+    </span>
+  );
+}
+
+function AdminSectionError({ message, onRetry }) {
+  return (
+    <div className="admin-section p-6 text-center">
+      <p className="font-black text-red-200">{message}</p>
+      {onRetry ? (
+        <button type="button" onClick={onRetry} className="admin-btn-surface mt-4 px-5 py-3">
+          إعادة المحاولة
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 const DailyAnalysisPublishPanel = dynamic(
   () =>
@@ -127,9 +265,17 @@ export default function AdminPage() {
   };
   const [expandedAnalysis, setExpandedAnalysis] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [hasLoadedAdminData, setHasLoadedAdminData] = useState(false);
-  const hasLoadedAdminDataRef = useRef(false);
-  const adminLoadInFlightRef = useRef(false);
+  const [apiStats, setApiStats] = useState(null);
+  const [sectionStates, setSectionStates] = useState({
+    stats: createAdminSectionState(),
+    overview: createAdminSectionState(),
+    analysis: createAdminSectionState(),
+    accounts: createAdminSectionState(),
+    subscriptions: createAdminSectionState(),
+  });
+  const sectionFetchRef = useRef(new Set());
+  const abortControllersRef = useRef(new Map());
+  const adminInitStartedRef = useRef(false);
   const [refreshWarning, setRefreshWarning] = useState("");
   const [replySending, setReplySending] = useState({});
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
@@ -302,156 +448,281 @@ export default function AdminPage() {
   };
 
 
+  const applySectionResult = useCallback((section, result) => {
+    if (section === "stats" && result.stats) {
+      setApiStats(result.stats);
+    }
+
+    if (section === "overview" || section === "notifications") {
+      setAdminFeedNotifications(result.admin_notifications || []);
+    }
+
+    if (section === "analysis") {
+      setAnalysisRequests((result.analysis_requests || []).map(formatAnalysisRequest));
+    }
+
+    if (section === "accounts") {
+      setAccountRequests((result.account_management_requests || []).map(formatAccountManagementRequest));
+    }
+
+    if (section === "subscriptions") {
+      setSubscriptionRequests((result.subscription_requests || []).map(formatSubscriptionRequest));
+    }
+
+    if (section === "users") {
+      setUsers(result.profiles || []);
+    }
+
+    setDataMode("secure-api");
+    setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
+    setRefreshWarning("");
+  }, []);
+
+  const loadSection = useCallback(
+    async (section, { force = false, background = false } = {}) => {
+      const cached = getCachedAdminSection(section);
+      const cacheFresh = isAdminSectionCacheFresh(section);
+
+      if (cacheFresh && !force) {
+        applySectionResult(section, cached);
+        setSectionStates((current) => ({
+          ...current,
+          [section]: {
+            ...current[section],
+            loading: false,
+            refreshing: false,
+            error: "",
+            loaded: true,
+          },
+        }));
+        return;
+      }
+
+      if (sectionFetchRef.current.has(section) && !force) {
+        return;
+      }
+
+      if (force) {
+        abortControllersRef.current.get(section)?.abort();
+      }
+
+      const showStaleWhileRevalidate = Boolean(cached) && (background || force || !cacheFresh);
+
+      if (showStaleWhileRevalidate) {
+        applySectionResult(section, cached);
+        setSectionStates((current) => ({
+          ...current,
+          [section]: {
+            ...current[section],
+            loading: false,
+            refreshing: true,
+            error: "",
+            loaded: true,
+          },
+        }));
+      } else if (!cached) {
+        setSectionStates((current) => ({
+          ...current,
+          [section]: {
+            ...createAdminSectionState(),
+            ...current[section],
+            loading: true,
+            refreshing: false,
+            error: "",
+          },
+        }));
+      }
+
+      sectionFetchRef.current.add(section);
+      const controller = new AbortController();
+      abortControllersRef.current.set(section, controller);
+
+      const startedAt = Date.now();
+      logAdminSectionLoad("ADMIN_SECTION_LOAD_STARTED", { section });
+
+      try {
+        const result = await fetchAdminDashboardSection(adminFetch, section, {
+          signal: controller.signal,
+        });
+
+        setCachedAdminSection(section, result);
+        applySectionResult(section, result);
+        logAdminSectionLoad("ADMIN_SECTION_LOAD_FINISHED", {
+          section,
+          durationMs: result.durationMs ?? Date.now() - startedAt,
+          returnedRows: result.returnedRows ?? 0,
+        });
+
+        setSectionStates((current) => ({
+          ...current,
+          [section]: {
+            loading: false,
+            refreshing: false,
+            error: "",
+            loaded: true,
+            durationMs: result.durationMs ?? null,
+            returnedRows: result.returnedRows ?? null,
+          },
+        }));
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        logAdminSectionLoad("ADMIN_SECTION_LOAD_FAILED", {
+          section,
+          durationMs: Date.now() - startedAt,
+          error: error?.message || "unknown",
+        });
+
+        setSectionStates((current) => ({
+          ...current,
+          [section]: {
+            ...current[section],
+            loading: false,
+            refreshing: false,
+            loaded: Boolean(cached),
+            error: cached ? "" : error?.message || "فشل تحميل القسم",
+          },
+        }));
+      } finally {
+        sectionFetchRef.current.delete(section);
+        abortControllersRef.current.delete(section);
+      }
+    },
+    [applySectionResult]
+  );
+
+  const refreshGlobalSections = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!silent) {
+        setIsRefreshing(true);
+      }
+
+      ADMIN_SHELL_SECTIONS.forEach((section) => invalidateAdminSectionCache(section));
+
+      await Promise.allSettled(
+        ADMIN_SHELL_SECTIONS.map((section) => loadSection(section, { force: true }))
+      );
+
+      if (!silent) {
+        setIsRefreshing(false);
+      }
+    },
+    [loadSection]
+  );
+
+  const refreshActiveTabSections = useCallback(
+    async ({ silent = false } = {}) => {
+      const sections = getAdminTabRefreshSections(activeAdminTab);
+      if (sections.length === 0) {
+        return;
+      }
+
+      if (!silent) {
+        setIsRefreshing(true);
+      }
+
+      sections.forEach((section) => invalidateAdminSectionCache(section));
+
+      await Promise.allSettled(
+        sections.map((section) => loadSection(section, { force: true }))
+      );
+
+      if (!silent) {
+        setIsRefreshing(false);
+      }
+    },
+    [activeAdminTab, loadSection]
+  );
+
   useEffect(() => {
     if (!authResolved || !profileReady || !user?.email || !isAdmin) {
       return undefined;
     }
 
+    if (adminInitStartedRef.current) {
+      return undefined;
+    }
+
+    adminInitStartedRef.current = true;
     let cancelled = false;
 
-    const initAdmin = async () => {
-      try {
-        const response = await adminFetch("/api/admin/dashboard", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const result = await response.json().catch(() => ({}));
-
-        if (cancelled) return;
-
-        if (response.status === 401 || response.status === 403) {
-          throw new Error(result?.error || "تعذر التحقق من صلاحية الإدارة");
-        }
-
-        if (!response.ok || !result?.success) {
-          throw new Error(result?.error || "فشل التحقق من صلاحية الإدارة");
-        }
-
-        if (typeof window !== "undefined" && "Notification" in window) {
-          if (Notification.permission === "granted") {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "granted") {
+        setBrowserNotificationsEnabled(true);
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
             setBrowserNotificationsEnabled(true);
-          } else if (Notification.permission !== "denied") {
-            Notification.requestPermission().then((permission) => {
-              if (permission === "granted") {
-                setBrowserNotificationsEnabled(true);
-              }
-            });
           }
-        }
-
-        await loadAdminData({ silent: false, initialResult: result });
-      } catch (error) {
-        if (cancelled) return;
-
-        showAdminNotice(
-          error?.message || "تعذر تحميل بيانات لوحة الإدارة",
-          "error",
-          "تعذر التحميل"
-        );
+        });
       }
-    };
+    }
 
-    initAdmin();
+    const frameId = requestAnimationFrame(() => {
+      if (cancelled) return;
+
+      ADMIN_SHELL_SECTIONS.forEach((section) => {
+        const cached = getCachedAdminSection(section);
+        void loadSection(section, {
+          background: Boolean(cached) && !isAdminSectionCacheFresh(section),
+        });
+      });
+    });
 
     return () => {
       cancelled = true;
-    };
-  }, [authResolved, profileReady, user?.email, isAdmin]);
-
-  const applyAdminDashboardResult = (result) => {
-    const formattedAnalysis = (result.analysis_requests || []).map(formatAnalysisRequest);
-    const formattedSubscriptions = (result.subscription_requests || []).map(
-      formatSubscriptionRequest
-    );
-    const formattedAccounts = (result.account_management_requests || []).map(
-      formatAccountManagementRequest
-    );
-
-    setUsers(result.profiles || []);
-    setAnalysisRequests(formattedAnalysis);
-    setSubscriptionRequests(formattedSubscriptions);
-    setAccountRequests(formattedAccounts);
-    setAdminFeedNotifications(result.admin_notifications || []);
-    setDataMode("secure-api");
-    setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
-    hasLoadedAdminDataRef.current = true;
-    setHasLoadedAdminData(true);
-    setRefreshWarning("");
-  };
-
-  const loadAdminData = async (options = {}) => {
-    if (adminLoadInFlightRef.current) {
-      return;
-    }
-
-    adminLoadInFlightRef.current = true;
-
-    if (!options.silent) {
-      setIsRefreshing(true);
-    }
-
-    try {
-      if (options.initialResult?.success) {
-        applyAdminDashboardResult(options.initialResult);
-        return;
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-
-      const response = await adminFetch("/api/admin/dashboard", {
-        method: "GET",
-        cache: "no-store",
-        signal: controller.signal,
+      cancelAnimationFrame(frameId);
+      ADMIN_SHELL_SECTIONS.forEach((section) => {
+        abortControllersRef.current.get(section)?.abort();
       });
+    };
+  }, [authResolved, profileReady, user?.email, isAdmin, loadSection]);
 
-      clearTimeout(timeout);
-
-      const result = await response.json().catch(() => ({}));
-
-      if (response.status === 401 || response.status === 403) {
-        throw new Error(result?.error || "تعذر تحميل بيانات لوحة الإدارة");
-      }
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "فشل تحميل بيانات لوحة الإدارة");
-      }
-
-      applyAdminDashboardResult(result);
-    } catch (err) {
-      console.error("Admin load error:", err);
-
-      if (options.silent || hasLoadedAdminDataRef.current) {
-        setRefreshWarning("بعض البيانات تأخرت في التحديث");
-        return;
-      }
-
-      setUsers([]);
-      setAnalysisRequests([]);
-      setSubscriptionRequests([]);
-      setAccountRequests([]);
-      setDataMode("secure-api");
-      setLastUpdatedAt(new Date().toLocaleTimeString("ar"));
-
-      showAdminNotice(
-        err?.name === "AbortError"
-          ? "انتهت مهلة تحميل لوحة الإدارة. جرّب تحديث الصفحة."
-          : err?.message || "فشل تحميل بيانات لوحة الإدارة",
-        "error"
-      );
-    } finally {
-      adminLoadInFlightRef.current = false;
-      setIsRefreshing(false);
+  useEffect(() => {
+    if (!authResolved || !profileReady || !user?.email || !isAdmin) {
+      return undefined;
     }
-  };
 
-  useVisibilityRefresh(() => loadAdminData({ silent: true }), {
-    enabled: authResolved && profileReady && Boolean(user?.email) && isAdmin,
-    intervalMs: 60000,
-    refreshOnVisible: false,
-    refreshOnFocus: false,
-  });
+    const sections = mapAdminTabToSections(activeAdminTab);
+    if (sections.length === 0) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const frameId = requestAnimationFrame(() => {
+      if (cancelled) return;
+
+      sections.forEach((section) => {
+        const cached = getCachedAdminSection(section);
+        void loadSection(section, {
+          background: Boolean(cached) && !isAdminSectionCacheFresh(section),
+        });
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+      sections.forEach((section) => {
+        abortControllersRef.current.get(section)?.abort();
+      });
+    };
+  }, [activeAdminTab, authResolved, profileReady, user?.email, isAdmin, loadSection]);
+
+  useVisibilityRefresh(
+    () => {
+      void refreshGlobalSections({ silent: true });
+      void refreshActiveTabSections({ silent: true });
+    },
+    {
+      enabled: authResolved && profileReady && Boolean(user?.email) && isAdmin,
+      intervalMs: 60000,
+      refreshOnVisible: false,
+      refreshOnFocus: false,
+    }
+  );
 
   useEffect(() => {
     const pendingSubscriptions = subscriptionRequests.filter(
@@ -562,13 +833,35 @@ export default function AdminPage() {
   };
 
   const stats = useMemo(() => {
+    if (apiStats) {
+      return {
+        pendingAnalysis: apiStats.analysisPending ?? 0,
+        completedAnalysis: apiStats.analysisReviewed ?? 0,
+        pendingAccounts: apiStats.accountsPending ?? 0,
+        pendingSubscriptions: apiStats.subscriptionsPending ?? 0,
+        usersCount: apiStats.usersCount ?? 0,
+        analysisTotal: apiStats.analysisTotal ?? analysisRequests.length,
+        accountsTotal: apiStats.accountsTotal ?? accountRequests.length,
+        subscriptionsTotal: apiStats.subscriptionsTotal ?? subscriptionRequests.length,
+      };
+    }
+
     const pendingAnalysis = analysisRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
     const completedAnalysis = analysisRequests.filter((req) => getAdminStatusKey(req.status) === "reviewed").length;
     const pendingAccounts = accountRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
     const pendingSubscriptions = subscriptionRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
 
-    return { pendingAnalysis, completedAnalysis, pendingAccounts, pendingSubscriptions, usersCount: users.length };
-  }, [analysisRequests, accountRequests, subscriptionRequests, users]);
+    return {
+      pendingAnalysis,
+      completedAnalysis,
+      pendingAccounts,
+      pendingSubscriptions,
+      usersCount: users.length,
+      analysisTotal: analysisRequests.length,
+      accountsTotal: accountRequests.length,
+      subscriptionsTotal: subscriptionRequests.length,
+    };
+  }, [apiStats, analysisRequests, accountRequests, subscriptionRequests, users]);
 
   const adminNotifications = useMemo(() => adminFeedNotifications, [adminFeedNotifications]);
 
@@ -597,6 +890,17 @@ export default function AdminPage() {
   };
 
   const recentOverviewItems = useMemo(() => {
+    if (adminFeedNotifications.length > 0) {
+      return adminFeedNotifications.slice(0, 6).map((item) => ({
+        id: item.id,
+        tab: item.targetTab || item.type,
+        icon: item.icon,
+        title: item.title,
+        message: item.message,
+        createdAt: item.createdAt,
+      }));
+    }
+
     const items = [
       ...analysisRequests
         .filter((item) => getAdminStatusKey(item.status) === "pending")
@@ -634,7 +938,7 @@ export default function AdminPage() {
     ];
 
     return items.slice(0, 6);
-  }, [analysisRequests, accountRequests, subscriptionRequests]);
+  }, [adminFeedNotifications, analysisRequests, accountRequests, subscriptionRequests]);
 
   const filteredAnalysis = useMemo(() => {
     let list = analysisRequests.filter((req) => matchesAdminStatusFilter(req.status, filter));
@@ -682,6 +986,13 @@ export default function AdminPage() {
     await logout();
     router.replace("/login");
   };
+
+  const statsPending = !sectionStates.stats.loaded && !sectionStates.stats.error;
+  const overviewPending = !sectionStates.overview.loaded && !sectionStates.overview.error;
+  const analysisPending = !sectionStates.analysis.loaded && !sectionStates.analysis.error;
+  const accountsPending = !sectionStates.accounts.loaded && !sectionStates.accounts.error;
+  const subscriptionsPending = !sectionStates.subscriptions.loaded && !sectionStates.subscriptions.error;
+
 
   const publishVipSignal = async (signalType) => {
     if (!vipSignalForm.coin.trim()) {
@@ -922,20 +1233,6 @@ export default function AdminPage() {
     }
   };
 
-  if (!hasLoadedAdminData) {
-    return (
-      <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,102,255,0.32),transparent_30%),linear-gradient(135deg,#020617,#07142f,#030712)]" />
-        <div className="relative z-10 flex min-h-[calc(100vh-180px)] items-center justify-center text-center">
-          <div className="max-w-md rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-8 backdrop-blur-2xl">
-            <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[28px] border border-cyan-300/25 bg-cyan-400/10 text-4xl">⏳</div>
-            <h1 className="text-3xl font-black">جاري تحميل لوحة الإدارة</h1>
-            <p className="mt-3 leading-7 text-slate-400">يرجى الانتظار حتى اكتمال تحميل البيانات...</p>
-          </div>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="admin-theme-page relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
@@ -1009,7 +1306,7 @@ export default function AdminPage() {
                 <div className="admin-notifications-panel__actions">
                   <button
                     type="button"
-                    onClick={() => void loadAdminData()}
+                    onClick={() => void loadSection("overview", { force: true })}
                     className="admin-notifications-panel__action"
                   >
                     تحديث
@@ -1047,7 +1344,7 @@ export default function AdminPage() {
                             setActiveAdminTab("accounts");
                           }
                           if (item.type === "analysis") {
-                            setAnalysisFilter("pending");
+                            setFilter("pending");
                             setActiveAdminTab("analysis");
                           }
                           if (item.type === "withdrawal") {
@@ -1129,7 +1426,7 @@ export default function AdminPage() {
           </span>
           <button
             onClick={() => {
-              loadAdminData();
+              void refreshGlobalSections();
             }}
             className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 font-black text-cyan-100 transition hover:bg-cyan-400/20"
           >
@@ -1196,7 +1493,7 @@ export default function AdminPage() {
               <button
                 type="button"
                 onClick={() => {
-                  loadAdminData();
+                  void refreshGlobalSections();
                 }}
                 className="shrink-0 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-black text-white shadow-[0_14px_38px_rgba(37,99,235,0.28)] transition hover:brightness-110"
               >
@@ -1205,6 +1502,20 @@ export default function AdminPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
+              <div className="sm:col-span-3 flex justify-end">
+                <AdminSectionRefreshingIndicator visible={sectionStates.stats.refreshing} />
+              </div>
+              {statsPending ? (
+                <AdminQuickStatsSkeleton />
+              ) : sectionStates.stats.error ? (
+                <div className="sm:col-span-3">
+                  <AdminSectionError
+                    message={sectionStates.stats.error}
+                    onRetry={() => void loadSection("stats", { force: true })}
+                  />
+                </div>
+              ) : (
+                <>
               <div className="admin-stat-chip">
                 <p className="text-xs font-bold text-slate-600">طلبات التحليل المنتظرة</p>
                 <p className="mt-1 admin-heading text-2xl">{stats.pendingAnalysis}</p>
@@ -1217,6 +1528,8 @@ export default function AdminPage() {
                 <p className="text-xs font-bold text-slate-600">طلبات الاشتراك المنتظرة</p>
                 <p className="mt-1 admin-heading text-2xl">{stats.pendingSubscriptions}</p>
               </div>
+                </>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -1260,24 +1573,86 @@ export default function AdminPage() {
 
         {activeAdminTab === "overview" && (
           <div className="relative flex flex-col gap-5">
+        {statsPending ? (
+          <AdminStatsGridSkeleton />
+        ) : sectionStates.stats.error ? (
+          <AdminSectionError
+            message={sectionStates.stats.error}
+            onRetry={() => void loadSection("stats", { force: true })}
+          />
+        ) : (
+        <>
+        <div className="order-1 flex justify-end">
+          <AdminSectionRefreshingIndicator visible={sectionStates.stats.refreshing} />
+        </div>
         <section className="order-1 grid gap-5 md:grid-cols-2 xl:grid-cols-6">
-          <AdminStat title="طلبات التحليل" value={analysisRequests.length} icon="🧠" subtitle="إجمالي الطلبات" />
+          <AdminStat title="طلبات التحليل" value={stats.analysisTotal} icon="🧠" subtitle="إجمالي الطلبات" />
           <AdminStat title="بانتظار الرد" value={stats.pendingAnalysis} icon="⏳" subtitle="طلبات تحتاج متابعة" tone="orange" />
           <AdminStat title="تم إنجازها" value={stats.completedAnalysis} icon="✅" subtitle="طلبات مكتملة" tone="green" />
-          <AdminStat title="إدارة الحسابات" value={accountRequests.length} icon="📂" subtitle="طلبات العملاء" tone="red" />
+          <AdminStat title="إدارة الحسابات" value={stats.accountsTotal} icon="📂" subtitle="طلبات العملاء" tone="red" />
           <AdminStat title="المستخدمون" value={stats.usersCount} icon="👥" subtitle={dataMode === "secure-api" ? "من Secure API" : dataMode === "supabase" ? "من Supabase" : "محلياً للتجربة"} tone="green" />
-          <AdminStat title="طلبات الاشتراك" value={subscriptionRequests.length} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
+          <AdminStat title="طلبات الاشتراك" value={stats.subscriptionsTotal} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
         </section>
+        </>
+        )}
 
+        <nav className="order-2 relative z-[120] grid gap-5" aria-label="أدوات الإدارة">
+          <AdminOverviewNavLink
+            href="/admin/partners"
+            gradientClass="from-emerald-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-emerald-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(16,185,129,0.18)]"
+            eyebrow="Partner Program"
+            title="🤝 إدارة الشركاء"
+            description="إحصائيات الشركاء، التفاصيل، وطلبات السحب"
+            icon="🤝"
+          />
+          <AdminOverviewNavLink
+            href="/admin/email-analytics"
+            gradientClass="from-blue-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
+            eyebrow="Email Analytics"
+            title="📧 مراقبة الإيميلات"
+            description="تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend"
+            icon="📧"
+          />
+          <AdminOverviewNavLink
+            href="/admin/notification-test"
+            gradientClass="from-violet-500/20 to-cyan-400/10"
+            hoverClasses="hover:border-violet-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(139,92,246,0.22)]"
+            eyebrow="Notification Test Center"
+            title="🔔 اختبار الإشعارات"
+            description="إرسال حقيقي عبر دوال الإنتاج لكل نوع إشعار (Hub + Push + Email)"
+            icon="🔔"
+          />
+        </nav>
+
+        {overviewPending ? (
+          <AdminRecentItemsSkeleton />
+        ) : sectionStates.overview.error ? (
+          <AdminSectionError
+            message={sectionStates.overview.error}
+            onRetry={() => void loadSection("overview", { force: true })}
+          />
+        ) : (
         <section className="order-3 relative z-0 admin-section p-5 md:p-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h2 className="admin-heading text-2xl">آخر الطلبات الجديدة</h2>
               <p className="mt-2 text-sm font-bold text-slate-600">أحدث الطلبات التي تحتاج متابعة سريعة.</p>
             </div>
-            <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200">
-              {recentOverviewItems.length} طلب
-            </span>
+            <div className="flex items-center gap-2">
+              <AdminSectionRefreshingIndicator visible={sectionStates.overview.refreshing} />
+              <button
+                type="button"
+                onClick={() => void loadSection("overview", { force: true })}
+                className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200 transition hover:bg-cyan-400/20"
+              >
+                تحديث القسم
+              </button>
+              <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200">
+                {recentOverviewItems.length} طلب
+              </span>
+            </div>
           </div>
 
           {recentOverviewItems.length === 0 ? (
@@ -1316,36 +1691,7 @@ export default function AdminPage() {
             </div>
           )}
         </section>
-
-        <nav className="order-2 relative z-[120] grid gap-5" aria-label="أدوات الإدارة">
-          <AdminOverviewNavLink
-            href="/admin/partners"
-            gradientClass="from-emerald-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-emerald-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(16,185,129,0.18)]"
-            eyebrow="Partner Program"
-            title="🤝 إدارة الشركاء"
-            description="إحصائيات الشركاء، التفاصيل، وطلبات السحب"
-            icon="🤝"
-          />
-          <AdminOverviewNavLink
-            href="/admin/email-analytics"
-            gradientClass="from-blue-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
-            eyebrow="Email Analytics"
-            title="📧 مراقبة الإيميلات"
-            description="تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend"
-            icon="📧"
-          />
-          <AdminOverviewNavLink
-            href="/admin/notification-test"
-            gradientClass="from-violet-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-violet-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(139,92,246,0.22)]"
-            eyebrow="Notification Test Center"
-            title="🔔 اختبار الإشعارات"
-            description="إرسال حقيقي عبر دوال الإنتاج لكل نوع إشعار (Hub + Push + Email)"
-            icon="🔔"
-          />
-        </nav>
+        )}
           </div>
         )}
 
@@ -1417,6 +1763,15 @@ export default function AdminPage() {
 
         {activeAdminTab === "analysis" && (
           <>
+        {analysisPending ? (
+          <AdminRequestsPanelSkeleton />
+        ) : sectionStates.analysis.error ? (
+          <AdminSectionError
+            message={sectionStates.analysis.error}
+            onRetry={() => void loadSection("analysis", { force: true })}
+          />
+        ) : (
+          <>
         <section className="admin-section p-4 md:p-5">
           <div className="flex flex-wrap gap-3">
             {ADMIN_STATUS_FILTERS.map(([key, label]) => (
@@ -1448,6 +1803,16 @@ export default function AdminPage() {
             <div>
               <h2 className="admin-heading text-3xl">طلبات تحليل العملات</h2>
               <p className="mt-2 text-slate-600">اكتب الرد وارفق صورة الشارت ثم أرسلها للمستخدم.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <AdminSectionRefreshingIndicator visible={sectionStates.analysis.refreshing} />
+              <button
+                type="button"
+                onClick={() => void refreshActiveTabSections()}
+                className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+              >
+                تحديث التبويب
+              </button>
             </div>
           </div>
 
@@ -1618,12 +1983,35 @@ export default function AdminPage() {
         </section>
           </>
         )}
+          </>
+        )}
 
         {activeAdminTab === "accounts" && (
+        accountsPending ? (
+          <AdminRequestsPanelSkeleton />
+        ) : sectionStates.accounts.error ? (
+          <AdminSectionError
+            message={sectionStates.accounts.error}
+            onRetry={() => void loadSection("accounts", { force: true })}
+          />
+        ) : (
         <section className="space-y-5 scroll-mt-6">
-          <div>
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+            <div>
             <h2 className="admin-heading text-3xl">طلبات إدارة الحسابات</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات إدارة المحافظ والحسابات من العملاء.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <AdminSectionRefreshingIndicator visible={sectionStates.accounts.refreshing} />
+              <button
+                type="button"
+                onClick={() => void refreshActiveTabSections()}
+                className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+              >
+                تحديث التبويب
+              </button>
+            </div>
+          </div>
             <div className="mt-4 flex flex-wrap gap-3">
               {ADMIN_STATUS_FILTERS.map(([key, label]) => (
                 <button
@@ -1647,7 +2035,6 @@ export default function AdminPage() {
                 className="admin-field font-bold"
               />
             </div>
-          </div>
 
           {filteredAccounts.length === 0 ? (
             <div className="admin-section admin-card--dashed p-10 text-center">
@@ -1756,13 +2143,34 @@ export default function AdminPage() {
             </div>
           )}
         </section>
-        )}
+        ))}
 
         {activeAdminTab === "subscriptions" && (
+        subscriptionsPending ? (
+          <AdminRequestsPanelSkeleton />
+        ) : sectionStates.subscriptions.error ? (
+          <AdminSectionError
+            message={sectionStates.subscriptions.error}
+            onRetry={() => void loadSection("subscriptions", { force: true })}
+          />
+        ) : (
         <section className="space-y-5 scroll-mt-6">
-          <div>
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+            <div>
             <h2 className="admin-heading text-3xl">طلبات الاشتراكات والدفع</h2>
             <p className="mt-2 text-slate-600">مراجعة طلبات اشتراك Spot & Futures وتفعيلها للمستخدمين.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <AdminSectionRefreshingIndicator visible={sectionStates.subscriptions.refreshing} />
+              <button
+                type="button"
+                onClick={() => void refreshActiveTabSections()}
+                className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+              >
+                تحديث التبويب
+              </button>
+            </div>
+          </div>
             <div className="mt-4 flex flex-wrap gap-3">
               {ADMIN_STATUS_FILTERS.map(([key, label]) => (
                 <button
@@ -1786,7 +2194,6 @@ export default function AdminPage() {
                 className="admin-field font-bold"
               />
             </div>
-          </div>
 
           {filteredSubscriptions.length === 0 ? (
             <div className="admin-section admin-card--dashed p-10 text-center">
@@ -1898,7 +2305,7 @@ export default function AdminPage() {
             </div>
           )}
         </section>
-        )}
+        ))}
       </div>
     </main>
   );

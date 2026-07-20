@@ -3932,10 +3932,11 @@ html[data-theme="light"] .news-search-input-wrapper__clear {
   inset: 0;
   z-index: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
   text-align: center;
+  overflow: hidden;
 }
 
 .news-card__fallback--hidden {
@@ -3981,46 +3982,152 @@ html[data-theme="light"] .news-search-input-wrapper__clear {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   overflow: hidden;
   text-align: center;
-  padding: 0.875rem 0.95rem 0.8rem;
   color: #fff;
   isolation: isolate;
+}
+
+.news-fallback-cover__pattern {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(
+      118deg,
+      transparent 0 46%,
+      rgba(255, 255, 255, 0.035) 47%,
+      rgba(255, 255, 255, 0.035) 48%,
+      transparent 49% 100%
+    );
+  background-size: 26px 26px, 26px 26px, 100% 100%;
+}
+
+.news-fallback-cover__grain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.08;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.35) 0.55px, transparent 0.55px);
+  background-size: 3px 3px;
+}
+
+.news-fallback-cover__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 42%, transparent 34%, rgba(2, 6, 23, 0.34) 100%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.18), transparent 28%, transparent 62%, rgba(2, 6, 23, 0.52));
+}
+
+.news-fallback-cover__watermark {
+  position: absolute;
+  inset-inline-end: 0.55rem;
+  bottom: 2.35rem;
+  z-index: 1;
+  font-size: clamp(2rem, 11vw, 3.4rem);
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.055);
+  user-select: none;
+  pointer-events: none;
 }
 
 .news-fallback-cover__glow {
   position: absolute;
   inset: 0;
   z-index: 0;
-  opacity: 0.6;
+  opacity: 0.5;
   background:
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.2), transparent 40%),
-    radial-gradient(circle at 82% 88%, rgba(255, 255, 255, 0.08), transparent 34%);
+    radial-gradient(circle at 24% 22%, rgba(255, 255, 255, 0.14), transparent 36%),
+    radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.05), transparent 28%);
   pointer-events: none;
-}
-
-.news-fallback-cover__watermark {
-  position: absolute;
-  inset-inline-end: -0.35rem;
-  bottom: -0.75rem;
-  z-index: 0;
-  font-size: clamp(3.5rem, 18vw, 5.5rem);
-  line-height: 1;
-  opacity: 0.12;
-  filter: blur(0.2px);
-  pointer-events: none;
-  user-select: none;
 }
 
 .news-fallback-cover__top {
+  position: absolute;
+  top: 0.62rem;
+  inset-inline-start: 0.62rem;
+  z-index: 4;
+}
+
+.news-fallback-cover__hero {
   position: relative;
   z-index: 2;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 1.1rem 0.75rem 2.4rem;
+}
+
+.news-fallback-cover__icon-ring {
+  display: grid;
+  place-items: center;
+  width: clamp(4.6rem, 24vw, 6.4rem);
+  height: clamp(4.6rem, 24vw, 6.4rem);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(2px);
+}
+
+.news-fallback-cover__icon {
+  font-size: clamp(2.4rem, 11vw, 3.5rem);
+  line-height: 1;
+  opacity: 0.88;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.28));
+  user-select: none;
+  pointer-events: none;
+}
+
+.news-fallback-cover__shade {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 42%;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, rgba(2, 6, 23, 0.55) 72%, rgba(2, 6, 23, 0.78) 100%);
+}
+
+.news-fallback-cover__footer {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 3;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.4rem;
+  justify-content: center;
+  padding: 0.62rem 0.75rem 0.72rem;
+}
+
+.news-fallback-cover__category {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 92%;
+  padding: 0.28rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: clamp(0.66rem, 2.3vw, 0.78rem);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(4px);
 }
 
 .news-fallback-cover__badge {
@@ -4036,11 +4143,6 @@ html[data-theme="light"] .news-search-input-wrapper__clear {
   backdrop-filter: blur(6px);
 }
 
-.news-fallback-cover__badge--category {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.95);
-}
-
 .news-fallback-cover__badge--urgent {
   background: rgba(239, 68, 68, 0.92);
   border-color: rgba(254, 202, 202, 0.55);
@@ -4048,121 +4150,99 @@ html[data-theme="light"] .news-search-input-wrapper__clear {
   box-shadow: 0 0 0 1px rgba(127, 29, 29, 0.35);
 }
 
-.news-fallback-cover__body {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.35rem 0.2rem;
-}
-
-.news-fallback-cover__title {
-  margin: 0;
-  width: 100%;
-  font-size: clamp(0.95rem, 2.8vw, 1.12rem);
-  font-weight: 900;
-  line-height: 1.55;
-  color: #fff;
-  text-shadow: 0 2px 14px rgba(2, 6, 23, 0.42);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  overflow: hidden;
-}
-
-.news-fallback-cover__footer {
-  position: relative;
-  z-index: 2;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.78);
-  text-align: start;
-}
-
 .news-fallback-cover--article {
-  padding: 1.1rem 1.25rem 1rem;
+  min-height: 100%;
+}
+
+.news-fallback-cover--article .news-fallback-cover__hero {
+  padding-bottom: 3rem;
+}
+
+.news-fallback-cover--article .news-fallback-cover__icon-ring {
+  width: clamp(5.8rem, 28vw, 8rem);
+  height: clamp(5.8rem, 28vw, 8rem);
+}
+
+.news-fallback-cover--article .news-fallback-cover__icon {
+  font-size: clamp(3rem, 13vw, 4.6rem);
+}
+
+.news-fallback-cover--article .news-fallback-cover__category {
+  font-size: clamp(0.74rem, 2.5vw, 0.9rem);
+  padding: 0.34rem 0.85rem;
 }
 
 .news-fallback-cover--article .news-fallback-cover__watermark {
-  font-size: clamp(5rem, 22vw, 8rem);
-  opacity: 0.1;
+  font-size: clamp(3rem, 16vw, 5.5rem);
+  bottom: 2.8rem;
 }
 
-.news-fallback-cover--article .news-fallback-cover__badge {
-  font-size: 0.75rem;
-  padding: 0.34rem 0.75rem;
+.news-fallback-cover--compact .news-fallback-cover__hero {
+  padding: 0.85rem 0.55rem 2rem;
 }
 
-.news-fallback-cover--article .news-fallback-cover__title {
-  font-size: clamp(1.2rem, 3.6vw, 1.85rem);
-  -webkit-line-clamp: 5;
-  max-width: 36rem;
-  margin-inline: auto;
+.news-fallback-cover--compact .news-fallback-cover__icon-ring {
+  width: clamp(3.6rem, 18vw, 4.8rem);
+  height: clamp(3.6rem, 18vw, 4.8rem);
 }
 
-.news-fallback-cover--article .news-fallback-cover__footer {
-  font-size: 0.8125rem;
+.news-fallback-cover--compact .news-fallback-cover__icon {
+  font-size: clamp(1.85rem, 8vw, 2.5rem);
 }
 
-.news-fallback-cover--compact {
-  padding: 0.65rem 0.75rem 0.55rem;
-}
-
-.news-fallback-cover--compact .news-fallback-cover__title {
-  -webkit-line-clamp: 2;
-  font-size: 0.8125rem;
+.news-fallback-cover--compact .news-fallback-cover__category {
+  font-size: 0.62rem;
+  padding: 0.22rem 0.58rem;
 }
 
 .news-fallback-cover--compact .news-fallback-cover__watermark {
-  font-size: 2.75rem;
+  font-size: clamp(1.5rem, 9vw, 2.2rem);
+  bottom: 1.85rem;
 }
 
 .news-fallback-cover--crypto {
-  background: linear-gradient(145deg, #6d28d9 0%, #2563eb 48%, #0f172a 100%);
+  background: linear-gradient(148deg, #4c1d95 0%, #312e81 34%, #1d4ed8 68%, #0f172a 100%);
 }
 
 .news-fallback-cover--economy {
-  background: linear-gradient(145deg, #1e3a8a 0%, #172554 56%, #020617 100%);
+  background: linear-gradient(148deg, #1e3a8a 0%, #172554 46%, #1e40af 72%, #020617 100%);
 }
 
 .news-fallback-cover--stocks,
 .news-fallback-cover--markets {
-  background: linear-gradient(145deg, #0891b2 0%, #2563eb 52%, #0f172a 100%);
+  background: linear-gradient(148deg, #0e7490 0%, #0369a1 42%, #1d4ed8 70%, #0f172a 100%);
 }
 
 .news-fallback-cover--commodities-gold {
-  background: linear-gradient(145deg, #a16207 0%, #78350f 54%, #1c1917 100%);
+  background: linear-gradient(148deg, #92400e 0%, #78350f 44%, #57534e 72%, #1c1917 100%);
 }
 
 .news-fallback-cover--oil-energy {
-  background: linear-gradient(145deg, #c2410c 0%, #9a3412 54%, #1c1917 100%);
+  background: linear-gradient(148deg, #c2410c 0%, #9a3412 46%, #7c2d12 72%, #1c1917 100%);
 }
 
 .news-fallback-cover--geopolitics {
-  background: linear-gradient(145deg, #991b1b 0%, #7f1d1d 54%, #020617 100%);
+  background: linear-gradient(148deg, #991b1b 0%, #7f1d1d 42%, #1e3a8a 74%, #020617 100%);
 }
 
 .news-fallback-cover--breaking {
-  background: linear-gradient(145deg, #dc2626 0%, #991b1b 48%, #450a0a 100%);
+  background: linear-gradient(148deg, #ef4444 0%, #b91c1c 38%, #7f1d1d 68%, #450a0a 100%);
 }
 
 .news-fallback-cover--forex {
-  background: linear-gradient(145deg, #0f766e 0%, #115e59 54%, #020617 100%);
+  background: linear-gradient(148deg, #0f766e 0%, #115e59 44%, #134e4a 72%, #020617 100%);
 }
 
 .news-fallback-cover--default {
-  background: linear-gradient(145deg, #334155 0%, #1e293b 52%, #020617 100%);
+  background: linear-gradient(148deg, #475569 0%, #334155 46%, #1e293b 72%, #020617 100%);
 }
 
-html[data-theme="light"] .news-fallback-cover__badge--category {
-  background: rgba(255, 255, 255, 0.18);
+html[data-theme="light"] .news-fallback-cover__category {
+  color: rgba(255, 255, 255, 0.96);
 }
 
-html[data-theme="light"] .news-fallback-cover__title,
-html[data-theme="light"] .news-fallback-cover__footer {
-  color: #fff;
+html[data-theme="light"] .news-fallback-cover__pattern {
+  opacity: 0.11;
 }
 
 .news-card__media-overlay {
