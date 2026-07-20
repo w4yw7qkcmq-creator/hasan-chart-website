@@ -1,0 +1,100 @@
+import { verifyAdminSession } from "../../../../../../lib/admin-auth";
+import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
+import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
+import {
+  handleAdminUserManagementAction,
+  isSelfTargetAction,
+  validateDangerousActionConfirmation,
+} from "../../../../../../lib/admin-user-management-action-handler";
+import { getAdminRole } from "../../../../../../lib/admin-permissions";
+import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(request, context) {
+  try {
+    const adminCheck = await verifyAdminSession();
+
+    if (!adminCheck.ok) {
+      return Response.json(
+        { success: false, error: adminCheck.error },
+        { status: adminCheck.status }
+      );
+    }
+
+    const rateLimited = await enforceRateLimit(
+      adminMutationLimiter,
+      String(adminCheck.user?.email || "admin").toLowerCase()
+    );
+    if (rateLimited) return rateLimited;
+
+    const params = await context.params;
+    const userId = String(params?.userId || "").trim();
+    const body = await request.json().catch(() => ({}));
+
+    if (!userId) {
+      return Response.json({ success: false, error: "معرّف المستخدم مطلوب" }, { status: 400 });
+    }
+
+    const { data: adminProfile } = await adminCheck.supabase
+      .from("profiles")
+      .select("id,email,role,admin_role")
+      .eq("id", adminCheck.user.id)
+      .maybeSingle();
+
+    const effectiveAdminProfile =
+      adminProfile || { id: adminCheck.user.id, email: adminCheck.user.email, role: "admin" };
+
+    if (!getAdminRole(effectiveAdminProfile)) {
+      return Response.json({ success: false, error: "غير مصرح لك بالدخول" }, { status: 403 });
+    }
+
+    const { data: targetProfile } = await adminCheck.supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const action = String(body?.action || "").trim();
+
+    if (isSelfTargetAction(adminCheck.user.id, userId, action)) {
+      return Response.json(
+        { success: false, error: "لا يمكنك تنفيذ هذا الإجراء على حسابك الشخصي" },
+        { status: 403 }
+      );
+    }
+
+    if (
+      !validateDangerousActionConfirmation(action, targetProfile?.email, body?.confirmEmail)
+    ) {
+      return Response.json(
+        { success: false, error: "تأكيد البريد الإلكتروني غير مطابق" },
+        { status: 400 }
+      );
+    }
+
+    const result = await handleAdminUserManagementAction(
+      adminCheck.supabase,
+      adminCheck.user,
+      effectiveAdminProfile,
+      userId,
+      body
+    );
+
+    return Response.json(result, {
+      headers: {
+        "Cache-Control": CACHE_NO_STORE,
+      },
+    });
+  } catch (error) {
+    console.error("Admin user-management action error:", error);
+
+    return Response.json(
+      {
+        success: false,
+        error: error?.message || "تعذر تنفيذ الإجراء",
+      },
+      { status: error?.status || 500 }
+    );
+  }
+}

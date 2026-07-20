@@ -149,6 +149,11 @@ export async function POST(req) {
       );
     }
 
+    const supabase = getSupabaseAdmin();
+    const { guardActiveAccountForApi } = await import("../../../lib/guard-active-account-api.js");
+    const blocked = await guardActiveAccountForApi(supabase, session.id);
+    if (blocked) return blocked;
+
     const rateLimitResult = await alertLimiter(session.id);
 
     if (!rateLimitResult.success) {
@@ -178,8 +183,6 @@ export async function POST(req) {
 
     const user_email = session.email;
     const username = session.username;
-
-    const supabase = getSupabaseAdmin();
 
     logApiRequest({
       route: "/api/alerts",

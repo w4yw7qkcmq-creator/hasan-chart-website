@@ -10,6 +10,7 @@ export const ADMIN_TABS = [
   { id: "daily-publish", label: "نشر تحليل يومي", icon: "📝" },
   { id: "accounts", label: "إدارة الحسابات", icon: "📂" },
   { id: "subscriptions", label: "الاشتراكات", icon: "💳" },
+  { id: "user-management", label: "إدارة المستخدمين", icon: "👥" },
   { id: "vip", label: "نشر VIP", icon: "⭐" },
 ];
 

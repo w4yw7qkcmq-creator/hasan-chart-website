@@ -50,7 +50,7 @@ const matchesSignalSubscription = (planText, signalType) => {
   );
 };
 
-const getAuthenticatedEmail = async () => {
+const getAuthenticatedUser = async () => {
   const cookieStore = await cookies();
   const token = cookieStore.get("hc_access_token")?.value;
 
@@ -67,7 +67,10 @@ const getAuthenticatedEmail = async () => {
     return null;
   }
 
-  return String(user.email).trim().toLowerCase();
+  return {
+    id: user.id,
+    email: String(user.email).trim().toLowerCase(),
+  };
 };
 
 const isSubscriptionExpired = (subscription) => {
@@ -226,9 +229,9 @@ export async function GET(request) {
     const signalType = normalizeSignalType(url.searchParams.get("type"));
     const { limit, offset } = parsePagination(url.searchParams);
 
-    const email = await getAuthenticatedEmail();
+    const authUser = await getAuthenticatedUser();
 
-    if (!email) {
+    if (!authUser?.email) {
       return NextResponse.json(
         {
           success: false,
@@ -237,6 +240,12 @@ export async function GET(request) {
         { status: 401 }
       );
     }
+
+    const { guardActiveAccountForApi } = await import("../../../lib/guard-active-account-api.js");
+    const blocked = await guardActiveAccountForApi(supabase, authUser.id);
+    if (blocked) return blocked;
+
+    const email = authUser.email;
 
     const dedupKey = `vip-signals:${hashUserKey(email)}:${signalType}:${limit}:${offset}`;
     const result = await withInFlightDedup(dedupKey, () =>

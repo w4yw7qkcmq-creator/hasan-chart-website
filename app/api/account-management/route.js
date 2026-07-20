@@ -109,6 +109,10 @@ export async function POST(request) {
       );
     }
 
+    const { guardActiveAccountForApi } = await import("../../../lib/guard-active-account-api.js");
+    const blocked = await guardActiveAccountForApi(supabase, user.id);
+    if (blocked) return blocked;
+
     const twentyFourHoursAgo = new Date(
       Date.now() - 24 * 60 * 60 * 1000
     ).toISOString();

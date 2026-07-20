@@ -192,6 +192,18 @@ const DailyAnalysisPublishPanel = dynamic(
   }
 );
 
+const AdminUserManagementPanel = dynamic(
+  () => import("./components/AdminUserManagementPanel"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-8 text-center text-sm text-slate-300">
+        جاري تحميل إدارة المستخدمين...
+      </div>
+    ),
+  }
+);
+
 export default function AdminPage() {
   const router = useRouter();
   const { logout, authResolved, profileReady, user, isAdmin } = useAuth();
@@ -1694,6 +1706,8 @@ export default function AdminPage() {
         )}
           </div>
         )}
+
+        {activeAdminTab === "user-management" && <AdminUserManagementPanel />}
 
         {activeAdminTab === "vip" && (
         <section className="space-y-5">
