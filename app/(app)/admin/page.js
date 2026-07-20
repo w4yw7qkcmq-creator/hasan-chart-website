@@ -40,6 +40,7 @@ import StatusBadge from "./components/StatusBadge";
 import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
 import {
   ADMIN_SHELL_SECTIONS,
+  ADMIN_DEFERRED_SECTIONS,
   createAdminSectionState,
   fetchAdminDashboardSection,
   getAdminTabRefreshSections,
@@ -204,6 +205,29 @@ const AdminUserManagementPanel = dynamic(
   }
 );
 
+const FinancialCenterPanel = dynamic(() => import("./components/FinancialCenterPanel"), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-8 text-center text-sm text-slate-300">
+      جاري تحميل المركز المالي...
+    </div>
+  ),
+});
+
+const AdminActivityFeed = dynamic(() => import("./components/AdminActivityFeed"), {
+  ssr: false,
+  loading: () => (
+    <section className="order-4 admin-section animate-pulse p-6">
+      <div className="h-6 w-48 rounded bg-white/15" />
+      <div className="mt-5 space-y-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="h-14 rounded-2xl bg-white/10" />
+        ))}
+      </div>
+    </section>
+  ),
+});
+
 export default function AdminPage() {
   const router = useRouter();
   const { logout, authResolved, profileReady, user, isAdmin } = useAuth();
@@ -220,6 +244,9 @@ export default function AdminPage() {
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [activeAdminTab, setActiveAdminTab] = useState("overview");
+  const [pendingDrawerUserId, setPendingDrawerUserId] = useState("");
+  const [activityFeedEvents, setActivityFeedEvents] = useState([]);
+  const [activityFeedPartialFailure, setActivityFeedPartialFailure] = useState(false);
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
   const [adminAcknowledgedVersion, setAdminAcknowledgedVersion] = useState(0);
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
@@ -281,6 +308,7 @@ export default function AdminPage() {
   const [sectionStates, setSectionStates] = useState({
     stats: createAdminSectionState(),
     overview: createAdminSectionState(),
+    "activity-feed": createAdminSectionState(),
     analysis: createAdminSectionState(),
     accounts: createAdminSectionState(),
     subscriptions: createAdminSectionState(),
@@ -288,6 +316,7 @@ export default function AdminPage() {
   const sectionFetchRef = useRef(new Set());
   const abortControllersRef = useRef(new Map());
   const adminInitStartedRef = useRef(false);
+  const activityFeedInitRef = useRef(false);
   const [refreshWarning, setRefreshWarning] = useState("");
   const [replySending, setReplySending] = useState({});
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
@@ -469,6 +498,11 @@ export default function AdminPage() {
       setAdminFeedNotifications(result.admin_notifications || []);
     }
 
+    if (section === "activity-feed") {
+      setActivityFeedEvents(result.events || []);
+      setActivityFeedPartialFailure(Boolean(result.partialFailure));
+    }
+
     if (section === "analysis") {
       setAnalysisRequests((result.analysis_requests || []).map(formatAnalysisRequest));
     }
@@ -612,9 +646,14 @@ export default function AdminPage() {
       }
 
       ADMIN_SHELL_SECTIONS.forEach((section) => invalidateAdminSectionCache(section));
+      ADMIN_DEFERRED_SECTIONS.forEach((section) => invalidateAdminSectionCache(section));
 
       await Promise.allSettled(
         ADMIN_SHELL_SECTIONS.map((section) => loadSection(section, { force: true }))
+      );
+
+      await Promise.allSettled(
+        ADMIN_DEFERRED_SECTIONS.map((section) => loadSection(section, { force: true }))
       );
 
       if (!silent) {
@@ -664,11 +703,14 @@ export default function AdminPage() {
       if (Notification.permission === "granted") {
         setBrowserNotificationsEnabled(true);
       } else if (Notification.permission !== "denied") {
-        Notification.requestPermission().then((permission) => {
-          if (permission === "granted") {
-            setBrowserNotificationsEnabled(true);
-          }
-        });
+        Notification.requestPermission()
+          .then((permission) => {
+            if (cancelled) return;
+            if (permission === "granted") {
+              setBrowserNotificationsEnabled(true);
+            }
+          })
+          .catch(() => {});
       }
     }
 
@@ -691,6 +733,71 @@ export default function AdminPage() {
       });
     };
   }, [authResolved, profileReady, user?.email, isAdmin, loadSection]);
+
+  useEffect(() => {
+    if (!authResolved || !profileReady || !user?.email || !isAdmin) {
+      return undefined;
+    }
+
+    if (!sectionStates.stats.loaded || !sectionStates.overview.loaded) {
+      return undefined;
+    }
+
+    if (activityFeedInitRef.current) {
+      return undefined;
+    }
+
+    activityFeedInitRef.current = true;
+
+    const cached = getCachedAdminSection("activity-feed");
+    void loadSection("activity-feed", {
+      background: Boolean(cached) && !isAdminSectionCacheFresh("activity-feed"),
+    });
+  }, [
+    authResolved,
+    profileReady,
+    user?.email,
+    isAdmin,
+    loadSection,
+    sectionStates.stats.loaded,
+    sectionStates.overview.loaded,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    const userId = params.get("userId");
+    if (tab) setActiveAdminTab(tab);
+    if (userId) setPendingDrawerUserId(userId);
+  }, []);
+
+  useEffect(() => {
+    const onOpenUser = (event) => {
+      const userId = event.detail?.userId;
+      if (!userId) return;
+      setActiveAdminTab("user-management");
+      setPendingDrawerUserId(userId);
+    };
+
+    window.addEventListener("admin:open-user", onOpenUser);
+    return () => window.removeEventListener("admin:open-user", onOpenUser);
+  }, []);
+
+  useEffect(() => {
+    const onCommand = (event) => {
+      const item = event.detail || {};
+      if (item.action === "refresh-dashboard") {
+        void refreshGlobalSections();
+        return;
+      }
+      if (item.tab) setActiveAdminTab(item.tab);
+    };
+
+    window.addEventListener("admin:command", onCommand);
+    return () => window.removeEventListener("admin:command", onCommand);
+  }, [refreshGlobalSections]);
 
   useEffect(() => {
     if (!authResolved || !profileReady || !user?.email || !isAdmin) {
@@ -952,6 +1059,26 @@ export default function AdminPage() {
     return items.slice(0, 6);
   }, [adminFeedNotifications, analysisRequests, accountRequests, subscriptionRequests]);
 
+  const handleActivityFeedRefresh = useCallback(() => {
+    invalidateAdminSectionCache("activity-feed");
+    void loadSection("activity-feed", { force: true, background: true });
+  }, [loadSection]);
+
+  const handleActivityEventOpen = useCallback((event) => {
+    if (event.href) {
+      router.push(event.href);
+      return;
+    }
+
+    if (event.tab) {
+      setActiveAdminTab(event.tab);
+    }
+
+    if (event.targetUserId) {
+      setPendingDrawerUserId(event.targetUserId);
+    }
+  }, [router]);
+
   const filteredAnalysis = useMemo(() => {
     let list = analysisRequests.filter((req) => matchesAdminStatusFilter(req.status, filter));
 
@@ -1001,6 +1128,8 @@ export default function AdminPage() {
 
   const statsPending = !sectionStates.stats.loaded && !sectionStates.stats.error;
   const overviewPending = !sectionStates.overview.loaded && !sectionStates.overview.error;
+  const activityFeedPending =
+    !sectionStates["activity-feed"].loaded && !sectionStates["activity-feed"].error;
   const analysisPending = !sectionStates.analysis.loaded && !sectionStates.analysis.error;
   const accountsPending = !sectionStates.accounts.loaded && !sectionStates.accounts.error;
   const subscriptionsPending = !sectionStates.subscriptions.loaded && !sectionStates.subscriptions.error;
@@ -1448,6 +1577,14 @@ export default function AdminPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("admin:command-palette-toggle"))}
+                className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                title="⌘K أو Ctrl+K"
+              >
+                ⌘K أوامر
+              </button>
               <div className="relative" ref={adminNotificationsRef}>
                 <button
                   ref={adminNotificationsBellRef}
@@ -1704,10 +1841,43 @@ export default function AdminPage() {
           )}
         </section>
         )}
+
+        {activityFeedPending ? (
+          <AdminActivityFeed loading />
+        ) : sectionStates["activity-feed"].error ? (
+          <AdminActivityFeed
+            error={sectionStates["activity-feed"].error}
+            onRefresh={handleActivityFeedRefresh}
+          />
+        ) : (
+          <AdminActivityFeed
+            events={activityFeedEvents}
+            partialFailure={activityFeedPartialFailure}
+            refreshing={sectionStates["activity-feed"].refreshing}
+            onRefresh={handleActivityFeedRefresh}
+            onOpenEvent={handleActivityEventOpen}
+          />
+        )}
           </div>
         )}
 
-        {activeAdminTab === "user-management" && <AdminUserManagementPanel />}
+        {activeAdminTab === "financial-center" && (
+          <FinancialCenterPanel
+            onNavigateTab={(tab) => setActiveAdminTab(tab)}
+            onOpenUser={(userId) => {
+              if (!userId) return;
+              setPendingDrawerUserId(userId);
+              setActiveAdminTab("user-management");
+            }}
+          />
+        )}
+
+        {activeAdminTab === "user-management" && (
+          <AdminUserManagementPanel
+            openUserId={pendingDrawerUserId}
+            onOpenUserHandled={() => setPendingDrawerUserId("")}
+          />
+        )}
 
         {activeAdminTab === "vip" && (
         <section className="space-y-5">
