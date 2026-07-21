@@ -913,11 +913,273 @@ html[data-theme="light"] .admin-user-drawer {
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(2, 6, 23, 0.62);
+  background: rgba(15, 23, 42, 0.55);
 }
 
 .admin-user-delete-modal__dialog {
   width: min(100%, 28rem);
+}
+
+/* CRM admin action modal */
+.admin-crm-action-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.admin-crm-action-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15, 23, 42, 0.58);
+  cursor: pointer;
+  animation: adminCrmModalFadeIn 0.2s ease;
+}
+
+.admin-crm-action-modal__dialog {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(100%, 35rem);
+  max-height: min(92vh, 44rem);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  border: 1px solid var(--admin-premium-border, rgba(148, 163, 184, 0.28));
+  background: var(--admin-premium-surface, #ffffff);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+  animation: adminCrmModalSlideIn 0.24s ease;
+  outline: none;
+}
+
+.admin-crm-action-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem 0.85rem;
+  border-bottom: 1px solid var(--admin-premium-border, rgba(148, 163, 184, 0.22));
+}
+
+.admin-crm-action-modal__header-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.admin-crm-action-modal__icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.9rem;
+  background: rgba(148, 163, 184, 0.14);
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.admin-crm-action-modal__dialog--danger .admin-crm-action-modal__icon {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.admin-crm-action-modal__dialog--warning .admin-crm-action-modal__icon {
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.admin-crm-action-modal__dialog--success .admin-crm-action-modal__icon {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.admin-crm-action-modal__eyebrow {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--admin-premium-muted, #64748b);
+}
+
+.admin-crm-action-modal__title {
+  margin-top: 0.15rem;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.admin-crm-action-modal__close {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.5rem;
+}
+
+.admin-crm-action-modal__close:hover {
+  background: rgba(148, 163, 184, 0.14);
+  color: #0f172a;
+}
+
+.admin-crm-action-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  overflow-y: auto;
+}
+
+.admin-crm-action-modal__user-card {
+  display: grid;
+  gap: 0.55rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--admin-premium-border, rgba(148, 163, 184, 0.22));
+  background: rgba(248, 250, 252, 0.92);
+  padding: 0.85rem 0.95rem;
+}
+
+.admin-crm-action-modal__user-row {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.admin-crm-action-modal__user-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--admin-premium-muted, #64748b);
+}
+
+.admin-crm-action-modal__user-value {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.admin-crm-action-modal__description {
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.65;
+  color: #475569;
+}
+
+.admin-crm-action-modal__field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.admin-crm-action-modal__field-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #334155;
+}
+
+.admin-crm-action-modal__textarea,
+.admin-crm-action-modal__input {
+  width: 100%;
+  min-height: 0;
+}
+
+.admin-crm-action-modal__textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.admin-crm-action-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding: 0.85rem 1.1rem 1rem;
+  border-top: 1px solid var(--admin-premium-border, rgba(148, 163, 184, 0.22));
+}
+
+.admin-crm-action-modal__btn {
+  border-radius: 0.85rem;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.admin-crm-action-modal__btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.admin-crm-action-modal__btn--cancel {
+  border: 1px solid var(--admin-premium-border, rgba(148, 163, 184, 0.28));
+  background: #fff;
+  color: #334155;
+}
+
+.admin-crm-action-modal__btn--confirm {
+  border: 0;
+  color: #fff;
+}
+
+.admin-crm-action-modal__btn--neutral {
+  background: linear-gradient(to left, #334155, #475569);
+}
+
+.admin-crm-action-modal__btn--success {
+  background: linear-gradient(to left, #047857, #10b981);
+}
+
+.admin-crm-action-modal__btn--warning {
+  background: linear-gradient(to left, #b45309, #f59e0b);
+}
+
+.admin-crm-action-modal__btn--danger {
+  background: linear-gradient(to left, #b91c1c, #ef4444);
+}
+
+.admin-crm-action-modal__btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+@keyframes adminCrmModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes adminCrmModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+html.dark .admin-crm-action-modal__dialog,
+html[data-theme="dark"] .admin-crm-action-modal__dialog {
+  background: var(--admin-premium-surface, #0f172a);
+}
+
+html.dark .admin-crm-action-modal__title,
+html.dark .admin-crm-action-modal__user-value,
+html[data-theme="dark"] .admin-crm-action-modal__title,
+html[data-theme="dark"] .admin-crm-action-modal__user-value {
+  color: #f1f5f9;
+}
+
+html.dark .admin-crm-action-modal__user-card,
+html[data-theme="dark"] .admin-crm-action-modal__user-card {
+  background: rgba(15, 23, 42, 0.65);
+}
+
+html.dark .admin-crm-action-modal__btn--cancel,
+html[data-theme="dark"] .admin-crm-action-modal__btn--cancel {
+  background: rgba(15, 23, 42, 0.8);
+  color: #e2e8f0;
 }
 
 .admin-user-drawer__tabs--scroll {

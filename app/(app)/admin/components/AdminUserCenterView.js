@@ -3,11 +3,31 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createPortal } from "react-dom";
+import { useEffect, useId, useRef } from "react";
 import { useAdminUserCenter } from "../../../../lib/use-admin-user-center";
 import AdminUserDrawerShell from "./AdminUserDrawerShell";
 
+const ACTION_ICONS = {
+  suspend_user: "⏸️",
+  unsuspend_user: "▶️",
+  ban_user: "🚫",
+  unban_user: "✅",
+  soft_delete_user: "🗑️",
+  restore_user: "♻️",
+  force_logout: "🚪",
+  password_reset_requested: "🔑",
+  activate_service: "✨",
+  deactivate_service: "⛔",
+  extend_subscription: "📅",
+};
+
+function resolveActionIcon(action) {
+  return ACTION_ICONS[action] || "🛡️";
+}
+
 export default function AdminUserActionConfirmModal({
   pendingAction,
+  user,
   actionLoading,
   confirmEmail,
   actionReason,
@@ -16,49 +36,133 @@ export default function AdminUserActionConfirmModal({
   onCancel,
   onConfirm,
 }) {
+  const titleId = useId();
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!pendingAction) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancel?.();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    requestAnimationFrame(() => dialogRef.current?.focus());
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onCancel, pendingAction]);
+
   if (!pendingAction) return null;
 
+  const tone = pendingAction.tone || "neutral";
+  const requireReason = Boolean(pendingAction.requireReason);
+  const icon = pendingAction.icon || resolveActionIcon(pendingAction.action);
+  const username = user?.username || user?.email || "—";
+  const email = user?.email || "—";
+  const statusLabel = user?.accountStatusLabel || user?.accountStatus || "—";
+
   return createPortal(
-    <div className="admin-user-delete-modal">
-      <div className="admin-user-delete-modal__dialog admin-modal admin-user-confirm-modal">
-        <p className="admin-user-confirm-modal__eyebrow">تأكيد الإجراء</p>
-        <h3 className="admin-heading text-2xl">{pendingAction.title}</h3>
-        <p className="mt-3 text-sm leading-7 text-slate-600">{pendingAction.description}</p>
-        {pendingAction.requireReason ? (
-          <div className="mt-4">
-            <label className="text-xs font-bold text-slate-500">سبب الإجراء (إلزامي)</label>
+    <div className="admin-crm-action-modal" role="presentation">
+      <button
+        type="button"
+        className="admin-crm-action-modal__backdrop"
+        aria-label="إغلاق"
+        onClick={onCancel}
+      />
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className={`admin-crm-action-modal__dialog admin-crm-action-modal__dialog--${tone}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <header className="admin-crm-action-modal__header">
+          <div className="admin-crm-action-modal__header-main">
+            <span className="admin-crm-action-modal__icon" aria-hidden="true">
+              {icon}
+            </span>
+            <div className="min-w-0">
+              <p className="admin-crm-action-modal__eyebrow">تأكيد الإجراء</p>
+              <h3 id={titleId} className="admin-crm-action-modal__title">
+                {pendingAction.title}
+              </h3>
+            </div>
+          </div>
+          <button type="button" className="admin-crm-action-modal__close" onClick={onCancel} aria-label="إغلاق">
+            ×
+          </button>
+        </header>
+
+        <div className="admin-crm-action-modal__body">
+          <article className="admin-crm-action-modal__user-card">
+            <div className="admin-crm-action-modal__user-row">
+              <span className="admin-crm-action-modal__user-label">المستخدم</span>
+              <strong className="admin-crm-action-modal__user-value">{username}</strong>
+            </div>
+            <div className="admin-crm-action-modal__user-row">
+              <span className="admin-crm-action-modal__user-label">البريد</span>
+              <strong className="admin-crm-action-modal__user-value">{email}</strong>
+            </div>
+            <div className="admin-crm-action-modal__user-row">
+              <span className="admin-crm-action-modal__user-label">الحالة الحالية</span>
+              <strong className="admin-crm-action-modal__user-value">{statusLabel}</strong>
+            </div>
+          </article>
+
+          {pendingAction.description ? (
+            <p className="admin-crm-action-modal__description">{pendingAction.description}</p>
+          ) : null}
+
+          <label className="admin-crm-action-modal__field">
+            <span className="admin-crm-action-modal__field-label">
+              سبب الإجراء{requireReason ? " (إلزامي)" : ""}
+            </span>
             <textarea
               value={actionReason}
               onChange={(event) => onActionReasonChange(event.target.value)}
-              className="admin-field mt-2 min-h-20 font-bold"
-              placeholder="اكتب سببًا واضحًا..."
+              className="admin-crm-action-modal__textarea admin-field"
+              rows={4}
+              placeholder="اكتب سببًا واضحًا للإجراء..."
             />
-          </div>
-        ) : null}
-        {pendingAction.dangerous ? (
-          <div className="mt-4">
-            <label className="text-xs font-bold text-slate-500">اكتب البريد للتأكيد</label>
-            <input
-              value={confirmEmail}
-              onChange={(event) => onConfirmEmailChange(event.target.value)}
-              className="admin-field mt-2 font-bold"
-              placeholder={pendingAction.targetEmail || "email@example.com"}
-            />
-          </div>
-        ) : null}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" className="admin-btn-surface px-5 py-3" onClick={onCancel}>
+          </label>
+
+          {pendingAction.dangerous ? (
+            <label className="admin-crm-action-modal__field">
+              <span className="admin-crm-action-modal__field-label">اكتب البريد للتأكيد</span>
+              <input
+                value={confirmEmail}
+                onChange={(event) => onConfirmEmailChange(event.target.value)}
+                className="admin-crm-action-modal__input admin-field"
+                placeholder={pendingAction.targetEmail || "email@example.com"}
+                autoComplete="off"
+              />
+            </label>
+          ) : null}
+        </div>
+
+        <footer className="admin-crm-action-modal__footer">
+          <button type="button" className="admin-crm-action-modal__btn admin-crm-action-modal__btn--cancel" onClick={onCancel}>
             إلغاء
           </button>
           <button
             type="button"
             disabled={Boolean(actionLoading)}
-            className={`admin-user-confirm-modal__confirm admin-user-confirm-modal__confirm--${pendingAction.tone || "neutral"}`}
+            className={`admin-crm-action-modal__btn admin-crm-action-modal__btn--confirm admin-crm-action-modal__btn--${tone}`}
             onClick={onConfirm}
           >
-            {actionLoading ? "جاري التنفيذ..." : pendingAction.confirmLabel}
+            {actionLoading ? "جاري التنفيذ..." : pendingAction.confirmLabel || "تأكيد"}
           </button>
-        </div>
+        </footer>
       </div>
     </div>,
     document.body
@@ -253,6 +357,7 @@ export function AdminUserCenterView({
 
       <AdminUserActionConfirmModal
         pendingAction={center.pendingAction}
+        user={user}
         actionLoading={center.actionLoading}
         confirmEmail={center.confirmEmail}
         actionReason={center.actionReason}
@@ -270,6 +375,7 @@ export function AdminUserCenterView({
             targetEmail: center.pendingAction.targetEmail,
             reason: center.actionReason,
             refresh: center.pendingAction.refresh,
+            requireReason: center.pendingAction.requireReason,
           })
         }
       />

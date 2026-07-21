@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { assertAdminCanActOnTarget, resolveAccountStatusFromProfile } from "../lib/account-lifecycle.js";
+import { isAdminActionResponseSuccess } from "../lib/admin-user-management-client.js";
 import {
   ACTIVITY_FILTER_TYPES,
   ADMIN_NOTES_TABLE_MISSING_MESSAGE,
@@ -104,6 +105,18 @@ function testErrorSanitization() {
   assert.equal(isTechnicalAdminError("تعذر تحميل البيانات"), false);
 }
 
+function testAdminActionResponseSuccess() {
+  assert.equal(isAdminActionResponseSuccess({ ok: true, status: 200 }, { success: true }), true);
+  assert.equal(isAdminActionResponseSuccess({ ok: true, status: 200 }, { ok: true }), true);
+  assert.equal(
+    isAdminActionResponseSuccess({ ok: true, status: 200 }, { action: "ban_user", message: "done" }),
+    true
+  );
+  assert.equal(isAdminActionResponseSuccess({ ok: true, status: 200 }, { success: false }), false);
+  assert.equal(isAdminActionResponseSuccess({ ok: false, status: 500 }, { success: true }), false);
+  assert.equal(isAdminActionResponseSuccess({ ok: true, status: 200 }, { error: "failed" }), false);
+}
+
 function testDoubleSubmitGuardPattern() {
   let loading = false;
   const run = () => {
@@ -127,6 +140,7 @@ const tests = [
   ["activity filter types", testActivityFilterTypes],
   ["notes missing-table payload", testNotesMissingTablePayload],
   ["error sanitization", testErrorSanitization],
+  ["admin action response success", testAdminActionResponseSuccess],
   ["double-submit guard pattern", testDoubleSubmitGuardPattern],
 ];
 
