@@ -1,5 +1,6 @@
 "use client";
 
+import "../../components/admin-access-loading.css";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { devLog } from "../../../lib/dev-log";
@@ -48,11 +49,16 @@ function getSafeNextPath(next) {
 }
 
 function resolvePostLoginDestination({ email, nextPath }) {
+  const safeNext = getSafeNextPath(nextPath);
+
   if (isAdminUser({ email })) {
+    if (safeNext && safeNext.startsWith("/admin")) {
+      return safeNext;
+    }
     return "/admin";
   }
 
-  return getSafeNextPath(nextPath) || "/my-dashboard";
+  return safeNext || "/my-dashboard";
 }
 
 async function loginWithApi(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
@@ -133,9 +139,9 @@ const verifyTurnstileToken = async (token) => {
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next");
+  const nextPath = searchParams.get("next") || searchParams.get("redirect");
   const { showAppModal } = useAppModal();
-  const { authResolved, user, acknowledgeSignIn } = useAuth();
+  const { authResolved, user, acknowledgeSignIn, status } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
@@ -146,10 +152,10 @@ export default function LoginPage() {
   const turnstileWidgetId = useRef(null);
 
   useEffect(() => {
-    if (!authResolved || !user?.email) return;
+    if (!authResolved || status === "loading" || !user?.email) return;
 
     router.replace(resolvePostLoginDestination({ email: user.email, nextPath }));
-  }, [authResolved, user, router, nextPath]);
+  }, [authResolved, status, user, router, nextPath]);
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY) return;
@@ -362,6 +368,20 @@ export default function LoginPage() {
       setResetLoading(false);
     }
   };
+
+  if (authResolved && status === "authenticated" && user?.email) {
+    return (
+      <main className="admin-access-loading admin-access-loading--calm">
+        <div className="admin-access-loading__panel">
+          <div className="admin-access-loading__icon" aria-hidden="true">
+            ⏳
+          </div>
+          <h1 className="admin-access-loading__title">جاري تحويلك...</h1>
+          <p className="admin-access-loading__desc">تم التحقق من الجلسة، سيتم إعادتك إلى وجهتك.</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen w-full overflow-hidden bg-[#020617] text-white">

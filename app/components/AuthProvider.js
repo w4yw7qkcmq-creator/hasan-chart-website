@@ -28,6 +28,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profileReady, setProfileReady] = useState(false);
   const enrichRequestRef = useRef(0);
+  const initCompleteRef = useRef(false);
+  const initInFlightRef = useRef(false);
 
   const enrichUserProfile = useCallback(async (authUser) => {
     if (!authUser?.email) {
@@ -106,16 +108,35 @@ export function AuthProvider({ children }) {
     setAuthResolved(true);
   }, []);
 
+  const resolveAuthUserWithRetry = useCallback(async () => {
+    let { user: authUser, error } = await resolveSupabaseAuthUser();
+
+    if (authUser?.email) {
+      return { authUser, error: null };
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    ({ user: authUser, error } = await resolveSupabaseAuthUser());
+
+    return { authUser, error };
+  }, []);
+
   useEffect(() => {
     let active = true;
 
     async function initAuth() {
+      if (initInFlightRef.current) return;
+      initInFlightRef.current = true;
+      initCompleteRef.current = false;
+      setStatus("loading");
+      setAuthResolved(false);
+
       try {
         const restored = await restoreSessionFromCookies();
 
         if (!active) return;
 
-        const { user: authUser, error } = await resolveSupabaseAuthUser();
+        const { authUser, error } = await resolveAuthUserWithRetry();
 
         if (!active) return;
 
@@ -148,6 +169,11 @@ export function AuthProvider({ children }) {
         if (active) {
           clearAuthenticatedUser();
         }
+      } finally {
+        initInFlightRef.current = false;
+        if (active) {
+          initCompleteRef.current = true;
+        }
       }
     }
 
@@ -156,7 +182,7 @@ export function AuthProvider({ children }) {
     return () => {
       active = false;
     };
-  }, [applyAuthenticatedUser, clearAuthenticatedUser]);
+  }, [applyAuthenticatedUser, clearAuthenticatedUser, resolveAuthUserWithRetry]);
 
   useEffect(() => {
     let active = true;
@@ -164,9 +190,15 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "INITIAL_SESSION") return;
+      if (event === "INITIAL_SESSION") {
+        if (session?.user?.email && !initCompleteRef.current) {
+          applyAuthenticatedUser(session.user);
+        }
+        return;
+      }
 
       if (event === "SIGNED_OUT") {
+        if (!initCompleteRef.current) return;
         clearAuthenticatedUser();
         return;
       }
