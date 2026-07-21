@@ -59,9 +59,9 @@ function UserAvatar({ name, avatarUrl, size = "md" }) {
 
 function SectionSkeleton({ rows = 4 }) {
   return (
-    <div className="animate-pulse space-y-3">
+    <div className="admin-premium-skeleton">
       {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} className="h-14 rounded-2xl bg-white/10" />
+        <div key={index} className="admin-premium-skeleton__row animate-pulse" />
       ))}
     </div>
   );
@@ -93,13 +93,14 @@ function SectionErrorState({ message, onRetry }) {
   );
 }
 
-function SectionEmptyDataState({ icon = "📭", message = ADMIN_SECTION_EMPTY_MESSAGE }) {
+function SectionEmptyDataState({ icon = "📭", message = ADMIN_SECTION_EMPTY_MESSAGE, detail = "لا توجد بيانات لعرضها في هذا القسم حالياً." }) {
   return (
-    <div className="admin-user-section-state admin-user-section-state--empty">
-      <span className="admin-user-section-state__icon" aria-hidden="true">
+    <div className="admin-premium-empty admin-premium-empty--compact">
+      <span className="admin-premium-empty__icon" aria-hidden="true">
         {icon}
       </span>
-      <p className="admin-user-section-state__title">{message}</p>
+      <p className="admin-premium-empty__title">{message}</p>
+      <p className="admin-premium-empty__desc">{detail}</p>
     </div>
   );
 }
@@ -228,15 +229,30 @@ function UserHeroCard({ user, stats }) {
   );
 }
 
-const MANAGEMENT_ACTIONS = [
-  { action: "suspend_user", label: "تعليق الحساب", tone: "warning", title: "تعليق الحساب", description: "سيتم تعليق وصول المستخدم إلى الخدمات المحمية وإنهاء جلساته.", confirmLabel: "تأكيد التعليق", requireReason: true },
-  { action: "unsuspend_user", label: "رفع التعليق", tone: "neutral", title: "رفع التعليق", description: "استعادة وصول المستخدم.", confirmLabel: "تأكيد" },
-  { action: "ban_user", label: "حظر المستخدم", tone: "danger", title: "حظر المستخدم", description: "منع تسجيل الدخول عبر Auth ban.", confirmLabel: "تأكيد الحظر", dangerous: true },
-  { action: "unban_user", label: "إلغاء الحظر", tone: "neutral", title: "إلغاء الحظر", description: "إزالة الحظر عن المستخدم.", confirmLabel: "تأكيد" },
-  { action: "soft_delete_user", label: "Soft Delete", tone: "danger", title: "حذف الحساب (Soft Delete)", description: "لن يتم حذف auth.users. لن تُحذف بيانات الطلبات والاشتراكات. سيتم منع الحساب من استخدام المنصة ويمكن استعادته لاحقًا.", confirmLabel: "تأكيد Soft Delete", dangerous: true },
-  { action: "restore_user", label: "استعادة الحساب", tone: "success", title: "استعادة الحساب", description: "إعادة تفعيل حساب محذوف/موقوف.", confirmLabel: "تأكيد الاستعادة" },
-  { action: "force_logout", label: "تسجيل خروج شامل", tone: "warning", title: "تسجيل خروج من جميع الأجهزة", description: "إنهاء جميع الجلسات النشطة.", confirmLabel: "تأكيد" },
-  { action: "password_reset_requested", label: "إرسال رابط إعادة كلمة المرور", tone: "neutral", title: "إعادة تعيين كلمة المرور", description: "إنشاء رابط است recovery عبر Supabase Admin.", confirmLabel: "تأكيد الإرسال" },
+const MANAGEMENT_SECTIONS = [
+  {
+    title: "حالة الحساب",
+    actions: [
+      { action: "suspend_user", label: "تعليق الحساب", tone: "danger", title: "تعليق الحساب", description: "سيتم تعليق وصول المستخدم إلى الخدمات المحمية وإنهاء جلساته.", confirmLabel: "تأكيد التعليق", requireReason: true },
+      { action: "unsuspend_user", label: "رفع التعليق", tone: "neutral", title: "رفع التعليق", description: "استعادة وصول المستخدم.", confirmLabel: "تأكيد" },
+      { action: "unban_user", label: "إلغاء الحظر", tone: "neutral", title: "إلغاء الحظر", description: "إزالة الحظر عن المستخدم.", confirmLabel: "تأكيد" },
+      { action: "restore_user", label: "استعادة الحساب", tone: "success", title: "استعادة الحساب", description: "إعادة تفعيل حساب محذوف/موقوف.", confirmLabel: "تأكيد الاستعادة" },
+    ],
+  },
+  {
+    title: "إجراءات الجلسة والأمان",
+    actions: [
+      { action: "force_logout", label: "تسجيل خروج شامل", tone: "warning", title: "تسجيل خروج من جميع الأجهزة", description: "إنهاء جميع الجلسات النشطة.", confirmLabel: "تأكيد", requireReason: true },
+      { action: "password_reset_requested", label: "طلب إعادة تعيين كلمة المرور", tone: "neutral", title: "إعادة تعيين كلمة المرور", description: "إنشاء رابط است recovery عبر Supabase Admin.", confirmLabel: "تأكيد الإرسال" },
+    ],
+  },
+  {
+    title: "إجراءات خطرة",
+    actions: [
+      { action: "ban_user", label: "حظر المستخدم", tone: "danger", title: "حظر المستخدم", description: "منع تسجيل الدخول عبر Auth ban.", confirmLabel: "تأكيد الحظر", dangerous: true, requireReason: true },
+      { action: "soft_delete_user", label: "حذف الحساب", tone: "danger", title: "حذف الحساب (Soft Delete)", description: "لن يتم حذف auth.users. سيتم منع الحساب من استخدام المنصة ويمكن استعادته لاحقًا.", confirmLabel: "تأكيد الحذف", dangerous: true, requireReason: true },
+    ],
+  },
 ];
 
 export default function AdminUserDrawerShell({
@@ -356,7 +372,7 @@ export default function AdminUserDrawerShell({
       </div>
       ) : null}
 
-      <div className="admin-user-drawer__tabs admin-user-drawer__tabs--scroll" role="tablist">
+      <div className={`admin-user-drawer__tabs admin-user-drawer__tabs--scroll ${isPageLayout ? "admin-user-drawer__tabs--sticky" : ""}`} role="tablist">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -372,7 +388,7 @@ export default function AdminUserDrawerShell({
         ))}
       </div>
 
-      <div className="admin-user-drawer__body">
+      <div className={`admin-user-drawer__body ${isPageLayout ? "admin-user-drawer__body--page" : ""}`}>
         {activeTab === "overview" &&
           renderSectionFrame("overview", {
             sectionState,
@@ -825,31 +841,36 @@ export default function AdminUserDrawerShell({
             onRefreshSection,
             children: (
               <>
-                <div className="admin-user-actions-grid">
-              {MANAGEMENT_ACTIONS.map((item) => {
-                const selfBlocked =
-                  isSelfTarget &&
-                  ["suspend_user", "ban_user", "soft_delete_user", "force_logout"].includes(item.action);
-                return (
-                  <button
-                    key={item.action}
-                    type="button"
-                    disabled={Boolean(actionLoading) || selfBlocked}
-                    title={selfBlocked ? "لا يمكن تنفيذ هذا الإجراء على حسابك" : undefined}
-                    className={`admin-user-action-btn admin-user-action-btn--${item.tone}`}
-                    onClick={() =>
-                      onRequestAction({
-                        ...item,
-                        targetEmail: user?.email,
-                        refresh: ["overview", "management", "activity"],
-                      })
-                    }
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-              </div>
+                {MANAGEMENT_SECTIONS.map((section) => (
+                  <section key={section.title} className="admin-user-management-section admin-user-section-card">
+                    <h4 className="admin-user-drawer__section-title">{section.title}</h4>
+                    <div className="admin-user-actions-grid mt-3">
+                      {section.actions.map((item) => {
+                        const selfBlocked =
+                          isSelfTarget &&
+                          ["suspend_user", "ban_user", "soft_delete_user", "force_logout"].includes(item.action);
+                        return (
+                          <button
+                            key={item.action}
+                            type="button"
+                            disabled={Boolean(actionLoading) || selfBlocked}
+                            title={selfBlocked ? "لا يمكن تنفيذ هذا الإجراء على حسابك" : undefined}
+                            className={`admin-user-action-btn admin-user-action-btn--${item.tone}`}
+                            onClick={() =>
+                              onRequestAction({
+                                ...item,
+                                targetEmail: user?.email,
+                                refresh: ["overview", "management", "activity"],
+                              })
+                            }
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
 
               <div className="mt-8">
                 <h4 className="admin-user-drawer__section-title">سجل التدقيق الإداري</h4>

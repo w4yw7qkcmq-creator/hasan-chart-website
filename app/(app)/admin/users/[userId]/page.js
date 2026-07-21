@@ -25,6 +25,8 @@ export default function AdminUserDetailPage() {
   }
 
   return (
-    <AdminUserCenterView userId={userId} currentAdminUserId={currentAdminUserId} layoutMode="page" />
+    <div className="admin-standalone-page admin-standalone-page--calm">
+      <AdminUserCenterView userId={userId} currentAdminUserId={currentAdminUserId} layoutMode="page" />
+    </div>
   );
 }

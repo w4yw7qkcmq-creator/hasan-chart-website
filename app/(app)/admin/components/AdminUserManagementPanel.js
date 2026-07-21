@@ -8,7 +8,7 @@ import { adminFetch } from "../../../../lib/admin-fetch";
 import { fetchAdminUserList, postAdminUserAction } from "../../../../lib/admin-user-management-client";
 import { sanitizeAdminUserFacingError } from "../../../../lib/admin-user-management-shared";
 import { notify } from "../../../../lib/notification-center";
-import AdminUserDrawer from "./AdminUserDrawer";
+import AdminUserQuickPreviewDrawer from "./AdminUserQuickPreviewDrawer";
 import AdminUserBulkActionModal from "./AdminUserBulkActionModal";
 import AdminUserBulkActionsBar from "./AdminUserBulkActionsBar";
 import AdminUserManagementDashboard from "./AdminUserManagementDashboard";
@@ -113,8 +113,8 @@ export default function AdminUserManagementPanel({
   const [dashboardStats, setDashboardStats] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUserId, setPreviewUserId] = useState("");
 
   const [accountStatusFilter, setAccountStatusFilter] = useState("all");
   const [clientFilters, setClientFilters] = useState(DEFAULT_CLIENT_FILTERS);
@@ -146,15 +146,9 @@ export default function AdminUserManagementPanel({
 
   useEffect(() => {
     if (!openUserId) return;
-    if (standalone) {
-      router.push(`/admin/users/${encodeURIComponent(openUserId)}`);
-      onOpenUserHandled?.();
-      return;
-    }
-    setSelectedUserId(openUserId);
-    setDrawerOpen(true);
+    router.push(`/admin/users/${encodeURIComponent(openUserId)}`);
     onOpenUserHandled?.();
-  }, [openUserId, onOpenUserHandled, router, standalone]);
+  }, [openUserId, onOpenUserHandled, router]);
 
   const hasClientFilters = useMemo(() => {
     return (
@@ -344,17 +338,18 @@ export default function AdminUserManagementPanel({
   };
 
   const openUser = (userId) => {
-    if (standalone) {
-      router.push(`/admin/users/${encodeURIComponent(userId)}`);
-      return;
-    }
-    setSelectedUserId(userId);
-    setDrawerOpen(true);
+    router.push(`/admin/users/${encodeURIComponent(userId)}`);
   };
 
-  const closeDrawer = () => {
-    setDrawerOpen(false);
-    setSelectedUserId("");
+  const openQuickPreview = (userId, event) => {
+    event?.stopPropagation?.();
+    setPreviewUserId(userId);
+    setPreviewOpen(true);
+  };
+
+  const closeQuickPreview = () => {
+    setPreviewOpen(false);
+    setPreviewUserId("");
   };
 
   const toggleSort = (nextSort) => {
@@ -531,28 +526,27 @@ export default function AdminUserManagementPanel({
             </Link>
           </div>
         ) : null}
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <header className={`admin-user-mgmt-hero ${standalone ? "admin-user-mgmt-hero--standalone" : ""}`}>
           <div>
+            <p className="admin-user-hero__eyebrow">HasaN CharT · CRM</p>
             <h2 className="admin-heading text-3xl">إدارة المستخدمين</h2>
-            <p className="mt-2 text-slate-600">
+            <p className="admin-user-mgmt-hero__desc">
               مركز CRM لإدارة المستخدمين — مؤشرات، فلاتر، إجراءات جماعية، وتفاصيل موسّعة.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="admin-user-mgmt-hero__actions">
             {refreshing ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-black text-cyan-100">
-                ⟳ تحديث
-              </span>
+              <span className="admin-user-mgmt-hero__refresh-badge">⟳ تحديث</span>
             ) : null}
             <button
               type="button"
               onClick={() => refreshAll({ background: true })}
-              className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+              className="admin-btn-surface px-4 py-2 text-sm font-black"
             >
               تحديث البيانات
             </button>
           </div>
-        </div>
+        </header>
 
         <AdminUserManagementDashboard
           stats={dashboardStats}
@@ -774,8 +768,12 @@ export default function AdminUserManagementPanel({
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.id} className={selectedUserIds.includes(user.id) ? "is-selected" : ""}>
-                    <td>
+                  <tr
+                    key={user.id}
+                    className={`admin-user-table__row ${selectedUserIds.includes(user.id) ? "is-selected" : ""}`}
+                    onClick={() => openUser(user.id)}
+                  >
+                    <td onClick={(event) => event.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedUserIds.includes(user.id)}
@@ -807,10 +805,19 @@ export default function AdminUserManagementPanel({
                       <AccountStatusBadge status={user.accountStatus} label={user.accountStatusLabel} />
                     </td>
                     <td>{user.activeSubscriptionsCount}</td>
-                    <td>
-                      <button type="button" className="admin-user-manage-btn" onClick={() => openUser(user.id)}>
-                        إدارة
-                      </button>
+                    <td onClick={(event) => event.stopPropagation()}>
+                      <div className="admin-user-table__actions">
+                        <button type="button" className="admin-user-manage-btn" onClick={() => openUser(user.id)}>
+                          فتح CRM
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-user-preview-btn"
+                          onClick={(event) => openQuickPreview(user.id, event)}
+                        >
+                          معاينة سريعة
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -868,13 +875,11 @@ export default function AdminUserManagementPanel({
         }}
       />
 
-      {!standalone ? (
-        <AdminUserDrawer
-          open={drawerOpen}
-          userId={selectedUserId}
-          onClose={closeDrawer}
-        />
-      ) : null}
+      <AdminUserQuickPreviewDrawer
+        open={previewOpen}
+        userId={previewUserId}
+        onClose={closeQuickPreview}
+      />
     </>
   );
 }

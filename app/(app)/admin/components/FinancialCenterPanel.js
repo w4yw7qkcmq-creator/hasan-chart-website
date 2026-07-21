@@ -1,10 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { adminFetch } from "../../../../lib/admin-fetch";
 import {
   downloadCsvBlob,
@@ -12,13 +10,22 @@ import {
   fetchPaymentProof,
   formatCurrencyTotals,
 } from "../../../../lib/admin-financial-center-client";
+import AdminPaymentProofModal from "./AdminPaymentProofModal";
 
 const TABS = [
-  { id: "overview", label: "نظرة عامة", icon: "📊" },
-  { id: "subscriptions", label: "الاشتراكات", icon: "💳" },
-  { id: "payment-reviews", label: "إثباتات الدفع", icon: "🧾" },
-  { id: "revenue", label: "الإيرادات", icon: "📈" },
-  { id: "referrals", label: "الإحالات والسحوبات", icon: "🤝", future: true },
+  { id: "overview", label: "نظرة عامة" },
+  { id: "subscriptions", label: "الاشتراكات" },
+  { id: "payment-reviews", label: "إثباتات الدفع" },
+  { id: "revenue", label: "الإيرادات" },
+  { id: "referrals", label: "الإحالات والسحوبات" },
+];
+
+const PERIOD_OPTIONS = [
+  { id: "today", label: "اليوم", revenuePeriod: "7d" },
+  { id: "7d", label: "7 أيام", revenuePeriod: "7d" },
+  { id: "30d", label: "30 يوم", revenuePeriod: "30d" },
+  { id: "90d", label: "90 يوم", revenuePeriod: "90d" },
+  { id: "year", label: "السنة", revenuePeriod: "year" },
 ];
 
 const STATUS_OPTIONS = [
@@ -41,83 +48,279 @@ const SERVICE_OPTIONS = [
 
 function SectionSkeleton({ rows = 4 }) {
   return (
-    <div className="space-y-3 animate-pulse">
+    <div className="admin-premium-skeleton">
       {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} className="h-14 rounded-2xl bg-white/10" />
+        <div key={index} className="admin-premium-skeleton__row animate-pulse" />
       ))}
     </div>
   );
 }
 
-function CurrencyCard({ title, totals, onClick }) {
+function sumCurrencyTotals(totals = {}) {
+  return Object.values(totals).reduce((sum, value) => sum + Number(value || 0), 0);
+}
+
+function ChartEmptyState({ icon = "📊", title, desc }) {
   return (
-    <button type="button" className="admin-financial-stat" onClick={onClick}>
-      <p className="admin-financial-stat__label">{title}</p>
-      <p className="admin-financial-stat__value">{formatCurrencyTotals(totals)}</p>
-      <p className="admin-financial-stat__hint">إيرادات تقديرية معترف بها</p>
-    </button>
+    <div className="admin-premium-empty admin-premium-empty--compact">
+      <span className="admin-premium-empty__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <p className="admin-premium-empty__title">{title}</p>
+      {desc ? <p className="admin-premium-empty__desc">{desc}</p> : null}
+    </div>
   );
 }
 
-function ProofModal({ proof, onClose }) {
-  if (!proof || typeof document === "undefined") return null;
+function RevenueLineChart({ daily = [], period = "30d" }) {
+  const points = useMemo(() => {
+    let rows = [...daily].reverse();
+    if (period === "today") {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      rows = rows.filter((row) => row.date === todayKey);
+    } else {
+      const limit = period === "7d" ? 7 : period === "90d" ? 90 : period === "year" ? 365 : 30;
+      rows = rows.slice(-limit);
+    }
+    return rows.map((row) => ({
+      date: row.date,
+      total: sumCurrencyTotals(row.revenue),
+      count: row.activatedCount || 0,
+    }));
+  }, [daily, period]);
 
-  const isInline = proof.isInline && String(proof.proof || "").startsWith("data:image");
+  if (points.length === 0) {
+    return (
+      <ChartEmptyState
+        icon="📈"
+        title="لا توجد بيانات إيرادات"
+        desc="ستظهر المنحنى عند تفعيل اشتراكات جديدة."
+      />
+    );
+  }
 
-  return createPortal(
-    <div className="admin-financial-proof-modal" role="presentation">
-      <button type="button" className="admin-financial-proof-modal__backdrop" onClick={onClose} aria-label="إغلاق" />
-      <div className="admin-financial-proof-modal__panel" role="dialog" aria-modal="true">
-        <div className="admin-financial-proof-modal__head">
-          <div>
-            <p className="admin-user-hero__eyebrow">معاينة إثبات الدفع</p>
-            <h3 className="admin-heading text-xl">{proof.planName || "طلب اشتراك"}</h3>
-            <p className="text-sm font-bold text-amber-200/90">
-              وجود إثبات دفع لا يعني أن العملية مؤكدة.
-            </p>
-          </div>
-          <button type="button" className="admin-btn-surface px-4 py-2" onClick={onClose}>
-            إغلاق
-          </button>
-        </div>
-        <div className="admin-financial-proof-modal__body">
-          {isInline ? (
-            <Image
-              src={proof.proof}
-              alt="إثبات الدفع"
-              width={900}
-              height={700}
-              unoptimized
-              className="max-h-[70vh] w-full rounded-2xl object-contain"
+  const maxValue = Math.max(...points.map((point) => point.total), 1);
+  const width = 400;
+  const height = 140;
+  const padding = 12;
+
+  const coordinates = points.map((point, index) => {
+    const x = padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
+    const y = height - padding - (point.total / maxValue) * (height - padding * 2);
+    return { x, y, point };
+  });
+
+  const polyline = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
+  const area = `${padding},${height - padding} ${polyline} ${width - padding},${height - padding}`;
+
+  return (
+    <div className="admin-financial-line-chart admin-financial-line-chart--premium">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="رسم الإيرادات" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="adminRevenueArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(37, 99, 235, 0.28)" />
+            <stop offset="100%" stopColor="rgba(37, 99, 235, 0.02)" />
+          </linearGradient>
+          <linearGradient id="adminRevenueLine" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#06b6d4" />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75].map((ratio) => {
+          const y = padding + ratio * (height - padding * 2);
+          return (
+            <line
+              key={ratio}
+              x1={padding}
+              y1={y}
+              x2={width - padding}
+              y2={y}
+              className="admin-financial-line-chart__grid"
             />
-          ) : (
-            <a href={proof.proof} target="_blank" rel="noopener noreferrer" className="admin-user-manage-btn">
-              فتح رابط إثبات الدفع
-            </a>
-          )}
-        </div>
+          );
+        })}
+        <polygon points={area} fill="url(#adminRevenueArea)" />
+        <polyline
+          points={polyline}
+          className="admin-financial-line-chart__line"
+          fill="none"
+          stroke="url(#adminRevenueLine)"
+        />
+        {coordinates.map(({ x, y, point }) => (
+          <circle key={point.date} cx={x} cy={y} r="4" className="admin-financial-line-chart__dot" />
+        ))}
+      </svg>
+      <div className="admin-financial-line-chart__labels">
+        <span>{points[0]?.date || "—"}</span>
+        <span>{points[points.length - 1]?.date || "—"}</span>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
 
-export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standalone = false }) {
-  const router = useRouter();
+function ServiceRevenueBars({ revenueByService = {} }) {
+  const entries = Object.entries(revenueByService || {});
+  if (entries.length === 0) {
+    return (
+      <ChartEmptyState
+        icon="📊"
+        title="لا يوجد توزيع إيرادات"
+        desc="سيظهر التوزيع حسب الخدمة عند توفر بيانات."
+      />
+    );
+  }
 
-  const openUser = useCallback(
-    (userId) => {
-      if (!userId) return;
-      if (standalone || !onOpenUser) {
-        router.push(`/admin/users/${encodeURIComponent(userId)}`);
-        return;
-      }
-      onOpenUser(userId);
-    },
-    [onOpenUser, router, standalone]
+  const maxTotal = Math.max(...entries.map(([, totals]) => sumCurrencyTotals(totals)), 1);
+
+  return (
+    <div className="admin-financial-service-bars admin-financial-service-bars--premium">
+      {entries.map(([service, totals], index) => {
+        const total = sumCurrencyTotals(totals);
+        const width = `${Math.max((total / maxTotal) * 100, 6)}%`;
+        return (
+          <div key={service} className="admin-financial-service-bars__row admin-animate-in" style={{ animationDelay: `${index * 40}ms` }}>
+            <div className="admin-financial-service-bars__meta">
+              <span className="admin-financial-service-bars__label">{service}</span>
+              <strong>{formatCurrencyTotals(totals)}</strong>
+            </div>
+            <div className="admin-financial-service-bars__track">
+              <span className="admin-financial-service-bars__fill" style={{ width }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
+}
+
+const FINANCIAL_KPI_ICONS = {
+  today: "☀️",
+  month: "📅",
+  year: "🗓️",
+  total: "💎",
+  active: "⭐",
+  pending: "⏳",
+};
+
+const FINANCIAL_KPI_DESCRIPTIONS = {
+  today: "إيرادات اليوم التقديرية",
+  month: "إيرادات الشهر الحالي",
+  year: "إيرادات السنة",
+  total: "إجمالي الإيرادات المعترف بها",
+  active: "اشتراكات نشطة حالياً",
+  pending: "طلبات بانتظار المراجعة",
+};
+
+function RecentOpCard({ title, subtitle, meta, badge, onAction, actionLabel }) {
+  return (
+    <article className="admin-financial-op-card">
+      <div className="admin-financial-op-card__body">
+        <p className="admin-financial-op-card__title">{title}</p>
+        {subtitle ? <p className="admin-financial-op-card__subtitle">{subtitle}</p> : null}
+        {meta ? <p className="admin-financial-op-card__meta">{meta}</p> : null}
+      </div>
+      <div className="admin-financial-op-card__aside">
+        {badge ? <span className="admin-financial-op-card__badge">{badge}</span> : null}
+        {onAction && actionLabel ? (
+          <button type="button" className="admin-user-manage-btn" onClick={onAction}>
+            {actionLabel}
+          </button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function RevenueDonutChart({ revenueByService = {} }) {
+  const entries = useMemo(() => {
+    return Object.entries(revenueByService || {})
+      .map(([service, totals]) => ({ service, total: sumCurrencyTotals(totals) }))
+      .filter((entry) => entry.total > 0);
+  }, [revenueByService]);
+
+  if (entries.length === 0) {
+    return (
+      <ChartEmptyState icon="🍩" title="لا يوجد توزيع إيرادات" desc="سيظهر الرسم عند توفر بيانات الخدمات." />
+    );
+  }
+
+  const total = entries.reduce((sum, entry) => sum + entry.total, 0);
+  const colors = ["#2563eb", "#06b6d4", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444"];
+  const size = 160;
+  const radius = 52;
+  const cx = size / 2;
+  const cy = size / 2;
+  let cumulative = 0;
+
+  const slices = entries.map((entry, index) => {
+    const fraction = entry.total / total;
+    const startAngle = cumulative * 2 * Math.PI - Math.PI / 2;
+    cumulative += fraction;
+    const endAngle = cumulative * 2 * Math.PI - Math.PI / 2;
+    const x1 = cx + radius * Math.cos(startAngle);
+    const y1 = cy + radius * Math.sin(startAngle);
+    const x2 = cx + radius * Math.cos(endAngle);
+    const y2 = cy + radius * Math.sin(endAngle);
+    const largeArc = fraction > 0.5 ? 1 : 0;
+    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+    return { ...entry, path, color: colors[index % colors.length], percent: Math.round(fraction * 100) };
+  });
+
+  return (
+    <div className="admin-financial-donut">
+      <svg viewBox={`0 0 ${size} ${size}`} className="admin-financial-donut__svg" role="img" aria-label="توزيع الإيرادات">
+        {slices.map((slice) => (
+          <path key={slice.service} d={slice.path} fill={slice.color} className="admin-financial-donut__slice" />
+        ))}
+        <circle cx={cx} cy={cy} r={30} className="admin-financial-donut__hole" />
+      </svg>
+      <ul className="admin-financial-donut__legend">
+        {slices.map((slice) => (
+          <li key={slice.service}>
+            <span className="admin-financial-donut__dot" style={{ background: slice.color }} />
+            <span className="admin-financial-donut__label">{slice.service}</span>
+            <strong>{slice.percent}%</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, hint, description, onClick, kpiKey = "", status = "stable" }) {
+  const Tag = onClick ? "button" : "article";
+  const icon = FINANCIAL_KPI_ICONS[kpiKey] || "📊";
+  const statusLabel = status === "attention" ? "يحتاج متابعة" : "مستقر";
+
+  return (
+    <Tag
+      type={onClick ? "button" : undefined}
+      className={`admin-financial-kpi admin-financial-kpi--premium ${status === "attention" ? "is-attention" : ""}`}
+      onClick={onClick}
+    >
+      <div className="admin-financial-kpi__head">
+        <span className="admin-financial-kpi__icon" aria-hidden="true">
+          {icon}
+        </span>
+        <span className={`admin-financial-kpi__status ${status === "attention" ? "is-attention" : "is-stable"}`}>
+          {statusLabel}
+        </span>
+      </div>
+      <p className="admin-financial-kpi__label">{label}</p>
+      <p className="admin-financial-kpi__value">{value}</p>
+      {description ? <p className="admin-financial-kpi__description">{description}</p> : null}
+      {hint ? <p className="admin-financial-kpi__hint">{hint}</p> : null}
+      {onClick ? <span className="admin-financial-kpi__direction" aria-hidden="true">→ عرض</span> : null}
+    </Tag>
+  );
+}
+
+export default function FinancialCenterPanel({ standalone = false }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
+  const [overviewPeriod, setOverviewPeriod] = useState("30d");
   const [overview, setOverview] = useState(null);
+  const [chartReport, setChartReport] = useState(null);
   const [recentActive, setRecentActive] = useState([]);
   const [recentPending, setRecentPending] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
@@ -125,50 +328,56 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
   const [paymentReviews, setPaymentReviews] = useState([]);
   const [paymentPagination, setPaymentPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [revenueReport, setRevenueReport] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [proofPreview, setProofPreview] = useState(null);
   const [proofLoadingId, setProofLoadingId] = useState("");
-
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({
-    status: "all",
-    service: "all",
-    source: "all",
-    paid: "all",
-  });
+  const [filters, setFilters] = useState({ status: "all", service: "all", source: "all", paid: "all" });
   const [reviewStatus, setReviewStatus] = useState("all");
   const [revenuePeriod, setRevenuePeriod] = useState("30d");
-
   const abortRef = useRef(null);
-  const loadedTabsRef = useRef(new Set());
+
+  const openUser = useCallback(
+    (userId) => {
+      if (!userId) return;
+      router.push(`/admin/users/${encodeURIComponent(userId)}`);
+    },
+    [router]
+  );
+
+  const selectedPeriod = PERIOD_OPTIONS.find((item) => item.id === overviewPeriod) || PERIOD_OPTIONS[2];
+
+  const loadOverviewBundle = useCallback(async (signal) => {
+    const [overviewResult, revenueResult] = await Promise.all([
+      fetchFinancialCenterSection(adminFetch, "overview", { signal }),
+      fetchFinancialCenterSection(adminFetch, "revenue", {
+        signal,
+        query: { period: selectedPeriod.revenuePeriod },
+      }),
+    ]);
+    setOverview(overviewResult.overview);
+    setRecentActive(overviewResult.recentActive || []);
+    setRecentPending(overviewResult.recentPending || []);
+    setChartReport(revenueResult.report || null);
+  }, [selectedPeriod.revenuePeriod]);
 
   const loadSection = useCallback(
     async (tab, { force = false } = {}) => {
-      if (!force && loadedTabsRef.current.has(tab)) return;
-
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
-
       setLoading(true);
       setError("");
 
       try {
         if (tab === "referrals") {
-          if (controller.signal.aborted) return;
-          loadedTabsRef.current.add(tab);
           setLoading(false);
           return;
         }
 
         if (tab === "overview") {
-          const result = await fetchFinancialCenterSection(adminFetch, "overview", { signal: controller.signal });
-          if (controller.signal.aborted) return;
-          setOverview(result.overview);
-          setRecentActive(result.recentActive || []);
-          setRecentPending(result.recentPending || []);
+          await loadOverviewBundle(controller.signal);
         }
 
         if (tab === "subscriptions") {
@@ -183,7 +392,6 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
               paid: filters.paid,
             },
           });
-          if (controller.signal.aborted) return;
           setSubscriptions(result.items || []);
           setSubscriptionPagination(result.pagination || subscriptionPagination);
         }
@@ -197,7 +405,6 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
               reviewStatus,
             },
           });
-          if (controller.signal.aborted) return;
           setPaymentReviews(result.items || []);
           setPaymentPagination(result.pagination || paymentPagination);
         }
@@ -207,11 +414,8 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
             signal: controller.signal,
             query: { period: revenuePeriod },
           });
-          if (controller.signal.aborted) return;
           setRevenueReport(result.report || null);
         }
-
-        loadedTabsRef.current.add(tab);
       } catch (err) {
         if (err?.name === "AbortError") return;
         setError(err?.message || "تعذر تحميل المركز المالي");
@@ -219,7 +423,7 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
         if (!controller.signal.aborted) setLoading(false);
       }
     },
-    [filters, paymentPagination.page, revenuePeriod, reviewStatus, search, subscriptionPagination.page]
+    [filters, loadOverviewBundle, paymentPagination.page, revenuePeriod, reviewStatus, search, subscriptionPagination.page]
   );
 
   useEffect(() => {
@@ -228,36 +432,40 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
   }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab !== "overview") return;
+    void loadSection("overview", { force: true });
+  }, [overviewPeriod]);
+
+  useEffect(() => {
     if (activeTab !== "subscriptions") return;
-    loadedTabsRef.current.delete("subscriptions");
     void loadSection("subscriptions", { force: true });
   }, [filters, search, subscriptionPagination.page]);
 
   useEffect(() => {
     if (activeTab !== "payment-reviews") return;
-    loadedTabsRef.current.delete("payment-reviews");
     void loadSection("payment-reviews", { force: true });
   }, [reviewStatus, search, paymentPagination.page]);
 
   useEffect(() => {
     if (activeTab !== "revenue") return;
-    loadedTabsRef.current.delete("revenue");
     void loadSection("revenue", { force: true });
   }, [revenuePeriod]);
 
-  const handleExport = async (section) => {
+  const handleExport = async () => {
+    const section =
+      activeTab === "overview" ? "revenue" : activeTab === "referrals" ? null : activeTab;
+    if (!section) return;
+
     try {
       const query =
         section === "subscriptions"
           ? { export: "csv", search, status: filters.status, service: filters.service, source: filters.source, paid: filters.paid }
           : section === "payment-reviews"
           ? { export: "csv", search, reviewStatus }
-          : { export: "csv", period: revenuePeriod };
+          : { export: "csv", period: activeTab === "overview" ? selectedPeriod.revenuePeriod : revenuePeriod };
 
       const result = await fetchFinancialCenterSection(adminFetch, section, { query });
-      if (result.csvBlob) {
-        downloadCsvBlob(result.csvBlob, `financial-${section}.csv`);
-      }
+      if (result.csvBlob) downloadCsvBlob(result.csvBlob, `financial-${section}.csv`);
     } catch (err) {
       setError(err?.message || "تعذر التصدير");
     }
@@ -275,42 +483,55 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
     }
   };
 
-  const overviewCards = useMemo(() => {
+  const overviewKpis = useMemo(() => {
     if (!overview) return [];
     return [
-      { key: "today", label: "اليوم", totals: overview.recognizedRevenueToday, filter: { tab: "revenue" } },
-      { key: "week", label: "هذا الأسبوع", totals: overview.recognizedRevenueWeek, filter: { tab: "revenue" } },
-      { key: "month", label: "هذا الشهر", totals: overview.recognizedRevenueMonth, filter: { tab: "revenue" } },
-      { key: "year", label: "هذه السنة", totals: overview.recognizedRevenueYear, filter: { tab: "revenue" } },
-      { key: "total", label: "الإجمالي", totals: overview.recognizedRevenueTotal, filter: { tab: "revenue" } },
+      { key: "today", label: "إيرادات اليوم", value: formatCurrencyTotals(overview.recognizedRevenueToday) },
+      { key: "month", label: "إيرادات هذا الشهر", value: formatCurrencyTotals(overview.recognizedRevenueMonth) },
+      { key: "year", label: "إيرادات هذه السنة", value: formatCurrencyTotals(overview.recognizedRevenueYear) },
+      { key: "total", label: "إجمالي الإيرادات", value: formatCurrencyTotals(overview.recognizedRevenueTotal) },
+      { key: "active", label: "الاشتراكات النشطة", value: (overview.activeSubscriptions || 0).toLocaleString("ar") },
+      { key: "pending", label: "بانتظار المراجعة", value: (overview.pendingReviews || 0).toLocaleString("ar") },
     ];
   }, [overview]);
 
   return (
-    <section className="space-y-5">
-      <div className="admin-section p-5 md:p-6">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+    <section className={`admin-financial-dashboard ${standalone ? "admin-financial-dashboard--standalone" : ""}`}>
+      <header className="admin-financial-dashboard__header admin-section">
+        <div className="admin-financial-dashboard__header-main">
           <div>
-            <p className="admin-user-hero__eyebrow">Financial Center · Phase 1</p>
-            <h2 className="admin-heading text-3xl">💰 المركز المالي</h2>
-            <p className="mt-2 text-sm font-bold text-slate-500">
-              {overview?.disclaimer ||
-                "هذه الأرقام مبنية على الاشتراكات المفعلة يدويًا وليست سجل معاملات دفع مصرفي."}
+            <p className="admin-financial-dashboard__eyebrow">HasaN CharT · Finance</p>
+            <h1 className="admin-heading text-3xl">المركز المالي</h1>
+            <p className="admin-financial-dashboard__subtitle">
+              أرقام تقديرية مبنية على الاشتراكات المفعلة يدوياً — ليست سجل معاملات مصرفية.
             </p>
           </div>
-          <button
-            type="button"
-            className="admin-btn-surface px-4 py-2"
-            onClick={() => {
-              loadedTabsRef.current.clear();
-              void loadSection(activeTab, { force: true });
-            }}
-          >
-            تحديث
-          </button>
+          <div className="admin-financial-dashboard__header-actions">
+            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => void loadSection(activeTab, { force: true })}>
+              تحديث
+            </button>
+            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => void handleExport()}>
+              تصدير CSV
+            </button>
+          </div>
         </div>
 
-        <div className="admin-financial-tabs mt-5">
+        {activeTab === "overview" ? (
+          <div className="admin-financial-period-filters">
+            {PERIOD_OPTIONS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`admin-filter-btn ${overviewPeriod === item.id ? "admin-filter-btn--active" : "admin-filter-btn--idle"}`}
+                onClick={() => setOverviewPeriod(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="admin-financial-tabs">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -318,15 +539,15 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
               className={`admin-financial-tabs__btn ${activeTab === tab.id ? "is-active" : ""}`}
               onClick={() => setActiveTab(tab.id)}
             >
-              <span aria-hidden="true">{tab.icon}</span> {tab.label}
+              {tab.label}
             </button>
           ))}
         </div>
-      </div>
+      </header>
 
       {error ? (
-        <div className="admin-section p-5 text-center">
-          <p className="font-black text-red-200">{error}</p>
+        <div className="admin-section admin-financial-dashboard__error">
+          <p className="font-black text-red-700">{error}</p>
           <button type="button" className="admin-btn-surface mt-4 px-5 py-3" onClick={() => void loadSection(activeTab, { force: true })}>
             إعادة المحاولة
           </button>
@@ -334,106 +555,117 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
       ) : null}
 
       {activeTab === "overview" ? (
-        <div className="space-y-5">
+        <div className="admin-financial-dashboard__content space-y-4">
           {loading && !overview ? (
-            <SectionSkeleton rows={6} />
+            <SectionSkeleton rows={8} />
           ) : overview ? (
             <>
-              <div className="admin-financial-stats-grid">
-                {overviewCards.map((card) => (
-                  <CurrencyCard
+              <div className="admin-financial-kpi-grid admin-financial-kpi-grid--premium admin-animate-in">
+                {overviewKpis.map((card) => (
+                  <KpiCard
                     key={card.key}
-                    title={card.label}
-                    totals={card.totals}
-                    onClick={() => setActiveTab("revenue")}
+                    kpiKey={card.key}
+                    label={card.label}
+                    value={card.value}
+                    description={FINANCIAL_KPI_DESCRIPTIONS[card.key]}
+                    hint="تقديري — اشتراكات مفعلة يدوياً"
+                    status={card.key === "pending" && Number(overview.pendingReviews || 0) > 0 ? "attention" : "stable"}
+                    onClick={
+                      card.key === "pending"
+                        ? () => setActiveTab("payment-reviews")
+                        : card.key === "active"
+                        ? () => setActiveTab("subscriptions")
+                        : undefined
+                    }
                   />
                 ))}
-                <button type="button" className="admin-financial-stat" onClick={() => setActiveTab("subscriptions")}>
-                  <p className="admin-financial-stat__label">اشتراكات نشطة</p>
-                  <p className="admin-financial-stat__value">{overview.activeSubscriptions?.toLocaleString("ar") || 0}</p>
-                </button>
-                <button type="button" className="admin-financial-stat" onClick={() => setActiveTab("payment-reviews")}>
-                  <p className="admin-financial-stat__label">بانتظار المراجعة</p>
-                  <p className="admin-financial-stat__value">{overview.pendingReviews?.toLocaleString("ar") || 0}</p>
-                </button>
-                <button type="button" className="admin-financial-stat" onClick={() => setActiveTab("subscriptions")}>
-                  <p className="admin-financial-stat__label">منتهية</p>
-                  <p className="admin-financial-stat__value">{overview.expiredSubscriptions?.toLocaleString("ar") || 0}</p>
-                </button>
-                <button type="button" className="admin-financial-stat" onClick={() => setActiveTab("subscriptions")}>
-                  <p className="admin-financial-stat__label">مجانية</p>
-                  <p className="admin-financial-stat__value">{overview.complimentarySubscriptions?.toLocaleString("ar") || 0}</p>
-                </button>
-                <button type="button" className="admin-financial-stat" onClick={() => setActiveTab("subscriptions")}>
-                  <p className="admin-financial-stat__label">أسعار غير قابلة للتحليل</p>
-                  <p className="admin-financial-stat__value">{overview.unparseablePriceCount?.toLocaleString("ar") || 0}</p>
-                </button>
               </div>
 
               {!overview.revenueScanComplete ? (
-                <p className="text-xs font-bold text-amber-200/90">
-                  تم حساب الإيرادات من عينة {overview.revenueScannedRows || 0} سجل نشط.
-                </p>
+                <p className="admin-financial-note">تم حساب الإيرادات من {overview.revenueScannedRows || 0} سجل نشط.</p>
               ) : null}
 
-              <div className="grid gap-5 lg:grid-cols-2">
-                <div className="admin-section p-5">
-                  <h3 className="admin-heading text-lg">توزيع الإيرادات حسب الخدمة</h3>
-                  <div className="mt-4 space-y-2">
-                    {Object.entries(overview.revenueByService || {}).map(([service, totals]) => (
-                      <div key={service} className="admin-financial-bar-row">
-                        <span>{service}</span>
-                        <span>{formatCurrencyTotals(totals)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="admin-section p-5">
-                  <h3 className="admin-heading text-lg">توزيع الاشتراكات حسب الحالة</h3>
-                  <div className="mt-4 space-y-2">
-                    {Object.entries(overview.subscriptionsByStatus || {}).map(([status, count]) => (
-                      <div key={status} className="admin-financial-bar-row">
-                        <span>{status}</span>
-                        <span>{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="admin-financial-dashboard__grid admin-financial-dashboard__grid--charts">
+                <article className="admin-section admin-financial-panel">
+                  <h2 className="admin-heading text-lg">منحنى الإيرادات</h2>
+                  <p className="admin-financial-panel__subtitle">Area Chart — تقديري</p>
+                  <RevenueLineChart daily={chartReport?.daily || []} period={overviewPeriod} />
+                </article>
+                <article className="admin-section admin-financial-panel">
+                  <h2 className="admin-heading text-lg">توزيع الإيرادات</h2>
+                  <p className="admin-financial-panel__subtitle">Donut Chart — حسب الخدمة</p>
+                  <RevenueDonutChart revenueByService={overview.revenueByService} />
+                </article>
+                <article className="admin-section admin-financial-panel md:col-span-2">
+                  <h2 className="admin-heading text-lg">الإيرادات حسب الخدمة</h2>
+                  <p className="admin-financial-panel__subtitle">Bar Chart</p>
+                  <ServiceRevenueBars revenueByService={overview.revenueByService} />
+                </article>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-2">
-                <div className="admin-section p-5">
-                  <h3 className="admin-heading text-lg">آخر 5 اشتراكات مفعلة</h3>
-                  <div className="mt-4 space-y-2">
-                    {recentActive.map((item) => (
-                      <div key={item.id} className="admin-financial-list-item">
-                        <div>
-                          <p className="font-black">{item.username || item.userEmail}</p>
-                          <p className="text-xs text-slate-500">{item.plan}</p>
-                        </div>
-                        <button type="button" className="admin-user-manage-btn" onClick={() => openUser(item.userId)}>
-                          CRM
-                        </button>
-                      </div>
-                    ))}
+              <div className="admin-financial-dashboard__grid">
+                <article className="admin-section admin-financial-panel">
+                  <div className="admin-financial-panel__head">
+                    <h2 className="admin-heading text-lg">آخر الاشتراكات المفعلة</h2>
+                    <button type="button" className="admin-user-manage-btn" onClick={() => setActiveTab("subscriptions")}>
+                      عرض الكل
+                    </button>
                   </div>
-                </div>
-                <div className="admin-section p-5">
-                  <h3 className="admin-heading text-lg">آخر 5 طلبات تنتظر المراجعة</h3>
-                  <div className="mt-4 space-y-2">
-                    {recentPending.map((item) => (
-                      <div key={item.id} className="admin-financial-list-item">
-                        <div>
-                          <p className="font-black">{item.username || item.userEmail}</p>
-                          <p className="text-xs text-slate-500">{item.priceRaw}</p>
-                        </div>
-                        <button type="button" className="admin-btn-surface px-3 py-2 text-xs" onClick={() => onNavigateTab?.("subscriptions")}>
-                          مراجعة
-                        </button>
-                      </div>
-                    ))}
+                  <div className="admin-financial-op-grid mt-4">
+                    {recentActive.length === 0 ? (
+                      <ChartEmptyState icon="💳" title="لا توجد اشتراكات حديثة" desc="ستظهر آخر الاشتراكات المفعلة هنا." />
+                    ) : (
+                      recentActive.map((item) => (
+                        <RecentOpCard
+                          key={item.id}
+                          title={item.username || item.userEmail || "مستخدم"}
+                          subtitle={item.plan}
+                          meta={`${item.priceRaw || "—"} · ${item.startedAt ? new Date(item.startedAt).toLocaleDateString("ar") : "—"}`}
+                          badge="مفعّل"
+                          onAction={item.userId ? () => openUser(item.userId) : undefined}
+                          actionLabel={item.userId ? "CRM" : undefined}
+                        />
+                      ))
+                    )}
                   </div>
-                </div>
+                </article>
+
+                <article className="admin-section admin-financial-panel">
+                  <div className="admin-financial-panel__head">
+                    <h2 className="admin-heading text-lg">طلبات الدفع قيد المراجعة</h2>
+                    <button type="button" className="admin-user-manage-btn" onClick={() => setActiveTab("payment-reviews")}>
+                      عرض الكل
+                    </button>
+                  </div>
+                  <p className="admin-financial-warning mt-2">وجود إثبات دفع لا يعني أن العملية مؤكدة.</p>
+                  <div className="admin-financial-op-grid mt-4">
+                    {recentPending.length === 0 ? (
+                      <ChartEmptyState icon="🧾" title="لا توجد طلبات معلقة" desc="ستظهر إثباتات الدفع قيد المراجعة هنا." />
+                    ) : (
+                      recentPending.map((item) => (
+                        <RecentOpCard
+                          key={item.id}
+                          title={item.username || item.userEmail || "مستخدم"}
+                          subtitle={item.plan}
+                          meta={`${item.priceRaw || "—"} · ${item.status}`}
+                          badge="مراجعة"
+                          onAction={
+                            item.paymentProofAvailable
+                              ? () => void openProof(item.requestId || item.id)
+                              : undefined
+                          }
+                          actionLabel={
+                            item.paymentProofAvailable
+                              ? proofLoadingId === String(item.requestId || item.id)
+                                ? "..."
+                                : "عرض الإثبات"
+                              : undefined
+                          }
+                        />
+                      ))
+                    )}
+                  </div>
+                </article>
               </div>
             </>
           ) : null}
@@ -441,7 +673,7 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
       ) : null}
 
       {activeTab === "subscriptions" ? (
-        <div className="admin-section p-5 space-y-4">
+        <div className="admin-section admin-financial-panel space-y-4">
           <div className="admin-user-filters-grid">
             <input className="admin-field" placeholder="بحث..." value={search} onChange={(e) => setSearch(e.target.value)} />
             <select className="admin-field" value={filters.status} onChange={(e) => setFilters((c) => ({ ...c, status: e.target.value }))}>
@@ -454,21 +686,8 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            <select className="admin-field" value={filters.paid} onChange={(e) => setFilters((c) => ({ ...c, paid: e.target.value }))}>
-              <option value="all">الكل</option>
-              <option value="paid">مدفوع</option>
-              <option value="complimentary">مجاني</option>
-              <option value="unparseable">غير قابل للتحليل</option>
-            </select>
           </div>
-          <div className="flex gap-2">
-            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => void handleExport("subscriptions")}>
-              تصدير CSV
-            </button>
-          </div>
-          {loading ? (
-            <SectionSkeleton />
-          ) : subscriptions.length === 0 ? (
+          {loading ? <SectionSkeleton /> : subscriptions.length === 0 ? (
             <p className="text-center font-bold text-slate-500">لا توجد اشتراكات مطابقة</p>
           ) : (
             <div className="admin-table-wrap overflow-x-auto">
@@ -479,11 +698,8 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
                     <th>الخدمة</th>
                     <th>الحالة</th>
                     <th>السعر</th>
-                    <th>المبلغ</th>
-                    <th>المصدر</th>
                     <th>البداية</th>
                     <th>الانتهاء</th>
-                    <th>إثبات</th>
                     <th />
                   </tr>
                 </thead>
@@ -494,11 +710,8 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
                       <td>{item.service}</td>
                       <td>{item.status}</td>
                       <td>{item.priceRaw}</td>
-                      <td>{item.priceAmount ?? "—"} {item.currency || ""}</td>
-                      <td>{item.source}</td>
                       <td>{item.startedAt ? new Date(item.startedAt).toLocaleDateString("ar") : "—"}</td>
                       <td>{item.expiresAt ? new Date(item.expiresAt).toLocaleDateString("ar") : "—"}</td>
-                      <td>{item.paymentProofAvailable ? "نعم" : "لا"}</td>
                       <td>
                         {item.userId ? (
                           <button type="button" className="admin-user-manage-btn" onClick={() => openUser(item.userId)}>
@@ -516,8 +729,8 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
       ) : null}
 
       {activeTab === "payment-reviews" ? (
-        <div className="admin-section p-5 space-y-4">
-          <p className="text-sm font-bold text-amber-200/90">وجود إثبات دفع لا يعني أن العملية مؤكدة.</p>
+        <div className="admin-section admin-financial-panel space-y-4">
+          <p className="admin-financial-warning">وجود إثبات دفع لا يعني أن العملية مؤكدة.</p>
           <div className="flex flex-wrap gap-2">
             <input className="admin-field" placeholder="بحث..." value={search} onChange={(e) => setSearch(e.target.value)} />
             <select className="admin-field" value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
@@ -526,16 +739,8 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
               <option value="confirmed">مؤكد</option>
               <option value="rejected">مرفوض</option>
             </select>
-            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => void handleExport("payment-reviews")}>
-              تصدير CSV
-            </button>
-            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => onNavigateTab?.("subscriptions")}>
-              فتح مراجعة الاشتراكات الحالية
-            </button>
           </div>
-          {loading ? (
-            <SectionSkeleton />
-          ) : paymentReviews.length === 0 ? (
+          {loading ? <SectionSkeleton /> : paymentReviews.length === 0 ? (
             <p className="text-center font-bold text-slate-500">لا توجد إثباتات دفع</p>
           ) : (
             <div className="admin-table-wrap overflow-x-auto">
@@ -547,7 +752,6 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
                     <th>السعر</th>
                     <th>حالة المراجعة</th>
                     <th>الإرسال</th>
-                    <th>التفعيل</th>
                     <th />
                   </tr>
                 </thead>
@@ -559,7 +763,6 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
                       <td>{item.priceRaw}</td>
                       <td>{item.status}</td>
                       <td>{item.submittedAt ? new Date(item.submittedAt).toLocaleDateString("ar") : "—"}</td>
-                      <td>{item.confirmedAt ? new Date(item.confirmedAt).toLocaleDateString("ar") : "—"}</td>
                       <td>
                         <button
                           type="button"
@@ -567,7 +770,7 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
                           disabled={proofLoadingId === String(item.requestId)}
                           onClick={() => void openProof(item.requestId)}
                         >
-                          {proofLoadingId === String(item.requestId) ? "..." : "معاينة"}
+                          {proofLoadingId === String(item.requestId) ? "..." : "عرض الإثبات"}
                         </button>
                       </td>
                     </tr>
@@ -580,39 +783,35 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
       ) : null}
 
       {activeTab === "revenue" ? (
-        <div className="admin-section p-5 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: "7d", label: "7 أيام" },
-              { id: "30d", label: "30 يومًا" },
-              { id: "90d", label: "90 يومًا" },
-              { id: "year", label: "السنة الحالية" },
-            ].map((item) => (
+        <div className="admin-section admin-financial-panel space-y-4">
+          <div className="admin-financial-period-filters">
+            {PERIOD_OPTIONS.filter((item) => item.id !== "today").map((item) => (
               <button
                 key={item.id}
                 type="button"
-                className={`admin-filter-btn ${revenuePeriod === item.id ? "admin-filter-btn--active" : "admin-filter-btn--idle"}`}
-                onClick={() => setRevenuePeriod(item.id)}
+                className={`admin-filter-btn ${revenuePeriod === item.revenuePeriod ? "admin-filter-btn--active" : "admin-filter-btn--idle"}`}
+                onClick={() => setRevenuePeriod(item.revenuePeriod)}
               >
                 {item.label}
               </button>
             ))}
-            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => void handleExport("revenue")}>
-              تصدير CSV
-            </button>
           </div>
           {loading && !revenueReport ? (
             <SectionSkeleton />
           ) : revenueReport ? (
             <>
-              <p className="text-sm font-bold text-amber-200/90">{revenueReport.disclaimer}</p>
-              <div className="admin-financial-stats-grid">
-                <CurrencyCard title="اليوم" totals={revenueReport.recognizedRevenueToday} />
-                <CurrencyCard title="الأسبوع" totals={revenueReport.recognizedRevenueWeek} />
-                <CurrencyCard title="الشهر" totals={revenueReport.recognizedRevenueMonth} />
-                <CurrencyCard title="السنة" totals={revenueReport.recognizedRevenueYear} />
-                <CurrencyCard title="الإجمالي" totals={revenueReport.recognizedRevenueTotal} />
+              <p className="admin-financial-note">{revenueReport.disclaimer}</p>
+              <div className="admin-financial-kpi-grid">
+                <KpiCard label="اليوم" value={formatCurrencyTotals(revenueReport.recognizedRevenueToday)} />
+                <KpiCard label="الأسبوع" value={formatCurrencyTotals(revenueReport.recognizedRevenueWeek)} />
+                <KpiCard label="الشهر" value={formatCurrencyTotals(revenueReport.recognizedRevenueMonth)} />
+                <KpiCard label="السنة" value={formatCurrencyTotals(revenueReport.recognizedRevenueYear)} />
+                <KpiCard label="الإجمالي" value={formatCurrencyTotals(revenueReport.recognizedRevenueTotal)} />
               </div>
+              <article className="admin-section admin-financial-panel">
+                <h2 className="admin-heading text-lg">منحنى الإيرادات</h2>
+                <RevenueLineChart daily={revenueReport.daily || []} period={revenuePeriod} />
+              </article>
               <div className="admin-table-wrap overflow-x-auto">
                 <table className="admin-user-table">
                   <thead>
@@ -641,19 +840,18 @@ export default function FinancialCenterPanel({ onNavigateTab, onOpenUser, standa
       ) : null}
 
       {activeTab === "referrals" ? (
-        <div className="admin-section p-6 md:p-8">
-          <h3 className="admin-heading text-2xl">الإحالات والسحوبات</h3>
+        <article className="admin-section admin-financial-panel">
+          <h2 className="admin-heading text-2xl">الإحالات والسحوبات</h2>
           <p className="mt-3 max-w-2xl text-sm font-bold leading-7 text-slate-500">
-            هذا التبويب مخصص لربط بيانات الشركاء والسحوبات بالمركز المالي في مرحلة لاحقة. حاليًا يمكنك
-            إدارة الشركاء من صفحة الشركاء دون تغيير منطق العمولات.
+            عرض read-only — لإدارة الشركاء والسحوبات استخدم صفحة الشركاء.
           </p>
           <Link href="/admin/partners" className="admin-hub-card__cta mt-6 inline-flex">
             فتح إدارة الشركاء والسحوبات
           </Link>
-        </div>
+        </article>
       ) : null}
 
-      <ProofModal proof={proofPreview} onClose={() => setProofPreview(null)} />
+      <AdminPaymentProofModal proof={proofPreview} onClose={() => setProofPreview(null)} />
     </section>
   );
 }

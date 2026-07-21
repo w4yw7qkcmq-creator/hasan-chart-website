@@ -34,9 +34,8 @@ import {
   matchesAdminSearch,
   matchesAdminStatusFilter,
 } from "./admin-dashboard-helpers";
-import AdminOverviewNavLink from "./components/AdminOverviewNavLink";
-import AdminStat from "./components/AdminStat";
 import StatusBadge from "./components/StatusBadge";
+import { useAdminCommandPaletteShortcut } from "./components/AdminCommandPalette";
 import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
 import {
   ADMIN_SHELL_SECTIONS,
@@ -53,72 +52,6 @@ import {
 } from "../../../lib/admin-dashboard-client";
 
 const AppModal = dynamic(() => import("../../components/AppModal"), { ssr: false });
-
-function AdminQuickStatsSkeleton() {
-  return (
-    <>
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className="admin-stat-chip animate-pulse">
-          <div className="h-3 w-24 rounded bg-slate-200/70" />
-          <div className="mt-3 h-8 w-12 rounded-lg bg-slate-300/70" />
-        </div>
-      ))}
-    </>
-  );
-}
-
-function AdminStatsGridSkeleton() {
-  return (
-    <section className="order-1 grid gap-5 md:grid-cols-2 xl:grid-cols-6">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div
-          key={index}
-          className="relative animate-pulse overflow-hidden rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 space-y-3">
-              <div className="h-3 w-24 rounded bg-white/15" />
-              <div className="h-9 w-16 rounded-lg bg-white/20" />
-              <div className="h-3 w-32 rounded bg-white/10" />
-            </div>
-            <div className="h-14 w-14 rounded-2xl bg-white/10" />
-          </div>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function AdminRecentItemsSkeleton() {
-  return (
-    <section className="order-3 admin-section animate-pulse p-5 md:p-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div className="space-y-2">
-          <div className="h-6 w-44 rounded bg-white/15" />
-          <div className="h-3 w-64 rounded bg-white/10" />
-        </div>
-        <div className="h-8 w-20 rounded-full bg-white/10" />
-      </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div
-            key={index}
-            className="rounded-2xl border border-cyan-300/15 bg-white/[0.04] p-4"
-          >
-            <div className="flex items-start gap-3">
-              <div className="h-11 w-11 shrink-0 rounded-2xl bg-white/10" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 w-4/5 rounded bg-white/15" />
-                <div className="h-3 w-full rounded bg-white/10" />
-                <div className="h-2.5 w-20 rounded bg-white/10" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function AdminRequestsPanelSkeleton() {
   return (
@@ -193,34 +126,28 @@ const DailyAnalysisPublishPanel = dynamic(
   }
 );
 
-const AdminHubCards = dynamic(() => import("./components/AdminHubCards"), {
+const AdminHubOverview = dynamic(() => import("./components/AdminHubOverview"), {
   ssr: false,
   loading: () => (
-    <section className="admin-hub-grid">
-      <div className="admin-hub-card admin-hub-card--skeleton animate-pulse h-48" />
-      <div className="admin-hub-card admin-hub-card--skeleton animate-pulse h-48" />
+    <section className="admin-hub-overview space-y-4 animate-pulse">
+      <div className="admin-section h-40 rounded-2xl bg-slate-200/40" />
+      <div className="admin-hub-tile-grid">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="admin-hub-tile h-36 rounded-2xl bg-slate-200/40" />
+        ))}
+      </div>
     </section>
   ),
+});
+
+const AdminCommandPalette = dynamic(() => import("./components/AdminCommandPalette"), {
+  ssr: false,
 });
 
 const AdminUserQuickPreviewDrawer = dynamic(
   () => import("./components/AdminUserQuickPreviewDrawer"),
   { ssr: false }
 );
-
-const AdminActivityFeed = dynamic(() => import("./components/AdminActivityFeed"), {
-  ssr: false,
-  loading: () => (
-    <section className="order-4 admin-section animate-pulse p-6">
-      <div className="h-6 w-48 rounded bg-white/15" />
-      <div className="mt-5 space-y-3">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-14 rounded-2xl bg-white/10" />
-        ))}
-      </div>
-    </section>
-  ),
-});
 
 export default function AdminPage() {
   const router = useRouter();
@@ -240,8 +167,10 @@ export default function AdminPage() {
   const [activeAdminTab, setActiveAdminTab] = useState("overview");
   const [pendingDrawerUserId, setPendingDrawerUserId] = useState("");
   const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [activityFeedEvents, setActivityFeedEvents] = useState([]);
   const [activityFeedPartialFailure, setActivityFeedPartialFailure] = useState(false);
+  const [activityFeedAllSourcesFailed, setActivityFeedAllSourcesFailed] = useState(false);
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
   const [adminAcknowledgedVersion, setAdminAcknowledgedVersion] = useState(0);
   const [adminNotificationsOpen, setAdminNotificationsOpen] = useState(false);
@@ -496,6 +425,7 @@ export default function AdminPage() {
     if (section === "activity-feed") {
       setActivityFeedEvents(result.events || []);
       setActivityFeedPartialFailure(Boolean(result.partialFailure));
+      setActivityFeedAllSourcesFailed(Boolean(result.allSourcesFailed));
     }
 
     if (section === "analysis") {
@@ -658,6 +588,44 @@ export default function AdminPage() {
     [loadSection]
   );
 
+  const toggleCommandPalette = useCallback(() => {
+    setCommandPaletteOpen((current) => !current);
+  }, []);
+
+  const handleCommandExecute = useCallback(
+    (item) => {
+      setCommandPaletteOpen(false);
+      if (!item) return;
+
+      if (item.userId) {
+        setPendingDrawerUserId(String(item.userId));
+        setPreviewDrawerOpen(true);
+        return;
+      }
+
+      if (item.action === "refresh-dashboard") {
+        void refreshGlobalSections();
+        return;
+      }
+
+      if (item.href) {
+        router.push(item.href);
+        return;
+      }
+
+      if (item.tab) {
+        if (item.tab === "user-management") {
+          router.push("/admin/users");
+          return;
+        }
+        setActiveAdminTab(item.tab);
+      }
+    },
+    [refreshGlobalSections, router]
+  );
+
+  useAdminCommandPaletteShortcut(toggleCommandPalette);
+
   const refreshActiveTabSections = useCallback(
     async ({ silent = false } = {}) => {
       const sections = getAdminTabRefreshSections(activeAdminTab);
@@ -782,24 +750,6 @@ export default function AdminPage() {
     window.addEventListener("admin:open-user", onOpenUser);
     return () => window.removeEventListener("admin:open-user", onOpenUser);
   }, []);
-
-  useEffect(() => {
-    const onCommand = (event) => {
-      const item = event.detail || {};
-      if (item.action === "refresh-dashboard") {
-        void refreshGlobalSections();
-        return;
-      }
-      if (item.href) {
-        router.push(item.href);
-        return;
-      }
-      if (item.tab) setActiveAdminTab(item.tab);
-    };
-
-    window.addEventListener("admin:command", onCommand);
-    return () => window.removeEventListener("admin:command", onCommand);
-  }, [refreshGlobalSections, router]);
 
   useEffect(() => {
     if (!authResolved || !profileReady || !user?.email || !isAdmin) {
@@ -964,6 +914,7 @@ export default function AdminPage() {
         analysisTotal: apiStats.analysisTotal ?? analysisRequests.length,
         accountsTotal: apiStats.accountsTotal ?? accountRequests.length,
         subscriptionsTotal: apiStats.subscriptionsTotal ?? subscriptionRequests.length,
+        withdrawalsPending: apiStats.withdrawalsPending ?? 0,
       };
     }
 
@@ -977,6 +928,7 @@ export default function AdminPage() {
       completedAnalysis,
       pendingAccounts,
       pendingSubscriptions,
+      withdrawalsPending: 0,
       usersCount: users.length,
       analysisTotal: analysisRequests.length,
       accountsTotal: accountRequests.length,
@@ -1060,6 +1012,34 @@ export default function AdminPage() {
 
     return items.slice(0, 6);
   }, [adminFeedNotifications, analysisRequests, accountRequests, subscriptionRequests]);
+
+  const urgentItems = useMemo(() => {
+    return recentOverviewItems.map((item) => {
+      let kindLabel = "متابعة";
+      if (item.tab === "subscriptions" || item.type === "subscription") kindLabel = "اشتراك";
+      if (item.tab === "accounts" || item.type === "account") kindLabel = "حساب";
+      if (item.tab === "analysis" || item.type === "analysis") kindLabel = "تحليل";
+      if (item.type === "withdrawal") kindLabel = "سحب";
+      if (item.type === "email") kindLabel = "بريد";
+      return { ...item, kindLabel };
+    });
+  }, [recentOverviewItems]);
+
+  const handleOpenUrgentItem = useCallback(
+    (item) => {
+      if (item.tab) {
+        setActiveAdminTab(item.tab);
+        if (item.tab === "analysis") setFilter("pending");
+        if (item.tab === "accounts") setAccountFilter("pending");
+        if (item.tab === "subscriptions") setSubscriptionFilter("pending");
+        return;
+      }
+      if (item.type === "withdrawal") {
+        window.location.href = item.url || "/admin/partners";
+      }
+    },
+    []
+  );
 
   const handleActivityFeedRefresh = useCallback(() => {
     invalidateAdminSectionCache("activity-feed");
@@ -1379,7 +1359,11 @@ export default function AdminPage() {
 
 
   return (
-    <main className="admin-theme-page relative overflow-hidden rounded-[34px] border border-cyan-300/10 bg-[#020617] text-white shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
+    <main
+      className={`admin-theme-page admin-hub-shell relative overflow-x-hidden ${
+        activeAdminTab === "overview" ? "admin-hub-shell--overview" : "admin-hub-shell--workspace"
+      }`}
+    >
       <AppModal
         open={adminNotice.open}
         type={adminNotice.type === "error" ? "error" : "success"}
@@ -1531,10 +1515,7 @@ export default function AdminPage() {
         onCancel={() => closeAdminConfirm(false)}
       />
 
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
-
-      <div className="relative z-20 space-y-8 p-4 text-slate-100 md:p-6">
+      <div className="relative z-20 space-y-4 p-4 md:p-6">
         {refreshWarning && (
           <div className="admin-warning-banner">
             <span>{refreshWarning}</span>
@@ -1548,323 +1529,89 @@ export default function AdminPage() {
           </div>
         )}
 
-        <section className="relative overflow-visible rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-7 md:p-9 shadow-2xl backdrop-blur-2xl">
-          <div className="pointer-events-none absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
-
-          <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-center">
-            <div>
-              <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-100">
-                ADMIN CONTROL CENTER
-              </span>
-              <h1 className="mt-5 text-4xl font-black leading-tight md:text-5xl">لوحة الإدارة</h1>
-              <p className="mt-4 max-w-3xl leading-8 text-slate-200">
-                إدارة طلبات التحليل، إرسال الردود مع الصور، ومراجعة طلبات إدارة الحسابات من مكان واحد. يتم تحديث الطلبات لحظيًا بدون إعادة تحميل اللوحة كاملة.
-              </p>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-cyan-300/15 bg-white/[0.045] p-4 text-sm text-slate-200 shadow-2xl backdrop-blur-2xl">
-          <span className="font-bold text-cyan-100">
-            {isRefreshing ? "جاري تحديث بيانات اللوحة..." : "التحديث اللحظي مفعل"}
-          </span>
-          <span className="text-slate-300">
-            {lastUpdatedAt ? `آخر تحديث: ${lastUpdatedAt}` : "بانتظار أول تحديث"}
-          </span>
-          <button
-            onClick={() => {
-              void refreshGlobalSections();
-            }}
-            className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 font-black text-cyan-100 transition hover:bg-cyan-400/20"
-          >
-            تحديث الآن
-          </button>
-        </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("admin:command-palette-toggle"))}
-                className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-5 py-4 font-black text-cyan-100 transition hover:bg-cyan-400/20"
-                title="⌘K أو Ctrl+K"
-              >
-                ⌘K أوامر
-              </button>
-              <div className="relative" ref={adminNotificationsRef}>
-                <button
-                  ref={adminNotificationsBellRef}
-                  type="button"
-                  onClick={handleAdminNotificationsBellClick}
-                  className="relative rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-6 py-4 font-black text-cyan-100 transition hover:bg-cyan-400/20"
-                >
-                  🔔 إشعارات الأدمن
-                  {adminUnreadCount > 0 && (
-                    <span className="absolute -right-2 -top-2 grid h-7 min-w-7 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_22px_rgba(239,68,68,0.55)]">
-                      {adminUnreadCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              <button
-                onClick={logoutAdmin}
-                className="rounded-2xl border border-red-400/20 bg-red-500/15 px-6 py-4 font-black text-red-100 transition hover:bg-red-500/25"
-              >
-                تسجيل خروج الأدمن
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="admin-section p-5 md:p-6">
-          {adminUnreadCount > 0 && (
-            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800">
-              يوجد {adminUnreadCount} طلبات جديدة تحتاج مراجعة
-            </div>
-          )}
-
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">Admin Command Center</p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-black text-emerald-800">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                    Online / Active
-                  </span>
-                  <span className="text-sm text-slate-600">
-                    آخر تحديث:{" "}
-                    <span className="font-black">
-                      {lastUpdatedAt || "بانتظار أول تحديث"}
-                    </span>
-                  </span>
-                  {isRefreshing && (
-                    <span className="text-sm font-bold text-cyan-700">جاري التحديث...</span>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  void refreshGlobalSections();
-                }}
-                className="shrink-0 rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-5 py-3 text-sm font-black text-white shadow-[0_14px_38px_rgba(37,99,235,0.28)] transition hover:brightness-110"
-              >
-                تحديث الآن
-              </button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="sm:col-span-3 flex justify-end">
-                <AdminSectionRefreshingIndicator visible={sectionStates.stats.refreshing} />
-              </div>
-              {statsPending ? (
-                <AdminQuickStatsSkeleton />
-              ) : sectionStates.stats.error ? (
-                <div className="sm:col-span-3">
-                  <AdminSectionError
-                    message={sectionStates.stats.error}
-                    onRetry={() => void loadSection("stats", { force: true })}
-                  />
-                </div>
-              ) : (
-                <>
-              <div className="admin-stat-chip">
-                <p className="text-xs font-bold text-slate-600">طلبات التحليل المنتظرة</p>
-                <p className="mt-1 admin-heading text-2xl">{stats.pendingAnalysis}</p>
-              </div>
-              <div className="admin-stat-chip">
-                <p className="text-xs font-bold text-slate-600">إدارة الحسابات المنتظرة</p>
-                <p className="mt-1 admin-heading text-2xl">{stats.pendingAccounts}</p>
-              </div>
-              <div className="admin-stat-chip">
-                <p className="text-xs font-bold text-slate-600">طلبات الاشتراك المنتظرة</p>
-                <p className="mt-1 admin-heading text-2xl">{stats.pendingSubscriptions}</p>
-              </div>
-                </>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {ADMIN_TABS.filter((tab) => tab.id !== "overview").map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveAdminTab(tab.id)}
-                  className={`rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
-                    tab.id === "vip"
-                      ? "border-blue-200 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 text-white shadow-[0_10px_28px_rgba(37,99,235,0.22)] hover:brightness-110"
-                      : "admin-filter-btn admin-filter-btn--active"
-                  }`}
-                >
-                  {tab.icon} {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="admin-section p-3 md:p-4">
-          <div className="flex flex-wrap gap-2">
+        <section className="admin-hub-tabs admin-section">
+          <div className="admin-hub-tabs__list" role="tablist" aria-label="أقسام لوحة الإدارة">
             {ADMIN_TABS.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                aria-selected={activeAdminTab === tab.id}
                 onClick={() => setActiveAdminTab(tab.id)}
-                className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
-                  activeAdminTab === tab.id
-                    ? "border-cyan-300 bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 text-white shadow-[0_12px_32px_rgba(37,99,235,0.28)]"
-                    : "border-cyan-100 bg-white/90 text-slate-800 hover:border-cyan-200 hover:bg-cyan-50"
-                }`}
+                className={`admin-hub-tabs__btn ${activeAdminTab === tab.id ? "is-active" : ""}`}
               >
-                <span className="ml-2">{tab.icon}</span>
+                <span aria-hidden="true">{tab.icon}</span>
                 {tab.label}
               </button>
             ))}
           </div>
         </section>
 
-        {activeAdminTab === "overview" && (
-          <div className="relative flex flex-col gap-5">
-        {statsPending ? (
-          <AdminStatsGridSkeleton />
-        ) : sectionStates.stats.error ? (
-          <AdminSectionError
-            message={sectionStates.stats.error}
-            onRetry={() => void loadSection("stats", { force: true })}
+        {activeAdminTab === "overview" ? (
+          <AdminHubOverview
+            user={user}
+            stats={stats}
+            statsPending={statsPending}
+            statsError={sectionStates.stats.error}
+            onRetryStats={() => void loadSection("stats", { force: true })}
+            lastUpdatedAt={lastUpdatedAt}
+            isRefreshing={isRefreshing}
+            adminUnreadCount={adminUnreadCount}
+            onRefresh={() => void refreshGlobalSections()}
+            onOpenCommandPalette={toggleCommandPalette}
+            onToggleNotifications={handleAdminNotificationsBellClick}
+            onLogout={logoutAdmin}
+            notificationsWrapperRef={adminNotificationsRef}
+            notificationsButtonRef={adminNotificationsBellRef}
+            onNavigateTab={setActiveAdminTab}
+            urgentItems={urgentItems}
+            urgentLoading={overviewPending}
+            onOpenUrgentItem={handleOpenUrgentItem}
+            activityEvents={activityFeedEvents}
+            activityLoading={activityFeedPending}
+            activityError={sectionStates["activity-feed"].error}
+            activityPartialFailure={activityFeedPartialFailure}
+            activityAllSourcesFailed={activityFeedAllSourcesFailed}
+            activityRefreshing={sectionStates["activity-feed"].refreshing}
+            onActivityRefresh={handleActivityFeedRefresh}
+            onOpenActivityEvent={handleActivityEventOpen}
           />
-        ) : (
-        <>
-        <div className="order-1 flex justify-end">
-          <AdminSectionRefreshingIndicator visible={sectionStates.stats.refreshing} />
-        </div>
-        <section className="order-1 grid gap-5 md:grid-cols-2 xl:grid-cols-6">
-          <AdminStat title="طلبات التحليل" value={stats.analysisTotal} icon="🧠" subtitle="إجمالي الطلبات" />
-          <AdminStat title="بانتظار الرد" value={stats.pendingAnalysis} icon="⏳" subtitle="طلبات تحتاج متابعة" tone="orange" />
-          <AdminStat title="تم إنجازها" value={stats.completedAnalysis} icon="✅" subtitle="طلبات مكتملة" tone="green" />
-          <AdminStat title="إدارة الحسابات" value={stats.accountsTotal} icon="📂" subtitle="طلبات العملاء" tone="red" />
-          <AdminStat title="المستخدمون" value={stats.usersCount} icon="👥" subtitle={dataMode === "secure-api" ? "من Secure API" : dataMode === "supabase" ? "من Supabase" : "محلياً للتجربة"} tone="green" />
-          <AdminStat title="طلبات الاشتراك" value={stats.subscriptionsTotal} icon="💳" subtitle={`${stats.pendingSubscriptions} بانتظار التفعيل`} tone="orange" />
-        </section>
-        </>
-        )}
+        ) : null}
 
-        <nav className="order-2 relative z-[120] grid gap-5" aria-label="أدوات الإدارة">
-          <AdminOverviewNavLink
-            href="/admin/partners"
-            gradientClass="from-emerald-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-emerald-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(16,185,129,0.18)]"
-            eyebrow="Partner Program"
-            title="🤝 إدارة الشركاء"
-            description="إحصائيات الشركاء، التفاصيل، وطلبات السحب"
-            icon="🤝"
-          />
-          <AdminOverviewNavLink
-            href="/admin/email-analytics"
-            gradientClass="from-blue-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-cyan-300/30 hover:bg-white/[0.06] hover:shadow-[0_0_40px_rgba(34,211,238,0.12)]"
-            eyebrow="Email Analytics"
-            title="📧 مراقبة الإيميلات"
-            description="تتبع التسليم، الفتح، النقر، والأخطاء عبر Resend"
-            icon="📧"
-          />
-          <AdminOverviewNavLink
-            href="/admin/notification-test"
-            gradientClass="from-violet-500/20 to-cyan-400/10"
-            hoverClasses="hover:border-violet-300/35 hover:bg-white/[0.08] hover:shadow-[0_0_48px_rgba(139,92,246,0.22)]"
-            eyebrow="Notification Test Center"
-            title="🔔 اختبار الإشعارات"
-            description="إرسال حقيقي عبر دوال الإنتاج لكل نوع إشعار (Hub + Push + Email)"
-            icon="🔔"
-          />
-        </nav>
-
-        {overviewPending ? (
-          <AdminRecentItemsSkeleton />
-        ) : sectionStates.overview.error ? (
-          <AdminSectionError
-            message={sectionStates.overview.error}
-            onRetry={() => void loadSection("overview", { force: true })}
-          />
-        ) : (
-        <section className="order-3 relative z-0 admin-section p-5 md:p-6">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div>
-              <h2 className="admin-heading text-2xl">آخر الطلبات الجديدة</h2>
-              <p className="mt-2 text-sm font-bold text-slate-600">أحدث الطلبات التي تحتاج متابعة سريعة.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <AdminSectionRefreshingIndicator visible={sectionStates.overview.refreshing} />
+        {activeAdminTab !== "overview" ? (
+          <section className="admin-hub-subtoolbar admin-section">
+            <button
+              type="button"
+              className="admin-standalone-back-link"
+              onClick={() => setActiveAdminTab("overview")}
+            >
+              ← العودة للرئيسية
+            </button>
+            <div className="admin-hub-subtoolbar__actions">
               <button
                 type="button"
-                onClick={() => void loadSection("overview", { force: true })}
-                className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200 transition hover:bg-cyan-400/20"
+                className="admin-btn-surface px-4 py-2"
+                onClick={toggleCommandPalette}
               >
-                تحديث القسم
+                ⌘K
               </button>
-              <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-xs font-black text-cyan-200">
-                {recentOverviewItems.length} طلب
-              </span>
-            </div>
-          </div>
-
-          {recentOverviewItems.length === 0 ? (
-            <div className="mt-5 rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-400/5 p-8 text-center">
-              <p className="text-3xl">✅</p>
-              <p className="mt-3 font-black">لا توجد طلبات جديدة حالياً</p>
-            </div>
-          ) : (
-            <div className="admin-scroll-panel admin-scroll-panel--list mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {recentOverviewItems.map((item) => (
+              <div className="relative" ref={activeAdminTab !== "overview" ? adminNotificationsRef : undefined}>
                 <button
-                  key={item.id}
                   type="button"
-                  onClick={() => {
-                    setActiveAdminTab(item.tab);
-                    if (item.tab === "analysis") setFilter("pending");
-                    if (item.tab === "accounts") setAccountFilter("pending");
-                    if (item.tab === "subscriptions") setSubscriptionFilter("pending");
-                  }}
-                  className="admin-inline-panel text-right transition hover:border-cyan-300 hover:bg-cyan-50"
+                  ref={activeAdminTab !== "overview" ? adminNotificationsBellRef : undefined}
+                  className="admin-btn-surface px-4 py-2"
+                  onClick={handleAdminNotificationsBellClick}
                 >
-                  <div className="flex items-start gap-3">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-xl">
-                      {item.icon}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black">{item.title}</p>
-                      <p className="mt-1 text-sm font-bold text-slate-600">{item.message}</p>
-                      {item.createdAt && (
-                        <p className="mt-2 text-xs font-bold text-slate-400">{item.createdAt}</p>
-                      )}
-                    </div>
-                  </div>
+                  🔔
+                  {adminUnreadCount > 0 ? ` (${adminUnreadCount})` : ""}
                 </button>
-              ))}
+              </div>
+              <button type="button" className="admin-btn-surface px-4 py-2" onClick={logoutAdmin}>
+                خروج
+              </button>
             </div>
-          )}
-        </section>
-        )}
-
-        <AdminHubCards />
-
-        {activityFeedPending ? (
-          <AdminActivityFeed loading />
-        ) : sectionStates["activity-feed"].error ? (
-          <AdminActivityFeed
-            error={sectionStates["activity-feed"].error}
-            onRefresh={handleActivityFeedRefresh}
-          />
-        ) : (
-          <AdminActivityFeed
-            events={activityFeedEvents}
-            partialFailure={activityFeedPartialFailure}
-            refreshing={sectionStates["activity-feed"].refreshing}
-            onRefresh={handleActivityFeedRefresh}
-            onOpenEvent={handleActivityEventOpen}
-          />
-        )}
-          </div>
-        )}
+          </section>
+        ) : null}
 
         {activeAdminTab === "vip" && (
         <section className="space-y-5">
@@ -2478,6 +2225,12 @@ export default function AdminPage() {
         </section>
         ))}
       </div>
+
+      <AdminCommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onExecute={handleCommandExecute}
+      />
 
       <AdminUserQuickPreviewDrawer
         open={previewDrawerOpen}

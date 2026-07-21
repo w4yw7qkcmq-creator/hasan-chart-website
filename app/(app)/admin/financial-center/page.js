@@ -6,7 +6,7 @@ import FinancialCenterPanel from "../components/FinancialCenterPanel";
 
 export default function AdminFinancialCenterPage() {
   return (
-    <div className="admin-standalone-page">
+    <div className="admin-standalone-page admin-standalone-page--calm">
       <div className="admin-standalone-page__toolbar">
         <Link href="/admin" className="admin-standalone-back-link">
           ← العودة إلى لوحة الإدارة

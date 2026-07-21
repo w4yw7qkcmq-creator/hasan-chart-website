@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { useAdminUserCenter } from "../../../../lib/use-admin-user-center";
 import AdminUserDrawerShell from "./AdminUserDrawerShell";
@@ -25,7 +26,7 @@ export default function AdminUserActionConfirmModal({
         <p className="mt-3 text-sm leading-7 text-slate-600">{pendingAction.description}</p>
         {pendingAction.requireReason ? (
           <div className="mt-4">
-            <label className="text-xs font-bold text-slate-500">سبب التعليق (إلزامي)</label>
+            <label className="text-xs font-bold text-slate-500">سبب الإجراء (إلزامي)</label>
             <textarea
               value={actionReason}
               onChange={(event) => onActionReasonChange(event.target.value)}
@@ -86,91 +87,169 @@ export function AdminUserCenterView({
     <>
       {layoutMode === "page" ? (
         <div className="admin-standalone-page admin-user-center-page">
-          <div className="admin-standalone-page__toolbar">
-            <Link href="/admin/users" className="admin-standalone-back-link">
-              ← العودة إلى إدارة المستخدمين
-            </Link>
-            <button
-              type="button"
-              className="admin-btn-surface px-4 py-2"
-              onClick={() => center.refreshSections(["overview"])}
-            >
-              تحديث
-            </button>
-          </div>
-
           <header className="admin-user-center-page__hero">
-            <div>
-              <p className="admin-user-hero__eyebrow">مركز CRM للمستخدم</p>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="admin-heading text-3xl">{user?.username || user?.email || "المستخدم"}</h1>
-                {user?.accountStatusLabel ? (
-                  <span className={`admin-user-status admin-user-status--${user.accountStatus || "active"}`}>
-                    {user.accountStatusIcon} {user.accountStatusLabel}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-2 text-sm font-bold text-slate-500">{user?.email || "—"}</p>
-              <p className="text-xs font-bold text-slate-400">{user?.uid || user?.id || ""}</p>
-              <p className="mt-2 text-sm font-bold text-slate-500">
-                إدارة كاملة للمعلومات، الخدمات، الاشتراكات، المدفوعات، الملاحظات، والنشاط.
-              </p>
+            <div className="admin-user-center-page__hero-top">
+              <Link href="/admin/users" className="admin-standalone-back-link">
+                ← العودة إلى إدارة المستخدمين
+              </Link>
+              <button
+                type="button"
+                className="admin-btn-surface px-4 py-2"
+                onClick={() => center.refreshSections([center.activeTab])}
+              >
+                تحديث
+              </button>
             </div>
-            {center.sectionData.overview?.stats ? (
-              <div className="admin-user-stat-grid admin-user-center-page__hero-stats">
-                <article className="admin-user-stat-card">
-                  <p className="admin-user-stat-card__label">خدمات نشطة</p>
-                  <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.activeServicesCount ?? 0}</p>
-                </article>
-                <article className="admin-user-stat-card">
-                  <p className="admin-user-stat-card__label">اشتراكات نشطة</p>
-                  <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.activeSubscriptionsCount ?? 0}</p>
-                </article>
-                <article className="admin-user-stat-card">
-                  <p className="admin-user-stat-card__label">الطلبات</p>
-                  <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.requestsCount ?? 0}</p>
-                </article>
-                <article className="admin-user-stat-card">
-                  <p className="admin-user-stat-card__label">التنبيهات</p>
-                  <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.alertsCount ?? 0}</p>
-                </article>
+            <div className="admin-user-center-page__hero-main">
+              <div className="admin-user-center-page__identity">
+                <div className="admin-user-center-page__identity-row">
+                  <div className="admin-user-avatar admin-user-avatar--hero" aria-hidden="true">
+                    {user?.avatarUrl ? (
+                      <Image
+                        src={user.avatarUrl}
+                        alt=""
+                        width={72}
+                        height={72}
+                        className="admin-user-avatar__image admin-user-avatar--lg"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="admin-user-avatar__initials admin-user-avatar--lg">
+                        {String(user?.username || user?.email || "؟").trim().slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="admin-user-hero__eyebrow">مركز CRM للمستخدم</p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h1 className="admin-heading text-3xl">{user?.username || user?.email || "المستخدم"}</h1>
+                      {user?.accountStatusLabel ? (
+                        <span className={`admin-user-status admin-user-status--${user.accountStatus || "active"}`}>
+                          {user.accountStatusIcon} {user.accountStatusLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="admin-user-center-page__email">{user?.email || "—"}</p>
+                    <p className="admin-user-center-page__uid">{user?.uid || user?.id || ""}</p>
+                    <dl className="admin-user-center-page__meta-grid">
+                      <div>
+                        <dt>Telegram</dt>
+                        <dd>{user?.telegram || "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>الدور</dt>
+                        <dd>{user?.role || "user"}</dd>
+                      </div>
+                      <div>
+                        <dt>التسجيل</dt>
+                        <dd>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString("ar") : "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>آخر دخول</dt>
+                        <dd>{user?.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString("ar") : "—"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
               </div>
-            ) : null}
+              {center.sectionState?.overview?.loading && !center.sectionData.overview?.stats ? (
+                <div className="admin-user-stat-grid admin-user-center-page__hero-stats admin-user-stat-grid--skeleton animate-pulse">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="admin-user-stat-card admin-user-stat-card--skeleton h-20" />
+                  ))}
+                </div>
+              ) : center.sectionData.overview?.stats ? (
+                <div className="admin-user-stat-grid admin-user-center-page__hero-stats admin-user-stat-grid--premium">
+                  <article className="admin-user-stat-card admin-user-stat-card--premium">
+                    <span className="admin-user-stat-card__icon" aria-hidden="true">⭐</span>
+                    <p className="admin-user-stat-card__label">خدمات نشطة</p>
+                    <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.activeServicesCount ?? 0}</p>
+                  </article>
+                  <article className="admin-user-stat-card admin-user-stat-card--premium">
+                    <span className="admin-user-stat-card__icon" aria-hidden="true">💳</span>
+                    <p className="admin-user-stat-card__label">اشتراكات نشطة</p>
+                    <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.activeSubscriptionsCount ?? 0}</p>
+                  </article>
+                  <article className="admin-user-stat-card admin-user-stat-card--premium">
+                    <span className="admin-user-stat-card__icon" aria-hidden="true">📋</span>
+                    <p className="admin-user-stat-card__label">الطلبات</p>
+                    <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.requestsCount ?? 0}</p>
+                  </article>
+                  <article className="admin-user-stat-card admin-user-stat-card--premium">
+                    <span className="admin-user-stat-card__icon" aria-hidden="true">🔔</span>
+                    <p className="admin-user-stat-card__label">التنبيهات</p>
+                    <p className="admin-user-stat-card__value">{center.sectionData.overview.stats.alertsCount ?? 0}</p>
+                  </article>
+                </div>
+              ) : null}
+            </div>
           </header>
-        </div>
-      ) : null}
 
-      <AdminUserDrawerShell
-        layoutMode={layoutMode}
-        activeTab={center.activeTab}
-        tabs={center.tabs}
-        onTabChange={center.setActiveTab}
-        onClose={onClose}
-        overview={center.sectionData.overview}
-        services={center.sectionData.services}
-        subscriptions={center.sectionData.subscriptions}
-        payments={center.sectionData.payments}
-        notifications={center.sectionData.notifications}
-        emails={center.sectionData.emails}
-        activity={center.sectionData.activity}
-        notes={center.sectionData.notes}
-        management={center.sectionData.management}
-        audit={center.sectionData.audit}
-        sectionState={center.sectionState}
-        pages={center.pages}
-        actionLoading={center.actionLoading}
-        currentAdminUserId={currentAdminUserId}
-        onPageChange={center.handlePageChange}
-        onRefreshSection={(section) => center.refreshSections([section])}
-        onRequestAction={center.setPendingAction}
-        onRunAction={center.runAction}
-        onAddNote={center.noteHandlers.onAddNote}
-        onUpdateNote={center.noteHandlers.onUpdateNote}
-        onDeleteNote={center.noteHandlers.onDeleteNote}
-        onTogglePinNote={center.noteHandlers.onTogglePinNote}
-        activityFilter={center.activityFilter}
-        onActivityFilterChange={center.handleActivityFilterChange}
-      />
+          <AdminUserDrawerShell
+            layoutMode={layoutMode}
+            activeTab={center.activeTab}
+            tabs={center.tabs}
+            onTabChange={center.setActiveTab}
+            onClose={onClose}
+            overview={center.sectionData.overview}
+            services={center.sectionData.services}
+            subscriptions={center.sectionData.subscriptions}
+            payments={center.sectionData.payments}
+            notifications={center.sectionData.notifications}
+            emails={center.sectionData.emails}
+            activity={center.sectionData.activity}
+            notes={center.sectionData.notes}
+            management={center.sectionData.management}
+            audit={center.sectionData.audit}
+            sectionState={center.sectionState}
+            pages={center.pages}
+            actionLoading={center.actionLoading}
+            currentAdminUserId={currentAdminUserId}
+            onPageChange={center.handlePageChange}
+            onRefreshSection={(section) => center.refreshSections([section])}
+            onRequestAction={center.setPendingAction}
+            onRunAction={center.runAction}
+            onAddNote={center.noteHandlers.onAddNote}
+            onUpdateNote={center.noteHandlers.onUpdateNote}
+            onDeleteNote={center.noteHandlers.onDeleteNote}
+            onTogglePinNote={center.noteHandlers.onTogglePinNote}
+            activityFilter={center.activityFilter}
+            onActivityFilterChange={center.handleActivityFilterChange}
+          />
+        </div>
+      ) : (
+        <AdminUserDrawerShell
+          layoutMode={layoutMode}
+          activeTab={center.activeTab}
+          tabs={center.tabs}
+          onTabChange={center.setActiveTab}
+          onClose={onClose}
+          overview={center.sectionData.overview}
+          services={center.sectionData.services}
+          subscriptions={center.sectionData.subscriptions}
+          payments={center.sectionData.payments}
+          notifications={center.sectionData.notifications}
+          emails={center.sectionData.emails}
+          activity={center.sectionData.activity}
+          notes={center.sectionData.notes}
+          management={center.sectionData.management}
+          audit={center.sectionData.audit}
+          sectionState={center.sectionState}
+          pages={center.pages}
+          actionLoading={center.actionLoading}
+          currentAdminUserId={currentAdminUserId}
+          onPageChange={center.handlePageChange}
+          onRefreshSection={(section) => center.refreshSections([section])}
+          onRequestAction={center.setPendingAction}
+          onRunAction={center.runAction}
+          onAddNote={center.noteHandlers.onAddNote}
+          onUpdateNote={center.noteHandlers.onUpdateNote}
+          onDeleteNote={center.noteHandlers.onDeleteNote}
+          onTogglePinNote={center.noteHandlers.onTogglePinNote}
+          activityFilter={center.activityFilter}
+          onActivityFilterChange={center.handleActivityFilterChange}
+        />
+      )}
 
       <AdminUserActionConfirmModal
         pendingAction={center.pendingAction}

@@ -14,7 +14,7 @@ export default function AdminUsersPage() {
   }, [user?.id]);
 
   return (
-    <div className="admin-standalone-page">
+    <div className="admin-standalone-page admin-standalone-page--calm">
       <AdminUserManagementPanel standalone currentAdminUserId={currentAdminUserId} />
     </div>
   );
