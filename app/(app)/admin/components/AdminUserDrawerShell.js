@@ -842,7 +842,7 @@ export default function AdminUserDrawerShell({
             children: (
               <>
                 {MANAGEMENT_SECTIONS.map((section) => (
-                  <section key={section.title} className="admin-user-management-section admin-user-section-card">
+                  <section key={section.title} className="admin-user-management-section admin-user-section-card admin-user-management-section--calm">
                     <h4 className="admin-user-drawer__section-title">{section.title}</h4>
                     <div className="admin-user-actions-grid mt-3">
                       {section.actions.map((item) => {

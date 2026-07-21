@@ -191,19 +191,38 @@ export function AdminUserCenterView({
     <>
       {layoutMode === "page" ? (
         <div className="admin-standalone-page admin-user-center-page">
-          <header className="admin-user-center-page__hero">
-            <div className="admin-user-center-page__hero-top">
-              <Link href="/admin/users" className="admin-standalone-back-link">
-                ← العودة إلى إدارة المستخدمين
+          <div className="admin-user-center-page__sticky-toolbar">
+            <div className="admin-user-center-page__sticky-toolbar-nav">
+              <Link href="/admin/users" className="admin-user-center-page__sticky-btn admin-user-center-page__sticky-btn--primary">
+                <span className="admin-user-center-page__sticky-label admin-user-center-page__sticky-label--full">
+                  ← العودة إلى إدارة المستخدمين
+                </span>
+                <span className="admin-user-center-page__sticky-label admin-user-center-page__sticky-label--short">
+                  ← المستخدمون
+                </span>
               </Link>
-              <button
-                type="button"
-                className="admin-btn-surface px-4 py-2"
-                onClick={() => center.refreshSections([center.activeTab])}
-              >
-                تحديث
-              </button>
+              <Link href="/admin" className="admin-user-center-page__sticky-btn admin-user-center-page__sticky-btn--secondary">
+                <span className="admin-user-center-page__sticky-label admin-user-center-page__sticky-label--full">
+                  لوحة الإدارة
+                </span>
+                <span className="admin-user-center-page__sticky-label admin-user-center-page__sticky-label--short">
+                  لوحة الإدارة
+                </span>
+              </Link>
             </div>
+            <p className="admin-user-center-page__sticky-title" title={user?.email || ""}>
+              {user?.username || user?.email || "المستخدم"}
+            </p>
+            <button
+              type="button"
+              className="admin-user-center-page__sticky-refresh"
+              onClick={() => center.refreshSections([center.activeTab])}
+            >
+              تحديث
+            </button>
+          </div>
+
+          <header className="admin-user-center-page__hero">
             <div className="admin-user-center-page__hero-main">
               <div className="admin-user-center-page__identity">
                 <div className="admin-user-center-page__identity-row">

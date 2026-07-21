@@ -2,8 +2,23 @@
 
 import Image from "next/image";
 import { createPortal } from "react-dom";
+import { useEffect } from "react";
 
 export default function AdminPaymentProofModal({ proof, onClose }) {
+  useEffect(() => {
+    if (!proof) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose?.();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose, proof]);
+
   if (!proof || typeof document === "undefined") return null;
 
   const proofValue = String(proof.proof || "").trim();
