@@ -23,6 +23,7 @@ import { supabase } from "../../lib/supabase";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const [authReady, setAuthReady] = useState(false);
   const [authResolved, setAuthResolved] = useState(false);
   const [status, setStatus] = useState("loading");
   const [user, setUser] = useState(null);
@@ -30,6 +31,7 @@ export function AuthProvider({ children }) {
   const enrichRequestRef = useRef(0);
   const initCompleteRef = useRef(false);
   const initInFlightRef = useRef(false);
+  const authenticatedRef = useRef(false);
 
   const enrichUserProfile = useCallback(async (authUser) => {
     if (!authUser?.email) {
@@ -71,6 +73,7 @@ export function AuthProvider({ children }) {
         : buildMinimalAppUser(authUser);
 
       if (!minimalUser) {
+        authenticatedRef.current = false;
         setUser(null);
         setStatus("unauthenticated");
         setProfileReady(true);
@@ -78,6 +81,7 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      authenticatedRef.current = true;
       setUser(minimalUser);
       setStatus("authenticated");
       setAuthResolved(true);
@@ -102,23 +106,18 @@ export function AuthProvider({ children }) {
 
   const clearAuthenticatedUser = useCallback(() => {
     enrichRequestRef.current += 1;
+    authenticatedRef.current = false;
     setUser(null);
     setStatus("unauthenticated");
     setProfileReady(true);
     setAuthResolved(true);
   }, []);
 
-  const resolveAuthUserWithRetry = useCallback(async () => {
-    let { user: authUser, error } = await resolveSupabaseAuthUser();
-
-    if (authUser?.email) {
-      return { authUser, error: null };
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    ({ user: authUser, error } = await resolveSupabaseAuthUser());
-
-    return { authUser, error };
+  const markAuthError = useCallback(() => {
+    enrichRequestRef.current += 1;
+    setStatus("error");
+    setProfileReady(true);
+    setAuthResolved(true);
   }, []);
 
   useEffect(() => {
@@ -128,26 +127,19 @@ export function AuthProvider({ children }) {
       if (initInFlightRef.current) return;
       initInFlightRef.current = true;
       initCompleteRef.current = false;
-      setStatus("loading");
-      setAuthResolved(false);
+      setAuthReady(false);
+
+      if (!authenticatedRef.current) {
+        setStatus("loading");
+        setAuthResolved(false);
+      }
 
       try {
         const restored = await restoreSessionFromCookies();
 
         if (!active) return;
 
-        const { authUser, error } = await resolveAuthUserWithRetry();
-
-        if (!active) return;
-
-        if (authUser?.email) {
-          applyAuthenticatedUser(authUser, {
-            serverSessionUser: restored.sessionUser,
-          });
-          return;
-        }
-
-        if (restored.sessionUser?.email) {
+        if (restored.outcome === "authenticated" && restored.sessionUser?.email) {
           applyAuthenticatedUser(
             {
               id: restored.sessionUser.id,
@@ -156,23 +148,54 @@ export function AuthProvider({ children }) {
             },
             { serverSessionUser: restored.sessionUser }
           );
+
+          if (!restored.restored && restored.session?.access_token && restored.session?.refresh_token) {
+            void supabase.auth
+              .setSession({
+                access_token: restored.session.access_token,
+                refresh_token: restored.session.refresh_token,
+              })
+              .catch((err) => {
+                console.warn("Background setSession skipped:", err?.message || err);
+              });
+          }
           return;
         }
 
-        if (error) {
-          console.warn("resolveSupabaseAuthUser skipped:", error.message);
+        if (restored.outcome === "transient_error") {
+          const { user: authUser } = await resolveSupabaseAuthUser();
+
+          if (!active) return;
+
+          if (authUser?.email) {
+            applyAuthenticatedUser(authUser);
+            return;
+          }
+
+          markAuthError();
+          return;
+        }
+
+        const { user: authUser } = await resolveSupabaseAuthUser();
+
+        if (!active) return;
+
+        if (authUser?.email) {
+          applyAuthenticatedUser(authUser);
+          return;
         }
 
         clearAuthenticatedUser();
       } catch (err) {
         console.warn("initAuth failed:", err?.message || err);
         if (active) {
-          clearAuthenticatedUser();
+          markAuthError();
         }
       } finally {
         initInFlightRef.current = false;
         if (active) {
           initCompleteRef.current = true;
+          setAuthReady(true);
         }
       }
     }
@@ -182,7 +205,7 @@ export function AuthProvider({ children }) {
     return () => {
       active = false;
     };
-  }, [applyAuthenticatedUser, clearAuthenticatedUser, resolveAuthUserWithRetry]);
+  }, [applyAuthenticatedUser, clearAuthenticatedUser, markAuthError]);
 
   useEffect(() => {
     let active = true;
@@ -206,27 +229,26 @@ export function AuthProvider({ children }) {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         const sessionUser = session?.user ?? null;
 
-        setTimeout(() => {
+        void (async () => {
           if (!active) return;
 
-          void (async () => {
-            if (sessionUser?.email) {
-              applyAuthenticatedUser(sessionUser);
-              return;
-            }
+          if (sessionUser?.email) {
+            applyAuthenticatedUser(sessionUser);
+            return;
+          }
 
-            const { user: authUser, error } = await resolveSupabaseAuthUser();
+          const { user: authUser, error } = await resolveSupabaseAuthUser();
 
-            if (!active) return;
+          if (!active) return;
 
-            if (error || !authUser?.email) {
-              clearAuthenticatedUser();
-              return;
-            }
+          if (error || !authUser?.email) {
+            if (!initCompleteRef.current) return;
+            clearAuthenticatedUser();
+            return;
+          }
 
-            applyAuthenticatedUser(authUser);
-          })();
-        }, 0);
+          applyAuthenticatedUser(authUser);
+        })();
       }
     });
 
@@ -235,6 +257,63 @@ export function AuthProvider({ children }) {
       subscription.unsubscribe();
     };
   }, [applyAuthenticatedUser, clearAuthenticatedUser]);
+
+  const retryAuth = useCallback(() => {
+    if (initInFlightRef.current) return;
+
+    setAuthReady(false);
+    setAuthResolved(false);
+    setStatus("loading");
+
+    void (async () => {
+      initInFlightRef.current = true;
+      initCompleteRef.current = false;
+
+      try {
+        const restored = await restoreSessionFromCookies();
+
+        if (restored.outcome === "authenticated" && restored.sessionUser?.email) {
+          applyAuthenticatedUser(
+            {
+              id: restored.sessionUser.id,
+              email: restored.sessionUser.email,
+              user_metadata: { role: restored.sessionUser.role },
+            },
+            { serverSessionUser: restored.sessionUser }
+          );
+          return;
+        }
+
+        if (restored.outcome === "transient_error") {
+          const { user: authUser } = await resolveSupabaseAuthUser();
+
+          if (authUser?.email) {
+            applyAuthenticatedUser(authUser);
+            return;
+          }
+
+          markAuthError();
+          return;
+        }
+
+        const { user: authUser } = await resolveSupabaseAuthUser();
+
+        if (authUser?.email) {
+          applyAuthenticatedUser(authUser);
+          return;
+        }
+
+        clearAuthenticatedUser();
+      } catch (err) {
+        console.warn("retryAuth failed:", err?.message || err);
+        markAuthError();
+      } finally {
+        initInFlightRef.current = false;
+        initCompleteRef.current = true;
+        setAuthReady(true);
+      }
+    })();
+  }, [applyAuthenticatedUser, clearAuthenticatedUser, markAuthError]);
 
   const acknowledgeSignIn = useCallback(
     (authUser) => {
@@ -278,6 +357,7 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(
     () => ({
+      authReady,
       authResolved,
       profileReady,
       status,
@@ -285,9 +365,10 @@ export function AuthProvider({ children }) {
       isAdmin,
       acknowledgeSignIn,
       logout,
+      retryAuth,
       updateUser: setUser,
     }),
-    [authResolved, profileReady, status, user, isAdmin, acknowledgeSignIn, logout]
+    [authReady, authResolved, profileReady, status, user, isAdmin, acknowledgeSignIn, logout, retryAuth]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

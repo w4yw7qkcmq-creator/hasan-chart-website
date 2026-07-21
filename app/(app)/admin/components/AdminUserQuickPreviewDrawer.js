@@ -83,7 +83,11 @@ export default function AdminUserQuickPreviewDrawer({ open, userId, onClose }) {
     if (!open) return undefined;
 
     const onKeyDown = (event) => {
-      if (event.key === "Escape") onClose?.();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose?.();
+      }
     };
 
     previousOverflowRef.current = document.body.style.overflow;
