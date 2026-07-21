@@ -222,7 +222,11 @@ function RecentOpCard({ title, subtitle, meta, badge, onAction, actionLabel }) {
       <div className="admin-financial-op-card__aside">
         {badge ? <span className="admin-financial-op-card__badge">{badge}</span> : null}
         {onAction && actionLabel ? (
-          <button type="button" className="admin-user-manage-btn" onClick={onAction}>
+          <button
+            type="button"
+            className="admin-financial-action-button admin-financial-action-button--primary"
+            onClick={onAction}
+          >
             {actionLabel}
           </button>
         ) : null}
@@ -471,11 +475,11 @@ export default function FinancialCenterPanel({ standalone = false }) {
     }
   };
 
-  const openProof = async (requestId) => {
+  const openProof = async (requestId, context = {}) => {
     setProofLoadingId(String(requestId));
     try {
       const proof = await fetchPaymentProof(adminFetch, requestId);
-      setProofPreview(proof);
+      setProofPreview({ ...context, ...proof });
     } catch (err) {
       setError(err?.message || "تعذر تحميل إثبات الدفع");
     } finally {
@@ -507,10 +511,10 @@ export default function FinancialCenterPanel({ standalone = false }) {
             </p>
           </div>
           <div className="admin-financial-dashboard__header-actions">
-            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => void loadSection(activeTab, { force: true })}>
+            <button type="button" className="admin-financial-action-button admin-financial-action-button--secondary px-4 py-2" onClick={() => void loadSection(activeTab, { force: true })}>
               تحديث
             </button>
-            <button type="button" className="admin-btn-surface px-4 py-2" onClick={() => void handleExport()}>
+            <button type="button" className="admin-financial-action-button admin-financial-action-button--primary px-4 py-2" onClick={() => void handleExport()}>
               تصدير CSV
             </button>
           </div>
@@ -548,7 +552,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
       {error ? (
         <div className="admin-section admin-financial-dashboard__error">
           <p className="font-black text-red-700">{error}</p>
-          <button type="button" className="admin-btn-surface mt-4 px-5 py-3" onClick={() => void loadSection(activeTab, { force: true })}>
+          <button type="button" className="admin-financial-action-button admin-financial-action-button--primary mt-4 px-5 py-3" onClick={() => void loadSection(activeTab, { force: true })}>
             إعادة المحاولة
           </button>
         </div>
@@ -633,7 +637,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
                 <article className="admin-section admin-financial-panel">
                   <div className="admin-financial-panel__head">
                     <h2 className="admin-heading text-lg">طلبات الدفع قيد المراجعة</h2>
-                    <button type="button" className="admin-user-manage-btn" onClick={() => setActiveTab("payment-reviews")}>
+                    <button type="button" className="admin-financial-action-button admin-financial-action-button--secondary" onClick={() => setActiveTab("payment-reviews")}>
                       عرض الكل
                     </button>
                   </div>
@@ -651,7 +655,14 @@ export default function FinancialCenterPanel({ standalone = false }) {
                           badge="مراجعة"
                           onAction={
                             item.paymentProofAvailable
-                              ? () => void openProof(item.requestId || item.id)
+                              ? () =>
+                                  void openProof(item.requestId || item.id, {
+                                    username: item.username,
+                                    userEmail: item.userEmail,
+                                    planName: item.plan,
+                                    priceRaw: item.priceRaw,
+                                    status: item.status,
+                                  })
                               : undefined
                           }
                           actionLabel={
@@ -714,7 +725,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
                       <td>{item.expiresAt ? new Date(item.expiresAt).toLocaleDateString("ar") : "—"}</td>
                       <td>
                         {item.userId ? (
-                          <button type="button" className="admin-user-manage-btn" onClick={() => openUser(item.userId)}>
+                          <button type="button" className="admin-financial-action-button admin-financial-action-button--secondary" onClick={() => openUser(item.userId)}>
                             CRM
                           </button>
                         ) : null}
@@ -766,9 +777,17 @@ export default function FinancialCenterPanel({ standalone = false }) {
                       <td>
                         <button
                           type="button"
-                          className="admin-user-manage-btn"
+                          className="admin-financial-action-button admin-financial-action-button--primary"
                           disabled={proofLoadingId === String(item.requestId)}
-                          onClick={() => void openProof(item.requestId)}
+                          onClick={() =>
+                            void openProof(item.requestId, {
+                              username: item.username,
+                              userEmail: item.userEmail,
+                              planName: item.plan,
+                              priceRaw: item.priceRaw,
+                              status: item.status,
+                            })
+                          }
                         >
                           {proofLoadingId === String(item.requestId) ? "..." : "عرض الإثبات"}
                         </button>

@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import { assertAdminCanActOnTarget, resolveAccountStatusFromProfile } from "../lib/account-lifecycle.js";
 import { isAdminActionResponseSuccess } from "../lib/admin-user-management-client.js";
 import {
+  isActiveSubscriptionRequest,
+} from "../lib/admin-user-service-classifier.js";
+
+function isVipActiveUser(user) {
+  return user?.activeServices?.vip === true;
+}
+
+function isAccountManagementActiveUser(user) {
+  return user?.activeServices?.accountManagement === true;
+}
+import {
   ACTIVITY_FILTER_TYPES,
   ADMIN_NOTES_TABLE_MISSING_MESSAGE,
   buildUnavailableSectionPayload,
@@ -131,6 +142,24 @@ function testDoubleSubmitGuardPattern() {
   assert.equal(run(), true);
 }
 
+function testActiveServiceUserFlags() {
+  assert.equal(
+    isVipActiveUser({
+      activeServices: { vip: true },
+      subscriptionPlan: "",
+      subscriptionStatus: "",
+    }),
+    true
+  );
+  assert.equal(
+    isAccountManagementActiveUser({
+      activeServices: { accountManagement: true },
+    }),
+    true
+  );
+  assert.equal(isActiveSubscriptionRequest({ status: "pending" }), false);
+}
+
 const tests = [
   ["dangerous confirmation", testDangerousConfirmation],
   ["self action blocked", testSelfActionBlocked],
@@ -142,6 +171,7 @@ const tests = [
   ["error sanitization", testErrorSanitization],
   ["admin action response success", testAdminActionResponseSuccess],
   ["double-submit guard pattern", testDoubleSubmitGuardPattern],
+  ["active service user flags", testActiveServiceUserFlags],
 ];
 
 let passed = 0;

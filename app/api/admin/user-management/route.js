@@ -31,6 +31,7 @@ export async function GET(request) {
     const order = String(searchParams.get("order") || "desc").trim().toLowerCase();
 
     const accountStatus = String(searchParams.get("accountStatus") || "").trim().toLowerCase();
+    const activeService = String(searchParams.get("activeService") || "").trim().toLowerCase();
 
     const payload = await loadAdminUserList(adminCheck.supabase, {
       page,
@@ -39,6 +40,7 @@ export async function GET(request) {
       sort: sort === "last_sign_in" ? "last_sign_in" : "created_at",
       order: order === "asc" ? "asc" : "desc",
       accountStatus,
+      activeService,
     });
 
     return Response.json(payload, {

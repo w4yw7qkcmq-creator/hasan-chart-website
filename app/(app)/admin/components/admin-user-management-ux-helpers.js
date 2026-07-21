@@ -1,4 +1,13 @@
-import { fetchAdminUserList } from "../../../../lib/admin-user-management-client";
+import { fetchAdminUserList, fetchAdminUserDashboardStats } from "../../../../lib/admin-user-management-client";
+import {
+  isActiveAccountManagementRequest,
+  isActivePriceAlertRow,
+  isActiveSubscriptionRequest,
+  isExpiredSubscriptionRequest,
+  isVipServiceType,
+  matchesAdminServiceFilter,
+  normalizeAdminUserServiceType,
+} from "../../../../lib/admin-user-service-classifier.js";
 
 export const DASHBOARD_SCAN_MAX_PAGES = 10;
 
@@ -56,6 +65,36 @@ export const DEFAULT_CLIENT_FILTERS = {
   lastLoginTo: "",
   subscriptionState: "all",
 };
+
+function readActiveServices(user) {
+  return user?.activeServices || {};
+}
+
+function isVipActiveUser(user) {
+  const flags = readActiveServices(user);
+  if (flags.vip === true) return true;
+  const text = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
+  return /vip|spot|future|فيوتشر|سبوت|signal|إشارات|قناة/.test(text) && /active|نشط|مفعل/.test(text);
+}
+
+function isAccountManagementActiveUser(user) {
+  const flags = readActiveServices(user);
+  if (flags.accountManagement === true) return true;
+  const text = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
+  return /account|إدارة|management/.test(text) && /active|نشط|مفعل|approved|تمت/.test(text);
+}
+
+function isPriceAlertsActiveUser(user) {
+  const flags = readActiveServices(user);
+  if (flags.priceAlerts === true) return true;
+  const text = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
+  return /alert|تنبيه/.test(text);
+}
+
+function isExpiredSubscriptionUser(user) {
+  const status = String(user.subscriptionStatus || "").toLowerCase();
+  return /expired|منته|ended|inactive|غير/.test(status) && Boolean(user.subscriptionPlan);
+}
 
 function matchesSubscriptionState(user, subscriptionState) {
   if (!subscriptionState || subscriptionState === "all") return true;
@@ -147,13 +186,27 @@ export function applyClientUserFilters(users, filters) {
     }
 
     if (service !== "all") {
-      const planText = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
-      if (service === "vip" && !/vip|spot|future|فيوتشر|سبوت/.test(planText) && !(user.activeSubscriptionsCount > 0 && /vip/.test(planText))) {
-        return false;
+      const flags = readActiveServices(user);
+      if (service === "vip" && flags.vip) {
+        // matched via server flags
+      } else if (service === "account_management" && flags.accountManagement) {
+        // matched via server flags
+      } else if (service === "alerts" && flags.priceAlerts) {
+        // matched via server flags
+      } else if (service === "academy" && flags.academy) {
+        // matched via server flags
+      } else {
+        const planText = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
+        if (
+          service === "vip" &&
+          !/vip|spot|future|فيوتشر|سبوت|signal|signals|إشارات|private\s*channel/.test(planText)
+        ) {
+          return false;
+        }
+        if (service === "account_management" && !/account|إدارة|management/.test(planText)) return false;
+        if (service === "alerts" && !/alert|تنبيه/.test(planText)) return false;
+        if (service === "academy" && !/academy|أكاديم/.test(planText)) return false;
       }
-      if (service === "account_management" && !/account|إدارة|management/.test(planText)) return false;
-      if (service === "alerts" && !/alert|تنبيه/.test(planText)) return false;
-      if (service === "academy" && !/academy|أكاديم/.test(planText)) return false;
     }
 
     const createdAt = user.createdAt ? new Date(user.createdAt).getTime() : null;
@@ -166,26 +219,6 @@ export function applyClientUserFilters(users, filters) {
 
     return true;
   });
-}
-
-function isVipActiveUser(user) {
-  const text = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
-  return /vip|spot|future|فيوتشر|سبوت/.test(text) && /active|نشط|مفعل/.test(text);
-}
-
-function isAccountManagementActiveUser(user) {
-  const text = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
-  return /account|إدارة|management/.test(text) && /active|نشط|مفعل|approved|تمت/.test(text);
-}
-
-function isPriceAlertsActiveUser(user) {
-  const text = `${user.subscriptionPlan || ""} ${user.subscriptionStatus || ""}`.toLowerCase();
-  return /alert|تنبيه/.test(text) || (user.activeSubscriptionsCount > 0 && /alert/.test(text));
-}
-
-function isExpiredSubscriptionUser(user) {
-  const status = String(user.subscriptionStatus || "").toLowerCase();
-  return /expired|منته|ended|inactive|غير/.test(status) && Boolean(user.subscriptionPlan);
 }
 
 function isNewWithinDays(dateValue, days) {
@@ -228,16 +261,20 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
   const statusTotals = {};
 
-  await Promise.all(
-    statusKeys.map(async ({ key, status }) => {
+  const [serviceStats, ...statusResults] = await Promise.all([
+    fetchAdminUserDashboardStats(adminFetch, { signal }),
+    ...statusKeys.map(async ({ key, status }) => {
       const result = await fetchAdminUserList(adminFetch, {
         page: 1,
         accountStatus: status === "all" ? "" : status,
         signal,
       });
       statusTotals[key] = Number(result.pagination?.total || 0);
-    })
-  );
+      return result;
+    }),
+  ]);
+
+  void statusResults;
 
   const scannedUsers = [];
   let totalPages = 1;
@@ -259,10 +296,24 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
   return {
     ...statusTotals,
-    ...derived,
+    vipActive: Number(serviceStats.vipActive || 0),
+    accountManagementActive: Number(serviceStats.accountManagementActive || 0),
+    priceAlertsActive: Number(serviceStats.priceAlertsActive ?? derived.priceAlertsActive ?? 0),
+    expiredSubscriptions: Number(serviceStats.expiredSubscriptions || derived.expiredSubscriptions || 0),
+    newToday: derived.newToday,
+    newThisWeek: derived.newThisWeek,
     scannedSampleSize: scannedUsers.length,
     scanComplete: totalPages <= DASHBOARD_SCAN_MAX_PAGES,
+    serviceStatsSources: serviceStats.sources || null,
   };
+}
+
+function resolveServerActiveServiceFilter(clientFilters = {}) {
+  const { service = "all", subscriptionState = "all" } = clientFilters;
+  if (subscriptionState === "active_vip" && service === "vip") return "vip";
+  if (subscriptionState === "active_am" && service === "account_management") return "account_management";
+  if (subscriptionState === "active_alerts" && service === "alerts") return "alerts";
+  return "";
 }
 
 export async function fetchUsersForClientView(
@@ -277,16 +328,19 @@ export async function fetchUsersForClientView(
     signal,
   } = {}
 ) {
+  const serverActiveService = resolveServerActiveServiceFilter(clientFilters);
+
   const needsClientPass =
-    Boolean(search.trim()) ||
-    clientFilters.service !== "all" ||
-    Boolean(clientFilters.plan?.trim()) ||
-    clientFilters.status !== "all" ||
-    (clientFilters.subscriptionState && clientFilters.subscriptionState !== "all") ||
-    Boolean(clientFilters.registeredFrom) ||
-    Boolean(clientFilters.registeredTo) ||
-    Boolean(clientFilters.lastLoginFrom) ||
-    Boolean(clientFilters.lastLoginTo);
+    !serverActiveService &&
+    (Boolean(search.trim()) ||
+      clientFilters.service !== "all" ||
+      Boolean(clientFilters.plan?.trim()) ||
+      clientFilters.status !== "all" ||
+      (clientFilters.subscriptionState && clientFilters.subscriptionState !== "all") ||
+      Boolean(clientFilters.registeredFrom) ||
+      Boolean(clientFilters.registeredTo) ||
+      Boolean(clientFilters.lastLoginFrom) ||
+      Boolean(clientFilters.lastLoginTo));
 
   if (!needsClientPass) {
     const result = await fetchAdminUserList(adminFetch, {
@@ -295,12 +349,13 @@ export async function fetchUsersForClientView(
       sort,
       order,
       accountStatus,
+      activeService: serverActiveService,
       signal,
     });
     return {
       users: result.users || [],
       pagination: result.pagination,
-      mode: "server",
+      mode: serverActiveService ? "server-active-service" : "server",
     };
   }
 
@@ -411,3 +466,17 @@ export const SERVICE_OPTIONS = [
   { key: "alerts", label: "التنبيهات" },
   { key: "academy", label: "الأكاديمية" },
 ];
+
+export {
+  isVipActiveUser,
+  isAccountManagementActiveUser,
+  isPriceAlertsActiveUser,
+  isExpiredSubscriptionUser,
+  isActiveSubscriptionRequest,
+  isActiveAccountManagementRequest,
+  isActivePriceAlertRow,
+  isExpiredSubscriptionRequest,
+  isVipServiceType,
+  matchesAdminServiceFilter,
+  normalizeAdminUserServiceType,
+};

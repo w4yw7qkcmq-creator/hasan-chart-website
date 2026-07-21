@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import {
   parseSubscriptionPrice,
   normalizeSubscriptionStatus,
@@ -136,6 +138,16 @@ function testNormalizeSubscriptionRow() {
   assert.equal(row.priceAmount, 100);
 }
 
+function testFinanceUiMarkup() {
+  const modalSource = fs.readFileSync(
+    path.join(process.cwd(), "app/(app)/admin/components/AdminPaymentProofModal.js"),
+    "utf8"
+  );
+  assert.match(modalSource, /admin-financial-proof-modal__close/);
+  assert.match(modalSource, /admin-financial-action-button--primary/);
+  assert.match(modalSource, /document\.body\.style\.overflow = "hidden"/);
+}
+
 const tests = [
   ["parse prices", testParsePrices],
   ["normalize statuses", testNormalizeStatuses],
@@ -144,6 +156,7 @@ const tests = [
   ["currency separation", testCurrencySeparation],
   ["permissions", testPermissions],
   ["normalize subscription row", testNormalizeSubscriptionRow],
+  ["finance ui markup", testFinanceUiMarkup],
 ];
 
 for (const [name, runner] of tests) {
