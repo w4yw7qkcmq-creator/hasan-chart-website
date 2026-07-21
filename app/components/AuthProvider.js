@@ -11,6 +11,14 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { isAdminUser } from "../../lib/admin-emails";
+import {
+  AUTH_BOOTSTRAP_MAX_ATTEMPTS,
+  getBootstrapRetryDelayMs,
+  isBootstrapRequestCurrent,
+  shouldMarkBootstrapError,
+  shouldRunBootstrapRetry,
+  waitWithAbort,
+} from "../../lib/auth-bootstrap-restore";
 import { buildAppUser } from "../../lib/auth-profile";
 import {
   buildAppUserFromSessionPayload,
@@ -30,11 +38,41 @@ export function AuthProvider({ children }) {
   const [profileReady, setProfileReady] = useState(false);
   const enrichRequestRef = useRef(0);
   const initCompleteRef = useRef(false);
-  const initInFlightRef = useRef(false);
   const authenticatedRef = useRef(false);
+  const bootstrapRequestRef = useRef(0);
+  const bootstrapAbortRef = useRef(null);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      bootstrapAbortRef.current?.abort();
+    };
+  }, []);
+
+  const isCurrentBootstrap = useCallback((requestId) => {
+    return mountedRef.current && isBootstrapRequestCurrent(bootstrapRequestRef.current, requestId);
+  }, []);
+
+  const setBootstrapStatus = useCallback((requestId, nextStatus) => {
+    if (!isCurrentBootstrap(requestId)) return;
+    setStatus(nextStatus);
+  }, [isCurrentBootstrap]);
+
+  const setBootstrapLoadingState = useCallback(
+    (requestId, { nextStatus = "loading" } = {}) => {
+      if (!isCurrentBootstrap(requestId)) return;
+      setStatus(nextStatus);
+      setAuthResolved(false);
+      setAuthReady(false);
+    },
+    [isCurrentBootstrap]
+  );
 
   const enrichUserProfile = useCallback(async (authUser) => {
     if (!authUser?.email) {
+      if (!mountedRef.current) return;
       setProfileReady(true);
       return;
     }
@@ -50,7 +88,7 @@ export function AuthProvider({ children }) {
         }),
       ]);
 
-      if (enrichRequestRef.current !== requestId) {
+      if (!mountedRef.current || enrichRequestRef.current !== requestId) {
         return;
       }
 
@@ -60,7 +98,7 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.warn("Profile enrich skipped:", err?.message || err);
     } finally {
-      if (enrichRequestRef.current === requestId) {
+      if (mountedRef.current && enrichRequestRef.current === requestId) {
         setProfileReady(true);
       }
     }
@@ -68,6 +106,8 @@ export function AuthProvider({ children }) {
 
   const applyAuthenticatedUser = useCallback(
     (authUser, { enrichProfile = true, serverSessionUser = null } = {}) => {
+      if (!mountedRef.current) return;
+
       const minimalUser = serverSessionUser?.email
         ? buildAppUserFromSessionPayload(serverSessionUser)
         : buildMinimalAppUser(authUser);
@@ -105,6 +145,8 @@ export function AuthProvider({ children }) {
   );
 
   const clearAuthenticatedUser = useCallback(() => {
+    if (!mountedRef.current) return;
+
     enrichRequestRef.current += 1;
     authenticatedRef.current = false;
     setUser(null);
@@ -113,99 +155,226 @@ export function AuthProvider({ children }) {
     setAuthResolved(true);
   }, []);
 
-  const markAuthError = useCallback(() => {
-    enrichRequestRef.current += 1;
-    setStatus("error");
-    setProfileReady(true);
-    setAuthResolved(true);
-  }, []);
+  const markAuthErrorForRequest = useCallback(
+    (requestId) => {
+      if (
+        !shouldMarkBootstrapError({
+          currentRequestId: bootstrapRequestRef.current,
+          requestId,
+          mounted: mountedRef.current,
+          authenticated: authenticatedRef.current,
+        })
+      ) {
+        return;
+      }
 
-  useEffect(() => {
-    let active = true;
+      enrichRequestRef.current += 1;
+      setStatus("error");
+      setProfileReady(true);
+      setAuthResolved(true);
+    },
+    []
+  );
 
-    async function initAuth() {
-      if (initInFlightRef.current) return;
-      initInFlightRef.current = true;
-      initCompleteRef.current = false;
+  const applyRestoredSession = useCallback(
+    (restored) => {
+      applyAuthenticatedUser(
+        {
+          id: restored.sessionUser.id,
+          email: restored.sessionUser.email,
+          user_metadata: { role: restored.sessionUser.role },
+        },
+        { serverSessionUser: restored.sessionUser }
+      );
+
+      if (!restored.restored && restored.session?.access_token && restored.session?.refresh_token) {
+        void supabase.auth
+          .setSession({
+            access_token: restored.session.access_token,
+            refresh_token: restored.session.refresh_token,
+          })
+          .catch((err) => {
+            console.warn("Background setSession skipped:", err?.message || err);
+          });
+      }
+    },
+    [applyAuthenticatedUser]
+  );
+
+  const beginAuthBootstrap = useCallback(() => {
+    bootstrapAbortRef.current?.abort();
+
+    const requestId = bootstrapRequestRef.current + 1;
+    bootstrapRequestRef.current = requestId;
+
+    const controller = new AbortController();
+    bootstrapAbortRef.current = controller;
+    initCompleteRef.current = false;
+
+    if (mountedRef.current && !authenticatedRef.current) {
       setAuthReady(false);
-
-      if (!authenticatedRef.current) {
-        setStatus("loading");
-        setAuthResolved(false);
-      }
-
-      try {
-        const restored = await restoreSessionFromCookies();
-
-        if (!active) return;
-
-        if (restored.outcome === "authenticated" && restored.sessionUser?.email) {
-          applyAuthenticatedUser(
-            {
-              id: restored.sessionUser.id,
-              email: restored.sessionUser.email,
-              user_metadata: { role: restored.sessionUser.role },
-            },
-            { serverSessionUser: restored.sessionUser }
-          );
-
-          if (!restored.restored && restored.session?.access_token && restored.session?.refresh_token) {
-            void supabase.auth
-              .setSession({
-                access_token: restored.session.access_token,
-                refresh_token: restored.session.refresh_token,
-              })
-              .catch((err) => {
-                console.warn("Background setSession skipped:", err?.message || err);
-              });
-          }
-          return;
-        }
-
-        if (restored.outcome === "transient_error") {
-          const { user: authUser } = await resolveSupabaseAuthUser();
-
-          if (!active) return;
-
-          if (authUser?.email) {
-            applyAuthenticatedUser(authUser);
-            return;
-          }
-
-          markAuthError();
-          return;
-        }
-
-        const { user: authUser } = await resolveSupabaseAuthUser();
-
-        if (!active) return;
-
-        if (authUser?.email) {
-          applyAuthenticatedUser(authUser);
-          return;
-        }
-
-        clearAuthenticatedUser();
-      } catch (err) {
-        console.warn("initAuth failed:", err?.message || err);
-        if (active) {
-          markAuthError();
-        }
-      } finally {
-        initInFlightRef.current = false;
-        if (active) {
-          initCompleteRef.current = true;
-          setAuthReady(true);
-        }
-      }
+      setAuthResolved(false);
+      setStatus("loading");
     }
 
-    void initAuth();
+    return { requestId, signal: controller.signal };
+  }, []);
+
+  const finishAuthBootstrap = useCallback((requestId) => {
+    if (!isCurrentBootstrap(requestId)) return;
+
+    initCompleteRef.current = true;
+    setAuthReady(true);
+  }, [isCurrentBootstrap]);
+
+  const runAuthBootstrap = useCallback(
+    async ({ requestId, signal }) => {
+      for (let attempt = 1; attempt <= AUTH_BOOTSTRAP_MAX_ATTEMPTS; attempt += 1) {
+        if (!isCurrentBootstrap(requestId)) {
+          return "cancelled";
+        }
+
+        if (authenticatedRef.current) {
+          return "authenticated";
+        }
+
+        setBootstrapLoadingState(requestId, {
+          nextStatus: attempt === 1 ? "loading" : "restoring",
+        });
+
+        try {
+          const restored = await restoreSessionFromCookies({ signal });
+
+          if (!isCurrentBootstrap(requestId)) {
+            return "cancelled";
+          }
+
+          if (authenticatedRef.current) {
+            return "authenticated";
+          }
+
+          if (restored.outcome === "authenticated" && restored.sessionUser?.email) {
+            applyRestoredSession(restored);
+            return "authenticated";
+          }
+
+          if (restored.outcome === "unauthenticated") {
+            const { user: authUser } = await resolveSupabaseAuthUser();
+
+            if (!isCurrentBootstrap(requestId)) {
+              return "cancelled";
+            }
+
+            if (authenticatedRef.current || authUser?.email) {
+              if (authUser?.email) {
+                applyAuthenticatedUser(authUser);
+              }
+              return "authenticated";
+            }
+
+            clearAuthenticatedUser();
+            return "unauthenticated";
+          }
+
+          const { user: authUser } = await resolveSupabaseAuthUser();
+
+          if (!isCurrentBootstrap(requestId)) {
+            return "cancelled";
+          }
+
+          if (authenticatedRef.current || authUser?.email) {
+            if (authUser?.email) {
+              applyAuthenticatedUser(authUser);
+            }
+            return "authenticated";
+          }
+
+          if (
+            shouldRunBootstrapRetry({
+              outcome: "transient_error",
+              attempt,
+              maxAttempts: AUTH_BOOTSTRAP_MAX_ATTEMPTS,
+            })
+          ) {
+            setBootstrapStatus(requestId, "restoring");
+            await waitWithAbort(getBootstrapRetryDelayMs(attempt), signal);
+            continue;
+          }
+
+          markAuthErrorForRequest(requestId);
+          return "error";
+        } catch (err) {
+          if (err?.name === "AbortError") {
+            return "cancelled";
+          }
+
+          console.warn("runAuthBootstrap attempt failed:", err?.message || err);
+
+          if (!isCurrentBootstrap(requestId)) {
+            return "cancelled";
+          }
+
+          if (authenticatedRef.current) {
+            return "authenticated";
+          }
+
+          if (
+            shouldRunBootstrapRetry({
+              outcome: "transient_error",
+              attempt,
+              maxAttempts: AUTH_BOOTSTRAP_MAX_ATTEMPTS,
+            })
+          ) {
+            setBootstrapStatus(requestId, "restoring");
+            await waitWithAbort(getBootstrapRetryDelayMs(attempt), signal);
+            continue;
+          }
+
+          markAuthErrorForRequest(requestId);
+          return "error";
+        }
+      }
+
+      if (
+        shouldMarkBootstrapError({
+          currentRequestId: bootstrapRequestRef.current,
+          requestId,
+          mounted: mountedRef.current,
+          authenticated: authenticatedRef.current,
+        })
+      ) {
+        markAuthErrorForRequest(requestId);
+        return "error";
+      }
+
+      return authenticatedRef.current ? "authenticated" : "cancelled";
+    },
+    [
+      applyAuthenticatedUser,
+      applyRestoredSession,
+      clearAuthenticatedUser,
+      isCurrentBootstrap,
+      markAuthErrorForRequest,
+      setBootstrapLoadingState,
+      setBootstrapStatus,
+    ]
+  );
+
+  useEffect(() => {
+    const { requestId, signal } = beginAuthBootstrap();
+
+    void (async () => {
+      try {
+        await runAuthBootstrap({ requestId, signal });
+      } finally {
+        finishAuthBootstrap(requestId);
+      }
+    })();
 
     return () => {
-      active = false;
+      bootstrapAbortRef.current?.abort();
     };
-  }, [applyAuthenticatedUser, clearAuthenticatedUser, markAuthError]);
+  }, [beginAuthBootstrap, finishAuthBootstrap, runAuthBootstrap]);
 
   useEffect(() => {
     let active = true;
@@ -259,61 +428,16 @@ export function AuthProvider({ children }) {
   }, [applyAuthenticatedUser, clearAuthenticatedUser]);
 
   const retryAuth = useCallback(() => {
-    if (initInFlightRef.current) return;
-
-    setAuthReady(false);
-    setAuthResolved(false);
-    setStatus("loading");
+    const { requestId, signal } = beginAuthBootstrap();
 
     void (async () => {
-      initInFlightRef.current = true;
-      initCompleteRef.current = false;
-
       try {
-        const restored = await restoreSessionFromCookies();
-
-        if (restored.outcome === "authenticated" && restored.sessionUser?.email) {
-          applyAuthenticatedUser(
-            {
-              id: restored.sessionUser.id,
-              email: restored.sessionUser.email,
-              user_metadata: { role: restored.sessionUser.role },
-            },
-            { serverSessionUser: restored.sessionUser }
-          );
-          return;
-        }
-
-        if (restored.outcome === "transient_error") {
-          const { user: authUser } = await resolveSupabaseAuthUser();
-
-          if (authUser?.email) {
-            applyAuthenticatedUser(authUser);
-            return;
-          }
-
-          markAuthError();
-          return;
-        }
-
-        const { user: authUser } = await resolveSupabaseAuthUser();
-
-        if (authUser?.email) {
-          applyAuthenticatedUser(authUser);
-          return;
-        }
-
-        clearAuthenticatedUser();
-      } catch (err) {
-        console.warn("retryAuth failed:", err?.message || err);
-        markAuthError();
+        await runAuthBootstrap({ requestId, signal });
       } finally {
-        initInFlightRef.current = false;
-        initCompleteRef.current = true;
-        setAuthReady(true);
+        finishAuthBootstrap(requestId);
       }
     })();
-  }, [applyAuthenticatedUser, clearAuthenticatedUser, markAuthError]);
+  }, [beginAuthBootstrap, finishAuthBootstrap, runAuthBootstrap]);
 
   const acknowledgeSignIn = useCallback(
     (authUser) => {
@@ -335,6 +459,8 @@ export function AuthProvider({ children }) {
   );
 
   const logout = useCallback(async () => {
+    bootstrapAbortRef.current?.abort();
+
     try {
       await fetch("/api/auth/logout", {
         method: "POST",
