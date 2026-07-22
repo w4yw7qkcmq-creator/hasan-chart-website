@@ -35,7 +35,17 @@ import {
   matchesAdminStatusFilter,
 } from "./admin-dashboard-helpers";
 import StatusBadge from "./components/StatusBadge";
+import AdminProofPreviewModal from "./components/AdminProofPreviewModal";
+import SubscriptionRejectModal from "./components/SubscriptionRejectModal";
+import SubscriptionRejectionDetailsModal from "./components/SubscriptionRejectionDetailsModal";
+import SubscriptionRequestTimeline from "./components/SubscriptionRequestTimeline";
 import { useAdminCommandPaletteShortcut } from "./components/AdminCommandPalette";
+import {
+  createAdminActionInFlightRegistry,
+  runAdminUserActionFlow,
+} from "../../../lib/admin-user-action-flow";
+import { canRejectSubscriptionRequest } from "../../../lib/admin-subscription-request-reject-shared.js";
+import { isRejectedSubscriptionStatus } from "../../../lib/admin-subscription-rejection-details.js";
 import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
 import {
   ADMIN_SHELL_SECTIONS,
@@ -255,6 +265,10 @@ export default function AdminPage() {
   const [accountKeys, setAccountKeys] = useState({});
   const [accountKeysLoading, setAccountKeysLoading] = useState({});
   const [proofPreview, setProofPreview] = useState(null);
+  const [subscriptionRejectTarget, setSubscriptionRejectTarget] = useState(null);
+  const [subscriptionRejectLoading, setSubscriptionRejectLoading] = useState(false);
+  const [subscriptionRejectionDetailsTarget, setSubscriptionRejectionDetailsTarget] = useState(null);
+  const subscriptionActionInFlightRef = useRef(createAdminActionInFlightRegistry());
 
   // Admin Notice/Confirm modals
   const [adminNotice, setAdminNotice] = useState({
@@ -842,65 +856,176 @@ export default function AdminPage() {
   ]);
 
   const updateSubscriptionRequest = async (request, newStatus) => {
-    const needsConfirm = newStatus === "مفعل" || newStatus === "مرفوض";
+    if (newStatus === "مرفوض") {
+      setSubscriptionRejectTarget(request);
+      return;
+    }
 
-    if (needsConfirm) {
-      const confirmed = await confirmAdminAction(
-        newStatus === "مفعل"
-          ? "هل تريد تفعيل هذا الاشتراك للمستخدم؟"
-          : "هل تريد رفض طلب الاشتراك؟"
-      );
-
+    if (newStatus === "مفعل") {
+      const confirmed = await confirmAdminAction("هل تريد تفعيل هذا الاشتراك للمستخدم؟");
       if (!confirmed) return;
     }
 
-    try {
-      const response = await adminFetch("/api/admin/dashboard", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "update-subscription-request",
-          requestId: request.id,
-          status: newStatus,
-          userEmail: request.userEmail,
-          planName: request.planName,
-        }),
-      });
+    const actionKey = `subscription:${request.id}:${newStatus}`;
 
-      const result = await response.json().catch(() => ({}));
+    const flowResult = await runAdminUserActionFlow({
+      actionKey,
+      inFlightRegistry: subscriptionActionInFlightRef.current,
+      execute: async () => {
+        const response = await adminFetch("/api/admin/dashboard", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "update-subscription-request",
+            requestId: request.id,
+            status: newStatus,
+            userEmail: request.userEmail,
+            planName: request.planName,
+          }),
+        });
 
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "تعذر تحديث حالة طلب الاشتراك");
-      }
+        const result = await response.json().catch(() => ({}));
 
-      setSubscriptionRequests((prev) =>
-        prev.map((item) =>
-          item.id === request.id ? { ...item, status: newStatus } : item
-        )
-      );
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "تعذر تحديث حالة طلب الاشتراك");
+        }
 
-      if (newStatus === "مفعل") {
-        setUsers((prev) =>
-          prev.map((user) =>
-            user.email === request.userEmail
-              ? {
-                  ...user,
-                  subscription_plan: request.planName,
-                  subscription_status: "نشط",
-                }
-              : user
+        return result;
+      },
+      refresh: async () => {
+        await loadSection("subscriptions", { force: true, background: true });
+      },
+      successMessage: newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك",
+      errorMessage: "تعذر تحديث حالة طلب الاشتراك",
+      onSuccess: () => {
+        setSubscriptionRequests((prev) =>
+          prev.map((item) =>
+            item.id === request.id ? { ...item, status: newStatus } : item
           )
         );
+
+        if (newStatus === "مفعل") {
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.email === request.userEmail
+                ? {
+                    ...user,
+                    subscription_plan: request.planName,
+                    subscription_status: "نشط",
+                  }
+                : user
+            )
+          );
+        }
+      },
+    });
+
+    if (flowResult.blocked) return;
+
+    if (flowResult.success) {
+      showAdminNotice(
+        flowResult.refreshFailed
+          ? `${flowResult.successMessage} — تعذر تحديث القائمة تلقائياً.`
+          : flowResult.successMessage
+      );
+      return;
+    }
+
+    showAdminNotice(flowResult.errorMessage || "تعذر تحديث حالة طلب الاشتراك", "error");
+  };
+
+  const confirmSubscriptionRejection = async ({ reasonLabel, notes }) => {
+    const request = subscriptionRejectTarget;
+    if (!request) return;
+
+    const actionKey = `subscription:${request.id}:reject`;
+
+    setSubscriptionRejectLoading(true);
+
+    const flowResult = await runAdminUserActionFlow({
+      actionKey,
+      inFlightRegistry: subscriptionActionInFlightRef.current,
+      execute: async () => {
+        const response = await adminFetch(
+          `/api/admin/subscription-requests/${encodeURIComponent(request.id)}/reject`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              rejectionReason: reasonLabel,
+              rejectionNotes: notes,
+            }),
+          }
+        );
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "تعذر رفض طلب الاشتراك");
+        }
+
+        return result;
+      },
+      refresh: async () => {
+        await loadSection("subscriptions", { force: true, background: true });
+      },
+      successMessage: "تم رفض طلب الاشتراك",
+      errorMessage: "تعذر رفض طلب الاشتراك",
+      onSuccess: (apiResult) => {
+        setSubscriptionRequests((prev) =>
+          prev.map((item) => {
+            if (item.id !== request.id) return item;
+
+            const details = apiResult?.rejectionDetails;
+            return {
+              ...item,
+              status: "مرفوض",
+              rejectionDetails: details
+                ? {
+                    rejectionReason: details.rejectionReason || "",
+                    adminNotes: details.adminNotes || "",
+                    rejectedAt: details.rejectedAt
+                      ? new Date(details.rejectedAt).toLocaleString("ar")
+                      : "",
+                    rejectedByEmail: details.rejectedByEmail || "",
+                    notificationCreated: Boolean(details.notificationCreated),
+                    emailQueued: Boolean(details.emailQueued),
+                  }
+                : item.rejectionDetails,
+            };
+          })
+        );
+        setSubscriptionRejectTarget(null);
+      },
+    });
+
+    setSubscriptionRejectLoading(false);
+
+    if (flowResult.blocked) return;
+
+    if (flowResult.success) {
+      const apiResult = flowResult.data || {};
+      let message = flowResult.refreshFailed
+        ? "تم رفض طلب الاشتراك — تعذر تحديث القائمة تلقائياً."
+        : flowResult.successMessage;
+
+      if (apiResult.notificationWarning) {
+        message = `${message} — ${apiResult.notificationWarning}`;
       }
 
-      showAdminNotice(
-        newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك"
-      );
-    } catch (error) {
-      showAdminNotice(error?.message || "تعذر تحديث حالة طلب الاشتراك", "error");
+      if (apiResult.emailWarning) {
+        message = `${message} — ${apiResult.emailWarning}`;
+      }
+
+      showAdminNotice(message);
+      return;
     }
+
+    showAdminNotice(flowResult.errorMessage || "تعذر رفض طلب الاشتراك", "error");
   };
 
   const stats = useMemo(() => {
@@ -1372,39 +1497,26 @@ export default function AdminPage() {
         onClose={() => setAdminNotice((current) => ({ ...current, open: false }))}
       />
 
-      {proofPreview && isValidPreviewUrl(proofPreview) && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className="pointer-events-auto fixed inset-0 z-[200] flex flex-col bg-slate-950/75 backdrop-blur-md"
-              onClick={() => setProofPreview(null)}
-            >
-              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-cyan-300/15 bg-black/30 px-4 py-4 md:px-6">
-                <p className="text-lg font-black">معاينة الصورة</p>
-                <button
-                  type="button"
-                  onClick={() => setProofPreview(null)}
-                  className="admin-btn-surface px-6 py-3"
-                >
-                  إغلاق
-                </button>
-              </div>
-              <div
-                className="flex flex-1 items-center justify-center overflow-auto p-4 md:p-8"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Image
-                  src={proofPreview}
-                  alt="معاينة الصورة"
-                  width={1400}
-                  height={1000}
-                  sizes="100vw"
-                  className="max-h-[calc(100vh-88px)] max-w-full rounded-2xl border border-cyan-300/15 bg-black/20 object-contain shadow-[0_20px_70px_rgba(14,165,233,0.2)]"
-                />
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+      <AdminProofPreviewModal
+        imageUrl={isValidPreviewUrl(proofPreview) ? proofPreview : null}
+        onClose={() => setProofPreview(null)}
+      />
+
+      <SubscriptionRejectModal
+        request={subscriptionRejectTarget}
+        loading={subscriptionRejectLoading}
+        onCancel={() => {
+          if (!subscriptionRejectLoading) {
+            setSubscriptionRejectTarget(null);
+          }
+        }}
+        onConfirm={confirmSubscriptionRejection}
+      />
+
+      <SubscriptionRejectionDetailsModal
+        request={subscriptionRejectionDetailsTarget}
+        onClose={() => setSubscriptionRejectionDetailsTarget(null)}
+      />
 
       {adminNotificationsOpen &&
       adminNotificationsDropdownStyle &&
@@ -2172,6 +2284,24 @@ export default function AdminPage() {
                       >
                         تفعيل الاشتراك
                       </button>
+                      {canRejectSubscriptionRequest(req.status) ? (
+                        <button
+                          type="button"
+                          onClick={() => updateSubscriptionRequest(req, "مرفوض")}
+                          className="admin-btn--reject rounded-2xl px-5 py-3 font-black transition hover:scale-[1.01] hover:brightness-110"
+                        >
+                          ❌ رفض الاشتراك
+                        </button>
+                      ) : null}
+                      {isRejectedSubscriptionStatus(req.status) ? (
+                        <button
+                          type="button"
+                          onClick={() => setSubscriptionRejectionDetailsTarget(req)}
+                          className="admin-btn--view-rejection rounded-2xl px-5 py-3 font-black transition hover:scale-[1.01] hover:brightness-110"
+                        >
+                          عرض سبب الرفض
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   {(req.telegramUsername || isValidPreviewUrl(req.paymentProof)) && (
@@ -2218,6 +2348,17 @@ export default function AdminPage() {
                       )}
                     </div>
                   )}
+
+                  <div className="mt-6">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h4 className="admin-heading text-lg">سجل الطلب</h4>
+                    </div>
+                    <SubscriptionRequestTimeline
+                      timeline={req.timeline}
+                      summary={req.timelineSummary}
+                      sparse={req.timelineSparse}
+                    />
+                  </div>
                 </article>
               ))}
             </div>

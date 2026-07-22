@@ -73,6 +73,13 @@ export default function StatusBadge({ status, variant = "admin-request" }) {
   }
 
   const isReviewed = getAdminStatusKey(status) === "reviewed";
+  const normalized = String(status || "").trim();
+
+  if (normalized === "مرفوض") {
+    return (
+      <span className="admin-badge admin-badge--rejected shrink-0">مرفوض</span>
+    );
+  }
 
   return (
     <span className={`admin-badge shrink-0 ${isReviewed ? "admin-badge--reviewed" : "admin-badge--pending"}`}>

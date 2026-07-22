@@ -123,6 +123,33 @@ export const formatSubscriptionRequest = (item) => ({
   paymentProof: item.payment_proof || "",
   status: item.status || "قيد المعالجة",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
+  rejectionDetails: item.rejection_details
+    ? {
+        rejectionReason: item.rejection_details.rejectionReason || "",
+        adminNotes: item.rejection_details.adminNotes || "",
+        rejectedAt: item.rejection_details.rejectedAt
+          ? new Date(item.rejection_details.rejectedAt).toLocaleString("ar")
+          : "",
+        rejectedByEmail: item.rejection_details.rejectedByEmail || "",
+        notificationCreated: Boolean(item.rejection_details.notificationCreated),
+        emailQueued: Boolean(item.rejection_details.emailQueued),
+      }
+    : null,
+  timeline: Array.isArray(item.timeline) ? item.timeline : [],
+  timelineSummary: item.timeline_summary
+    ? {
+        totalEvents: Number(item.timeline_summary.totalEvents) || 0,
+        lastUpdateLabel: item.timeline_summary.lastUpdateLabel || "—",
+        lastAdminEmail: item.timeline_summary.lastAdminEmail || "—",
+        hasAdminHistory: Boolean(item.timeline_summary.hasAdminHistory),
+      }
+    : {
+        totalEvents: 0,
+        lastUpdateLabel: "—",
+        lastAdminEmail: "—",
+        hasAdminHistory: false,
+      },
+  timelineSparse: Boolean(item.timeline_sparse),
 });
 
 export const formatAccountManagementRequest = (item) => ({
