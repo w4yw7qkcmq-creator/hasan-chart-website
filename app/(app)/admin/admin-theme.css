@@ -316,6 +316,108 @@ html[data-theme="light"] .admin-theme-page .admin-badge--suspended {
   color: var(--admin-text);
 }
 
+.admin-theme-page .admin-filter-btn--idle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(56, 168, 242, 0.38);
+  background: rgba(56, 168, 242, 0.16);
+}
+
+.admin-theme-page .admin-filter-btn--active:hover,
+.admin-theme-page .admin-filter-btn--expired-active:hover {
+  transform: translateY(-1px);
+}
+
+.admin-theme-page .admin-filter-btn--expired-active {
+  border: none;
+  background: linear-gradient(to left, #f59e0b, #ef4444);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28);
+}
+
+.admin-theme-page .admin-filter-btn--expired-idle {
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+}
+
+html[data-theme="light"] .admin-theme-page .admin-filter-btn--expired-idle {
+  border-color: rgba(217, 119, 6, 0.34);
+  background: rgba(251, 191, 36, 0.14);
+  color: #b45309;
+}
+
+html[data-theme="light"] .admin-theme-page .admin-filter-btn--expired-active {
+  color: #fff;
+}
+
+.admin-user-table__status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.admin-user-subscription-state {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.admin-user-subscription-state--active {
+  background: rgba(16, 185, 129, 0.14);
+  color: #6ee7b7;
+}
+
+.admin-user-subscription-state--expired {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+}
+
+.admin-user-subscription-state--mixed {
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+}
+
+.admin-user-subscription-state--none {
+  background: rgba(100, 116, 139, 0.18);
+  color: #cbd5e1;
+}
+
+.admin-user-expired-badge-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.admin-user-expired-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.6875rem;
+  font-weight: 900;
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+}
+
+.admin-user-expired-badge__types {
+  font-size: 0.625rem;
+  font-weight: 800;
+  color: rgba(252, 211, 77, 0.82);
+}
+
+html[data-theme="light"] .admin-user-expired-badge {
+  background: rgba(251, 191, 36, 0.18);
+  color: #b45309;
+}
+
+html[data-theme="light"] .admin-user-expired-badge__types {
+  color: #92400e;
+}
+
 .admin-theme-page .admin-section {
   border-radius: 1.875rem;
   border: 1px solid var(--admin-panel-border);

@@ -1,6 +1,11 @@
 import { fetchAdminUserList, fetchAdminUserDashboardStats } from "../../../../lib/admin-user-management-client";
 import {
   countDistinctUsersWithExpiredSubscriptions,
+  EXPIRED_SUBSCRIPTION_FILTER,
+  isExpiredSubscriptionFilterActive,
+  resolveEffectiveAccountStatusFilter,
+  resolveExpiredSubscriptionBadge,
+  resolveUserSubscriptionStateLabel,
   userHasExpiredSubscription,
 } from "../../../../lib/admin-user-subscription-state.js";
 import {
@@ -151,7 +156,7 @@ export function getDashboardCardFilterPreset(cardKey) {
     },
     expiredSubscriptions: {
       accountStatus: "all",
-      clientFilters: { ...DEFAULT_CLIENT_FILTERS, subscriptionState: "expired" },
+      clientFilters: { ...DEFAULT_CLIENT_FILTERS, subscriptionState: EXPIRED_SUBSCRIPTION_FILTER },
     },
     newToday: {
       accountStatus: "all",
@@ -179,7 +184,13 @@ export function applyClientUserFilters(users, filters) {
   } = filters;
 
   return (users || []).filter((user) => {
-    if (status !== "all" && user.accountStatus !== status) return false;
+    if (
+      !isExpiredSubscriptionFilterActive({ subscriptionState }) &&
+      status !== "all" &&
+      user.accountStatus !== status
+    ) {
+      return false;
+    }
 
     if (!matchesSubscriptionState(user, subscriptionState)) return false;
 
@@ -332,6 +343,7 @@ export async function fetchUsersForClientView(
     signal,
   } = {}
 ) {
+  const effectiveAccountStatus = resolveEffectiveAccountStatusFilter(accountStatus, clientFilters);
   const serverActiveService = resolveServerActiveServiceFilter(clientFilters);
 
   const needsClientPass =
@@ -352,7 +364,7 @@ export async function fetchUsersForClientView(
       search,
       sort,
       order,
-      accountStatus,
+      accountStatus: effectiveAccountStatus,
       activeService: serverActiveService,
       signal,
     });
@@ -372,7 +384,7 @@ export async function fetchUsersForClientView(
       search,
       sort,
       order,
-      accountStatus,
+      accountStatus: effectiveAccountStatus,
       signal,
     });
 
@@ -472,6 +484,11 @@ export const SERVICE_OPTIONS = [
 ];
 
 export {
+  EXPIRED_SUBSCRIPTION_FILTER,
+  isExpiredSubscriptionFilterActive,
+  resolveEffectiveAccountStatusFilter,
+  resolveExpiredSubscriptionBadge,
+  resolveUserSubscriptionStateLabel,
   isVipActiveUser,
   isAccountManagementActiveUser,
   isPriceAlertsActiveUser,

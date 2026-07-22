@@ -18,10 +18,15 @@ import AdminUserQuickActions from "./AdminUserQuickActions";
 import {
   BULK_ACTIONS,
   DEFAULT_CLIENT_FILTERS,
+  EXPIRED_SUBSCRIPTION_FILTER,
   exportUsersToCsv,
   fetchDashboardStats,
   fetchUsersForClientView,
   getDashboardCardFilterPreset,
+  isExpiredSubscriptionFilterActive,
+  resolveEffectiveAccountStatusFilter,
+  resolveExpiredSubscriptionBadge,
+  resolveUserSubscriptionStateLabel,
 } from "./admin-user-management-ux-helpers";
 
 function formatDateTime(value) {
@@ -64,6 +69,32 @@ function AccountStatusBadge({ status, label }) {
       : "admin-user-status--active";
 
   return <span className={`admin-user-status ${tone}`}>{label}</span>;
+}
+
+function SubscriptionStateBadge({ user }) {
+  const label = resolveUserSubscriptionStateLabel(user);
+  const tone =
+    label === "نشط + منتهي"
+      ? "admin-user-subscription-state--mixed"
+      : label === "منتهي"
+      ? "admin-user-subscription-state--expired"
+      : label === "نشط"
+      ? "admin-user-subscription-state--active"
+      : "admin-user-subscription-state--none";
+
+  return <span className={`admin-user-subscription-state ${tone}`}>{label}</span>;
+}
+
+function ExpiredSubscriptionBadge({ user }) {
+  const badge = resolveExpiredSubscriptionBadge(user);
+  if (!badge) return null;
+
+  return (
+    <div className="admin-user-expired-badge-wrap">
+      <span className="admin-user-expired-badge">{badge.countLabel}</span>
+      {badge.typesLabel ? <span className="admin-user-expired-badge__types">{badge.typesLabel}</span> : null}
+    </div>
+  );
 }
 
 function UserAvatar({ name, avatarUrl }) {
@@ -167,6 +198,12 @@ export default function AdminUserManagementPanel({
     );
   }, [clientFilters, searchQuery]);
 
+  const expiredFilterActive = isExpiredSubscriptionFilterActive(clientFilters);
+  const effectiveAccountStatusFilter = resolveEffectiveAccountStatusFilter(
+    accountStatusFilter,
+    clientFilters
+  );
+
   const loadDashboard = useCallback(async ({ background = false } = {}) => {
     dashboardAbortRef.current?.abort();
     const controller = new AbortController();
@@ -232,7 +269,8 @@ export default function AdminUserManagementPanel({
             search: searchQuery,
             sort,
             order,
-            accountStatus: accountStatusFilter,
+            accountStatus: effectiveAccountStatusFilter,
+            activeService: expiredFilterActive ? EXPIRED_SUBSCRIPTION_FILTER : "",
             signal: controller.signal,
           });
 
@@ -269,7 +307,7 @@ export default function AdminUserManagementPanel({
         }
       }
     },
-    [accountStatusFilter, clientFilters, hasClientFilters, order, searchQuery, sort]
+    [accountStatusFilter, clientFilters, effectiveAccountStatusFilter, expiredFilterActive, hasClientFilters, order, searchQuery, sort]
   );
 
   const refreshAll = useCallback(
@@ -415,7 +453,30 @@ export default function AdminUserManagementPanel({
     setAccountStatusFilter(preset.accountStatus);
     setClientFilters(preset.clientFilters);
     setPagination((current) => ({ ...current, page: 1 }));
-    setUxNotice(`تم تطبيق فلتر: ${cardKey === "total" ? "الكل" : cardKey}`);
+    setUxNotice(
+      cardKey === "expiredSubscriptions"
+        ? "تم تطبيق فلتر: الاشتراكات المنتهية"
+        : `تم تطبيق فلتر: ${cardKey === "total" ? "الكل" : cardKey}`
+    );
+  };
+
+  const handleAccountStatusFilterClick = (statusId) => {
+    setAccountStatusFilter(statusId);
+    setActiveDashboardKey("");
+    setClientFilters((current) => ({ ...current, subscriptionState: "all", status: "all" }));
+    setPagination((current) => ({ ...current, page: 1 }));
+  };
+
+  const handleExpiredSubscriptionFilterClick = () => {
+    setAccountStatusFilter("all");
+    setActiveDashboardKey("expiredSubscriptions");
+    setClientFilters((current) => ({
+      ...current,
+      subscriptionState: EXPIRED_SUBSCRIPTION_FILTER,
+      status: "all",
+    }));
+    setPagination((current) => ({ ...current, page: 1 }));
+    setUxNotice("تم تطبيق فلتر: الاشتراكات المنتهية");
   };
 
   const handleQuickAction = (actionId) => {
@@ -753,13 +814,9 @@ export default function AdminUserManagementPanel({
               <button
                 key={item.id}
                 type="button"
-                onClick={() => {
-                  setAccountStatusFilter(item.id);
-                  setActiveDashboardKey("");
-                  setPagination((current) => ({ ...current, page: 1 }));
-                }}
-                className={`rounded-2xl border px-4 py-2 text-sm font-black transition ${
-                  accountStatusFilter === item.id
+                onClick={() => handleAccountStatusFilterClick(item.id)}
+                className={`rounded-2xl border px-4 py-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+                  !expiredFilterActive && accountStatusFilter === item.id
                     ? "admin-filter-btn admin-filter-btn--active"
                     : "admin-filter-btn admin-filter-btn--idle"
                 }`}
@@ -767,6 +824,17 @@ export default function AdminUserManagementPanel({
                 {item.label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={handleExpiredSubscriptionFilterClick}
+              className={`rounded-2xl border px-4 py-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 ${
+                expiredFilterActive
+                  ? "admin-filter-btn admin-filter-btn--expired-active"
+                  : "admin-filter-btn admin-filter-btn--expired-idle"
+              }`}
+            >
+              الاشتراكات المنتهية
+            </button>
           </div>
 
           {uxNotice ? <p className="text-xs font-bold text-cyan-200/80">{uxNotice}</p> : null}
@@ -807,6 +875,7 @@ export default function AdminUserManagementPanel({
                   <th>تاريخ التسجيل</th>
                   <th>آخر دخول</th>
                   <th>الحالة</th>
+                  <th>حالة الاشتراك</th>
                   <th>اشتراكات نشطة</th>
                   <th />
                 </tr>
@@ -847,7 +916,13 @@ export default function AdminUserManagementPanel({
                     <td>{formatDateTime(user.createdAt)}</td>
                     <td>{formatDateTime(user.lastSignInAt)}</td>
                     <td>
-                      <AccountStatusBadge status={user.accountStatus} label={user.accountStatusLabel} />
+                      <div className="admin-user-table__status-stack">
+                        <AccountStatusBadge status={user.accountStatus} label={user.accountStatusLabel} />
+                        <ExpiredSubscriptionBadge user={user} />
+                      </div>
+                    </td>
+                    <td>
+                      <SubscriptionStateBadge user={user} />
                     </td>
                     <td>{user.activeSubscriptionsCount}</td>
                     <td onClick={(event) => event.stopPropagation()}>

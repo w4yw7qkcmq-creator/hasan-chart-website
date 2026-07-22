@@ -15,6 +15,9 @@ import {
   computeExpiredSubscriptionCardStats,
   countDistinctUsersWithExpiredSubscriptions,
   filterUsersWithExpiredSubscriptions,
+  resolveEffectiveAccountStatusFilter,
+  resolveExpiredSubscriptionBadge,
+  resolveUserSubscriptionStateLabel,
   summarizeUserSubscriptionRows,
   userHasExpiredSubscription,
 } from "../lib/admin-user-subscription-state.js";
@@ -332,6 +335,7 @@ function buildExpiredFilterScenarioUsers() {
       hasActiveSubscription: false,
       expiredSubscriptionCount: 1,
       activeSubscriptionCount: 0,
+      expiredSubscriptionTypes: ["vip_spot"],
       activeServices: { vip: false },
     },
     {
@@ -342,6 +346,7 @@ function buildExpiredFilterScenarioUsers() {
       hasActiveSubscription: true,
       expiredSubscriptionCount: 1,
       activeSubscriptionCount: 1,
+      expiredSubscriptionTypes: ["vip_futures"],
       activeServices: { vip: true },
     },
     {
@@ -352,6 +357,7 @@ function buildExpiredFilterScenarioUsers() {
       hasActiveSubscription: false,
       expiredSubscriptionCount: 2,
       activeSubscriptionCount: 0,
+      expiredSubscriptionTypes: ["vip_spot", "vip_signals"],
       activeServices: { vip: false },
     },
   ];
@@ -398,6 +404,47 @@ function testExpiredCardFilterMatchesDistinctUsers() {
   assert.equal(vipFiltered.some((user) => user.id === "user-active-and-expired"), true);
 }
 
+function testSubscriptionStateLabelsAndBadges() {
+  const activeOnly = buildExpiredFilterScenarioUsers().find((user) => user.id === "user-active-only");
+  const expiredOnly = buildExpiredFilterScenarioUsers().find((user) => user.id === "user-expired-only");
+  const dualState = buildExpiredFilterScenarioUsers().find((user) => user.id === "user-active-and-expired");
+  const multiExpired = buildExpiredFilterScenarioUsers().find((user) => user.id === "user-multi-expired");
+
+  assert.equal(activeOnly.accountStatus, "active");
+  assert.equal(resolveUserSubscriptionStateLabel(activeOnly), "نشط");
+  assert.equal(resolveExpiredSubscriptionBadge(activeOnly), null);
+
+  assert.equal(resolveUserSubscriptionStateLabel(expiredOnly), "منتهي");
+  assert.equal(resolveExpiredSubscriptionBadge(expiredOnly)?.countLabel, "اشتراك منتهي");
+  assert.match(resolveExpiredSubscriptionBadge(expiredOnly)?.typesLabel || "", /VIP Spot/);
+
+  assert.equal(resolveUserSubscriptionStateLabel(dualState), "نشط + منتهي");
+  assert.equal(resolveExpiredSubscriptionBadge(dualState)?.countLabel, "اشتراك منتهي");
+
+  assert.equal(resolveExpiredSubscriptionBadge(multiExpired)?.countLabel, "2 اشتراكات منتهية");
+}
+
+function testExpiredFilterDoesNotConflictWithAccountStatus() {
+  const users = buildExpiredFilterScenarioUsers();
+  const filtered = filterUsersWithExpiredSubscriptions(users);
+
+  assert.equal(filtered.length, 3);
+  assert.equal(
+    resolveEffectiveAccountStatusFilter("active", { subscriptionState: "expired" }),
+    "all"
+  );
+  assert.equal(filtered.every((user) => user.accountStatus === "active"), true);
+}
+
+function testExpiredKpiMatchesManualFilter() {
+  const users = buildExpiredFilterScenarioUsers();
+  const cardStats = computeExpiredSubscriptionCardStats(users);
+  const manualFiltered = filterUsersWithExpiredSubscriptions(users);
+
+  assert.equal(cardStats.cardCount, manualFiltered.length);
+  assert.equal(cardStats.cardCount, 3);
+}
+
 const tests = [
   ["dangerous confirmation", testDangerousConfirmation],
   ["self action blocked", testSelfActionBlocked],
@@ -417,6 +464,9 @@ const tests = [
   ["expired distinct users and filter match", testExpiredDistinctUsersAndFilterMatch],
   ["expired rows distinct email count", testExpiredRowsDistinctEmailCount],
   ["expired card filter matches distinct users", testExpiredCardFilterMatchesDistinctUsers],
+  ["subscription state labels and badges", testSubscriptionStateLabelsAndBadges],
+  ["expired filter account status conflict", testExpiredFilterDoesNotConflictWithAccountStatus],
+  ["expired kpi matches manual filter", testExpiredKpiMatchesManualFilter],
 ];
 
 let passed = 0;
