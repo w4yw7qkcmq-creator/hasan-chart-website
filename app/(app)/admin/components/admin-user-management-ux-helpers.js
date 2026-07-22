@@ -4,9 +4,11 @@ import {
   EXPIRED_SUBSCRIPTION_FILTER,
   isExpiredSubscriptionFilterActive,
   resolveEffectiveAccountStatusFilter,
+  resolveExpiredServerActiveServiceFilter,
   resolveExpiredSubscriptionBadge,
   resolveUserSubscriptionStateLabel,
   userHasExpiredSubscription,
+  userMatchesExpiredAndServiceFilter,
 } from "../../../../lib/admin-user-subscription-state.js";
 import {
   isActiveAccountManagementRequest,
@@ -104,9 +106,9 @@ function isExpiredSubscriptionUser(user) {
   return userHasExpiredSubscription(user);
 }
 
-function matchesSubscriptionState(user, subscriptionState) {
+function matchesSubscriptionState(user, subscriptionState, service = "all") {
   if (!subscriptionState || subscriptionState === "all") return true;
-  if (subscriptionState === "expired") return isExpiredSubscriptionUser(user);
+  if (subscriptionState === "expired") return userMatchesExpiredAndServiceFilter(user, service);
   if (subscriptionState === "active_vip") return isVipActiveUser(user);
   if (subscriptionState === "active_am") return isAccountManagementActiveUser(user);
   if (subscriptionState === "active_alerts") return isPriceAlertsActiveUser(user);
@@ -192,14 +194,14 @@ export function applyClientUserFilters(users, filters) {
       return false;
     }
 
-    if (!matchesSubscriptionState(user, subscriptionState)) return false;
+    if (!matchesSubscriptionState(user, subscriptionState, service)) return false;
 
     if (plan.trim()) {
       const planText = String(user.subscriptionPlan || "").toLowerCase();
       if (!planText.includes(plan.trim().toLowerCase())) return false;
     }
 
-    if (service !== "all") {
+    if (service !== "all" && subscriptionState !== "expired") {
       const flags = readActiveServices(user);
       if (service === "vip" && flags.vip) {
         // matched via server flags
@@ -324,7 +326,10 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
 function resolveServerActiveServiceFilter(clientFilters = {}) {
   const { service = "all", subscriptionState = "all" } = clientFilters;
-  if (subscriptionState === "expired") return "expired";
+  if (subscriptionState === "expired") {
+    if (service === "all") return "";
+    return resolveExpiredServerActiveServiceFilter(service);
+  }
   if (subscriptionState === "active_vip" && service === "vip") return "vip";
   if (subscriptionState === "active_am" && service === "account_management") return "account_management";
   if (subscriptionState === "active_alerts" && service === "alerts") return "alerts";
@@ -487,8 +492,10 @@ export {
   EXPIRED_SUBSCRIPTION_FILTER,
   isExpiredSubscriptionFilterActive,
   resolveEffectiveAccountStatusFilter,
+  resolveExpiredServerActiveServiceFilter,
   resolveExpiredSubscriptionBadge,
   resolveUserSubscriptionStateLabel,
+  userMatchesExpiredAndServiceFilter,
   isVipActiveUser,
   isAccountManagementActiveUser,
   isPriceAlertsActiveUser,

@@ -25,6 +25,7 @@ import {
   getDashboardCardFilterPreset,
   isExpiredSubscriptionFilterActive,
   resolveEffectiveAccountStatusFilter,
+  resolveExpiredServerActiveServiceFilter,
   resolveExpiredSubscriptionBadge,
   resolveUserSubscriptionStateLabel,
 } from "./admin-user-management-ux-helpers";
@@ -71,28 +72,38 @@ function AccountStatusBadge({ status, label }) {
   return <span className={`admin-user-status ${tone}`}>{label}</span>;
 }
 
-function SubscriptionStateBadge({ user }) {
-  const label = resolveUserSubscriptionStateLabel(user);
-  const tone =
-    label === "نشط + منتهي"
-      ? "admin-user-subscription-state--mixed"
-      : label === "منتهي"
-      ? "admin-user-subscription-state--expired"
-      : label === "نشط"
-      ? "admin-user-subscription-state--active"
-      : "admin-user-subscription-state--none";
+function SubscriptionStateBadge({ user, serviceFilter = "all" }) {
+  const label = resolveUserSubscriptionStateLabel(user, { serviceFilter });
 
-  return <span className={`admin-user-subscription-state ${tone}`}>{label}</span>;
+  if (label === "نشط + منتهي") {
+    return (
+      <span className="admin-subscription-state admin-subscription-state--mixed">
+        <span className="admin-subscription-state__part admin-subscription-state__part--active">نشط</span>
+        <span className="admin-subscription-state__part admin-subscription-state__part--expired">منتهي</span>
+      </span>
+    );
+  }
+
+  const tone =
+    label === "منتهي"
+      ? "admin-subscription-state--expired"
+      : label === "نشط"
+      ? "admin-subscription-state--active"
+      : label === "خدمة غير نشطة"
+      ? "admin-subscription-state--inactive-service"
+      : "admin-subscription-state--none";
+
+  return <span className={`admin-subscription-state ${tone}`}>{label}</span>;
 }
 
-function ExpiredSubscriptionBadge({ user }) {
-  const badge = resolveExpiredSubscriptionBadge(user);
+function ExpiredSubscriptionBadge({ user, serviceFilter = "all" }) {
+  const badge = resolveExpiredSubscriptionBadge(user, { serviceFilter });
   if (!badge) return null;
 
   return (
-    <div className="admin-user-expired-badge-wrap">
-      <span className="admin-user-expired-badge">{badge.countLabel}</span>
-      {badge.typesLabel ? <span className="admin-user-expired-badge__types">{badge.typesLabel}</span> : null}
+    <div className="admin-expired-service-badge-wrap">
+      <span className="admin-expired-service-badge">{badge.countLabel}</span>
+      {badge.typesLabel ? <span className="admin-expired-service-badge__types">{badge.typesLabel}</span> : null}
     </div>
   );
 }
@@ -199,10 +210,14 @@ export default function AdminUserManagementPanel({
   }, [clientFilters, searchQuery]);
 
   const expiredFilterActive = isExpiredSubscriptionFilterActive(clientFilters);
+  const selectedServiceFilter = clientFilters.service || "all";
   const effectiveAccountStatusFilter = resolveEffectiveAccountStatusFilter(
     accountStatusFilter,
     clientFilters
   );
+  const expiredActiveService = expiredFilterActive
+    ? resolveExpiredServerActiveServiceFilter(selectedServiceFilter)
+    : "";
 
   const loadDashboard = useCallback(async ({ background = false } = {}) => {
     dashboardAbortRef.current?.abort();
@@ -270,7 +285,7 @@ export default function AdminUserManagementPanel({
             sort,
             order,
             accountStatus: effectiveAccountStatusFilter,
-            activeService: expiredFilterActive ? EXPIRED_SUBSCRIPTION_FILTER : "",
+            activeService: expiredActiveService,
             signal: controller.signal,
           });
 
@@ -307,7 +322,7 @@ export default function AdminUserManagementPanel({
         }
       }
     },
-    [accountStatusFilter, clientFilters, effectiveAccountStatusFilter, expiredFilterActive, hasClientFilters, order, searchQuery, sort]
+    [accountStatusFilter, clientFilters, effectiveAccountStatusFilter, expiredActiveService, hasClientFilters, order, searchQuery, sort]
   );
 
   const refreshAll = useCallback(
@@ -918,11 +933,11 @@ export default function AdminUserManagementPanel({
                     <td>
                       <div className="admin-user-table__status-stack">
                         <AccountStatusBadge status={user.accountStatus} label={user.accountStatusLabel} />
-                        <ExpiredSubscriptionBadge user={user} />
+                        <ExpiredSubscriptionBadge user={user} serviceFilter={selectedServiceFilter} />
                       </div>
                     </td>
                     <td>
-                      <SubscriptionStateBadge user={user} />
+                      <SubscriptionStateBadge user={user} serviceFilter={selectedServiceFilter} />
                     </td>
                     <td>{user.activeSubscriptionsCount}</td>
                     <td onClick={(event) => event.stopPropagation()}>

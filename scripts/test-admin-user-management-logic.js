@@ -16,14 +16,20 @@ import {
   countDistinctUsersWithExpiredSubscriptions,
   filterUsersWithExpiredSubscriptions,
   resolveEffectiveAccountStatusFilter,
+  resolveExpiredServerActiveServiceFilter,
   resolveExpiredSubscriptionBadge,
   resolveUserSubscriptionStateLabel,
+  summarizeUserServiceStates,
   summarizeUserSubscriptionRows,
   userHasExpiredSubscription,
+  userMatchesExpiredAndServiceFilter,
 } from "../lib/admin-user-subscription-state.js";
 import {
+  ADMIN_SERVICE_TYPES,
   isActiveSubscriptionRequest,
   isExpiredSubscriptionRequest,
+  isInactiveAccountManagementRequest,
+  isPendingAccountManagementRequest,
 } from "../lib/admin-user-service-classifier.js";
 
 function isVipActiveUser(user) {
@@ -322,9 +328,12 @@ function buildExpiredFilterScenarioUsers() {
       email: "active-only@test.com",
       accountStatus: "active",
       hasExpiredSubscription: false,
+      hasExpiredService: false,
       hasActiveSubscription: true,
       expiredSubscriptionCount: 0,
       activeSubscriptionCount: 1,
+      expiredServiceTypes: [],
+      activeServiceTypes: ["vip_spot"],
       activeServices: { vip: true },
     },
     {
@@ -332,9 +341,11 @@ function buildExpiredFilterScenarioUsers() {
       email: "expired-only@test.com",
       accountStatus: "active",
       hasExpiredSubscription: true,
+      hasExpiredService: true,
       hasActiveSubscription: false,
       expiredSubscriptionCount: 1,
       activeSubscriptionCount: 0,
+      expiredServiceTypes: ["vip_spot"],
       expiredSubscriptionTypes: ["vip_spot"],
       activeServices: { vip: false },
     },
@@ -343,10 +354,13 @@ function buildExpiredFilterScenarioUsers() {
       email: "dual-state@test.com",
       accountStatus: "active",
       hasExpiredSubscription: true,
+      hasExpiredService: true,
       hasActiveSubscription: true,
       expiredSubscriptionCount: 1,
       activeSubscriptionCount: 1,
+      expiredServiceTypes: ["vip_futures"],
       expiredSubscriptionTypes: ["vip_futures"],
+      activeServiceTypes: ["vip_spot"],
       activeServices: { vip: true },
     },
     {
@@ -354,10 +368,39 @@ function buildExpiredFilterScenarioUsers() {
       email: "multi-expired@test.com",
       accountStatus: "active",
       hasExpiredSubscription: true,
+      hasExpiredService: true,
       hasActiveSubscription: false,
       expiredSubscriptionCount: 2,
       activeSubscriptionCount: 0,
+      expiredServiceTypes: ["vip_spot", "vip_signals"],
       expiredSubscriptionTypes: ["vip_spot", "vip_signals"],
+      activeServices: { vip: false },
+    },
+    {
+      id: "user-am-expired-vip-active",
+      email: "am-expired-vip-active@test.com",
+      accountStatus: "active",
+      hasExpiredSubscription: true,
+      hasExpiredService: true,
+      hasActiveSubscription: true,
+      expiredSubscriptionCount: 1,
+      activeSubscriptionCount: 1,
+      expiredServiceTypes: ["account_management"],
+      expiredSubscriptionTypes: ["account_management"],
+      activeServiceTypes: ["vip_spot"],
+      activeServices: { vip: true, accountManagement: false },
+    },
+    {
+      id: "user-vip-signals-expired-only",
+      email: "signals-expired@test.com",
+      accountStatus: "active",
+      hasExpiredSubscription: true,
+      hasExpiredService: true,
+      hasActiveSubscription: false,
+      expiredSubscriptionCount: 1,
+      activeSubscriptionCount: 0,
+      expiredServiceTypes: ["vip_signals"],
+      expiredSubscriptionTypes: ["vip_signals"],
       activeServices: { vip: false },
     },
   ];
@@ -375,10 +418,10 @@ function testExpiredCardFilterMatchesDistinctUsers() {
     )}`
   );
 
-  assert.equal(cardStats.cardCount, 3);
-  assert.equal(filteredUsers.length, 3);
+  assert.equal(cardStats.cardCount, 5);
+  assert.equal(filteredUsers.length, 5);
   assert.equal(cardStats.cardCount, filteredUsers.length);
-  assert.equal(countDistinctUsersWithExpiredSubscriptions(users), 3);
+  assert.equal(countDistinctUsersWithExpiredSubscriptions(users), 5);
 
   const activeOnly = users.find((user) => user.id === "user-active-only");
   const expiredOnly = users.find((user) => user.id === "user-expired-only");
@@ -400,7 +443,7 @@ function testExpiredCardFilterMatchesDistinctUsers() {
   assert.equal(filteredIds.has("user-active-only"), false);
 
   const vipFiltered = users.filter((user) => user.activeServices?.vip === true);
-  assert.equal(vipFiltered.length, 2);
+  assert.equal(vipFiltered.length, 3);
   assert.equal(vipFiltered.some((user) => user.id === "user-active-and-expired"), true);
 }
 
@@ -428,7 +471,7 @@ function testExpiredFilterDoesNotConflictWithAccountStatus() {
   const users = buildExpiredFilterScenarioUsers();
   const filtered = filterUsersWithExpiredSubscriptions(users);
 
-  assert.equal(filtered.length, 3);
+  assert.equal(filtered.length, 5);
   assert.equal(
     resolveEffectiveAccountStatusFilter("active", { subscriptionState: "expired" }),
     "all"
@@ -442,7 +485,109 @@ function testExpiredKpiMatchesManualFilter() {
   const manualFiltered = filterUsersWithExpiredSubscriptions(users);
 
   assert.equal(cardStats.cardCount, manualFiltered.length);
-  assert.equal(cardStats.cardCount, 3);
+  assert.equal(cardStats.cardCount, 5);
+}
+
+function testServiceExpiredAndFilter() {
+  const users = buildExpiredFilterScenarioUsers();
+
+  const vipExpired = filterUsersWithExpiredSubscriptions(users, "vip");
+  assert.equal(vipExpired.some((user) => user.id === "user-expired-only"), true);
+  assert.equal(vipExpired.some((user) => user.id === "user-am-expired-vip-active"), false);
+  assert.equal(vipExpired.some((user) => user.id === "user-vip-signals-expired-only"), true);
+
+  const amExpired = filterUsersWithExpiredSubscriptions(users, "account_management");
+  assert.equal(amExpired.length, 1);
+  assert.equal(amExpired[0].id, "user-am-expired-vip-active");
+
+  const allExpired = filterUsersWithExpiredSubscriptions(users, "all");
+  assert.equal(allExpired.length, 5);
+
+  assert.equal(userMatchesExpiredAndServiceFilter(users[3], "vip"), true);
+  assert.equal(userMatchesExpiredAndServiceFilter(users[4], "account_management"), true);
+
+  const amUser = users.find((user) => user.id === "user-am-expired-vip-active");
+  assert.equal(userMatchesExpiredAndServiceFilter(amUser, "account_management"), true);
+  assert.equal(userMatchesExpiredAndServiceFilter(amUser, "vip"), false);
+}
+
+function testSummarizeUserServiceStatesSources() {
+  const summary = summarizeUserServiceStates({
+    subscriptionRows: [
+      { user_email: "a@test.com", status: "موقوف", plan_name: "VIP Spot", category: "Spot" },
+      { user_email: "a@test.com", status: "مفعل", plan_name: "VIP Futures", category: "Futures" },
+    ],
+    accountRows: [
+      { user_id: "u1", status: "موقوف" },
+      { user_id: "u2", status: "قيد المراجعة" },
+    ],
+    alertRows: [{ user_email: "a@test.com", status: "disabled" }],
+  });
+
+  assert.deepEqual(summary.expiredServiceTypes.sort(), [
+    "account_management",
+    "price_alert",
+    "vip_spot",
+  ].sort());
+  assert.equal(summary.activeServiceTypes.includes("vip_futures"), true);
+  assert.equal(summary.hasInactiveAccountManagement, true);
+}
+
+function testAccountManagementInactiveStatuses() {
+  assert.equal(isInactiveAccountManagementRequest({ status: "موقوف" }), true);
+  assert.equal(isInactiveAccountManagementRequest({ status: "قيد المراجعة" }), false);
+  assert.equal(isPendingAccountManagementRequest({ status: "قيد المراجعة" }), true);
+  assert.equal(isInactiveAccountManagementRequest({ status: "نشط" }), false);
+}
+
+function testScopedBadgeRespectsServiceFilter() {
+  const user = buildExpiredFilterScenarioUsers().find((user) => user.id === "user-multi-expired");
+
+  const allBadge = resolveExpiredSubscriptionBadge(user, { serviceFilter: "all" });
+  assert.match(allBadge.typesLabel, /VIP Spot/);
+  assert.match(allBadge.typesLabel, /VIP Signals/);
+
+  const vipBadge = resolveExpiredSubscriptionBadge(user, { serviceFilter: "vip" });
+  assert.equal(vipBadge.count, 2);
+
+  const amBadge = resolveExpiredSubscriptionBadge(user, { serviceFilter: "account_management" });
+  assert.equal(amBadge, null);
+
+  const amUser = buildExpiredFilterScenarioUsers().find((user) => user.id === "user-am-expired-vip-active");
+  assert.equal(resolveUserSubscriptionStateLabel(amUser, { serviceFilter: "account_management" }), "خدمة غير نشطة");
+  assert.equal(resolveUserSubscriptionStateLabel(amUser, { serviceFilter: "vip" }), "نشط");
+  assert.equal(amUser.accountStatus, "active");
+}
+
+function testExpiredServerActiveServiceFilterKeys() {
+  assert.equal(resolveExpiredServerActiveServiceFilter("all"), "expired");
+  assert.equal(resolveExpiredServerActiveServiceFilter("vip"), "expired_vip");
+  assert.equal(resolveExpiredServerActiveServiceFilter("account_management"), "expired_account_management");
+}
+
+function testSubscriptionStateClassMapping() {
+  const labels = {
+    active: resolveUserSubscriptionStateLabel({ hasActiveSubscription: true, activeServiceTypes: ["vip_spot"] }),
+    expired: resolveUserSubscriptionStateLabel({
+      hasExpiredSubscription: true,
+      expiredServiceTypes: ["vip_spot"],
+    }),
+    mixed: resolveUserSubscriptionStateLabel({
+      hasActiveSubscription: true,
+      hasExpiredSubscription: true,
+      activeServiceTypes: ["vip_spot"],
+      expiredServiceTypes: ["vip_futures"],
+    }),
+    inactiveService: resolveUserSubscriptionStateLabel({
+      hasExpiredSubscription: true,
+      expiredServiceTypes: ["account_management"],
+    }),
+  };
+
+  assert.equal(labels.active, "نشط");
+  assert.equal(labels.expired, "منتهي");
+  assert.equal(labels.mixed, "نشط + منتهي");
+  assert.equal(labels.inactiveService, "خدمة غير نشطة");
 }
 
 const tests = [
@@ -467,6 +612,12 @@ const tests = [
   ["subscription state labels and badges", testSubscriptionStateLabelsAndBadges],
   ["expired filter account status conflict", testExpiredFilterDoesNotConflictWithAccountStatus],
   ["expired kpi matches manual filter", testExpiredKpiMatchesManualFilter],
+  ["service + expired AND filter", testServiceExpiredAndFilter],
+  ["summarize user service states sources", testSummarizeUserServiceStatesSources],
+  ["account management inactive statuses", testAccountManagementInactiveStatuses],
+  ["scoped badge respects service filter", testScopedBadgeRespectsServiceFilter],
+  ["expired server active service filter keys", testExpiredServerActiveServiceFilterKeys],
+  ["subscription state class mapping", testSubscriptionStateClassMapping],
 ];
 
 let passed = 0;

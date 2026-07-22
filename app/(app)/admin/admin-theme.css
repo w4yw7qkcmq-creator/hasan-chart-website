@@ -357,65 +357,141 @@ html[data-theme="light"] .admin-theme-page .admin-filter-btn--expired-active {
   gap: 0.35rem;
 }
 
-.admin-user-subscription-state {
+.admin-subscription-state {
   display: inline-flex;
   align-items: center;
+  gap: 0.25rem;
   border-radius: 9999px;
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 900;
+  line-height: 1.2;
 }
 
-.admin-user-subscription-state--active {
-  background: rgba(16, 185, 129, 0.14);
-  color: #6ee7b7;
+.admin-subscription-state--active {
+  background: rgba(5, 150, 105, 0.22);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.45);
 }
 
-.admin-user-subscription-state--expired {
-  background: rgba(245, 158, 11, 0.14);
-  color: #fcd34d;
+.admin-subscription-state--expired {
+  background: rgba(217, 119, 6, 0.22);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.45);
 }
 
-.admin-user-subscription-state--mixed {
-  background: rgba(59, 130, 246, 0.14);
-  color: #93c5fd;
+.admin-subscription-state--inactive-service {
+  background: rgba(100, 116, 139, 0.24);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.42);
 }
 
-.admin-user-subscription-state--none {
-  background: rgba(100, 116, 139, 0.18);
+.admin-subscription-state--none {
+  background: rgba(71, 85, 105, 0.28);
   color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.28);
 }
 
-.admin-user-expired-badge-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+.admin-subscription-state--mixed {
+  padding: 0.15rem;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
-.admin-user-expired-badge {
+.admin-subscription-state__part {
   display: inline-flex;
   align-items: center;
   border-radius: 9999px;
-  padding: 0.2rem 0.65rem;
+  padding: 0.2rem 0.55rem;
   font-size: 0.6875rem;
   font-weight: 900;
-  background: rgba(245, 158, 11, 0.16);
-  color: #fcd34d;
 }
 
-.admin-user-expired-badge__types {
+.admin-subscription-state__part--active {
+  background: rgba(5, 150, 105, 0.28);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+}
+
+.admin-subscription-state__part--expired {
+  background: rgba(217, 119, 6, 0.28);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+}
+
+.admin-expired-service-badge-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.admin-expired-service-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.22rem 0.68rem;
+  font-size: 0.6875rem;
+  font-weight: 900;
+  background: rgba(217, 119, 6, 0.24);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+}
+
+.admin-expired-service-badge__types {
   font-size: 0.625rem;
   font-weight: 800;
-  color: rgba(252, 211, 77, 0.82);
+  color: #fde68a;
 }
 
-html[data-theme="light"] .admin-user-expired-badge {
-  background: rgba(251, 191, 36, 0.18);
-  color: #b45309;
+html[data-theme="light"] .admin-subscription-state--active {
+  background: #dcfce7;
+  color: #047857;
+  border-color: #86efac;
 }
 
-html[data-theme="light"] .admin-user-expired-badge__types {
-  color: #92400e;
+html[data-theme="light"] .admin-subscription-state--expired {
+  background: #ffedd5;
+  color: #c2410c;
+  border-color: #fdba74;
+}
+
+html[data-theme="light"] .admin-subscription-state--inactive-service {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+html[data-theme="light"] .admin-subscription-state--none {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+html[data-theme="light"] .admin-subscription-state--mixed {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+html[data-theme="light"] .admin-subscription-state__part--active {
+  background: #dcfce7;
+  color: #047857;
+  border-color: #86efac;
+}
+
+html[data-theme="light"] .admin-subscription-state__part--expired {
+  background: #ffedd5;
+  color: #c2410c;
+  border-color: #fdba74;
+}
+
+html[data-theme="light"] .admin-expired-service-badge {
+  background: #ffedd5;
+  color: #c2410c;
+  border-color: #fdba74;
+}
+
+html[data-theme="light"] .admin-expired-service-badge__types {
+  color: #9a3412;
 }
 
 .admin-theme-page .admin-section {
