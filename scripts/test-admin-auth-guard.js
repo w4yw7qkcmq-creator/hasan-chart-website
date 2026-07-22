@@ -13,6 +13,7 @@ import {
   buildAdminLoginRedirect,
   resolveAdminGatePhase,
   shouldAdminEscCloseOverlay,
+  shouldKeepAdminGateAuthenticatedDuringProfileEnrich,
   shouldRedirectAdminTo403,
   shouldRedirectAdminToLogin,
 } from "../lib/admin-auth-guard.js";
@@ -229,6 +230,29 @@ test("bootstrap never marks error once authenticated", () => {
     }),
     false
   );
+});
+
+test("authenticated admin stays visible during background profile enrich", () => {
+  assert.equal(
+    shouldKeepAdminGateAuthenticatedDuringProfileEnrich({
+      status: "authenticated",
+      isAuthenticated: true,
+      profileReady: false,
+      isAdmin: true,
+    }),
+    true
+  );
+
+  const phase = resolveAdminGatePhase({
+    authReady: true,
+    authResolved: true,
+    status: "authenticated",
+    profileReady: false,
+    isAuthenticated: true,
+    isAdmin: true,
+    keepAuthenticatedDuringProfileEnrich: true,
+  });
+  assert.equal(phase, "authenticated");
 });
 
 console.log(`\n${passed}/${passed} admin auth guard tests passed`);

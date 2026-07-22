@@ -1,8 +1,26 @@
 import assert from "node:assert/strict";
 import { assertAdminCanActOnTarget, resolveAccountStatusFromProfile } from "../lib/account-lifecycle.js";
+import {
+  createBackgroundRevalidationController,
+  shouldRunBackgroundRevalidation,
+} from "../lib/admin-background-revalidation.js";
+import {
+  resolveAdminActionToastOutcome,
+  runIsolatedPostActionRefresh,
+  shouldBlockDuplicateAdminAction,
+} from "../lib/admin-user-action-flow.js";
 import { isAdminActionResponseSuccess } from "../lib/admin-user-management-client.js";
 import {
+  collectDistinctExpiredEmailsFromRows,
+  computeExpiredSubscriptionCardStats,
+  countDistinctUsersWithExpiredSubscriptions,
+  filterUsersWithExpiredSubscriptions,
+  summarizeUserSubscriptionRows,
+  userHasExpiredSubscription,
+} from "../lib/admin-user-subscription-state.js";
+import {
   isActiveSubscriptionRequest,
+  isExpiredSubscriptionRequest,
 } from "../lib/admin-user-service-classifier.js";
 
 function isVipActiveUser(user) {
@@ -160,6 +178,226 @@ function testActiveServiceUserFlags() {
   assert.equal(isActiveSubscriptionRequest({ status: "pending" }), false);
 }
 
+function testBackgroundRevalidationThrottle() {
+  assert.equal(shouldRunBackgroundRevalidation(0, 10_000, 60_000), true);
+  assert.equal(shouldRunBackgroundRevalidation(9_000, 10_000, 60_000), false);
+  assert.equal(shouldRunBackgroundRevalidation(0, 70_000, 60_000), true);
+}
+
+async function testBackgroundRevalidationSingleFlight() {
+  const controller = createBackgroundRevalidationController({
+    minIntervalMs: 0,
+    now: () => 1_000,
+  });
+
+  let runs = 0;
+  const first = controller.revalidate(async () => {
+    runs += 1;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return "ok";
+  });
+  const second = controller.revalidate(async () => {
+    runs += 1;
+    return "ok-2";
+  });
+
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  assert.equal(firstResult.skipped, false);
+  assert.equal(secondResult.skipped, true);
+  assert.equal(secondResult.reason, "in_flight");
+  assert.equal(runs, 1);
+}
+
+function testActionSuccessIndependentFromRefreshFailure() {
+  const toast = resolveAdminActionToastOutcome({ actionSucceeded: true });
+  assert.equal(toast.type, "success");
+
+  const failedAction = resolveAdminActionToastOutcome({
+    actionSucceeded: false,
+    actionErrorMessage: "network",
+  });
+  assert.equal(failedAction.type, "error");
+  assert.equal(failedAction.title, "فشل الإجراء");
+}
+
+async function testPostActionRefreshIsolation() {
+  const ok = await runIsolatedPostActionRefresh(async () => {});
+  assert.equal(ok.ok, true);
+
+  const failed = await runIsolatedPostActionRefresh(async () => {
+    throw new Error("refresh failed");
+  });
+  assert.equal(failed.ok, false);
+  assert.match(failed.message, /refresh failed/);
+}
+
+function testDuplicateActionBlock() {
+  assert.equal(shouldBlockDuplicateAdminAction({ inFlight: true, actionLoading: "" }), true);
+  assert.equal(shouldBlockDuplicateAdminAction({ inFlight: false, actionLoading: "deactivate_service" }), true);
+  assert.equal(shouldBlockDuplicateAdminAction({ inFlight: false, actionLoading: "" }), false);
+}
+
+function testExpiredSubscriptionUnifiedDefinition() {
+  assert.equal(
+    isExpiredSubscriptionRequest({
+      status: "مفعل",
+      admin_disabled: true,
+    }),
+    true
+  );
+  assert.equal(
+    isExpiredSubscriptionRequest({
+      status: "موقوف",
+      admin_disabled: false,
+    }),
+    true
+  );
+  assert.equal(
+    isExpiredSubscriptionRequest({
+      status: "مفعل",
+      expires_at: "2020-01-01T00:00:00.000Z",
+    }),
+    true
+  );
+}
+
+function testExpiredDistinctUsersAndFilterMatch() {
+  const users = [
+    {
+      id: "1",
+      email: "a@test.com",
+      hasExpiredSubscription: true,
+      activeServices: { vip: true },
+    },
+    {
+      id: "2",
+      email: "b@test.com",
+      hasExpiredSubscription: true,
+      activeServices: { vip: false },
+    },
+    {
+      id: "3",
+      email: "c@test.com",
+      hasExpiredSubscription: true,
+      activeServices: { vip: false },
+    },
+    {
+      id: "4",
+      email: "d@test.com",
+      hasExpiredSubscription: false,
+      activeServices: { vip: true },
+    },
+  ];
+
+  const expiredUsers = users.filter(userHasExpiredSubscription);
+  assert.equal(countDistinctUsersWithExpiredSubscriptions(users), 3);
+  assert.equal(expiredUsers.length, 3);
+
+  const dualState = users.filter(
+    (user) => userHasExpiredSubscription(user) && user.activeServices?.vip === true
+  );
+  assert.equal(dualState.length, 1);
+}
+
+function testExpiredRowsDistinctEmailCount() {
+  const rows = [
+    { user_email: "a@test.com", status: "موقوف", admin_disabled: true },
+    { user_email: "a@test.com", status: "منتهي" },
+    { user_email: "b@test.com", status: "expired" },
+    { user_email: "c@test.com", status: "مفعل", expires_at: "2020-01-01T00:00:00.000Z" },
+  ];
+
+  const summary = summarizeUserSubscriptionRows(rows);
+  assert.equal(summary.expiredSubscriptionCount, 4);
+  assert.equal(collectDistinctExpiredEmailsFromRows(rows).size, 3);
+}
+
+function buildExpiredFilterScenarioUsers() {
+  return [
+    {
+      id: "user-active-only",
+      email: "active-only@test.com",
+      accountStatus: "active",
+      hasExpiredSubscription: false,
+      hasActiveSubscription: true,
+      expiredSubscriptionCount: 0,
+      activeSubscriptionCount: 1,
+      activeServices: { vip: true },
+    },
+    {
+      id: "user-expired-only",
+      email: "expired-only@test.com",
+      accountStatus: "active",
+      hasExpiredSubscription: true,
+      hasActiveSubscription: false,
+      expiredSubscriptionCount: 1,
+      activeSubscriptionCount: 0,
+      activeServices: { vip: false },
+    },
+    {
+      id: "user-active-and-expired",
+      email: "dual-state@test.com",
+      accountStatus: "active",
+      hasExpiredSubscription: true,
+      hasActiveSubscription: true,
+      expiredSubscriptionCount: 1,
+      activeSubscriptionCount: 1,
+      activeServices: { vip: true },
+    },
+    {
+      id: "user-multi-expired",
+      email: "multi-expired@test.com",
+      accountStatus: "active",
+      hasExpiredSubscription: true,
+      hasActiveSubscription: false,
+      expiredSubscriptionCount: 2,
+      activeSubscriptionCount: 0,
+      activeServices: { vip: false },
+    },
+  ];
+}
+
+function testExpiredCardFilterMatchesDistinctUsers() {
+  const users = buildExpiredFilterScenarioUsers();
+  const cardStats = computeExpiredSubscriptionCardStats(users);
+  const filteredUsers = filterUsersWithExpiredSubscriptions(users);
+
+  console.log(
+    `[verify] expired card: cardCount=${cardStats.cardCount}, filteredUsers=${filteredUsers.length}, totalExpiredRows=${users.reduce(
+      (sum, user) => sum + Number(user.expiredSubscriptionCount || 0),
+      0
+    )}`
+  );
+
+  assert.equal(cardStats.cardCount, 3);
+  assert.equal(filteredUsers.length, 3);
+  assert.equal(cardStats.cardCount, filteredUsers.length);
+  assert.equal(countDistinctUsersWithExpiredSubscriptions(users), 3);
+
+  const activeOnly = users.find((user) => user.id === "user-active-only");
+  const expiredOnly = users.find((user) => user.id === "user-expired-only");
+  const dualState = users.find((user) => user.id === "user-active-and-expired");
+  const multiExpired = users.find((user) => user.id === "user-multi-expired");
+
+  assert.equal(userHasExpiredSubscription(activeOnly), false);
+  assert.equal(filteredUsers.some((user) => user.id === activeOnly.id), false);
+
+  assert.equal(userHasExpiredSubscription(expiredOnly), true);
+  assert.equal(userHasExpiredSubscription(dualState), true);
+  assert.equal(userHasExpiredSubscription(multiExpired), true);
+  assert.equal(multiExpired.expiredSubscriptionCount, 2);
+
+  const filteredIds = new Set(filteredUsers.map((user) => user.id));
+  assert.equal(filteredIds.has("user-expired-only"), true);
+  assert.equal(filteredIds.has("user-active-and-expired"), true);
+  assert.equal(filteredIds.has("user-multi-expired"), true);
+  assert.equal(filteredIds.has("user-active-only"), false);
+
+  const vipFiltered = users.filter((user) => user.activeServices?.vip === true);
+  assert.equal(vipFiltered.length, 2);
+  assert.equal(vipFiltered.some((user) => user.id === "user-active-and-expired"), true);
+}
+
 const tests = [
   ["dangerous confirmation", testDangerousConfirmation],
   ["self action blocked", testSelfActionBlocked],
@@ -172,6 +410,13 @@ const tests = [
   ["admin action response success", testAdminActionResponseSuccess],
   ["double-submit guard pattern", testDoubleSubmitGuardPattern],
   ["active service user flags", testActiveServiceUserFlags],
+  ["background revalidation throttle", testBackgroundRevalidationThrottle],
+  ["action success independent from refresh failure", testActionSuccessIndependentFromRefreshFailure],
+  ["duplicate action block", testDuplicateActionBlock],
+  ["expired subscription unified definition", testExpiredSubscriptionUnifiedDefinition],
+  ["expired distinct users and filter match", testExpiredDistinctUsersAndFilterMatch],
+  ["expired rows distinct email count", testExpiredRowsDistinctEmailCount],
+  ["expired card filter matches distinct users", testExpiredCardFilterMatchesDistinctUsers],
 ];
 
 let passed = 0;
@@ -181,4 +426,10 @@ for (const [name, fn] of tests) {
   console.log(`✓ ${name}`);
 }
 
-console.log(`\n${passed}/${tests.length} logic checks passed`);
+await testBackgroundRevalidationSingleFlight();
+await testPostActionRefreshIsolation();
+passed += 2;
+console.log("✓ background revalidation single-flight");
+console.log("✓ post-action refresh isolation");
+
+console.log(`\n${passed}/${tests.length + 2} logic checks passed`);

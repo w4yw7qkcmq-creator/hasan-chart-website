@@ -47,6 +47,7 @@ export function AdminAccessGate({ children }) {
         profileReady,
         isAuthenticated,
         isAdmin,
+        keepAuthenticatedDuringProfileEnrich: true,
       }),
     [authReady, authResolved, status, profileReady, isAuthenticated, isAdmin]
   );

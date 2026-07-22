@@ -108,6 +108,7 @@ export function AuthProvider({ children }) {
     (authUser, { enrichProfile = true, serverSessionUser = null } = {}) => {
       if (!mountedRef.current) return;
 
+      const wasAuthenticated = authenticatedRef.current;
       const minimalUser = serverSessionUser?.email
         ? buildAppUserFromSessionPayload(serverSessionUser)
         : buildMinimalAppUser(authUser);
@@ -127,7 +128,9 @@ export function AuthProvider({ children }) {
       setAuthResolved(true);
 
       if (enrichProfile) {
-        setProfileReady(false);
+        if (!wasAuthenticated) {
+          setProfileReady(false);
+        }
         const enrichSource =
           authUser?.email
             ? authUser
@@ -402,7 +405,17 @@ export function AuthProvider({ children }) {
           if (!active) return;
 
           if (sessionUser?.email) {
-            applyAuthenticatedUser(sessionUser);
+            const wasAuthenticated = authenticatedRef.current;
+            applyAuthenticatedUser(sessionUser, {
+              enrichProfile: !wasAuthenticated,
+            });
+            if (wasAuthenticated && event === "TOKEN_REFRESHED" && typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("hc:admin-background-refresh", {
+                  detail: { source: "token_refreshed" },
+                })
+              );
+            }
             return;
           }
 

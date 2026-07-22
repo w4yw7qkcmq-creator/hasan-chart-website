@@ -1,5 +1,9 @@
 import { fetchAdminUserList, fetchAdminUserDashboardStats } from "../../../../lib/admin-user-management-client";
 import {
+  countDistinctUsersWithExpiredSubscriptions,
+  userHasExpiredSubscription,
+} from "../../../../lib/admin-user-subscription-state.js";
+import {
   isActiveAccountManagementRequest,
   isActivePriceAlertRow,
   isActiveSubscriptionRequest,
@@ -92,8 +96,7 @@ function isPriceAlertsActiveUser(user) {
 }
 
 function isExpiredSubscriptionUser(user) {
-  const status = String(user.subscriptionStatus || "").toLowerCase();
-  return /expired|منته|ended|inactive|غير/.test(status) && Boolean(user.subscriptionPlan);
+  return userHasExpiredSubscription(user);
 }
 
 function matchesSubscriptionState(user, subscriptionState) {
@@ -235,7 +238,7 @@ export function computeStatsFromUsers(users) {
     vipActive: list.filter(isVipActiveUser).length,
     accountManagementActive: list.filter(isAccountManagementActiveUser).length,
     priceAlertsActive: list.filter(isPriceAlertsActiveUser).length,
-    expiredSubscriptions: list.filter(isExpiredSubscriptionUser).length,
+    expiredSubscriptions: countDistinctUsersWithExpiredSubscriptions(list),
     newToday: list.filter((user) => {
       if (!user.createdAt) return false;
       const created = new Date(user.createdAt);
@@ -310,6 +313,7 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
 function resolveServerActiveServiceFilter(clientFilters = {}) {
   const { service = "all", subscriptionState = "all" } = clientFilters;
+  if (subscriptionState === "expired") return "expired";
   if (subscriptionState === "active_vip" && service === "vip") return "vip";
   if (subscriptionState === "active_am" && service === "account_management") return "account_management";
   if (subscriptionState === "active_alerts" && service === "alerts") return "alerts";

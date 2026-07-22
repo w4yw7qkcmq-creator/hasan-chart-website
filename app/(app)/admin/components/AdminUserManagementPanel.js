@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVisibilityRefresh } from "../../../hooks/useVisibilityRefresh";
+import { createBackgroundRevalidationController } from "../../../../lib/admin-background-revalidation";
 import { adminFetch } from "../../../../lib/admin-fetch";
 import { fetchAdminUserList, postAdminUserAction } from "../../../../lib/admin-user-management-client";
 import { sanitizeAdminUserFacingError } from "../../../../lib/admin-user-management-shared";
@@ -143,6 +145,7 @@ export default function AdminUserManagementPanel({
   const dashboardAbortRef = useRef(null);
   const searchDebounceRef = useRef(null);
   const listRequestRef = useRef(0);
+  const backgroundRevalidationRef = useRef(createBackgroundRevalidationController());
 
   useEffect(() => {
     if (!openUserId) return;
@@ -176,7 +179,7 @@ export default function AdminUserManagementPanel({
       if (controller.signal.aborted) return;
       setDashboardStats(stats);
     } catch {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && !background) {
         setDashboardStats(null);
       }
     } finally {
@@ -251,6 +254,10 @@ export default function AdminUserManagementPanel({
         setLoaded(true);
       } catch (fetchError) {
         if (fetchError?.name === "AbortError" || requestId !== listRequestRef.current) return;
+        if (background) {
+          setUxNotice("تعذر تحديث البيانات في الخلفية — ما زالت آخر نسخة معروضة.");
+          return;
+        }
         const sanitized = sanitizeAdminUserFacingError(fetchError, {
           fallback: "تعذر تحميل المستخدمين",
         });
@@ -272,6 +279,44 @@ export default function AdminUserManagementPanel({
     },
     [loadDashboard, loadUsers, pagination.page]
   );
+
+  const refreshAllRef = useRef(refreshAll);
+  refreshAllRef.current = refreshAll;
+
+  const runBackgroundRevalidation = useCallback(async () => {
+    return backgroundRevalidationRef.current.revalidate(async () => {
+      await Promise.all([
+        loadDashboard({ background: true }),
+        loadUsers({ page: pagination.page, background: true }),
+      ]);
+    });
+  }, [loadDashboard, loadUsers, pagination.page]);
+
+  useVisibilityRefresh(
+    () => {
+      void runBackgroundRevalidation();
+    },
+    {
+      enabled: loaded,
+      throttleMs: 60_000,
+      singleFlight: true,
+      refreshOnVisible: true,
+      refreshOnFocus: true,
+    }
+  );
+
+  useEffect(() => {
+    if (!loaded) return undefined;
+
+    const handleBackgroundRefresh = () => {
+      void runBackgroundRevalidation();
+    };
+
+    window.addEventListener("hc:admin-background-refresh", handleBackgroundRefresh);
+    return () => {
+      window.removeEventListener("hc:admin-background-refresh", handleBackgroundRefresh);
+    };
+  }, [loaded, runBackgroundRevalidation]);
 
   useEffect(() => {
     void adminFetch("/api/auth/session", { cache: "no-store" })

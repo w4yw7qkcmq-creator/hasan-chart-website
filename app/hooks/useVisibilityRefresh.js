@@ -5,10 +5,12 @@ import { useEffect, useRef } from "react";
 /**
  * Schedules background refresh while the page is active.
  *
- * @param {() => void} callback
+ * @param {() => void | Promise<void>} callback
  * @param {{
  *   enabled?: boolean,
  *   intervalMs?: number | null,
+ *   throttleMs?: number,
+ *   singleFlight?: boolean,
  *   refreshOnFocus?: boolean,
  *   refreshOnVisible?: boolean,
  *   skipWhenHidden?: boolean,
@@ -18,12 +20,16 @@ export function useVisibilityRefresh(callback, options = {}) {
   const {
     enabled = true,
     intervalMs = null,
+    throttleMs = 0,
+    singleFlight = false,
     refreshOnFocus = false,
     refreshOnVisible = true,
     skipWhenHidden = true,
   } = options;
 
   const callbackRef = useRef(callback);
+  const lastRunRef = useRef(0);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     callbackRef.current = callback;
@@ -32,9 +38,19 @@ export function useVisibilityRefresh(callback, options = {}) {
   useEffect(() => {
     if (!enabled) return undefined;
 
-    const run = () => {
+    const run = async () => {
       if (skipWhenHidden && document.hidden) return;
-      callbackRef.current();
+      if (throttleMs > 0 && Date.now() - lastRunRef.current < throttleMs) return;
+      if (singleFlight && inFlightRef.current) return;
+
+      inFlightRef.current = true;
+      lastRunRef.current = Date.now();
+
+      try {
+        await callbackRef.current();
+      } finally {
+        inFlightRef.current = false;
+      }
     };
 
     let intervalId = null;
@@ -60,7 +76,7 @@ export function useVisibilityRefresh(callback, options = {}) {
       startInterval();
 
       if (refreshOnVisible) {
-        callbackRef.current();
+        void run();
       }
     };
 
@@ -85,5 +101,13 @@ export function useVisibilityRefresh(callback, options = {}) {
         document.removeEventListener("visibilitychange", handleVisibilityChange);
       }
     };
-  }, [enabled, intervalMs, refreshOnFocus, refreshOnVisible, skipWhenHidden]);
+  }, [
+    enabled,
+    intervalMs,
+    refreshOnFocus,
+    refreshOnVisible,
+    singleFlight,
+    skipWhenHidden,
+    throttleMs,
+  ]);
 }
