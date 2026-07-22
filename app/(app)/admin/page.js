@@ -60,6 +60,7 @@ import {
   mapAdminTabToSections,
   setCachedAdminSection,
 } from "../../../lib/admin-dashboard-client";
+import { fetchPaymentProof } from "../../../lib/admin-financial-center-client.js";
 
 const AppModal = dynamic(() => import("../../components/AppModal"), { ssr: false });
 
@@ -264,7 +265,96 @@ export default function AdminPage() {
   });
   const [accountKeys, setAccountKeys] = useState({});
   const [accountKeysLoading, setAccountKeysLoading] = useState({});
-  const [proofPreview, setProofPreview] = useState(null);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState(null);
+  const [subscriptionProofPreview, setSubscriptionProofPreview] = useState(null);
+  const subscriptionProofAbortRef = useRef(null);
+  const subscriptionProofInFlightRef = useRef(null);
+  const closeProofPreview = useCallback(() => {
+    subscriptionProofAbortRef.current?.abort();
+    subscriptionProofAbortRef.current = null;
+    subscriptionProofInFlightRef.current = null;
+    setProofPreviewUrl(null);
+    setSubscriptionProofPreview(null);
+  }, []);
+
+  const openSubscriptionProofPreview = useCallback(
+    (requestId) => {
+      const normalizedId = String(requestId || "").trim();
+      if (!normalizedId) return;
+
+      if (subscriptionProofInFlightRef.current === normalizedId) {
+        return;
+      }
+
+      if (
+        subscriptionProofPreview?.requestId === normalizedId &&
+        subscriptionProofPreview?.loading
+      ) {
+        return;
+      }
+
+      if (
+        subscriptionProofPreview?.requestId === normalizedId &&
+        subscriptionProofPreview?.imageUrl
+      ) {
+        return;
+      }
+
+      subscriptionProofAbortRef.current?.abort();
+      const controller = new AbortController();
+      subscriptionProofAbortRef.current = controller;
+      subscriptionProofInFlightRef.current = normalizedId;
+
+      setProofPreviewUrl(null);
+      setSubscriptionProofPreview({
+        requestId: normalizedId,
+        imageUrl: null,
+        loading: true,
+        error: "",
+      });
+
+      fetchPaymentProof(adminFetch, normalizedId, { signal: controller.signal })
+        .then((proof) => {
+          if (controller.signal.aborted) return;
+
+          const url = String(proof?.proof || "").trim();
+          if (!isValidPreviewUrl(url)) {
+            throw new Error("إثبات الدفع غير متوفر لهذا الطلب");
+          }
+
+          setSubscriptionProofPreview({
+            requestId: normalizedId,
+            imageUrl: url,
+            loading: false,
+            error: "",
+          });
+        })
+        .catch((error) => {
+          if (error?.name === "AbortError") return;
+
+          setSubscriptionProofPreview({
+            requestId: normalizedId,
+            imageUrl: null,
+            loading: false,
+            error: error?.message || "تعذر تحميل إثبات الدفع",
+          });
+        })
+        .finally(() => {
+          if (subscriptionProofInFlightRef.current === normalizedId) {
+            subscriptionProofInFlightRef.current = null;
+          }
+        });
+    },
+    [subscriptionProofPreview?.imageUrl, subscriptionProofPreview?.loading, subscriptionProofPreview?.requestId]
+  );
+
+  useEffect(() => {
+    return () => {
+      subscriptionProofAbortRef.current?.abort();
+      subscriptionProofAbortRef.current = null;
+      subscriptionProofInFlightRef.current = null;
+    };
+  }, []);
   const [subscriptionRejectTarget, setSubscriptionRejectTarget] = useState(null);
   const [subscriptionRejectLoading, setSubscriptionRejectLoading] = useState(false);
   const [subscriptionRejectionDetailsTarget, setSubscriptionRejectionDetailsTarget] = useState(null);
@@ -367,7 +457,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     return () => {
-      setProofPreview(null);
+      closeProofPreview();
       setAdminNotificationsOpen(false);
       setAdminNotice((current) => ({ ...current, open: false }));
       setAdminConfirm((current) => {
@@ -1498,8 +1588,21 @@ export default function AdminPage() {
       />
 
       <AdminProofPreviewModal
-        imageUrl={isValidPreviewUrl(proofPreview) ? proofPreview : null}
-        onClose={() => setProofPreview(null)}
+        open={Boolean(proofPreviewUrl || subscriptionProofPreview)}
+        imageUrl={
+          proofPreviewUrl ||
+          (subscriptionProofPreview?.imageUrl && isValidPreviewUrl(subscriptionProofPreview.imageUrl)
+            ? subscriptionProofPreview.imageUrl
+            : null)
+        }
+        loading={Boolean(subscriptionProofPreview?.loading)}
+        error={subscriptionProofPreview?.error || ""}
+        onRetry={
+          subscriptionProofPreview?.requestId
+            ? () => openSubscriptionProofPreview(subscriptionProofPreview.requestId)
+            : null
+        }
+        onClose={closeProofPreview}
       />
 
       <SubscriptionRejectModal
@@ -1925,7 +2028,7 @@ export default function AdminPage() {
                         {isValidPreviewUrl(req.replyImage) && (
                           <button
                             type="button"
-                            onClick={() => setProofPreview(req.replyImage)}
+                            onClick={() => setProofPreviewUrl(req.replyImage)}
                             className="mt-4 block w-full overflow-hidden rounded-2xl border border-cyan-100 bg-slate-50 p-2 transition hover:border-cyan-200 hover:shadow-[0_12px_40px_rgba(14,165,233,0.14)]"
                             title="عرض صورة التحليل"
                           >
@@ -1969,7 +2072,7 @@ export default function AdminPage() {
                       {isValidPreviewUrl(replies[req.id]?.image) && (
                         <button
                           type="button"
-                          onClick={() => setProofPreview(replies[req.id].image)}
+                          onClick={() => setProofPreviewUrl(replies[req.id].image)}
                           className="mt-4 block w-full overflow-hidden rounded-2xl border border-cyan-100 bg-slate-50 p-2 transition hover:border-cyan-200"
                           title="معاينة الصورة"
                         >
@@ -2304,7 +2407,7 @@ export default function AdminPage() {
                       ) : null}
                     </div>
                   </div>
-                  {(req.telegramUsername || isValidPreviewUrl(req.paymentProof)) && (
+                  {(req.telegramUsername || req.hasPaymentProof) && (
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                       {req.telegramUsername && (
                         <div className="admin-inline-panel">
@@ -2313,39 +2416,31 @@ export default function AdminPage() {
                         </div>
                       )}
 
-                      {isValidPreviewUrl(req.paymentProof) && (
+                      {req.hasPaymentProof ? (
                         <div className="admin-inline-panel">
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="text-xs font-bold text-slate-800">إثبات الدفع</p>
                               <p className="mt-2 font-bold">صورة إشعار الدفع مرفقة</p>
-                              <p className="mt-1 text-xs font-bold text-slate-800">اضغط على الصورة أو زر فتح الصورة لعرضها بدقة كاملة.</p>
+                              <p className="mt-1 text-xs font-bold text-slate-800">
+                                اضغط زر فتح الصورة لعرض إثبات الدفع بدقة كاملة.
+                              </p>
                             </div>
                             <button
                               type="button"
-                              onClick={() => setProofPreview(req.paymentProof)}
+                              onClick={() => openSubscriptionProofPreview(req.id)}
                               className="shrink-0 rounded-xl bg-gradient-to-l from-blue-700 to-cyan-500 px-4 py-2 text-sm font-black text-white shadow-[0_10px_24px_rgba(37,99,235,0.25)] transition hover:brightness-110"
                             >
                               فتح الصورة
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setProofPreview(req.paymentProof)}
-                            className="mt-4 block w-full overflow-hidden rounded-2xl border border-cyan-100 bg-slate-50 p-2 transition hover:border-cyan-200 hover:shadow-[0_16px_45px_rgba(14,165,233,0.14)]"
-                            title="عرض إثبات الدفع بدقة كاملة"
-                          >
-                            <Image
-                              src={req.paymentProof}
-                              alt="إثبات الدفع"
-                              width={900}
-                              height={700}
-                              sizes="(max-width: 768px) 100vw, 600px"
-                              className="max-h-[340px] w-full cursor-pointer rounded-xl object-contain"
-                            />
-                          </button>
+                          <div className="mt-4 flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-cyan-100 bg-slate-50 p-6 text-center">
+                            <p className="text-sm font-bold text-slate-600">
+                              لم يتم تحميل الصورة بعد. سيتم جلبها عند فتح المعاينة.
+                            </p>
+                          </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   )}
 

@@ -5742,6 +5742,64 @@ html[data-theme="dark"] .admin-user-action-btn--danger {
     0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
+.admin-proof-preview__state {
+  display: grid;
+  gap: 0.85rem;
+  justify-items: center;
+  min-width: min(100%, 28rem);
+  padding: 2rem 1.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.82);
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.admin-proof-preview__state--error {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.admin-proof-preview__state-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.admin-proof-preview__state-message {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.admin-proof-preview__spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 3px solid rgba(148, 163, 184, 0.25);
+  border-top-color: #22d3ee;
+  animation: adminProofPreviewSpin 0.8s linear infinite;
+}
+
+.admin-proof-preview__retry {
+  margin-top: 0.35rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(to left, #2563eb, #06b6d4);
+  color: #fff;
+  padding: 0.65rem 1.2rem;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@keyframes adminProofPreviewSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .admin-crm-action-modal__field-hint {
   font-size: 0.68rem;
   font-weight: 700;

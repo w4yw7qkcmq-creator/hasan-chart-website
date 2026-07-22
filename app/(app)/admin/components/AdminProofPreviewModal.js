@@ -4,12 +4,19 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export default function AdminProofPreviewModal({ imageUrl, onClose }) {
+export default function AdminProofPreviewModal({
+  open = false,
+  imageUrl = null,
+  loading = false,
+  error = "",
+  onRetry = null,
+  onClose,
+}) {
   const dialogRef = useRef(null);
-  const [visible, setVisible] = useState(Boolean(imageUrl));
+  const [visible, setVisible] = useState(open);
 
   useEffect(() => {
-    if (!imageUrl) {
+    if (!open) {
       setVisible(false);
       return undefined;
     }
@@ -32,9 +39,9 @@ export default function AdminProofPreviewModal({ imageUrl, onClose }) {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [imageUrl, onClose]);
+  }, [open, onClose]);
 
-  if (!imageUrl || typeof document === "undefined") return null;
+  if (!open || typeof document === "undefined") return null;
 
   return createPortal(
     <div
@@ -50,6 +57,7 @@ export default function AdminProofPreviewModal({ imageUrl, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-label="معاينة الصورة"
+        aria-busy={loading ? "true" : "false"}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="admin-proof-preview__frame">
@@ -69,15 +77,37 @@ export default function AdminProofPreviewModal({ imageUrl, onClose }) {
               />
             </svg>
           </button>
-          <Image
-            src={imageUrl}
-            alt="معاينة إثبات الدفع"
-            width={1400}
-            height={1000}
-            sizes="100vw"
-            className="admin-proof-preview__image"
-            priority
-          />
+
+          {loading ? (
+            <div className="admin-proof-preview__state">
+              <span className="admin-proof-preview__spinner" aria-hidden="true" />
+              <p className="admin-proof-preview__state-title">جاري تحميل إثبات الدفع...</p>
+            </div>
+          ) : error ? (
+            <div className="admin-proof-preview__state admin-proof-preview__state--error">
+              <p className="admin-proof-preview__state-title">تعذر تحميل إثبات الدفع</p>
+              <p className="admin-proof-preview__state-message">{error}</p>
+              {typeof onRetry === "function" ? (
+                <button
+                  type="button"
+                  className="admin-proof-preview__retry"
+                  onClick={onRetry}
+                >
+                  إعادة المحاولة
+                </button>
+              ) : null}
+            </div>
+          ) : imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt="معاينة إثبات الدفع"
+              width={1400}
+              height={1000}
+              sizes="100vw"
+              className="admin-proof-preview__image"
+              priority
+            />
+          ) : null}
         </div>
       </div>
     </div>,

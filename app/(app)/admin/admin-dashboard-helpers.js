@@ -120,7 +120,8 @@ export const formatSubscriptionRequest = (item) => ({
   category: item.category,
   price: item.price,
   telegramUsername: item.telegram_username || "",
-  paymentProof: item.payment_proof || "",
+  hasPaymentProof: Boolean(item.has_payment_proof),
+  paymentProof: "",
   status: item.status || "قيد المعالجة",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
   rejectionDetails: item.rejection_details
