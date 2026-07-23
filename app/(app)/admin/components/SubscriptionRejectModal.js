@@ -35,6 +35,7 @@ export function buildSubscriptionRejectionMessage(reasonLabel, notes) {
 export default function SubscriptionRejectModal({
   request,
   loading = false,
+  apiError = "",
   onCancel,
   onConfirm,
 }) {
@@ -212,6 +213,12 @@ export default function SubscriptionRejectModal({
           {validationError ? (
             <p className="admin-crm-action-modal__validation-error" role="alert">
               {validationError}
+            </p>
+          ) : null}
+
+          {apiError ? (
+            <p className="admin-crm-action-modal__validation-error" role="alert">
+              {apiError}
             </p>
           ) : null}
         </div>

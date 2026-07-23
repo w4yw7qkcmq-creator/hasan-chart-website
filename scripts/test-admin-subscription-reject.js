@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   __resetSubscriptionRejectLocksForTests,
   rejectSubscriptionRequest,
@@ -501,7 +502,7 @@ async function testPaymentProofPreservedAfterReject() {
   });
 
   assert.equal(result.success, true);
-  assert.equal(result.paymentProof, PAYMENT_PROOF);
+  assert.equal(Object.prototype.hasOwnProperty.call(result, "paymentProof"), false);
   assert.equal(supabase.getRow().payment_proof, PAYMENT_PROOF);
   assert.equal(supabase.getRow().status, "مرفوض");
   assert.equal(supabase.storageRemoveCalled(), false);
@@ -744,6 +745,50 @@ async function testNotesMaxLength() {
   );
 }
 
+async function testRejectSuccessWithAuditFailure() {
+  __resetSubscriptionRejectLocksForTests();
+
+  const supabase = createMockSupabase({
+    id: REQUEST_ID,
+    user_email: USER_EMAIL,
+    plan_name: "VIP Spot",
+    status: "قيد المعالجة",
+  });
+
+  const originalFrom = supabase.from.bind(supabase);
+  supabase.from = (table) => {
+    if (table === "admin_logs") {
+      return {
+        insert() {
+          return Promise.resolve({ error: { message: "audit insert failed" } });
+        },
+      };
+    }
+    return originalFrom(table);
+  };
+
+  const result = await rejectSubscriptionRequest(supabase, {
+    adminUser: ADMIN_USER,
+    requestId: REQUEST_ID,
+    rejectionReason: "بيانات غير مكتملة",
+    ...createRejectSideEffectMocks(),
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.auditLogged, false);
+  assert.match(result.auditWarning, /تعذر تسجيل العملية/);
+}
+
+async function testRejectSelectExcludesPaymentProofColumn() {
+  const source = readFileSync(
+    new URL("../lib/admin-subscription-request-reject.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /\.select\("id,user_email,username,plan_name,price,status,created_at"\)/);
+  assert.doesNotMatch(source, /select\("[^"]*payment_proof/);
+}
+
 const tests = [
   ["successful reject + notification + email queue", testSuccessfulRejectWithNotificationAndEmail],
   ["empty reason rejected", testEmptyReasonRejected],
@@ -764,6 +809,8 @@ const tests = [
   ["reject response includes rejection details without admin id", testRejectResponseIncludesRejectionDetailsWithoutAdminId],
   ["email content excludes internal data", testEmailContentHasNoInternalData],
   ["concurrent reject blocked", testConcurrentRejectBlocked],
+  ["reject success with audit failure", testRejectSuccessWithAuditFailure],
+  ["reject select excludes payment_proof column", testRejectSelectExcludesPaymentProofColumn],
   ["ui reject guard", testCanRejectUiGuard],
   ["notes max length", testNotesMaxLength],
 ];

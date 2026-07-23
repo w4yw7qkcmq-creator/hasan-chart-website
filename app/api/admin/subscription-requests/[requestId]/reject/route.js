@@ -11,32 +11,76 @@ import { requireValidUuid } from "../../../../../../lib/partner-security";
 
 export const dynamic = "force-dynamic";
 
+const REJECT_ERROR_CODES = {
+  400: "INVALID_REQUEST",
+  401: "UNAUTHORIZED",
+  403: "FORBIDDEN",
+  404: "NOT_FOUND",
+  409: "STATUS_CONFLICT",
+  429: "RATE_LIMITED",
+  500: "REJECT_FAILED",
+};
+
+function resolveRejectErrorCode(status) {
+  return REJECT_ERROR_CODES[status] || "REJECT_FAILED";
+}
+
 export async function POST(request, context) {
+  const startedAt = Date.now();
+  let stage = "start";
+  let requestId = null;
+
+  console.info("SUBSCRIPTION_REJECT_START", { requestId: requestId || "pending" });
+
   try {
+    stage = "auth";
     const adminCheck = await verifyAdminSession();
     assertAdminSubscriptionRejectAuthorized(adminCheck);
+    console.info("SUBSCRIPTION_REJECT_AUTH_OK", {
+      adminEmail: adminCheck.user?.email || null,
+    });
 
     const rateLimited = await enforceRateLimit(
       adminMutationLimiter,
       String(adminCheck.user?.email || "admin").toLowerCase()
     );
-    if (rateLimited) return rateLimited;
+    if (rateLimited) {
+      console.error("SUBSCRIPTION_REJECT_FAILED", {
+        stage: "rate-limit",
+        requestId,
+        statusCode: 429,
+        error: "rate-limited",
+      });
+      return rateLimited;
+    }
 
+    stage = "validation";
     const params = await context.params;
-    let requestId;
 
     try {
       requestId = requireValidUuid(params?.requestId, "requestId");
     } catch {
+      console.error("SUBSCRIPTION_REJECT_FAILED", {
+        stage,
+        requestId,
+        statusCode: 400,
+        error: "invalid-request-id",
+      });
       return Response.json(
-        { success: false, error: "معرّف طلب الاشتراك غير صالح" },
+        {
+          success: false,
+          errorCode: "INVALID_REQUEST_ID",
+          error: "معرّف طلب الاشتراك غير صالح",
+        },
         { status: 400 }
       );
     }
 
     const body = await request.json().catch(() => ({}));
     const { rejectionReason, rejectionNotes } = validateSubscriptionRejectPayload(body);
+    console.info("SUBSCRIPTION_REJECT_VALIDATION_OK", { requestId });
 
+    stage = "reject";
     const result = await rejectSubscriptionRequest(adminCheck.supabase, {
       adminUser: adminCheck.user,
       requestId,
@@ -44,12 +88,34 @@ export async function POST(request, context) {
       rejectionNotes,
     });
 
+    const warnings = [
+      result.notificationWarning,
+      result.emailWarning,
+      result.auditWarning,
+    ].filter(Boolean);
+
+    console.info("SUBSCRIPTION_REJECT_RESPONSE", {
+      requestId,
+      durationMs: Date.now() - startedAt,
+      notificationCreated: result.notificationCreated,
+      emailQueued: result.emailQueued,
+      auditLogged: result.auditLogged,
+      warningsCount: warnings.length,
+    });
+
     return Response.json(
       {
         success: true,
-        message: result.notificationWarning || "تم رفض طلب الاشتراك",
-        warning: result.notificationWarning || null,
-        ...result,
+        message: "تم رفض طلب الاشتراك",
+        warnings,
+        notificationCreated: Boolean(result.notificationCreated),
+        emailQueued: Boolean(result.emailQueued),
+        auditLogged: Boolean(result.auditLogged),
+        warning: warnings[0] || null,
+        requestId: result.requestId,
+        status: result.status,
+        previousStatus: result.previousStatus,
+        rejectionDetails: result.rejectionDetails,
       },
       {
         headers: {
@@ -58,14 +124,29 @@ export async function POST(request, context) {
       }
     );
   } catch (error) {
-    console.error("ADMIN_SUBSCRIPTION_REJECT_ERROR", error?.message || error);
+    const statusCode = error?.status || 500;
+
+    console.error("SUBSCRIPTION_REJECT_FAILED", {
+      stage,
+      requestId,
+      statusCode,
+      error: error?.message || String(error),
+      supabaseCode: error?.code || null,
+      stack: error?.stack,
+    });
 
     return Response.json(
       {
         success: false,
+        errorCode: resolveRejectErrorCode(statusCode),
         error: error?.message || "تعذر رفض طلب الاشتراك",
       },
-      { status: error?.status || 500 }
+      {
+        status: statusCode,
+        headers: {
+          "Cache-Control": CACHE_NO_STORE,
+        },
+      }
     );
   }
 }

@@ -269,10 +269,13 @@ export default function AdminPage() {
   const [subscriptionProofPreview, setSubscriptionProofPreview] = useState(null);
   const subscriptionProofAbortRef = useRef(null);
   const subscriptionProofInFlightRef = useRef(null);
+  const subscriptionProofRevokeRef = useRef(null);
   const closeProofPreview = useCallback(() => {
     subscriptionProofAbortRef.current?.abort();
     subscriptionProofAbortRef.current = null;
     subscriptionProofInFlightRef.current = null;
+    subscriptionProofRevokeRef.current?.();
+    subscriptionProofRevokeRef.current = null;
     setProofPreviewUrl(null);
     setSubscriptionProofPreview(null);
   }, []);
@@ -317,10 +320,13 @@ export default function AdminPage() {
         .then((proof) => {
           if (controller.signal.aborted) return;
 
-          const url = String(proof?.proof || "").trim();
+          const url = String(proof?.imageUrl || proof?.proof || "").trim();
           if (!isValidPreviewUrl(url)) {
             throw new Error("إثبات الدفع غير متوفر لهذا الطلب");
           }
+
+          subscriptionProofRevokeRef.current?.();
+          subscriptionProofRevokeRef.current = typeof proof?.revoke === "function" ? proof.revoke : null;
 
           setSubscriptionProofPreview({
             requestId: normalizedId,
@@ -357,6 +363,7 @@ export default function AdminPage() {
   }, []);
   const [subscriptionRejectTarget, setSubscriptionRejectTarget] = useState(null);
   const [subscriptionRejectLoading, setSubscriptionRejectLoading] = useState(false);
+  const [subscriptionRejectApiError, setSubscriptionRejectApiError] = useState("");
   const [subscriptionRejectionDetailsTarget, setSubscriptionRejectionDetailsTarget] = useState(null);
   const subscriptionActionInFlightRef = useRef(createAdminActionInFlightRegistry());
 
@@ -1031,8 +1038,11 @@ export default function AdminPage() {
     if (!request) return;
 
     const actionKey = `subscription:${request.id}:reject`;
+    const rejectController = new AbortController();
+    const rejectTimeoutId = setTimeout(() => rejectController.abort(), 20000);
 
     setSubscriptionRejectLoading(true);
+    setSubscriptionRejectApiError("");
 
     const flowResult = await runAdminUserActionFlow({
       actionKey,
@@ -1049,13 +1059,16 @@ export default function AdminPage() {
               rejectionReason: reasonLabel,
               rejectionNotes: notes,
             }),
+            signal: rejectController.signal,
           }
         );
 
         const result = await response.json().catch(() => ({}));
 
         if (!response.ok || !result?.success) {
-          throw new Error(result?.error || "تعذر رفض طلب الاشتراك");
+          const error = new Error(result?.error || "تعذر رفض طلب الاشتراك");
+          error.code = result?.errorCode || null;
+          throw error;
         }
 
         return result;
@@ -1090,9 +1103,11 @@ export default function AdminPage() {
           })
         );
         setSubscriptionRejectTarget(null);
+        setSubscriptionRejectApiError("");
       },
     });
 
+    clearTimeout(rejectTimeoutId);
     setSubscriptionRejectLoading(false);
 
     if (flowResult.blocked) return;
@@ -1103,19 +1118,24 @@ export default function AdminPage() {
         ? "تم رفض طلب الاشتراك — تعذر تحديث القائمة تلقائياً."
         : flowResult.successMessage;
 
-      if (apiResult.notificationWarning) {
-        message = `${message} — ${apiResult.notificationWarning}`;
-      }
+      const warnings = Array.isArray(apiResult.warnings)
+        ? apiResult.warnings.filter(Boolean)
+        : [apiResult.notificationWarning, apiResult.emailWarning, apiResult.auditWarning].filter(Boolean);
 
-      if (apiResult.emailWarning) {
-        message = `${message} — ${apiResult.emailWarning}`;
+      if (warnings.length) {
+        message = `${message} — ${warnings.join(" — ")}`;
       }
 
       showAdminNotice(message);
       return;
     }
 
-    showAdminNotice(flowResult.errorMessage || "تعذر رفض طلب الاشتراك", "error");
+    const rejectErrorMessage =
+      flowResult.error?.name === "AbortError"
+        ? "تعذر رفض طلب الاشتراك خلال الوقت المحدد"
+        : flowResult.error?.message || flowResult.errorMessage || "تعذر رفض طلب الاشتراك";
+
+    setSubscriptionRejectApiError(rejectErrorMessage);
   };
 
   const stats = useMemo(() => {
@@ -1608,9 +1628,11 @@ export default function AdminPage() {
       <SubscriptionRejectModal
         request={subscriptionRejectTarget}
         loading={subscriptionRejectLoading}
+        apiError={subscriptionRejectApiError}
         onCancel={() => {
           if (!subscriptionRejectLoading) {
             setSubscriptionRejectTarget(null);
+            setSubscriptionRejectApiError("");
           }
         }}
         onConfirm={confirmSubscriptionRejection}
