@@ -261,6 +261,16 @@ function testPageClearsProofPreviewOnClose() {
   assert.match(pageSource, /setSubscriptionProofPreview\(null\)/);
 }
 
+function testPaymentProofRouteUsesCentralSubscriptionIdValidator() {
+  const routeSource = readFileSync(
+    new URL("../app/api/admin/financial-center/payment-proof/[requestId]/route.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(routeSource, /requireValidSubscriptionRequestId/);
+  assert.doesNotMatch(routeSource, /requireValidUuid/);
+}
+
 const tests = [
   ["subscription list select excludes payment_proof", testSubscriptionListSelectExcludesPaymentProof],
   ["formatted subscription request has no proof payload", testFormattedSubscriptionRequestHasNoProofPayload],
@@ -279,6 +289,7 @@ const tests = [
   ["page revokes proof object url on close", testPageRevokesProofObjectUrlOnClose],
   ["reject fetch does not load payment_proof column", testRejectFetchDoesNotLoadPaymentProofColumn],
   ["reject modal shows api error inline", testRejectModalShowsApiErrorInline],
+  ["payment proof route uses central subscription id validator", testPaymentProofRouteUsesCentralSubscriptionIdValidator],
 ];
 
 let passed = 0;

@@ -1,9 +1,9 @@
 import { verifyAdminSession } from "../../../../../../lib/admin-auth";
 import {
   assertAdminSubscriptionRejectAuthorized,
-  requireValidSubscriptionRequestId,
   validateSubscriptionRejectPayload,
 } from "../../../../../../lib/admin-subscription-request-reject-shared.js";
+import { requireValidSubscriptionRequestId } from "../../../../../../lib/id-validation.js";
 import { rejectSubscriptionRequest } from "../../../../../../lib/admin-subscription-request-reject.js";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
 import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";

@@ -805,6 +805,7 @@ function testSubscriptionRequestIdRejectsInvalidValues() {
     null,
     "",
     "   ",
+    "0",
     "-123",
     "-1",
     "123abc",

@@ -7,6 +7,7 @@ import {
   buildUrlPaymentProofResponse,
   classifyPaymentProof,
 } from "../../../../../../lib/admin-payment-proof-response.js";
+import { requireValidSubscriptionRequestId } from "../../../../../../lib/id-validation.js";
 import { getPaymentProofForReview } from "../../../../../../lib/financial-center/payment-service.js";
 import { sanitizeFinancialError } from "../../../../../../lib/financial-center/financial-center-shared.js";
 
@@ -16,11 +17,32 @@ function logPaymentProofEvent(event, payload) {
   console.info(event, payload);
 }
 
+function trimIdForLog(value) {
+  if (value == null) return "";
+  return String(value).trim().slice(0, 80);
+}
+
 export async function GET(_request, { params }) {
   const startedAt = Date.now();
   const resolvedParams = await params;
-  const requestId = String(resolvedParams?.requestId || "").trim();
+  let requestId = "";
   let stage = "start";
+
+  try {
+    requestId = requireValidSubscriptionRequestId(resolvedParams?.requestId, "requestId");
+  } catch {
+    logPaymentProofEvent("PAYMENT_PROOF_FETCH_FAILED", {
+      requestId: trimIdForLog(resolvedParams?.requestId),
+      stage: "validation",
+      durationMs: Date.now() - startedAt,
+      statusCode: 400,
+      error: "invalid-request-id",
+    });
+    return Response.json(
+      { success: false, error: "معرّف طلب الاشتراك غير صالح" },
+      { status: 400 }
+    );
+  }
 
   logPaymentProofEvent("PAYMENT_PROOF_FETCH_START", { requestId });
 
@@ -51,17 +73,6 @@ export async function GET(_request, { params }) {
         error: "rate-limited",
       });
       return rateLimited;
-    }
-
-    if (!requestId) {
-      logPaymentProofEvent("PAYMENT_PROOF_FETCH_FAILED", {
-        requestId,
-        stage: "validation",
-        durationMs: Date.now() - startedAt,
-        statusCode: 400,
-        error: "missing-request-id",
-      });
-      return Response.json({ success: false, error: "معرّف الطلب مطلوب" }, { status: 400 });
     }
 
     stage = "db";
