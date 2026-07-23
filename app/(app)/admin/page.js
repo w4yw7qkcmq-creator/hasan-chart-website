@@ -30,10 +30,17 @@ import {
   getAdminStatusKey,
   getAdminStatusLabel,
   getSimpleStatusSelectValue,
+  isNewPendingSubscriptionRequest,
   isValidPreviewUrl,
   matchesAdminSearch,
   matchesAdminStatusFilter,
 } from "./admin-dashboard-helpers";
+import {
+  buildSubscriptionRequestCreatedNotificationId,
+  dispatchAdminSubscriptionRemovedEvent,
+  markAdminSubscriptionEndedNotificationSent,
+  resolveAdminSubscriptionEndedNotifyDecision,
+} from "../../../lib/admin-subscription-remove-client";
 import StatusBadge from "./components/StatusBadge";
 import AdminProofPreviewModal from "./components/AdminProofPreviewModal";
 import SubscriptionRejectModal from "./components/SubscriptionRejectModal";
@@ -371,6 +378,7 @@ export default function AdminPage() {
   const [subscriptionRemoveApiError, setSubscriptionRemoveApiError] = useState("");
   const [subscriptionRejectionDetailsTarget, setSubscriptionRejectionDetailsTarget] = useState(null);
   const subscriptionActionInFlightRef = useRef(createAdminActionInFlightRegistry());
+  const subscriptionEndedNotifySessionRef = useRef(new Set());
 
   // Admin Notice/Confirm modals
   const [adminNotice, setAdminNotice] = useState({
@@ -912,8 +920,8 @@ export default function AdminPage() {
   );
 
   useEffect(() => {
-    const pendingSubscriptions = subscriptionRequests.filter(
-      (item) => getAdminStatusKey(item.status) === "pending"
+    const pendingSubscriptions = subscriptionRequests.filter((item) =>
+      isNewPendingSubscriptionRequest(item.status)
     );
 
     const pendingAccounts = accountRequests.filter(
@@ -922,7 +930,7 @@ export default function AdminPage() {
 
     const notifications = [
       ...pendingSubscriptions.map((item) => ({
-        id: `subscription-${item.id}`,
+        id: buildSubscriptionRequestCreatedNotificationId(item.id),
         key: "subscription_request",
         title: "طلب اشتراك جديد 💳",
         body: `${item.planName || "اشتراك جديد"} - ${item.userEmail || item.username || "مستخدم"}`,
@@ -1195,8 +1203,46 @@ export default function AdminPage() {
       errorMessage: "تعذر إزالة الاشتراك",
       onSuccess: () => {
         setSubscriptionRequests((prev) =>
-          prev.map((item) => (item.id === request.id ? { ...item, status: "منتهي" } : item))
+          prev.map((item) =>
+            item.id === request.id
+              ? { ...item, status: "منتهي", admin_disabled: true }
+              : item
+          )
         );
+
+        dispatchAdminSubscriptionRemovedEvent({
+          requestId: request.id,
+          userEmail: request.userEmail,
+          userId: request.userId,
+          planName: request.planName,
+          status: "منتهي",
+        });
+
+        const endedNotifyDecision = resolveAdminSubscriptionEndedNotifyDecision(request.id, {
+          isAcknowledged: isAdminDashboardNotificationAcknowledged,
+          isRendered: isNotificationCenterRendered,
+          sessionSentIds: subscriptionEndedNotifySessionRef.current,
+        });
+
+        if (endedNotifyDecision.shouldNotify) {
+          markAdminSubscriptionEndedNotificationSent(
+            request.id,
+            subscriptionEndedNotifySessionRef.current
+          );
+
+          void notify({
+            key: "subscription_ended",
+            title: "تم إنهاء اشتراك المستخدم",
+            body: `${request.planName || "اشتراك"} — ${request.userEmail || request.username || "مستخدم"}`,
+            url: "/admin",
+            persist: false,
+            skipBrowser: !browserNotificationsEnabled,
+            metadata: { id: endedNotifyDecision.id },
+            source: "admin-dashboard",
+          }).finally(() => {
+            acknowledgeAdminDashboardNotifications([endedNotifyDecision.id]);
+          });
+        }
 
         if (request.userEmail) {
           setUsers((prev) =>
@@ -1344,10 +1390,10 @@ export default function AdminPage() {
           createdAt: item.createdAt,
         })),
       ...subscriptionRequests
-        .filter((item) => getAdminStatusKey(item.status) === "pending")
+        .filter((item) => isNewPendingSubscriptionRequest(item.status))
         .slice(0, 3)
         .map((item) => ({
-          id: `subscription-${item.id}`,
+          id: buildSubscriptionRequestCreatedNotificationId(item.id),
           tab: "subscriptions",
           icon: "💳",
           title: item.planName || "طلب اشتراك",

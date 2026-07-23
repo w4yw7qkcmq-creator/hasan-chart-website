@@ -62,6 +62,18 @@ export function useAdminScrollPanel({
     const onScroll = () => saveScrollPosition();
     el.addEventListener("scroll", onScroll, { passive: true });
 
+    const onWheel = (event) => {
+      if (el.scrollHeight <= el.clientHeight) return;
+      event.stopPropagation();
+      const atTop = el.scrollTop <= 0;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+      if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
+        event.preventDefault();
+      }
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+
     const onKeyDown = (event) => {
       if (document.activeElement !== el && !el.contains(document.activeElement)) return;
       if (event.target.closest?.(INTERACTIVE_SELECTOR)) return;
@@ -137,6 +149,7 @@ export function useAdminScrollPanel({
 
     return () => {
       el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("wheel", onWheel);
       document.removeEventListener("keydown", onKeyDown);
       el.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);

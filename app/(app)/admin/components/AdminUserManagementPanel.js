@@ -155,17 +155,13 @@ export default function AdminUserManagementPanel({
 }) {
   const router = useRouter();
   const savedListStateRef = useRef(readSavedUsersListState());
+  const filterSignatureRef = useRef("");
   const [users, setUsers] = useState([]);
-  const [pagination, setPagination] = useState({
-    page: Number(savedListStateRef.current?.page) > 0 ? Number(savedListStateRef.current.page) : 1,
-    pageSize: 20,
-    total: 0,
-    totalPages: 1,
-  });
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sort, setSort] = useState("created_at");
-  const [order, setOrder] = useState("desc");
+  const [listTotal, setListTotal] = useState(0);
+  const [searchInput, setSearchInput] = useState(() => String(savedListStateRef.current?.searchInput || ""));
+  const [searchQuery, setSearchQuery] = useState(() => String(savedListStateRef.current?.searchQuery || ""));
+  const [sort, setSort] = useState(() => savedListStateRef.current?.sort || "created_at");
+  const [order, setOrder] = useState(() => savedListStateRef.current?.order || "desc");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -178,9 +174,15 @@ export default function AdminUserManagementPanel({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUserId, setPreviewUserId] = useState("");
 
-  const [accountStatusFilter, setAccountStatusFilter] = useState("all");
-  const [clientFilters, setClientFilters] = useState(DEFAULT_CLIENT_FILTERS);
-  const [activeDashboardKey, setActiveDashboardKey] = useState("");
+  const [accountStatusFilter, setAccountStatusFilter] = useState(
+    () => savedListStateRef.current?.accountStatusFilter || "all"
+  );
+  const [clientFilters, setClientFilters] = useState(
+    () => savedListStateRef.current?.clientFilters || DEFAULT_CLIENT_FILTERS
+  );
+  const [activeDashboardKey, setActiveDashboardKey] = useState(
+    () => savedListStateRef.current?.activeDashboardKey || ""
+  );
   const [currentAdminUserId, setCurrentAdminUserId] = useState("");
 
   const [selectedUserIds, setSelectedUserIds] = useState([]);
@@ -207,16 +209,34 @@ export default function AdminUserManagementPanel({
   const listRequestRef = useRef(0);
   const backgroundRevalidationRef = useRef(createBackgroundRevalidationController());
 
-  const usersListScrollKey = useMemo(
-    () => `hc:admin-users-scroll:${pagination.page}:${viewMode}`,
-    [pagination.page, viewMode]
-  );
+  const usersListScrollKey = useMemo(() => {
+    const filterKey = JSON.stringify({
+      searchQuery,
+      accountStatusFilter,
+      clientFilters,
+      sort,
+      order,
+      viewMode,
+    });
+    return `hc:admin-users-scroll:${filterKey}`;
+  }, [accountStatusFilter, clientFilters, order, searchQuery, sort, viewMode]);
 
   const { panelRef, saveScrollPosition, restoreScrollPosition } = useAdminScrollPanel({
     storageKey: usersListScrollKey,
     enabled: !loading && users.length > 0,
     restoreDeps: [usersListScrollKey, users.length, loading],
   });
+
+  const resetListScroll = useCallback(() => {
+    if (panelRef.current) {
+      panelRef.current.scrollTop = 0;
+    }
+    try {
+      sessionStorage.removeItem(usersListScrollKey);
+    } catch {
+      // ignore
+    }
+  }, [panelRef, usersListScrollKey]);
 
   useEffect(() => {
     if (!openUserId) return;
@@ -269,7 +289,7 @@ export default function AdminUserManagementPanel({
   }, []);
 
   const loadUsers = useCallback(
-    async ({ page = 1, background = false } = {}) => {
+    async ({ background = false } = {}) => {
       listAbortRef.current?.abort();
       const controller = new AbortController();
       listAbortRef.current = controller;
@@ -293,23 +313,16 @@ export default function AdminUserManagementPanel({
           if (requestId !== listRequestRef.current) return;
 
           setUsers(result.users || []);
-          setPagination(
-            result.pagination || {
-              page: 1,
-              pageSize: 20,
-              total: 0,
-              totalPages: 1,
-            }
-          );
+          setListTotal(Number(result.pagination?.total || result.users?.length || 0));
           setViewMode(result.mode || "client");
           setUxNotice(
             result.mode === "client"
-              ? `عرض ${result.users.length} نتيجة بعد البحث/الفلاتر (تم فحص ${result.scannedPages} صفحة)`
+              ? `عرض ${result.users.length} نتيجة بعد البحث/الفلاتر`
               : ""
           );
         } else {
           const result = await fetchAdminUserList(adminFetch, {
-            page,
+            listAll: true,
             search: searchQuery,
             sort,
             order,
@@ -321,16 +334,13 @@ export default function AdminUserManagementPanel({
           if (requestId !== listRequestRef.current) return;
 
           setUsers(result.users || []);
-          setPagination(
-            result.pagination || {
-              page: 1,
-              pageSize: 20,
-              total: 0,
-              totalPages: 1,
-            }
-          );
+          setListTotal(Number(result.pagination?.total || result.users?.length || 0));
           setViewMode("server");
-          setUxNotice("");
+          setUxNotice(
+            result.truncation?.truncated
+              ? result.truncation.warning || "تم عرض جزء من النتائج بسبب الحد الأقصى للقائمة."
+              : ""
+          );
         }
 
         setLoaded(true);
@@ -357,9 +367,9 @@ export default function AdminUserManagementPanel({
   const refreshAll = useCallback(
     ({ background = false } = {}) => {
       void loadDashboard({ background });
-      void loadUsers({ page: pagination.page, background });
+      void loadUsers({ background });
     },
-    [loadDashboard, loadUsers, pagination.page]
+    [loadDashboard, loadUsers]
   );
 
   const refreshAllRef = useRef(refreshAll);
@@ -369,10 +379,10 @@ export default function AdminUserManagementPanel({
     return backgroundRevalidationRef.current.revalidate(async () => {
       await Promise.all([
         loadDashboard({ background: true }),
-        loadUsers({ page: pagination.page, background: true }),
+        loadUsers({ background: true }),
       ]);
     });
-  }, [loadDashboard, loadUsers, pagination.page]);
+  }, [loadDashboard, loadUsers]);
 
   useVisibilityRefresh(
     () => {
@@ -416,8 +426,26 @@ export default function AdminUserManagementPanel({
   }, [loadDashboard]);
 
   useEffect(() => {
-    void loadUsers({ page: hasClientFilters ? 1 : pagination.page });
-  }, [hasClientFilters, loadUsers, pagination.page]);
+    void loadUsers();
+  }, [hasClientFilters, loadUsers]);
+
+  useEffect(() => {
+    if (!loaded) return undefined;
+
+    const signature = JSON.stringify({
+      searchQuery,
+      accountStatusFilter,
+      clientFilters,
+      sort,
+      order,
+    });
+
+    if (filterSignatureRef.current && filterSignatureRef.current !== signature) {
+      resetListScroll();
+    }
+
+    filterSignatureRef.current = signature;
+  }, [accountStatusFilter, clientFilters, loaded, order, resetListScroll, searchQuery, sort]);
 
   useEffect(() => {
     return () => {
@@ -432,7 +460,6 @@ export default function AdminUserManagementPanel({
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
       setSearchQuery(searchInput.trim());
-      setPagination((current) => ({ ...current, page: 1 }));
     }, 350);
 
     return () => {
@@ -495,7 +522,13 @@ export default function AdminUserManagementPanel({
         USERS_LIST_STATE_KEY,
         JSON.stringify({
           scrollTop,
-          page: pagination.page,
+          searchInput,
+          searchQuery,
+          sort,
+          order,
+          accountStatusFilter,
+          clientFilters,
+          activeDashboardKey,
         })
       );
       saveScrollPosition();
@@ -524,7 +557,6 @@ export default function AdminUserManagementPanel({
       setSort(nextSort);
       setOrder("desc");
     }
-    setPagination((current) => ({ ...current, page: 1 }));
   };
 
   const handleDashboardCardClick = (cardKey) => {
@@ -534,7 +566,6 @@ export default function AdminUserManagementPanel({
     setActiveDashboardKey(cardKey);
     setAccountStatusFilter(preset.accountStatus);
     setClientFilters(preset.clientFilters);
-    setPagination((current) => ({ ...current, page: 1 }));
     setUxNotice(
       cardKey === "expiredSubscriptions"
         ? "تم تطبيق فلتر: الاشتراكات المنتهية"
@@ -546,7 +577,6 @@ export default function AdminUserManagementPanel({
     setAccountStatusFilter(statusId);
     setActiveDashboardKey("");
     setClientFilters((current) => ({ ...current, subscriptionState: "all", status: "all" }));
-    setPagination((current) => ({ ...current, page: 1 }));
   };
 
   const handleExpiredSubscriptionFilterClick = () => {
@@ -557,7 +587,6 @@ export default function AdminUserManagementPanel({
       subscriptionState: EXPIRED_SUBSCRIPTION_FILTER,
       status: "all",
     }));
-    setPagination((current) => ({ ...current, page: 1 }));
     setUxNotice("تم تطبيق فلتر: الاشتراكات المنتهية");
   };
 
@@ -928,7 +957,7 @@ export default function AdminUserManagementPanel({
             <button
               type="button"
               className="admin-btn-surface mt-4 px-5 py-3"
-              onClick={() => void loadUsers({ page: pagination.page })}
+              onClick={() => void loadUsers()}
             >
               إعادة المحاولة
             </button>
@@ -1031,35 +1060,10 @@ export default function AdminUserManagementPanel({
           </div>
         )}
 
-        {!error && viewMode === "server" && pagination.totalPages > 1 ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-bold text-slate-500">
-              عرض {users.length} من {pagination.total} مستخدم — الصفحة {pagination.page} / {pagination.totalPages}
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={pagination.page <= 1 || loading}
-                onClick={() => setPagination((current) => ({ ...current, page: Math.max(current.page - 1, 1) }))}
-                className="admin-btn-surface px-4 py-2 disabled:opacity-50"
-              >
-                السابق
-              </button>
-              <button
-                type="button"
-                disabled={pagination.page >= pagination.totalPages || loading}
-                onClick={() =>
-                  setPagination((current) => ({
-                    ...current,
-                    page: Math.min(current.page + 1, current.totalPages),
-                  }))
-                }
-                className="admin-btn-surface px-4 py-2 disabled:opacity-50"
-              >
-                التالي
-              </button>
-            </div>
-          </div>
+        {!error && users.length > 0 ? (
+          <p className="px-1 text-sm font-bold text-slate-500">
+            عرض {users.length} مستخدم{listTotal > users.length ? ` من ${listTotal}` : ""}
+          </p>
         ) : null}
       </section>
 

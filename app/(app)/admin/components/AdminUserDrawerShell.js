@@ -7,6 +7,7 @@ import {
   ADMIN_SECTION_NOT_ENABLED_MESSAGE,
   ADMIN_SECTION_PHASE_MESSAGE,
 } from "../../../../lib/admin-user-management-shared";
+import { canRemoveSubscriptionRequest, isAdminSubscriptionActiveDisplay, resolveAdminSubscriptionBadgeClass } from "../../../../lib/admin-subscription-request-remove-shared";
 import { TIMELINE_FILTER_OPTIONS } from "./admin-user-management-ux-helpers";
 import AdminPaymentProofModal from "./AdminPaymentProofModal";
 import { adminFetch } from "../../../../lib/admin-fetch";
@@ -276,6 +277,7 @@ export default function AdminUserDrawerShell({
   sectionState,
   pages,
   actionLoading,
+  subscriptionRemoveLoading = false,
   currentAdminUserId,
   onPageChange,
   onRefreshSection,
@@ -287,6 +289,7 @@ export default function AdminUserDrawerShell({
   onTogglePinNote,
   activityFilter = "all",
   onActivityFilterChange,
+  onRequestSubscriptionRemove,
 }) {
   const user = overview?.user;
   const [noteDraft, setNoteDraft] = useState("");
@@ -479,27 +482,37 @@ export default function AdminUserDrawerShell({
               (subscriptions?.subscriptions || []).length > 0 ? (
                 <>
                   <div className="admin-user-services-grid">
-                    {(subscriptions?.subscriptions || []).map((sub) => (
+                    {(subscriptions?.subscriptions || []).map((sub) => {
+                      const isActive = isAdminSubscriptionActiveDisplay(sub);
+                      const canRemove = canRemoveSubscriptionRequest(sub.rawStatus, sub.adminDisabled);
+                      const badgeClass = resolveAdminSubscriptionBadgeClass(sub);
+
+                      return (
                   <article key={sub.id} className="admin-user-service-tile">
                     <div className="admin-user-service-tile__head">
                       <div>
                         <h5 className="font-black">{sub.serviceName}</h5>
                         <p className="text-xs text-slate-400">{sub.planName} — {sub.category}</p>
                       </div>
-                      <span className="admin-user-service-tile__badge is-active">{sub.status}</span>
+                      <span className={`admin-user-service-tile__badge ${badgeClass}`}>{sub.status}</span>
                     </div>
                     <div className="admin-user-service-tile__dates">
                       <p><span>البداية</span><strong>{formatDateTime(sub.startedAt)}</strong></p>
                       <p><span>الانتهاء</span><strong>{formatDateTime(sub.endsAt)}</strong></p>
                       <p><span>المصدر</span><strong>{sub.activationSource}</strong></p>
                       <p><span>تجديد تلقائي</span><strong>{sub.autoRenew ? "نعم" : "لا"}</strong></p>
+                      {sub.adminDisabled ? (
+                        <p><span>إدارة</span><strong>تم إنهاؤه من الإدارة</strong></p>
+                      ) : null}
                     </div>
+                    {isActive ? (
+                      <>
                     <div className="admin-user-actions-grid">
                       {subscriptionActions.map((item) => (
                         <button
                           key={`${sub.id}-${item.label}`}
                           type="button"
-                          disabled={Boolean(actionLoading)}
+                          disabled={Boolean(actionLoading) || subscriptionRemoveLoading}
                           className="admin-user-action-btn"
                           onClick={() =>
                             onRequestAction({
@@ -522,11 +535,12 @@ export default function AdminUserDrawerShell({
                         value={manualExpiry}
                         onChange={(event) => setManualExpiry(event.target.value)}
                         className="admin-field text-sm"
+                        disabled={Boolean(actionLoading) || subscriptionRemoveLoading}
                       />
                       <button
                         type="button"
                         className="admin-user-action-btn"
-                        disabled={Boolean(actionLoading)}
+                        disabled={Boolean(actionLoading) || subscriptionRemoveLoading}
                         onClick={() =>
                           onRequestAction({
                             action: "extend_subscription",
@@ -544,8 +558,21 @@ export default function AdminUserDrawerShell({
                         حفظ تاريخ الانتهاء
                       </button>
                     </div>
+                    {canRemove ? (
+                      <button
+                        type="button"
+                        className="admin-user-action-btn admin-user-action-btn--danger mt-3 w-full"
+                        disabled={Boolean(actionLoading) || subscriptionRemoveLoading}
+                        onClick={() => onRequestSubscriptionRemove?.(sub)}
+                      >
+                        إزالة الاشتراك
+                      </button>
+                    ) : null}
+                      </>
+                    ) : null}
                   </article>
-                ))}
+                      );
+                    })}
                   </div>
                   <PaginationBar
                     pagination={subscriptions?.pagination}

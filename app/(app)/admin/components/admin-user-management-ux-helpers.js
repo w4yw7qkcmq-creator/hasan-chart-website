@@ -365,7 +365,7 @@ export async function fetchUsersForClientView(
 
   if (!needsClientPass) {
     const result = await fetchAdminUserList(adminFetch, {
-      page: 1,
+      listAll: true,
       search,
       sort,
       order,
@@ -380,28 +380,19 @@ export async function fetchUsersForClientView(
     };
   }
 
-  const merged = [];
-  let totalPages = 1;
-
-  for (let page = 1; page <= maxPages; page += 1) {
-    const result = await fetchAdminUserList(adminFetch, {
-      page,
-      search,
-      sort,
-      order,
-      accountStatus: effectiveAccountStatus,
-      signal,
-    });
-
-    merged.push(...(result.users || []));
-    totalPages = Number(result.pagination?.totalPages || 1);
-    if (page >= totalPages) break;
-  }
+  const result = await fetchAdminUserList(adminFetch, {
+    listAll: true,
+    search,
+    sort,
+    order,
+    accountStatus: effectiveAccountStatus,
+    signal,
+  });
 
   const deduped = [];
   const seen = new Set();
 
-  for (const user of merged) {
+  for (const user of result.users || []) {
     if (!user?.id || seen.has(user.id)) continue;
     seen.add(user.id);
     if (!matchUserSmart(user, search)) continue;
@@ -419,7 +410,7 @@ export async function fetchUsersForClientView(
       totalPages: 1,
     },
     mode: "client",
-    scannedPages: Math.min(totalPages, maxPages),
+    scannedPages: 1,
   };
 }
 

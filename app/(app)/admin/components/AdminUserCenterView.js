@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useId, useRef } from "react";
 import { useAdminUserCenter } from "../../../../lib/use-admin-user-center";
 import AdminUserDrawerShell from "./AdminUserDrawerShell";
+import SubscriptionRemoveModal from "./SubscriptionRemoveModal";
 
 const ACTION_ICONS = {
   suspend_user: "⏸️",
@@ -327,11 +328,13 @@ export function AdminUserCenterView({
             sectionState={center.sectionState}
             pages={center.pages}
             actionLoading={center.actionLoading}
+            subscriptionRemoveLoading={center.subscriptionRemoveLoading}
             currentAdminUserId={currentAdminUserId}
             onPageChange={center.handlePageChange}
             onRefreshSection={(section) => center.refreshSections([section])}
             onRequestAction={center.setPendingAction}
             onRunAction={center.runAction}
+            onRequestSubscriptionRemove={center.requestSubscriptionRemove}
             onAddNote={center.noteHandlers.onAddNote}
             onUpdateNote={center.noteHandlers.onUpdateNote}
             onDeleteNote={center.noteHandlers.onDeleteNote}
@@ -360,11 +363,13 @@ export function AdminUserCenterView({
           sectionState={center.sectionState}
           pages={center.pages}
           actionLoading={center.actionLoading}
+          subscriptionRemoveLoading={center.subscriptionRemoveLoading}
           currentAdminUserId={currentAdminUserId}
           onPageChange={center.handlePageChange}
           onRefreshSection={(section) => center.refreshSections([section])}
           onRequestAction={center.setPendingAction}
           onRunAction={center.runAction}
+          onRequestSubscriptionRemove={center.requestSubscriptionRemove}
           onAddNote={center.noteHandlers.onAddNote}
           onUpdateNote={center.noteHandlers.onUpdateNote}
           onDeleteNote={center.noteHandlers.onDeleteNote}
@@ -397,6 +402,14 @@ export function AdminUserCenterView({
             requireReason: center.pendingAction.requireReason,
           })
         }
+      />
+
+      <SubscriptionRemoveModal
+        request={center.subscriptionRemoveTarget}
+        loading={center.subscriptionRemoveLoading}
+        apiError={center.subscriptionRemoveApiError}
+        onCancel={center.cancelSubscriptionRemove}
+        onConfirm={center.confirmSubscriptionRemoval}
       />
     </>
   );

@@ -40,11 +40,43 @@ const REVIEWED_STATUS_VALUES = new Set([
   "تم التواصل",
   "قيد التفعيل",
   "نشط",
+  "active",
   "مرفوض",
   "مؤرشف",
   "مغلق",
   "بانتظار الدفع",
+  "منتهي",
+  "موقوف",
+  "ملغى",
+  "ملغي",
+  "cancelled",
+  "canceled",
+  "expired",
+  "ended",
+  "rejected",
 ]);
+
+export const SUBSCRIPTION_TERMINAL_STATUS_VALUES = [
+  "منتهي",
+  "مرفوض",
+  "ملغى",
+  "ملغي",
+  "expired",
+  "ended",
+  "cancelled",
+  "canceled",
+  "rejected",
+  "موقوف",
+  "مؤرشف",
+];
+
+export function isNewPendingSubscriptionRequest(status) {
+  const raw = String(status || "").trim();
+  if (!raw) return false;
+  if (REVIEWED_STATUS_VALUES.has(raw)) return false;
+  if (REVIEWED_STATUS_VALUES.has(raw.toLowerCase())) return false;
+  return getAdminStatusKey(raw) === "pending";
+}
 
 export const ADMIN_ANALYSIS_LIMIT = 50;
 export const ADMIN_USERS_LIMIT = 200;

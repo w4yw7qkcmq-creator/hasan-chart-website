@@ -33,9 +33,13 @@ export async function GET(request) {
     const accountStatus = String(searchParams.get("accountStatus") || "").trim().toLowerCase();
     const activeService = String(searchParams.get("activeService") || "").trim().toLowerCase();
 
+    const listAll =
+      searchParams.get("listAll") === "1" || String(searchParams.get("pageSize") || "") === "0";
+
     const payload = await loadAdminUserList(adminCheck.supabase, {
       page,
       pageSize: pageSize > 0 ? pageSize : undefined,
+      listAll,
       search,
       sort: sort === "last_sign_in" ? "last_sign_in" : "created_at",
       order: order === "asc" ? "asc" : "desc",

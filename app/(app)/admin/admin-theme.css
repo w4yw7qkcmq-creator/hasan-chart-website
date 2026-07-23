@@ -1928,6 +1928,11 @@ html[data-theme="light"] .admin-user-stat-card {
   color: #cbd5e1;
 }
 
+.admin-user-service-tile__badge.is-expired {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+}
+
 .admin-user-service-tile__dates {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
