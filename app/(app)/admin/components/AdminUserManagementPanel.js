@@ -15,6 +15,7 @@ import AdminUserBulkActionModal from "./AdminUserBulkActionModal";
 import AdminUserBulkActionsBar from "./AdminUserBulkActionsBar";
 import AdminUserManagementDashboard from "./AdminUserManagementDashboard";
 import AdminUserQuickActions from "./AdminUserQuickActions";
+import { useAdminScrollPanel } from "./useAdminScrollPanel";
 import {
   BULK_ACTIONS,
   DEFAULT_CLIENT_FILTERS,
@@ -29,6 +30,22 @@ import {
   resolveExpiredSubscriptionBadge,
   resolveUserSubscriptionStateLabel,
 } from "./admin-user-management-ux-helpers";
+
+const USERS_LIST_STATE_KEY = "hc:admin-users-list-state";
+
+function readSavedUsersListState() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = sessionStorage.getItem(USERS_LIST_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 function formatDateTime(value) {
   if (!value) return "—";
@@ -137,9 +154,10 @@ export default function AdminUserManagementPanel({
   currentAdminUserId: currentAdminUserIdProp = "",
 }) {
   const router = useRouter();
+  const savedListStateRef = useRef(readSavedUsersListState());
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState({
-    page: 1,
+    page: Number(savedListStateRef.current?.page) > 0 ? Number(savedListStateRef.current.page) : 1,
     pageSize: 20,
     total: 0,
     totalPages: 1,
@@ -188,6 +206,17 @@ export default function AdminUserManagementPanel({
   const searchDebounceRef = useRef(null);
   const listRequestRef = useRef(0);
   const backgroundRevalidationRef = useRef(createBackgroundRevalidationController());
+
+  const usersListScrollKey = useMemo(
+    () => `hc:admin-users-scroll:${pagination.page}:${viewMode}`,
+    [pagination.page, viewMode]
+  );
+
+  const { panelRef, saveScrollPosition, restoreScrollPosition } = useAdminScrollPanel({
+    storageKey: usersListScrollKey,
+    enabled: !loading && users.length > 0,
+    restoreDeps: [usersListScrollKey, users.length, loading],
+  });
 
   useEffect(() => {
     if (!openUserId) return;
@@ -435,7 +464,45 @@ export default function AdminUserManagementPanel({
     );
   };
 
+  useEffect(() => {
+    if (loading || users.length === 0) return;
+
+    const savedTop = Number(savedListStateRef.current?.scrollTop);
+    if (Number.isFinite(savedTop) && savedTop > 0) {
+      const el = panelRef.current;
+      if (el) {
+        el.scrollTop = savedTop;
+      } else {
+        restoreScrollPosition();
+      }
+      savedListStateRef.current = null;
+      try {
+        sessionStorage.removeItem(USERS_LIST_STATE_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    restoreScrollPosition();
+  }, [loading, users.length, restoreScrollPosition, panelRef]);
+
   const openUser = (userId) => {
+    const scrollTop = panelRef.current?.scrollTop || 0;
+
+    try {
+      sessionStorage.setItem(
+        USERS_LIST_STATE_KEY,
+        JSON.stringify({
+          scrollTop,
+          page: pagination.page,
+        })
+      );
+      saveScrollPosition();
+    } catch {
+      // ignore
+    }
+
     router.push(`/admin/users/${encodeURIComponent(userId)}`);
   };
 
@@ -872,7 +939,10 @@ export default function AdminUserManagementPanel({
             <h3 className="admin-heading text-2xl">لا يوجد مستخدمون مطابقون</h3>
           </div>
         ) : (
-          <div className="admin-section admin-table-wrap p-0">
+          <div
+            ref={panelRef}
+            className="admin-section admin-table-wrap admin-scroll-panel admin-scroll-panel--table admin-scroll-panel--interactive p-0"
+          >
             <table className="admin-user-table">
               <thead>
                 <tr>

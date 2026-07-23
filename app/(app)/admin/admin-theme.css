@@ -112,6 +112,21 @@ html[data-theme="light"] .admin-theme-page .admin-stat-card__title {
   max-height: 640px;
 }
 
+.admin-scroll-panel--interactive {
+  cursor: grab;
+}
+
+.admin-scroll-panel--interactive.admin-scroll-panel--dragging,
+.admin-scroll-panel--dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.admin-scroll-panel--interactive:focus-visible {
+  outline: 2px solid rgba(56, 168, 242, 0.55);
+  outline-offset: 2px;
+}
+
 .admin-theme-page .admin-table {
   min-width: 100%;
   font-size: 0.875rem;
@@ -195,6 +210,13 @@ html[data-theme="light"] .admin-theme-page .admin-select {
   box-shadow: 0 6px 20px rgba(239, 68, 68, 0.2);
 }
 
+.admin-theme-page .admin-btn--remove {
+  border: none;
+  background: linear-gradient(to left, #7f1d1d, #dc2626);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.24);
+}
+
 .admin-theme-page .admin-btn--view-rejection {
   border: 1px solid rgba(248, 113, 113, 0.35);
   background: linear-gradient(to left, rgba(69, 10, 10, 0.92), rgba(127, 29, 29, 0.88));
@@ -230,6 +252,30 @@ html[data-theme="light"] .admin-theme-page .admin-select {
   color: #f8fafc;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.admin-theme-page .admin-subscription-remove-modal__notice {
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  border-radius: 1rem;
+  background: rgba(69, 10, 10, 0.35);
+  padding: 1rem 1.1rem;
+}
+
+.admin-theme-page .admin-subscription-remove-modal__notice-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #fecaca;
+}
+
+.admin-theme-page .admin-subscription-remove-modal__notice-list {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fee2e2;
 }
 
 html[data-theme="light"] .admin-theme-page .admin-subscription-rejection-details {

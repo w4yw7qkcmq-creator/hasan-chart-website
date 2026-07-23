@@ -37,6 +37,7 @@ import {
 import StatusBadge from "./components/StatusBadge";
 import AdminProofPreviewModal from "./components/AdminProofPreviewModal";
 import SubscriptionRejectModal from "./components/SubscriptionRejectModal";
+import SubscriptionRemoveModal from "./components/SubscriptionRemoveModal";
 import SubscriptionRejectionDetailsModal from "./components/SubscriptionRejectionDetailsModal";
 import SubscriptionRequestTimeline from "./components/SubscriptionRequestTimeline";
 import { useAdminCommandPaletteShortcut } from "./components/AdminCommandPalette";
@@ -45,6 +46,7 @@ import {
   runAdminUserActionFlow,
 } from "../../../lib/admin-user-action-flow";
 import { canRejectSubscriptionRequest } from "../../../lib/admin-subscription-request-reject-shared.js";
+import { canRemoveSubscriptionRequest } from "../../../lib/admin-subscription-request-remove-shared.js";
 import { isRejectedSubscriptionStatus } from "../../../lib/admin-subscription-rejection-details.js";
 import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
 import {
@@ -364,6 +366,9 @@ export default function AdminPage() {
   const [subscriptionRejectTarget, setSubscriptionRejectTarget] = useState(null);
   const [subscriptionRejectLoading, setSubscriptionRejectLoading] = useState(false);
   const [subscriptionRejectApiError, setSubscriptionRejectApiError] = useState("");
+  const [subscriptionRemoveTarget, setSubscriptionRemoveTarget] = useState(null);
+  const [subscriptionRemoveLoading, setSubscriptionRemoveLoading] = useState(false);
+  const [subscriptionRemoveApiError, setSubscriptionRemoveApiError] = useState("");
   const [subscriptionRejectionDetailsTarget, setSubscriptionRejectionDetailsTarget] = useState(null);
   const subscriptionActionInFlightRef = useRef(createAdminActionInFlightRegistry());
 
@@ -958,6 +963,11 @@ export default function AdminPage() {
       return;
     }
 
+    if (newStatus === "remove") {
+      setSubscriptionRemoveTarget(request);
+      return;
+    }
+
     if (newStatus === "مفعل") {
       const confirmed = await confirmAdminAction("هل تريد تفعيل هذا الاشتراك للمستخدم؟");
       if (!confirmed) return;
@@ -1137,6 +1147,106 @@ export default function AdminPage() {
         : flowResult.error?.message || flowResult.errorMessage || "تعذر رفض طلب الاشتراك";
 
     setSubscriptionRejectApiError(rejectErrorMessage);
+  };
+
+  const confirmSubscriptionRemoval = async ({ notes }) => {
+    const request = subscriptionRemoveTarget;
+    if (!request) return;
+
+    const actionKey = `subscription:${request.id}:remove`;
+    const removeController = new AbortController();
+    const removeTimeoutId = setTimeout(() => removeController.abort(), 20000);
+
+    setSubscriptionRemoveLoading(true);
+    setSubscriptionRemoveApiError("");
+
+    const subscriptionRequestId = String(request?.id ?? "").trim();
+    const removeUrl = `/api/admin/subscription-requests/${encodeURIComponent(subscriptionRequestId)}/remove`;
+
+    const flowResult = await runAdminUserActionFlow({
+      actionKey,
+      inFlightRegistry: subscriptionActionInFlightRef.current,
+      execute: async () => {
+        const response = await adminFetch(removeUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            removalNotes: notes,
+          }),
+          signal: removeController.signal,
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result?.success) {
+          const error = new Error(result?.error || "تعذر إزالة الاشتراك");
+          error.code = result?.errorCode || null;
+          throw error;
+        }
+
+        return result;
+      },
+      refresh: async () => {
+        await loadSection("subscriptions", { force: true, background: true });
+      },
+      successMessage: "تم إزالة الاشتراك",
+      errorMessage: "تعذر إزالة الاشتراك",
+      onSuccess: () => {
+        setSubscriptionRequests((prev) =>
+          prev.map((item) => (item.id === request.id ? { ...item, status: "منتهي" } : item))
+        );
+
+        if (request.userEmail) {
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.email === request.userEmail
+                ? {
+                    ...user,
+                    subscription_status: "غير نشط",
+                  }
+                : user
+            )
+          );
+        }
+
+        setSubscriptionRemoveTarget(null);
+        setSubscriptionRemoveApiError("");
+      },
+    });
+
+    clearTimeout(removeTimeoutId);
+    setSubscriptionRemoveLoading(false);
+
+    if (flowResult.blocked) return;
+
+    if (flowResult.success) {
+      const apiResult = flowResult.data || {};
+      let message = flowResult.refreshFailed
+        ? "تم إزالة الاشتراك — تعذر تحديث القائمة تلقائياً."
+        : flowResult.successMessage;
+
+      const warnings = Array.isArray(apiResult.warnings)
+        ? apiResult.warnings.filter(Boolean)
+        : [apiResult.notificationWarning, apiResult.emailWarning, apiResult.auditWarning].filter(
+            Boolean
+          );
+
+      if (warnings.length) {
+        message = `${message} — ${warnings.join(" — ")}`;
+      }
+
+      showAdminNotice(message);
+      return;
+    }
+
+    const removeErrorMessage =
+      flowResult.error?.name === "AbortError"
+        ? "تعذر إزالة الاشتراك خلال الوقت المحدد"
+        : flowResult.error?.message || flowResult.errorMessage || "تعذر إزالة الاشتراك";
+
+    setSubscriptionRemoveApiError(removeErrorMessage);
   };
 
   const stats = useMemo(() => {
@@ -1637,6 +1747,19 @@ export default function AdminPage() {
           }
         }}
         onConfirm={confirmSubscriptionRejection}
+      />
+
+      <SubscriptionRemoveModal
+        request={subscriptionRemoveTarget}
+        loading={subscriptionRemoveLoading}
+        apiError={subscriptionRemoveApiError}
+        onCancel={() => {
+          if (!subscriptionRemoveLoading) {
+            setSubscriptionRemoveTarget(null);
+            setSubscriptionRemoveApiError("");
+          }
+        }}
+        onConfirm={confirmSubscriptionRemoval}
       />
 
       <SubscriptionRejectionDetailsModal
@@ -2417,6 +2540,15 @@ export default function AdminPage() {
                           className="admin-btn--reject rounded-2xl px-5 py-3 font-black transition hover:scale-[1.01] hover:brightness-110"
                         >
                           ❌ رفض الاشتراك
+                        </button>
+                      ) : null}
+                      {canRemoveSubscriptionRequest(req.status) ? (
+                        <button
+                          type="button"
+                          onClick={() => updateSubscriptionRequest(req, "remove")}
+                          className="admin-btn--remove rounded-2xl px-5 py-3 font-black transition hover:scale-[1.01] hover:brightness-110"
+                        >
+                          🔴 إزالة الاشتراك
                         </button>
                       ) : null}
                       {isRejectedSubscriptionStatus(req.status) ? (
