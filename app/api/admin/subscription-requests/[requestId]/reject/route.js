@@ -1,13 +1,13 @@
 import { verifyAdminSession } from "../../../../../../lib/admin-auth";
 import {
   assertAdminSubscriptionRejectAuthorized,
+  requireValidSubscriptionRequestId,
   validateSubscriptionRejectPayload,
 } from "../../../../../../lib/admin-subscription-request-reject-shared.js";
 import { rejectSubscriptionRequest } from "../../../../../../lib/admin-subscription-request-reject.js";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
 import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
 import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
-import { requireValidUuid } from "../../../../../../lib/partner-security";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +36,6 @@ export async function POST(request, context) {
     stage = "auth";
     const adminCheck = await verifyAdminSession();
     assertAdminSubscriptionRejectAuthorized(adminCheck);
-    console.info("SUBSCRIPTION_REJECT_AUTH_OK", {
-      adminEmail: adminCheck.user?.email || null,
-    });
 
     const rateLimited = await enforceRateLimit(
       adminMutationLimiter,
@@ -58,13 +55,13 @@ export async function POST(request, context) {
     const params = await context.params;
 
     try {
-      requestId = requireValidUuid(params?.requestId, "requestId");
+      requestId = requireValidSubscriptionRequestId(params?.requestId, "requestId");
     } catch {
       console.error("SUBSCRIPTION_REJECT_FAILED", {
         stage,
-        requestId,
         statusCode: 400,
         error: "invalid-request-id",
+        validation: "subscription_request_id",
       });
       return Response.json(
         {

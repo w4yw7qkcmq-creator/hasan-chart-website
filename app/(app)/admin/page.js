@@ -1044,13 +1044,14 @@ export default function AdminPage() {
     setSubscriptionRejectLoading(true);
     setSubscriptionRejectApiError("");
 
+    const subscriptionRequestId = String(request?.id ?? "").trim();
+    const rejectUrl = `/api/admin/subscription-requests/${encodeURIComponent(subscriptionRequestId)}/reject`;
+
     const flowResult = await runAdminUserActionFlow({
       actionKey,
       inFlightRegistry: subscriptionActionInFlightRef.current,
       execute: async () => {
-        const response = await adminFetch(
-          `/api/admin/subscription-requests/${encodeURIComponent(request.id)}/reject`,
-          {
+        const response = await adminFetch(rejectUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

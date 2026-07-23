@@ -7,6 +7,8 @@ import {
 import {
   assertAdminSubscriptionRejectAuthorized,
   canRejectSubscriptionRequest,
+  normalizeSubscriptionRequestId,
+  requireValidSubscriptionRequestId,
   validateSubscriptionRejectPayload,
 } from "../lib/admin-subscription-request-reject-shared.js";
 import {
@@ -56,7 +58,7 @@ function createMockSupabase(initialRow, options = {}) {
               eq(_column, value) {
                 return {
                   async maybeSingle() {
-                    if (value !== REQUEST_ID || !row) {
+                    if (!row || String(value) !== String(row.id)) {
                       return { data: null, error: null };
                     }
                     return { data: { ...row }, error: null };
@@ -83,7 +85,7 @@ function createMockSupabase(initialRow, options = {}) {
                     return chain;
                   },
                   async maybeSingle() {
-                    if (value !== REQUEST_ID || !row) {
+                    if (!row || String(value) !== String(row.id)) {
                       return { data: null, error: null };
                     }
 
@@ -789,6 +791,84 @@ async function testRejectSelectExcludesPaymentProofColumn() {
   assert.doesNotMatch(source, /select\("[^"]*payment_proof/);
 }
 
+function testSubscriptionRequestIdAcceptsLegacyBigint() {
+  assert.equal(normalizeSubscriptionRequestId("1234567890"), "1234567890");
+  assert.equal(
+    requireValidSubscriptionRequestId("11111111-1111-4111-8111-111111111111"),
+    "11111111-1111-4111-8111-111111111111"
+  );
+}
+
+function testSubscriptionRequestIdRejectsInvalidValues() {
+  const invalidValues = [
+    undefined,
+    null,
+    "",
+    "   ",
+    "-123",
+    "-1",
+    "123abc",
+    "abc123",
+    "123/456",
+    "../123",
+    "123-456",
+    "12.34",
+    "not-an-id",
+    "user-id-abc",
+    "123 456",
+    "123;drop",
+  ];
+
+  for (const value of invalidValues) {
+    assert.equal(normalizeSubscriptionRequestId(value), null, `expected null for ${String(value)}`);
+    assert.throws(
+      () => requireValidSubscriptionRequestId(value),
+      /INVALID_REQUESTID/,
+      `expected throw for ${String(value)}`
+    );
+  }
+}
+
+function testSubscriptionRequestIdPreservesLargeBigintString() {
+  const largeId = "9007199254740993";
+
+  assert.equal(requireValidSubscriptionRequestId(largeId), largeId);
+  assert.notEqual(Number(largeId).toString(), largeId, "Number() must not be used for large ids");
+}
+
+function testRejectLibUsesStringIdWithoutNumberConversion() {
+  const source = readFileSync(
+    new URL("../lib/admin-subscription-request-reject.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /\.eq\("id", normalizedRequestId\)/);
+  assert.doesNotMatch(source, /parseInt\([^\)]*requestId/);
+  assert.doesNotMatch(source, /Number\([^\)]*requestId/);
+}
+
+function testRejectRouteUsesSubscriptionRequestIdValidator() {
+  const routeSource = readFileSync(
+    new URL("../app/api/admin/subscription-requests/[requestId]/reject/route.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(routeSource, /requireValidSubscriptionRequestId\(params\?\.requestId/);
+  assert.doesNotMatch(routeSource, /requireValidUuid/);
+  assert.doesNotMatch(routeSource, /parseInt\([^\)]*requestId/);
+  assert.doesNotMatch(routeSource, /Number\([^\)]*requestId/);
+}
+
+function testRejectRouteValidationMatchesParamShape() {
+  const validBigint = requireValidSubscriptionRequestId("42");
+  const validUuid = requireValidSubscriptionRequestId("11111111-1111-4111-8111-111111111111");
+  const invalid = normalizeSubscriptionRequestId("bad-id");
+
+  assert.equal(validBigint, "42");
+  assert.equal(validUuid, "11111111-1111-4111-8111-111111111111");
+  assert.equal(invalid, null);
+}
+
 const tests = [
   ["successful reject + notification + email queue", testSuccessfulRejectWithNotificationAndEmail],
   ["empty reason rejected", testEmptyReasonRejected],
@@ -811,6 +891,12 @@ const tests = [
   ["concurrent reject blocked", testConcurrentRejectBlocked],
   ["reject success with audit failure", testRejectSuccessWithAuditFailure],
   ["reject select excludes payment_proof column", testRejectSelectExcludesPaymentProofColumn],
+  ["subscription request id accepts legacy bigint", testSubscriptionRequestIdAcceptsLegacyBigint],
+  ["subscription request id rejects invalid values", testSubscriptionRequestIdRejectsInvalidValues],
+  ["subscription request id preserves large bigint string", testSubscriptionRequestIdPreservesLargeBigintString],
+  ["reject lib uses string id without number conversion", testRejectLibUsesStringIdWithoutNumberConversion],
+  ["reject route uses subscription request id validator", testRejectRouteUsesSubscriptionRequestIdValidator],
+  ["reject route validation matches param shape", testRejectRouteValidationMatchesParamShape],
   ["ui reject guard", testCanRejectUiGuard],
   ["notes max length", testNotesMaxLength],
 ];
