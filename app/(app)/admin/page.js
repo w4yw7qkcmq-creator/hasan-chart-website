@@ -24,6 +24,7 @@ import {
   ADMIN_TABS,
   SIMPLE_STATUS_OPTIONS,
   countAdminStatusFilter,
+  countSubscriptionStatusFilter,
   formatAccountManagementRequest,
   formatAnalysisRequest,
   formatSubscriptionRequest,
@@ -34,6 +35,7 @@ import {
   isValidPreviewUrl,
   matchesAdminSearch,
   matchesAdminStatusFilter,
+  matchesSubscriptionStatusFilter,
 } from "./admin-dashboard-helpers";
 import {
   buildSubscriptionRequestCreatedNotificationId,
@@ -954,7 +956,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     const pendingSubscriptions = subscriptionRequests.filter((item) =>
-      isNewPendingSubscriptionRequest(item.status)
+      isNewPendingSubscriptionRequest(item)
     );
 
     const pendingAccounts = accountRequests.filter(
@@ -1048,6 +1050,17 @@ export default function AdminPage() {
       successMessage: newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك",
       errorMessage: "تعذر تحديث حالة طلب الاشتراك",
       onSuccess: (apiResult) => {
+        if (isNewPendingSubscriptionRequest(request)) {
+          setApiStats((current) =>
+            current
+              ? {
+                  ...current,
+                  subscriptionsPending: Math.max(0, Number(current.subscriptionsPending || 0) - 1),
+                }
+              : current
+          );
+        }
+
         setSubscriptionRequests((prev) =>
           prev.map((item) =>
             item.id === request.id ? { ...item, status: newStatus } : item
@@ -1154,6 +1167,17 @@ export default function AdminPage() {
       successMessage: "تم رفض طلب الاشتراك",
       errorMessage: "تعذر رفض طلب الاشتراك",
       onSuccess: (apiResult) => {
+        if (isNewPendingSubscriptionRequest(request)) {
+          setApiStats((current) =>
+            current
+              ? {
+                  ...current,
+                  subscriptionsPending: Math.max(0, Number(current.subscriptionsPending || 0) - 1),
+                }
+              : current
+          );
+        }
+
         setSubscriptionRequests((prev) =>
           prev.map((item) => {
             if (item.id !== request.id) return item;
@@ -1377,7 +1401,9 @@ export default function AdminPage() {
     const pendingAnalysis = analysisRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
     const completedAnalysis = analysisRequests.filter((req) => getAdminStatusKey(req.status) === "reviewed").length;
     const pendingAccounts = accountRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
-    const pendingSubscriptions = subscriptionRequests.filter((req) => getAdminStatusKey(req.status) === "pending").length;
+    const pendingSubscriptions = subscriptionRequests.filter((req) =>
+      isNewPendingSubscriptionRequest(req)
+    ).length;
 
     return {
       pendingAnalysis,
@@ -1455,7 +1481,7 @@ export default function AdminPage() {
           createdAt: item.createdAt,
         })),
       ...subscriptionRequests
-        .filter((item) => isNewPendingSubscriptionRequest(item.status))
+        .filter((item) => isNewPendingSubscriptionRequest(item))
         .slice(0, 3)
         .map((item) => ({
           id: buildSubscriptionRequestCreatedNotificationId(item.id),
@@ -1529,7 +1555,7 @@ export default function AdminPage() {
 
   const filteredSubscriptions = useMemo(() => {
     let list = subscriptionRequests.filter((req) =>
-      matchesAdminStatusFilter(req.status, subscriptionFilter)
+      matchesSubscriptionStatusFilter(req, subscriptionFilter)
     );
 
     return list.filter((req) =>
@@ -1544,6 +1570,9 @@ export default function AdminPage() {
       ])
     );
   }, [subscriptionRequests, subscriptionFilter, subscriptionSearch]);
+
+  const subscriptionPendingBadgeCount =
+    stats.pendingSubscriptions ?? countSubscriptionStatusFilter(subscriptionRequests, "pending");
 
   const filteredAccounts = useMemo(() => {
     let list = accountRequests.filter((req) => matchesAdminStatusFilter(req.status, accountFilter));
@@ -2572,7 +2601,12 @@ export default function AdminPage() {
                       : "admin-filter-btn admin-filter-btn--idle"
                   }`}
                 >
-                  {label} ({countAdminStatusFilter(subscriptionRequests, key)})
+                  {label}{" "}
+                  (
+                  {key === "pending"
+                    ? subscriptionPendingBadgeCount
+                    : countAdminStatusFilter(subscriptionRequests, key)}
+                  )
                 </button>
               ))}
             </div>

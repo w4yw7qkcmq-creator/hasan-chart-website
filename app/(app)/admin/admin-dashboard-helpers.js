@@ -4,6 +4,12 @@ import {
   isPendingAdminStatus,
   isReviewedAdminStatus,
 } from "../../../lib/admin-status-constants.js";
+import {
+  isPendingSubscriptionRequestRow,
+  SUBSCRIPTION_TERMINAL_STATUS_VALUES,
+} from "../../../lib/admin-pending-subscription-request.js";
+
+export { SUBSCRIPTION_TERMINAL_STATUS_VALUES };
 
 export const ADMIN_STATUS_FILTERS = [
   ["pending", "بانتظار المراجعة"],
@@ -28,26 +34,24 @@ export const SIMPLE_STATUS_OPTIONS = [
 const PENDING_STATUS_VALUES = PENDING_ADMIN_STATUS_VALUES;
 const REVIEWED_STATUS_VALUES = REVIEWED_ADMIN_STATUS_VALUES;
 
-export const SUBSCRIPTION_TERMINAL_STATUS_VALUES = [
-  "منتهي",
-  "مرفوض",
-  "ملغى",
-  "ملغي",
-  "expired",
-  "ended",
-  "cancelled",
-  "canceled",
-  "rejected",
-  "موقوف",
-  "مؤرشف",
-];
+export function isNewPendingSubscriptionRequest(statusOrRow) {
+  if (typeof statusOrRow === "object" && statusOrRow !== null) {
+    return isPendingSubscriptionRequestRow(statusOrRow);
+  }
+  return isPendingSubscriptionRequestRow({ status: statusOrRow });
+}
 
-export function isNewPendingSubscriptionRequest(status) {
-  const raw = String(status || "").trim();
-  if (!raw) return false;
-  if (REVIEWED_STATUS_VALUES.has(raw)) return false;
-  if (REVIEWED_STATUS_VALUES.has(raw.toLowerCase())) return false;
-  return getAdminStatusKey(raw) === "pending";
+export function matchesSubscriptionStatusFilter(row, filterKey) {
+  if (filterKey === "all") return true;
+  if (filterKey === "pending") return isPendingSubscriptionRequestRow(row);
+  return getAdminStatusKey(row?.status) === filterKey;
+}
+
+export function countSubscriptionStatusFilter(list, filterKey) {
+  if (filterKey === "pending") {
+    return list.filter((item) => isPendingSubscriptionRequestRow(item)).length;
+  }
+  return countAdminStatusFilter(list, filterKey);
 }
 
 export const ADMIN_ANALYSIS_LIMIT = 50;
@@ -122,7 +126,9 @@ export const formatSubscriptionRequest = (item) => ({
   price: item.price,
   telegramUsername: item.telegram_username || "",
   hasPaymentProof: Boolean(item.has_payment_proof),
+  paymentProofPath: item.payment_proof_path || "",
   paymentProof: "",
+  adminDisabled: Boolean(item.admin_disabled),
   status: item.status || "قيد المعالجة",
   createdAt: item.created_at ? new Date(item.created_at).toLocaleString("ar") : "",
   rejectionDetails: item.rejection_details

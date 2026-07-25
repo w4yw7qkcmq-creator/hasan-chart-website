@@ -97,6 +97,7 @@ function testFinancialHubUsesPaymentReviewCounter() {
   assert.equal(financialCard.statKey, "pendingPaymentReviews");
   assert.equal(subscriptionsCard.statKey, "pendingSubscriptions");
   assert.match(dashboardSectionsSource, /countPendingPaymentReviews/);
+  assert.match(dashboardSectionsSource, /countPendingSubscriptionRequests/);
   assert.match(dashboardSectionsSource, /pendingPaymentReviews,/);
 }
 
