@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  __resetAdminEventDispatchForTests,
+  dispatchAdminEvent,
+} from "../lib/admin-events.js";
+import { recordAdminAction } from "../lib/admin-audit-log.js";
+import {
   __resetSubscriptionRejectLocksForTests,
   rejectSubscriptionRequest,
 } from "../lib/admin-subscription-request-reject.js";
@@ -194,19 +199,49 @@ function createMockSupabase(initialRow, options = {}) {
   return supabase;
 }
 
-function createRejectSideEffectMocks(overrides = {}) {
+function createRejectAdminEventDeps(overrides = {}) {
   return {
-    dispatchAlerts:
-      overrides.dispatchAlerts ||
-      (async () => ({ notificationCreated: true })),
-    dispatchRejectedEmail:
-      overrides.dispatchRejectedEmail ||
-      (async () => ({ emailQueued: true, queued: true, enqueued: true })),
+    createUserNotification:
+      overrides.createUserNotification ||
+      (async () => ({
+        success: true,
+        notificationCreated: true,
+        userNotificationCreated: true,
+      })),
+    queueEmail:
+      overrides.queueEmail ||
+      (async () => ({ success: true, emailQueued: true })),
+    createAuditLog:
+      overrides.createAuditLog ||
+      (async (client, payload) => {
+        const auditResult = await recordAdminAction(client, {
+          adminId: payload.adminId,
+          adminEmail: payload.adminEmail,
+          action: payload.action,
+          targetTable: payload.targetTable,
+          targetId: payload.targetId,
+          details: payload.details,
+        });
+        return { ok: auditResult?.ok === true, success: auditResult?.ok === true };
+      }),
+  };
+}
+
+function createRejectDispatchOptions(overrides = {}) {
+  const adminEventDeps = {
+    ...createRejectAdminEventDeps(overrides.adminEventDeps || {}),
+    ...(overrides.adminEventDeps || {}),
+  };
+
+  return {
+    dispatchAdminEventFn: overrides.dispatchAdminEventFn || dispatchAdminEvent,
+    adminEventDeps,
   };
 }
 
 async function testSuccessfulRejectWithNotificationAndEmail() {
   __resetSubscriptionRejectLocksForTests();
+  __resetAdminEventDispatchForTests();
 
   const supabase = createMockSupabase({
     id: REQUEST_ID,
@@ -226,17 +261,25 @@ async function testSuccessfulRejectWithNotificationAndEmail() {
     requestId: REQUEST_ID,
     rejectionReason: "صورة الدفع غير واضحة",
     rejectionNotes: "يرجى إعادة الإرسال",
-    dispatchAlerts: async () => {
-      notificationCalled = true;
-      return { notificationCreated: true };
-    },
-    dispatchRejectedEmail: async (payload) => {
-      emailCalled = true;
-      assert.equal(payload.subscriptionRequestId, REQUEST_ID);
-      assert.equal(payload.recipientEmail, USER_EMAIL);
-      assert.equal(payload.planName, "VIP Spot");
-      return { emailQueued: true, queued: true, enqueued: true };
-    },
+    ...createRejectDispatchOptions({
+      adminEventDeps: {
+        createUserNotification: async () => {
+          notificationCalled = true;
+          return {
+            success: true,
+            notificationCreated: true,
+            userNotificationCreated: true,
+          };
+        },
+        queueEmail: async (payload) => {
+          emailCalled = true;
+          assert.equal(payload.subscriptionRequestId, REQUEST_ID);
+          assert.equal(payload.recipientEmail, USER_EMAIL);
+          assert.equal(payload.planName, "VIP Spot");
+          return { success: true, emailQueued: true };
+        },
+      },
+    }),
   });
 
   assert.equal(result.success, true);
@@ -273,10 +316,12 @@ async function testRequestNotFound() {
         adminUser: ADMIN_USER,
         requestId: REQUEST_ID,
         rejectionReason: "صورة الدفع غير واضحة",
-        ...createRejectSideEffectMocks({
-          dispatchRejectedEmail: async () => {
-            emailCalled = true;
-            return { emailQueued: true };
+        ...createRejectDispatchOptions({
+          adminEventDeps: {
+            queueEmail: async () => {
+              emailCalled = true;
+              return { success: true, emailQueued: true };
+            },
           },
         }),
       }),
@@ -316,10 +361,12 @@ async function testAlreadyRejected() {
         adminUser: ADMIN_USER,
         requestId: REQUEST_ID,
         rejectionReason: "صورة الدفع غير واضحة",
-        ...createRejectSideEffectMocks({
-          dispatchRejectedEmail: async () => {
-            emailCalled = true;
-            return { emailQueued: true };
+        ...createRejectDispatchOptions({
+          adminEventDeps: {
+            queueEmail: async () => {
+              emailCalled = true;
+              return { success: true, emailQueued: true };
+            },
           },
         }),
       }),
@@ -331,6 +378,7 @@ async function testAlreadyRejected() {
 
 async function testRejectSuccessWithNotificationFailure() {
   __resetSubscriptionRejectLocksForTests();
+  __resetAdminEventDispatchForTests();
 
   const supabase = createMockSupabase({
     id: REQUEST_ID,
@@ -343,10 +391,14 @@ async function testRejectSuccessWithNotificationFailure() {
     adminUser: ADMIN_USER,
     requestId: REQUEST_ID,
     rejectionReason: "المبلغ غير مطابق",
-    dispatchAlerts: async () => {
-      throw new Error("notification down");
-    },
-    dispatchRejectedEmail: async () => ({ emailQueued: true }),
+    ...createRejectDispatchOptions({
+      adminEventDeps: {
+        createUserNotification: async () => {
+          throw new Error("notification down");
+        },
+        queueEmail: async () => ({ success: true, emailQueued: true }),
+      },
+    }),
   });
 
   assert.equal(result.success, true);
@@ -358,6 +410,7 @@ async function testRejectSuccessWithNotificationFailure() {
 
 async function testRejectSuccessWithEmailQueueFailure() {
   __resetSubscriptionRejectLocksForTests();
+  __resetAdminEventDispatchForTests();
 
   const supabase = createMockSupabase({
     id: REQUEST_ID,
@@ -370,8 +423,16 @@ async function testRejectSuccessWithEmailQueueFailure() {
     adminUser: ADMIN_USER,
     requestId: REQUEST_ID,
     rejectionReason: "إثبات الدفع غير صحيح",
-    dispatchAlerts: async () => ({ notificationCreated: true }),
-    dispatchRejectedEmail: async () => ({ emailQueued: false, error: "queue failed" }),
+    ...createRejectDispatchOptions({
+      adminEventDeps: {
+        createUserNotification: async () => ({
+          success: true,
+          notificationCreated: true,
+          userNotificationCreated: true,
+        }),
+        queueEmail: async () => ({ success: false, emailQueued: false, error: "queue failed" }),
+      },
+    }),
   });
 
   assert.equal(result.success, true);
@@ -394,7 +455,7 @@ async function testNoEmailWhenUpdateFails() {
   );
 
   let emailCalled = false;
-  let notificationCalled = false;
+  let dispatchCalled = false;
 
   await assert.rejects(
     () =>
@@ -402,20 +463,30 @@ async function testNoEmailWhenUpdateFails() {
         adminUser: ADMIN_USER,
         requestId: REQUEST_ID,
         rejectionReason: "بيانات غير مكتملة",
-        dispatchAlerts: async () => {
-          notificationCalled = true;
-          return { notificationCreated: true };
-        },
-        dispatchRejectedEmail: async () => {
-          emailCalled = true;
-          return { emailQueued: true };
-        },
+        ...createRejectDispatchOptions({
+          dispatchAdminEventFn: async () => {
+            dispatchCalled = true;
+            return {
+              success: true,
+              userNotificationCreated: true,
+              emailQueued: true,
+              auditLogged: true,
+              warnings: [],
+            };
+          },
+          adminEventDeps: {
+            queueEmail: async () => {
+              emailCalled = true;
+              return { success: true, emailQueued: true };
+            },
+          },
+        }),
       }),
     /update failed/
   );
 
   assert.equal(emailCalled, false);
-  assert.equal(notificationCalled, false);
+  assert.equal(dispatchCalled, false);
 }
 
 async function testPreventDuplicateEmailDispatch() {
@@ -500,7 +571,7 @@ async function testPaymentProofPreservedAfterReject() {
     adminUser: ADMIN_USER,
     requestId: REQUEST_ID,
     rejectionReason: "صورة الدفع غير واضحة",
-    ...createRejectSideEffectMocks(),
+    ...createRejectDispatchOptions(),
   });
 
   assert.equal(result.success, true);
@@ -526,7 +597,7 @@ async function testRejectDoesNotDeleteStorageOrRecreateRequest() {
     adminUser: ADMIN_USER,
     requestId: REQUEST_ID,
     rejectionReason: "المبلغ غير مطابق",
-    ...createRejectSideEffectMocks(),
+    ...createRejectDispatchOptions(),
   });
 
   assert.equal(supabase.getRow().id, REQUEST_ID);
@@ -650,7 +721,7 @@ async function testRejectResponseIncludesRejectionDetailsWithoutAdminId() {
     requestId: REQUEST_ID,
     rejectionReason: "بيانات غير مكتملة",
     rejectionNotes: "أعد الإرسال",
-    ...createRejectSideEffectMocks(),
+    ...createRejectDispatchOptions(),
   });
 
   assert.equal(result.rejectionDetails.rejectionReason, "بيانات غير مكتملة");
@@ -690,6 +761,7 @@ async function testEmailContentHasNoInternalData() {
 
 async function testConcurrentRejectBlocked() {
   __resetSubscriptionRejectLocksForTests();
+  __resetAdminEventDispatchForTests();
 
   const supabase = createMockSupabase({
     id: REQUEST_ID,
@@ -707,11 +779,19 @@ async function testConcurrentRejectBlocked() {
     adminUser: ADMIN_USER,
     requestId: REQUEST_ID,
     rejectionReason: "بيانات غير مكتملة",
-    dispatchAlerts: async () => {
-      await gate;
-      return { notificationCreated: true };
-    },
-    dispatchRejectedEmail: async () => ({ emailQueued: true }),
+    ...createRejectDispatchOptions({
+      adminEventDeps: {
+        createUserNotification: async () => {
+          await gate;
+          return {
+            success: true,
+            notificationCreated: true,
+            userNotificationCreated: true,
+          };
+        },
+        queueEmail: async () => ({ success: true, emailQueued: true }),
+      },
+    }),
   });
 
   await assert.rejects(
@@ -749,6 +829,7 @@ async function testNotesMaxLength() {
 
 async function testRejectSuccessWithAuditFailure() {
   __resetSubscriptionRejectLocksForTests();
+  __resetAdminEventDispatchForTests();
 
   const supabase = createMockSupabase({
     id: REQUEST_ID,
@@ -773,7 +854,7 @@ async function testRejectSuccessWithAuditFailure() {
     adminUser: ADMIN_USER,
     requestId: REQUEST_ID,
     rejectionReason: "بيانات غير مكتملة",
-    ...createRejectSideEffectMocks(),
+    ...createRejectDispatchOptions(),
   });
 
   assert.equal(result.success, true);

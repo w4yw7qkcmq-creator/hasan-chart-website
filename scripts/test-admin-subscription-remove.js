@@ -12,6 +12,10 @@ import {
   dispatchSubscriptionEndedEmail,
   SUBSCRIPTION_ENDED_SUBJECT,
 } from "../lib/subscription-ended-dispatch.js";
+import {
+  __resetAdminEventDispatchForTests,
+  dispatchAdminEvent,
+} from "../lib/admin-events.js";
 import { buildSubscriptionEndedEmailContent } from "../lib/email-layout.js";
 import { buildSubscriptionRequestTimeline } from "../lib/admin-subscription-request-timeline.js";
 import {
@@ -26,6 +30,19 @@ const ADMIN_USER = {
 };
 const USER_EMAIL = "user@example.com";
 const USER_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+function createMockDispatchAdminEvent(overrides = {}) {
+  return async () => ({
+    success: true,
+    eventType: "subscription.ended",
+    auditLogged: true,
+    userNotificationCreated: true,
+    adminNotificationCreated: true,
+    emailQueued: true,
+    warnings: [],
+    ...overrides,
+  });
+}
 
 function createMockSupabase(initialRow, options = {}) {
   let row = initialRow ? { ...initialRow } : null;
@@ -198,6 +215,7 @@ function testValidateSubscriptionRemovePayload() {
 
 async function testRemoveSubscriptionRequestSuccess() {
   __resetSubscriptionRemoveLocksForTests();
+  __resetAdminEventDispatchForTests();
 
   const supabase = createMockSupabase({
     id: REQUEST_ID,
@@ -212,9 +230,6 @@ async function testRemoveSubscriptionRequestSuccess() {
     admin_disabled: false,
   });
 
-  let alertCalled = false;
-  let emailCalled = false;
-
   const result = await removeSubscriptionRequest(supabase, {
     adminUser: ADMIN_USER,
     requestId: REQUEST_ID,
@@ -225,21 +240,32 @@ async function testRemoveSubscriptionRequestSuccess() {
       otherActiveSameServiceIds: [],
       serviceRemovedFromProfile: true,
     }),
-    dispatchAlerts: async () => {
-      alertCalled = true;
-      return { notificationCreated: true };
-    },
-    dispatchEndedEmail: async () => {
-      emailCalled = true;
-      return { emailQueued: true };
+    dispatchAdminEventFn: dispatchAdminEvent,
+    adminEventDeps: {
+      createUserNotification: async () => ({
+        success: true,
+        notificationCreated: true,
+        userNotificationCreated: true,
+      }),
+      createAdminNotification: async () => ({
+        success: true,
+        created: true,
+        adminNotificationCreated: true,
+      }),
+      queueEmail: async () => ({ success: true, emailQueued: true }),
+      createAuditLog: async (client, payload) => {
+        await client.from("admin_logs").insert(payload);
+        return { ok: true, success: true };
+      },
     },
   });
 
   assert.equal(result.success, true);
   assert.equal(result.status, "منتهي");
   assert.equal(result.profileReconciled, true);
-  assert.equal(alertCalled, true);
-  assert.equal(emailCalled, true);
+  assert.equal(result.notificationCreated, true);
+  assert.equal(result.emailQueued, true);
+  assert.equal(result.auditLogged, true);
   assert.equal(supabase.auditRows.length, 1);
   assert.equal(supabase.auditRows[0].action, "remove-subscription-request");
   console.log("✓ removeSubscriptionRequest success");
@@ -281,8 +307,7 @@ async function testRemoveKeepsProfileWhenSameServiceActive() {
     requestId: REQUEST_ID,
     reconcileProfile: async (_client, payload) =>
       reconcileProfileAfterSubscriptionRemoval(_client, payload),
-    dispatchAlerts: async () => ({ notificationCreated: true }),
-    dispatchEndedEmail: async () => ({ emailQueued: true }),
+    dispatchAdminEventFn: createMockDispatchAdminEvent(),
   });
 
   assert.equal(result.profileReconciled, true);
@@ -313,8 +338,7 @@ async function testRemoveProfileReconcileFailureStillSuccess() {
     requestId: REQUEST_ID,
     reconcileProfile: async (_client, payload) =>
       reconcileProfileAfterSubscriptionRemoval(_client, payload),
-    dispatchAlerts: async () => ({ notificationCreated: true }),
-    dispatchEndedEmail: async () => ({ emailQueued: true }),
+    dispatchAdminEventFn: createMockDispatchAdminEvent(),
   });
 
   assert.equal(result.success, true);

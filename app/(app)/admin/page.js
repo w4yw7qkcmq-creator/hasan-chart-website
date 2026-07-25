@@ -1014,14 +1014,14 @@ export default function AdminPage() {
       },
       successMessage: newStatus === "مفعل" ? "تم تفعيل الاشتراك" : "تم تحديث حالة طلب الاشتراك",
       errorMessage: "تعذر تحديث حالة طلب الاشتراك",
-      onSuccess: () => {
+      onSuccess: (apiResult) => {
         setSubscriptionRequests((prev) =>
           prev.map((item) =>
             item.id === request.id ? { ...item, status: newStatus } : item
           )
         );
 
-        if (newStatus === "مفعل") {
+        if (newStatus === "مفعل" && apiResult?.profileUpdated !== false) {
           setUsers((prev) =>
             prev.map((user) =>
               user.email === request.userEmail
@@ -1040,11 +1040,26 @@ export default function AdminPage() {
     if (flowResult.blocked) return;
 
     if (flowResult.success) {
-      showAdminNotice(
-        flowResult.refreshFailed
-          ? `${flowResult.successMessage} — تعذر تحديث القائمة تلقائياً.`
-          : flowResult.successMessage
-      );
+      const apiResult = flowResult.data || {};
+      let message = flowResult.refreshFailed
+        ? `${flowResult.successMessage} — تعذr تحديث القائمة تلقائياً.`
+        : flowResult.successMessage;
+
+      if (newStatus === "مفعل") {
+        const warnings = Array.isArray(apiResult.warnings)
+          ? apiResult.warnings.filter(Boolean)
+          : [
+              apiResult.notificationWarning,
+              apiResult.emailWarning,
+              apiResult.auditWarning,
+            ].filter(Boolean);
+
+        if (warnings.length) {
+          message = `${message} — ${warnings.join(" — ")}`;
+        }
+      }
+
+      showAdminNotice(message);
       return;
     }
 

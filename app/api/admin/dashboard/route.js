@@ -4,10 +4,9 @@ import { dispatchAnalysisReplyAlerts, resolveAnalysisReplyRecipientEmail } from 
 import { dispatchUnifiedSiteAlerts } from "../../../../lib/site-notification-dispatch.js";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, buildEmailLayout } from "../../../../lib/email";
-import { buildEmailParagraph, buildVipSignalEmailContent } from "../../../../lib/email-layout.js";
+import { buildEmailParagraph } from "../../../../lib/email-layout.js";
 import { dispatchTransactionalEmail } from "../../../../lib/email-dispatch.js";
-import { dispatchSubscriptionActivatedEmail } from "../../../../lib/subscription-activated-dispatch.js";
-import { dispatchVipSignalEmail } from "../../../../lib/vip-signal-email-dispatch.js";
+import { activateSubscriptionRequest } from "../../../../lib/admin-subscription-request-activate.js";
 import {
   adminMutationLimiter,
   adminReadLimiter,
@@ -18,12 +17,16 @@ import {
   ADMIN_DASHBOARD_SECTIONS,
   ADMIN_DASHBOARD_SECTION_CACHE_MS,
   ADMIN_DASHBOARD_STATS_CACHE_MS,
+  ADMIN_ACTIVITY_FEED_CACHE_MS,
   loadAdminDashboardSection,
 } from "../../../../lib/admin-dashboard-sections";
 import {
   onPartnerAccountManagementActivated,
-  onPartnerSubscriptionActivated,
 } from "../../../../lib/partner-service-hooks";
+import {
+  normalizeVipSignalType,
+  notifyVipSubscribers,
+} from "../../../../lib/vip-subscriber-notify.js";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +60,11 @@ export async function GET(request) {
     }
 
     const cacheTtl =
-      section === "stats" ? ADMIN_DASHBOARD_STATS_CACHE_MS : ADMIN_DASHBOARD_SECTION_CACHE_MS;
+      section === "stats"
+        ? ADMIN_DASHBOARD_STATS_CACHE_MS
+        : section === "activity-feed"
+        ? ADMIN_ACTIVITY_FEED_CACHE_MS
+        : ADMIN_DASHBOARD_SECTION_CACHE_MS;
 
     const { data: sectionPayload } = await withReadCache(
       `admin-dashboard:${adminEmail}:${section}`,
@@ -210,231 +217,6 @@ async function resolveAccountManagementEmail(supabase, row) {
   return String(profile?.email || "").trim().toLowerCase();
 }
 
-
-function signalTypeLabel(signalType) {
-  return signalType === "futures" ? "Futures" : "Spot";
-}
-
-function normalizeVipSignalType(value) {
-  const text = String(value || "").trim().toLowerCase();
-
-  if (
-    text.includes("future") ||
-    text.includes("futures") ||
-    text.includes("فيوتشر") ||
-    text.includes("عقود")
-  ) {
-    return "futures";
-  }
-
-  return "spot";
-}
-
-function matchesSignalSubscription(planText, signalType) {
-  const text = String(planText || "").toLowerCase();
-
-  if (signalType === "futures") {
-    return (
-      text.includes("future") ||
-      text.includes("futures") ||
-      text.includes("فيوتشر") ||
-      text.includes("vip futures")
-    );
-  }
-
-  return (
-    text.includes("spot") ||
-    text.includes("سبوت") ||
-    text.includes("vip spot")
-  );
-}
-
-function getSubscriptionDurationDays(planName) {
-  const text = String(planName || "").toLowerCase();
-
-  if (
-    text.includes("year") ||
-    text.includes("annual") ||
-    text.includes("سنة") ||
-    text.includes("سنوي")
-  ) {
-    return 365;
-  }
-
-  if (
-    text.includes("6 month") ||
-    text.includes("6 months") ||
-    text.includes("ستة أشهر") ||
-    text.includes("٦ أشهر") ||
-    text.includes("6 اشهر") ||
-    text.includes("6 أشهر")
-  ) {
-    return 180;
-  }
-
-  if (
-    text.includes("3 month") ||
-    text.includes("3 months") ||
-    text.includes("ثلاثة أشهر") ||
-    text.includes("٣ أشهر") ||
-    text.includes("3 اشهر") ||
-    text.includes("3 أشهر")
-  ) {
-    return 90;
-  }
-
-  if (
-    text.includes("week") ||
-    text.includes("أسبوع") ||
-    text.includes("اسبوع")
-  ) {
-    return 7;
-  }
-
-  return 30;
-}
-
-function getSubscriptionExpiryDate(planName) {
-  const startedAt = new Date();
-  const expiresAt = new Date(startedAt);
-  expiresAt.setDate(expiresAt.getDate() + getSubscriptionDurationDays(planName));
-
-  return {
-    startedAt: startedAt.toISOString(),
-    expiresAt: expiresAt.toISOString(),
-  };
-}
-
-function isActiveSubscriptionRow(item) {
-  if (!item) return false;
-
-  const status = String(item.status || item.subscription_status || "").trim().toLowerCase();
-  const isActiveStatus = status === "مفعل" || status === "نشط" || status === "active";
-
-  if (!isActiveStatus) return false;
-
-  if (item.expires_at) {
-    const expiresTime = new Date(item.expires_at).getTime();
-    if (Number.isFinite(expiresTime) && expiresTime <= Date.now()) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-async function notifyVipSubscribers(supabase, signal) {
-  try {
-    const { signalType, coin, entry, targets, stopLoss, notes, signalId } = signal;
-    const normalizedSignalType = normalizeVipSignalType(signalType);
-    const label = signalTypeLabel(normalizedSignalType);
-
-    const [subscriptionsResult, profilesResult] = await Promise.all([
-      supabase
-        .from("subscription_requests")
-        .select("user_email,plan_name,category,status,expires_at")
-        .eq("status", "مفعل"),
-      supabase
-        .from("profiles")
-        .select("email,subscription_plan,subscription_status"),
-    ]);
-
-    if (subscriptionsResult.error) {
-      console.error("VIP subscribers load error:", subscriptionsResult.error.message || subscriptionsResult.error);
-    }
-
-    if (profilesResult.error) {
-      console.error("VIP subscriber profiles load error:", profilesResult.error.message || profilesResult.error);
-    }
-
-    const subscribersFromRequests = (subscriptionsResult.data || [])
-      .filter(isActiveSubscriptionRow)
-      .filter((item) =>
-        matchesSignalSubscription(`${item.plan_name || ""} ${item.category || ""}`, normalizedSignalType)
-      )
-      .map((item) => String(item.user_email || "").trim().toLowerCase())
-      .filter(Boolean);
-
-    const subscribersFromProfiles = (profilesResult.data || [])
-      .filter(isActiveSubscriptionRow)
-      .filter((item) =>
-        matchesSignalSubscription(item.subscription_plan || "", normalizedSignalType)
-      )
-      .map((item) => String(item.email || "").trim().toLowerCase())
-      .filter(Boolean);
-
-    const recipientEmails = [...new Set([...subscribersFromRequests, ...subscribersFromProfiles])];
-
-    console.log("VIP signal recipients:", {
-      signalType: normalizedSignalType,
-      count: recipientEmails.length,
-      recipientEmails,
-    });
-
-    if (recipientEmails.length === 0) return;
-
-    const signalPagePath = normalizedSignalType === "futures" ? "/vip-futures" : "/vip-spot";
-    const siteType = normalizedSignalType === "futures" ? "vip-futures" : "vip-spot";
-    const notificationTitle = `🚨 توصية VIP ${label} جديدة`;
-    const notificationMessage = `تم نشر توصية جديدة على ${coin}. افتح صفحة توصيات VIP ${label} للاطلاع على التفاصيل.`;
-    const subject = `${notificationTitle} - ${coin}`;
-    const signalPageUrl = `${getSiteUrl()}${signalPagePath}`;
-    const emailContent = buildVipSignalEmailContent({
-      coin,
-      entry,
-      targets,
-      stopLoss,
-      notes,
-    });
-
-    const dispatchResults = [];
-
-    for (const email of recipientEmails) {
-      const emailResult = await dispatchVipSignalEmail({
-        signalId: signalId || null,
-        recipientEmail: email,
-        signalType: normalizedSignalType,
-        coin,
-        subject,
-        title: notificationTitle,
-        content: emailContent,
-        actionText: "فتح صفحة التوصيات",
-        actionUrl: signalPageUrl,
-      });
-
-      const alertResult = await dispatchUnifiedSiteAlerts(supabase, {
-        preset: "vip_signal",
-        userEmail: email,
-        title: notificationTitle,
-        message: notificationMessage,
-        type: siteType,
-        url: signalPagePath,
-        metadata: {
-          signalId: signalId || null,
-          signalType: normalizedSignalType,
-          coin,
-          notification_key: "vip_signal",
-        },
-      });
-
-      dispatchResults.push({
-        ...alertResult,
-        emailResult,
-      });
-    }
-
-    console.log("VIP signal dispatch summary:", {
-      signalType: normalizedSignalType,
-      coin,
-      recipients: recipientEmails.length,
-      notificationsCreated: dispatchResults.filter((item) => item.notificationCreated).length,
-      pushSent: dispatchResults.filter((item) => (item.pushResult?.sent || 0) > 0).length,
-      emailsSent: dispatchResults.filter((item) => item.emailResult?.sent).length,
-    });
-  } catch (error) {
-    console.error("VIP subscriber notification error:", error.message || error);
-  }
-}
 
 export async function POST(request) {
   try {
@@ -760,71 +542,37 @@ export async function POST(request) {
         );
       }
 
-      const activationDates =
-        newStatus === "مفعل"
-          ? getSubscriptionExpiryDate(planName)
-          : null;
+      if (newStatus === "مفعل") {
+        const activationResult = await activateSubscriptionRequest(supabase, {
+          adminUser,
+          requestId,
+          userEmail,
+          planName,
+        });
 
-      const subscriptionUpdate =
-        newStatus === "مفعل"
-          ? {
-              status: newStatus,
-              started_at: activationDates.startedAt,
-              expires_at: activationDates.expiresAt,
-              expired_notice_sent: false,
-            }
-          : { status: newStatus };
+        invalidateDashboardCache();
+        return Response.json({
+          success: true,
+          notificationCreated: Boolean(activationResult.notificationCreated),
+          emailQueued: Boolean(activationResult.emailQueued),
+          auditLogged: Boolean(activationResult.auditLogged),
+          profileUpdated: activationResult.profileUpdated === true,
+          partnerHookCompleted: activationResult.partnerHookCompleted,
+          warnings: Array.isArray(activationResult.warnings)
+            ? activationResult.warnings
+            : [],
+          eventType: activationResult.eventType || "subscription.activated",
+          duplicate: Boolean(activationResult.duplicate),
+        });
+      }
 
       const { error } = await supabase
         .from("subscription_requests")
-        .update(subscriptionUpdate)
+        .update({ status: newStatus })
         .eq("id", requestId);
 
       if (error) {
         throw new Error(error.message || "تعذر تحديث طلب الاشتراك");
-      }
-
-      if (newStatus === "مفعل") {
-        const emailDispatchResult = await dispatchSubscriptionActivatedEmail({
-          subscriptionRequestId: requestId,
-          recipientEmail: userEmail,
-          planName,
-          expiresAt: activationDates?.expiresAt || null,
-        });
-
-        if (userEmail) {
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .update({
-              subscription_plan: planName || "اشتراك مفعل",
-              subscription_status: "نشط",
-            })
-            .eq("email", userEmail);
-
-          if (profileError) {
-            throw new Error(
-              profileError.message || "تم تحديث الطلب لكن تعذر تفعيل اشتراك المستخدم"
-            );
-          }
-
-          await dispatchUnifiedSiteAlerts(supabase, {
-            preset: "system",
-            userEmail,
-            title: "تم تفعيل اشتراكك بنجاح 🎉",
-            message: `تم تفعيل اشتراك ${planName || "الخاص بك"} حتى تاريخ ${new Date(activationDates.expiresAt).toLocaleDateString("ar-SY-u-nu-latn")}.`,
-            url: "/subscriptions",
-            metadata: {
-              requestId,
-              planName: planName || null,
-              expiresAt: activationDates.expiresAt,
-              notification_key: "system",
-            },
-          });
-
-          await onPartnerSubscriptionActivated(supabase, {
-            subscriptionRequestId: requestId,
-          });
-        }
       }
 
       await writeAdminLog(supabase, {
@@ -836,7 +584,7 @@ export async function POST(request) {
           status: newStatus,
           userEmail,
           planName,
-          expiresAt: activationDates?.expiresAt || null,
+          expiresAt: null,
         },
       });
 
