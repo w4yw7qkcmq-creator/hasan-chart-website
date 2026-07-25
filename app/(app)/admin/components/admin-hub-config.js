@@ -36,7 +36,7 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     description: "عمولات، شركاء، وسحوبات.",
     href: "/admin/partners",
     statKey: "withdrawalsPending",
-    statLabel: "سحب معلق",
+    statLabel: "طلبات سحب معلقة",
     attentionKey: "withdrawalsPending",
   },
   {

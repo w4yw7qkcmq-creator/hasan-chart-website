@@ -1,3 +1,10 @@
+import {
+  PENDING_ADMIN_STATUS_VALUES,
+  REVIEWED_ADMIN_STATUS_VALUES,
+  isPendingAdminStatus,
+  isReviewedAdminStatus,
+} from "../../../lib/admin-status-constants.js";
+
 export const ADMIN_STATUS_FILTERS = [
   ["pending", "بانتظار المراجعة"],
   ["reviewed", "تمت المراجعة"],
@@ -18,43 +25,8 @@ export const SIMPLE_STATUS_OPTIONS = [
   { value: "reviewed", label: "تمت المراجعة" },
 ];
 
-const PENDING_STATUS_VALUES = new Set([
-  "pending",
-  "new",
-  "reviewing",
-  "قيد المراجعة",
-  "بانتظار المراجعة",
-  "جديد",
-  "قيد المعالجة",
-  "قيد التحليل",
-]);
-
-const REVIEWED_STATUS_VALUES = new Set([
-  "reviewed",
-  "approved",
-  "completed",
-  "تمت المراجعة",
-  "تم الرد",
-  "مكتمل",
-  "مفعل",
-  "تم التواصل",
-  "قيد التفعيل",
-  "نشط",
-  "active",
-  "مرفوض",
-  "مؤرشف",
-  "مغلق",
-  "بانتظار الدفع",
-  "منتهي",
-  "موقوف",
-  "ملغى",
-  "ملغي",
-  "cancelled",
-  "canceled",
-  "expired",
-  "ended",
-  "rejected",
-]);
+const PENDING_STATUS_VALUES = PENDING_ADMIN_STATUS_VALUES;
+const REVIEWED_STATUS_VALUES = REVIEWED_ADMIN_STATUS_VALUES;
 
 export const SUBSCRIPTION_TERMINAL_STATUS_VALUES = [
   "منتهي",
@@ -85,15 +57,12 @@ export const ADMIN_SUBSCRIPTIONS_LIMIT = 50;
 const normalizeAdminStatusValue = (status) => String(status || "").trim().toLowerCase();
 
 export const getAdminStatusKey = (status) => {
-  const raw = String(status || "").trim();
-  const normalized = normalizeAdminStatusValue(status);
-
-  if (!raw || PENDING_STATUS_VALUES.has(raw) || PENDING_STATUS_VALUES.has(normalized)) {
-    return "pending";
+  if (isReviewedAdminStatus(status)) {
+    return "reviewed";
   }
 
-  if (REVIEWED_STATUS_VALUES.has(raw) || REVIEWED_STATUS_VALUES.has(normalized)) {
-    return "reviewed";
+  if (isPendingAdminStatus(status)) {
+    return "pending";
   }
 
   return "pending";
