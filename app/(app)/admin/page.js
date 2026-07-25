@@ -41,6 +41,10 @@ import {
   markAdminSubscriptionEndedNotificationSent,
   resolveAdminSubscriptionEndedNotifyDecision,
 } from "../../../lib/admin-subscription-remove-client";
+import {
+  dispatchAdminSubscriptionUpdatedEvent,
+  subscribeAdminSubscriptionUpdated,
+} from "../../../lib/admin-subscription-updated-client";
 import StatusBadge from "./components/StatusBadge";
 import AdminProofPreviewModal from "./components/AdminProofPreviewModal";
 import SubscriptionRejectModal from "./components/SubscriptionRejectModal";
@@ -185,6 +189,7 @@ export default function AdminPage() {
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [activeAdminTab, setActiveAdminTab] = useState("overview");
+  const [highlightedSubscriptionRequestId, setHighlightedSubscriptionRequestId] = useState("");
   const [pendingDrawerUserId, setPendingDrawerUserId] = useState("");
   const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -854,12 +859,18 @@ export default function AdminPage() {
     if (typeof window === "undefined") return undefined;
 
     const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
+    const tab = params.get("section") || params.get("tab");
     const userId = params.get("userId");
+    const requestId = params.get("requestId");
     if (tab) setActiveAdminTab(tab);
     if (userId) {
       setPendingDrawerUserId(userId);
       setPreviewDrawerOpen(true);
+    }
+    if (requestId) {
+      setHighlightedSubscriptionRequestId(String(requestId));
+      setActiveAdminTab("subscriptions");
+      setSubscriptionFilter("all");
     }
   }, []);
 
@@ -874,6 +885,28 @@ export default function AdminPage() {
     window.addEventListener("admin:open-user", onOpenUser);
     return () => window.removeEventListener("admin:open-user", onOpenUser);
   }, []);
+
+  useEffect(() => {
+    return subscribeAdminSubscriptionUpdated((event) => {
+      if (event.detail?.source === "subscriptions") return;
+      void loadSection("subscriptions", { force: true, background: true });
+      void loadSection("stats", { force: true, background: true });
+    });
+  }, [loadSection]);
+
+  useEffect(() => {
+    if (!highlightedSubscriptionRequestId || activeAdminTab !== "subscriptions") return undefined;
+    const frameId = requestAnimationFrame(() => {
+      const element = document.querySelector(
+        `[data-subscription-request-id="${CSS.escape(highlightedSubscriptionRequestId)}"]`
+      );
+      if (!element) return;
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.classList.add("is-highlighted");
+      window.setTimeout(() => element.classList.remove("is-highlighted"), 3200);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [highlightedSubscriptionRequestId, activeAdminTab, subscriptionRequests.length]);
 
   useEffect(() => {
     if (!authResolved || !profileReady || !user?.email || !isAdmin) {
@@ -1021,6 +1054,14 @@ export default function AdminPage() {
           )
         );
 
+        dispatchAdminSubscriptionUpdatedEvent({
+          requestId: request.id,
+          userEmail: request.userEmail,
+          previousStatus: request.status,
+          newStatus,
+          source: "subscriptions",
+        });
+
         if (newStatus === "مفعل" && apiResult?.profileUpdated !== false) {
           setUsers((prev) =>
             prev.map((user) =>
@@ -1138,6 +1179,13 @@ export default function AdminPage() {
         );
         setSubscriptionRejectTarget(null);
         setSubscriptionRejectApiError("");
+        dispatchAdminSubscriptionUpdatedEvent({
+          requestId: request.id,
+          userEmail: request.userEmail,
+          previousStatus: request.status,
+          newStatus: "مرفوض",
+          source: "subscriptions",
+        });
       },
     });
 
@@ -2543,7 +2591,13 @@ export default function AdminPage() {
           ) : (
             <div className="admin-scroll-panel admin-scroll-panel--cards-lg grid gap-5">
               {filteredSubscriptions.map((req) => (
-                <article key={req.id} className="admin-section admin-card p-6">
+                <article
+                  key={req.id}
+                  data-subscription-request-id={String(req.id)}
+                  className={`admin-section admin-card p-6 ${
+                    highlightedSubscriptionRequestId === String(req.id) ? "is-highlighted" : ""
+                  }`}
+                >
                   <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
                     <div>
                       <div className="flex flex-wrap items-center gap-3">

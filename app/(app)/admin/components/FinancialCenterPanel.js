@@ -10,7 +10,26 @@ import {
   fetchPaymentProof,
   formatCurrencyTotals,
 } from "../../../../lib/admin-financial-center-client";
+import {
+  createAdminActionInFlightRegistry,
+  runAdminUserActionFlow,
+} from "../../../../lib/admin-user-action-flow";
+import {
+  buildSubscriptionOpenHref,
+  canActivatePaymentReviewItem,
+  canRejectPaymentReviewItem,
+  mapPaymentReviewToSubscriptionRequest,
+  postSubscriptionActivateViaDashboard,
+  postSubscriptionRejectViaApi,
+} from "../../../../lib/admin-subscription-review-actions-client";
+import {
+  dispatchAdminSubscriptionUpdatedEvent,
+  subscribeAdminSubscriptionUpdated,
+} from "../../../../lib/admin-subscription-updated-client";
+import { PAYMENT_REVIEW_STATUSES } from "../../../../lib/financial-center/financial-types.js";
+import { formatPaymentReviewStatusLabel } from "../../../../lib/financial-center/financial-center-shared.js";
 import AdminPaymentProofModal from "./AdminPaymentProofModal";
+import SubscriptionRejectModal from "./SubscriptionRejectModal";
 
 const TABS = [
   { id: "overview", label: "نظرة عامة" },
@@ -319,6 +338,92 @@ function KpiCard({ label, value, hint, description, onClick, kpiKey = "", status
   );
 }
 
+function SubscriptionActivateConfirmModal({ request, loading = false, apiError = "", onCancel, onConfirm }) {
+  if (!request) return null;
+
+  return (
+    <div className="admin-crm-action-modal" role="presentation">
+      <button type="button" className="admin-crm-action-modal__backdrop" aria-label="إغلاق" disabled={loading} onClick={onCancel} />
+      <div className="admin-crm-action-modal__dialog" role="dialog" aria-modal="true">
+        <h2 className="admin-heading text-xl">تأكيد قبول وتفعيل الاشتراك</h2>
+        <p className="admin-crm-action-modal__description mt-3">
+          سيتم استخدام مسار التفعيل الرسمي نفسه المستخدم في صفحة الاشتراكات.
+        </p>
+        <dl className="admin-financial-activate-summary mt-4 space-y-2 text-sm">
+          <div><dt className="admin-muted inline">المستخدم: </dt><dd className="inline font-bold">{request.username || request.userEmail || "—"}</dd></div>
+          <div><dt className="admin-muted inline">الباقة: </dt><dd className="inline font-bold">{request.planName || "—"}</dd></div>
+          <div><dt className="admin-muted inline">السعر: </dt><dd className="inline font-bold">{request.price || "—"}</dd></div>
+          <div><dt className="admin-muted inline">إثبات الدفع: </dt><dd className="inline font-bold">{request.hasPaymentProof ? "متاح" : "غير متاح"}</dd></div>
+        </dl>
+        {apiError ? <p className="mt-4 font-bold text-red-600">{apiError}</p> : null}
+        <div className="admin-crm-action-modal__actions mt-6 flex flex-wrap gap-3">
+          <button type="button" className="admin-financial-action-button admin-financial-action-button--secondary px-4 py-2" disabled={loading} onClick={onCancel}>
+            إلغاء
+          </button>
+          <button type="button" className="admin-financial-action-button admin-financial-action-button--primary px-4 py-2" disabled={loading} onClick={onConfirm}>
+            {loading ? "جاري التفعيل..." : "قبول وتفعيل"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentReviewActions({
+  item,
+  proofLoadingId,
+  actionLoadingId,
+  onOpenProof,
+  onActivate,
+  onReject,
+  onOpenSubscription,
+}) {
+  const requestId = String(item.requestId || "");
+  const isBusy = proofLoadingId === requestId || actionLoadingId === requestId;
+  const showDecisionActions = canActivatePaymentReviewItem(item) || canRejectPaymentReviewItem(item);
+
+  return (
+    <div className="flex flex-wrap gap-2 min-w-[220px]">
+      <button
+        type="button"
+        className="admin-financial-action-button admin-financial-action-button--secondary"
+        disabled={isBusy}
+        onClick={() => onOpenProof(item)}
+      >
+        {proofLoadingId === requestId ? "..." : "فتح الإثبات"}
+      </button>
+      <button
+        type="button"
+        className="admin-financial-action-button admin-financial-action-button--primary"
+        disabled={isBusy}
+        onClick={() => onOpenSubscription(item)}
+      >
+        فتح الطلب
+      </button>
+      {showDecisionActions ? (
+        <>
+          <button
+            type="button"
+            className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-4 py-2 text-sm font-black text-white"
+            disabled={isBusy}
+            onClick={() => onActivate(item)}
+          >
+            قبول وتفعيل
+          </button>
+          <button
+            type="button"
+            className="admin-btn--reject rounded-2xl px-4 py-2 text-sm font-black"
+            disabled={isBusy}
+            onClick={() => onReject(item)}
+          >
+            رفض الطلب
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export default function FinancialCenterPanel({ standalone = false }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
@@ -340,7 +445,16 @@ export default function FinancialCenterPanel({ standalone = false }) {
   const [filters, setFilters] = useState({ status: "all", service: "all", source: "all", paid: "all" });
   const [reviewStatus, setReviewStatus] = useState("all");
   const [revenuePeriod, setRevenuePeriod] = useState("30d");
+  const [activateTarget, setActivateTarget] = useState(null);
+  const [activateLoading, setActivateLoading] = useState(false);
+  const [activateApiError, setActivateApiError] = useState("");
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
+  const [rejectApiError, setRejectApiError] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState("");
+  const [refreshWarning, setRefreshWarning] = useState("");
   const abortRef = useRef(null);
+  const subscriptionActionInFlightRef = useRef(createAdminActionInFlightRegistry());
 
   const openUser = useCallback(
     (userId) => {
@@ -487,6 +601,173 @@ export default function FinancialCenterPanel({ standalone = false }) {
     }
   };
 
+  const applyPaymentReviewStatusUpdate = useCallback((requestId, nextReviewStatus, nextRawStatus = "") => {
+    const normalizedRequestId = String(requestId || "").trim();
+    setPaymentReviews((current) =>
+      current.map((item) =>
+        String(item.requestId) === normalizedRequestId
+          ? {
+              ...item,
+              status: nextReviewStatus,
+              rawStatus: nextRawStatus || item.rawStatus,
+            }
+          : item
+      )
+    );
+    setRecentPending((current) =>
+      current.filter((item) => String(item.requestId || item.id) !== normalizedRequestId)
+    );
+    if (nextReviewStatus === PAYMENT_REVIEW_STATUSES.PENDING_REVIEW) return;
+    setOverview((current) =>
+      current
+        ? {
+            ...current,
+            pendingReviews: Math.max(0, Number(current.pendingReviews || 0) - 1),
+          }
+        : current
+    );
+  }, []);
+
+  const refreshFinancialSections = useCallback(async () => {
+    try {
+      if (activeTab === "payment-reviews") {
+        await loadSection("payment-reviews", { force: true });
+      }
+      if (activeTab === "overview" || activeTab === "payment-reviews") {
+        await loadOverviewBundle(abortRef.current?.signal);
+      }
+    } catch (refreshError) {
+      setRefreshWarning("تم تنفيذ الإجراء، لكن تعذر تحديث القائمة تلقائياً.");
+      return { ok: false, message: refreshError?.message || String(refreshError) };
+    }
+    setRefreshWarning("");
+    return { ok: true };
+  }, [activeTab, loadOverviewBundle, loadSection]);
+
+  const handleActivatePaymentReview = (item) => {
+    setActivateApiError("");
+    setActivateTarget(mapPaymentReviewToSubscriptionRequest(item));
+  };
+
+  const confirmActivatePaymentReview = async () => {
+    const request = activateTarget;
+    if (!request?.id) return;
+
+    const actionKey = `subscription:${request.id}:activate`;
+    setActivateLoading(true);
+    setActivateApiError("");
+    setActionLoadingId(String(request.id));
+
+    const flowResult = await runAdminUserActionFlow({
+      actionKey,
+      inFlightRegistry: subscriptionActionInFlightRef.current,
+      execute: async () => postSubscriptionActivateViaDashboard(adminFetch, request),
+      refresh: refreshFinancialSections,
+      successMessage: "تم تفعيل الاشتراك",
+      errorMessage: "تعذر تفعيل طلب الاشتراك",
+      onSuccess: () => {
+        applyPaymentReviewStatusUpdate(request.id, PAYMENT_REVIEW_STATUSES.CONFIRMED, "مفعل");
+        dispatchAdminSubscriptionUpdatedEvent({
+          requestId: request.id,
+          userEmail: request.userEmail,
+          previousStatus: request.status,
+          newStatus: "مفعل",
+          source: "financial-center",
+        });
+        setActivateTarget(null);
+      },
+    });
+
+    setActivateLoading(false);
+    setActionLoadingId("");
+
+    if (flowResult.blocked) return;
+
+    if (!flowResult.success) {
+      const message =
+        flowResult.error?.status === 409
+          ? flowResult.error?.message || "لا يمكن تفعيل هذا الطلب في حالته الحالية"
+          : flowResult.error?.message || flowResult.errorMessage || "تعذر تفعيل طلب الاشتراك";
+      setActivateApiError(message);
+      return;
+    }
+
+    if (flowResult.refreshFailed) {
+      setRefreshWarning("تم تفعيل الاشتراك — تعذر تحديث القائمة تلقائياً.");
+    }
+  };
+
+  const handleRejectPaymentReview = (item) => {
+    setRejectApiError("");
+    setRejectTarget(mapPaymentReviewToSubscriptionRequest(item));
+  };
+
+  const confirmRejectPaymentReview = async ({ reasonLabel, notes }) => {
+    const request = rejectTarget;
+    if (!request?.id) return;
+
+    const actionKey = `subscription:${request.id}:reject`;
+    setRejectLoading(true);
+    setRejectApiError("");
+    setActionLoadingId(String(request.id));
+
+    const flowResult = await runAdminUserActionFlow({
+      actionKey,
+      inFlightRegistry: subscriptionActionInFlightRef.current,
+      execute: async () =>
+        postSubscriptionRejectViaApi(adminFetch, request.id, {
+          rejectionReason: reasonLabel,
+          rejectionNotes: notes,
+        }),
+      refresh: refreshFinancialSections,
+      successMessage: "تم رفض طلب الاشتراك",
+      errorMessage: "تعذر رفض طلب الاشتراك",
+      onSuccess: () => {
+        applyPaymentReviewStatusUpdate(request.id, PAYMENT_REVIEW_STATUSES.REJECTED, "مرفوض");
+        dispatchAdminSubscriptionUpdatedEvent({
+          requestId: request.id,
+          userEmail: request.userEmail,
+          previousStatus: request.status,
+          newStatus: "مرفوض",
+          source: "financial-center",
+        });
+        setRejectTarget(null);
+      },
+    });
+
+    setRejectLoading(false);
+    setActionLoadingId("");
+
+    if (flowResult.blocked) return;
+
+    if (!flowResult.success) {
+      const message =
+        flowResult.error?.status === 409
+          ? flowResult.error?.message || "لا يمكن رفض هذا الطلب في حالته الحالية"
+          : flowResult.error?.message || flowResult.errorMessage || "تعذر رفض طلب الاشتراك";
+      setRejectApiError(message);
+      return;
+    }
+
+    if (flowResult.refreshFailed) {
+      setRefreshWarning("تم رفض طلب الاشتراك — تعذر تحديث القائمة تلقائياً.");
+    }
+  };
+
+  const openSubscriptionRequest = useCallback(
+    (item) => {
+      router.push(buildSubscriptionOpenHref(item?.requestId || item?.id));
+    },
+    [router]
+  );
+
+  useEffect(() => {
+    return subscribeAdminSubscriptionUpdated((event) => {
+      if (event.detail?.source === "financial-center") return;
+      void refreshFinancialSections();
+    });
+  }, [refreshFinancialSections]);
+
   const overviewKpis = useMemo(() => {
     if (!overview) return [];
     return [
@@ -555,6 +836,12 @@ export default function FinancialCenterPanel({ standalone = false }) {
           <button type="button" className="admin-financial-action-button admin-financial-action-button--primary mt-4 px-5 py-3" onClick={() => void loadSection(activeTab, { force: true })}>
             إعادة المحاولة
           </button>
+        </div>
+      ) : null}
+
+      {refreshWarning ? (
+        <div className="admin-section admin-financial-dashboard__warning">
+          <p className="font-bold text-amber-700">{refreshWarning}</p>
         </div>
       ) : null}
 
@@ -651,7 +938,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
                           key={item.id}
                           title={item.username || item.userEmail || "مستخدم"}
                           subtitle={item.plan}
-                          meta={`${item.priceRaw || "—"} · ${item.status}`}
+                          meta={`${item.priceRaw || "—"} · ${formatPaymentReviewStatusLabel(item.status)}`}
                           badge="مراجعة"
                           onAction={
                             item.paymentProofAvailable
@@ -763,7 +1050,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
                     <th>السعر</th>
                     <th>حالة المراجعة</th>
                     <th>الإرسال</th>
-                    <th />
+                    <th>الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -772,25 +1059,26 @@ export default function FinancialCenterPanel({ standalone = false }) {
                       <td>{item.username || item.userEmail}</td>
                       <td>{item.plan}</td>
                       <td>{item.priceRaw}</td>
-                      <td>{item.status}</td>
+                      <td>{formatPaymentReviewStatusLabel(item.status)}</td>
                       <td>{item.submittedAt ? new Date(item.submittedAt).toLocaleDateString("ar") : "—"}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="admin-financial-action-button admin-financial-action-button--primary"
-                          disabled={proofLoadingId === String(item.requestId)}
-                          onClick={() =>
-                            void openProof(item.requestId, {
-                              username: item.username,
-                              userEmail: item.userEmail,
-                              planName: item.plan,
-                              priceRaw: item.priceRaw,
-                              status: item.status,
+                        <PaymentReviewActions
+                          item={item}
+                          proofLoadingId={proofLoadingId}
+                          actionLoadingId={actionLoadingId}
+                          onOpenProof={(row) =>
+                            void openProof(row.requestId, {
+                              username: row.username,
+                              userEmail: row.userEmail,
+                              planName: row.plan,
+                              priceRaw: row.priceRaw,
+                              status: row.status,
                             })
                           }
-                        >
-                          {proofLoadingId === String(item.requestId) ? "..." : "عرض الإثبات"}
-                        </button>
+                          onActivate={handleActivatePaymentReview}
+                          onReject={handleRejectPaymentReview}
+                          onOpenSubscription={openSubscriptionRequest}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -871,6 +1159,32 @@ export default function FinancialCenterPanel({ standalone = false }) {
       ) : null}
 
       <AdminPaymentProofModal proof={proofPreview} onClose={() => setProofPreview(null)} />
+
+      <SubscriptionActivateConfirmModal
+        request={activateTarget}
+        loading={activateLoading}
+        apiError={activateApiError}
+        onCancel={() => {
+          if (!activateLoading) {
+            setActivateTarget(null);
+            setActivateApiError("");
+          }
+        }}
+        onConfirm={() => void confirmActivatePaymentReview()}
+      />
+
+      <SubscriptionRejectModal
+        request={rejectTarget}
+        loading={rejectLoading}
+        apiError={rejectApiError}
+        onCancel={() => {
+          if (!rejectLoading) {
+            setRejectTarget(null);
+            setRejectApiError("");
+          }
+        }}
+        onConfirm={confirmRejectPaymentReview}
+      />
     </section>
   );
 }

@@ -744,48 +744,48 @@ html[data-theme="light"] .admin-theme-page .admin-filter-btn--expired-active {
   color: #fde68a;
 }
 
-html[data-theme="light"] .admin-subscription-state--active {
+html[data-theme="light"] .admin-theme-page .admin-subscription-state--active {
   background: #dcfce7;
   color: #047857;
   border-color: #86efac;
 }
 
-html[data-theme="light"] .admin-subscription-state--expired {
+html[data-theme="light"] .admin-theme-page .admin-subscription-state--expired {
   background: #ffedd5;
   color: #c2410c;
   border-color: #fdba74;
 }
 
-html[data-theme="light"] .admin-subscription-state--inactive-service {
+html[data-theme="light"] .admin-theme-page .admin-subscription-state--inactive-service {
   background: #f1f5f9;
   color: #334155;
   border-color: #cbd5e1;
 }
 
-html[data-theme="light"] .admin-subscription-state--none {
+html[data-theme="light"] .admin-theme-page .admin-subscription-state--none {
   background: #f8fafc;
   color: #64748b;
   border-color: #e2e8f0;
 }
 
-html[data-theme="light"] .admin-subscription-state--mixed {
+html[data-theme="light"] .admin-theme-page .admin-subscription-state--mixed {
   background: #f8fafc;
   border-color: #cbd5e1;
 }
 
-html[data-theme="light"] .admin-subscription-state__part--active {
+html[data-theme="light"] .admin-theme-page .admin-subscription-state__part--active {
   background: #dcfce7;
   color: #047857;
   border-color: #86efac;
 }
 
-html[data-theme="light"] .admin-subscription-state__part--expired {
+html[data-theme="light"] .admin-theme-page .admin-subscription-state__part--expired {
   background: #ffedd5;
   color: #c2410c;
   border-color: #fdba74;
 }
 
-html[data-theme="light"] .admin-expired-service-badge {
+html[data-theme="light"] .admin-theme-page .admin-expired-service-badge {
   background: #ffedd5;
   color: #c2410c;
   border-color: #fdba74;
@@ -815,6 +815,11 @@ html[data-theme="light"] .admin-expired-service-badge__types {
 
 .admin-theme-page .admin-card--dashed {
   border-style: dashed;
+}
+
+.admin-theme-page .admin-card.is-highlighted {
+  border-color: rgba(37, 99, 235, 0.75);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18), 0 8px 32px rgba(0, 102, 255, 0.12);
 }
 
 .admin-theme-page .admin-stat-chip {
