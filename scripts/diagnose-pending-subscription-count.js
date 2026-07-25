@@ -4,8 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { PENDING_ADMIN_DB_STATUSES } from "../lib/admin-status-constants.js";
 import {
   countPendingSubscriptionRequestRows,
-  explainPendingSubscriptionRequestRow,
   filterPendingSubscriptionRequestRows,
+  getPendingSubscriptionDiagnostic,
 } from "../lib/admin-pending-subscription-request.js";
 import { countPendingPaymentReviewRows } from "../lib/financial-center/pending-payment-review.js";
 
@@ -66,15 +66,16 @@ const paymentReviewPending = allRows.filter((row) =>
 const extraRows = hubLegacyPending
   .filter((row) => !subscriptionPending.some((item) => item.id === row.id))
   .map((row) => {
-    const explanation = explainPendingSubscriptionRequestRow(row);
+    const diagnostic = getPendingSubscriptionDiagnostic(row);
     return {
       requestId: row.id,
       rawStatus: String(row.status || "").trim() || "(empty)",
-      hasPaymentProof: Boolean(String(row.payment_proof_path || "").trim() || String(row.payment_proof || "").trim()),
-      admin_disabled: Boolean(row.admin_disabled),
+      hasPaymentProof: diagnostic.hasProof,
+      admin_disabled: diagnostic.adminDisabled,
       created_at: row.created_at,
       hubReason: "matches PENDING_ADMIN_DB_STATUSES",
-      tabReason: explanation.reason,
+      tabReason: diagnostic.reason,
+      isPending: diagnostic.isPending,
     };
   });
 

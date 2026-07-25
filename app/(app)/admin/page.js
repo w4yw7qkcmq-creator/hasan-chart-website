@@ -1419,6 +1419,21 @@ export default function AdminPage() {
     };
   }, [apiStats, analysisRequests, accountRequests, subscriptionRequests, users]);
 
+  const resolvedPendingSubscriptions = useMemo(() => {
+    if (sectionStates.subscriptions.loaded) {
+      return countSubscriptionStatusFilter(subscriptionRequests, "pending");
+    }
+    return stats.pendingSubscriptions ?? 0;
+  }, [sectionStates.subscriptions.loaded, subscriptionRequests, stats.pendingSubscriptions]);
+
+  const hubStats = useMemo(
+    () => ({
+      ...stats,
+      pendingSubscriptions: resolvedPendingSubscriptions,
+    }),
+    [stats, resolvedPendingSubscriptions]
+  );
+
   const adminNotifications = useMemo(() => adminFeedNotifications, [adminFeedNotifications]);
 
   const adminUnreadCount = useMemo(() => {
@@ -1571,8 +1586,7 @@ export default function AdminPage() {
     );
   }, [subscriptionRequests, subscriptionFilter, subscriptionSearch]);
 
-  const subscriptionPendingBadgeCount =
-    stats.pendingSubscriptions ?? countSubscriptionStatusFilter(subscriptionRequests, "pending");
+  const subscriptionPendingBadgeCount = resolvedPendingSubscriptions;
 
   const filteredAccounts = useMemo(() => {
     let list = accountRequests.filter((req) => matchesAdminStatusFilter(req.status, accountFilter));
@@ -2051,7 +2065,7 @@ export default function AdminPage() {
         {activeAdminTab === "overview" ? (
           <AdminHubOverview
             user={user}
-            stats={stats}
+            stats={hubStats}
             statsPending={statsPending}
             statsError={sectionStates.stats.error}
             onRetryStats={() => void loadSection("stats", { force: true })}
@@ -2638,7 +2652,7 @@ export default function AdminPage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
                         <h3 className="admin-heading text-2xl">{req.planName}</h3>
-                        <StatusBadge status={req.status} />
+                        <StatusBadge status={req.status} subscriptionRow={req} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3 text-sm">
                         <span className="admin-chip">

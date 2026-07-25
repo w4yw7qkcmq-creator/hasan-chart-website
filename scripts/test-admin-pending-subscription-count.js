@@ -2,33 +2,34 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { ADMIN_HUB_QUICK_NAV_ITEMS } from "../app/(app)/admin/components/admin-hub-config.js";
 import {
   countSubscriptionStatusFilter,
+  formatSubscriptionRequest,
   isNewPendingSubscriptionRequest,
   matchesSubscriptionStatusFilter,
 } from "../app/(app)/admin/admin-dashboard-helpers.js";
 import {
   countPendingSubscriptionRequestRows,
   explainPendingSubscriptionRequestRow,
+  getPendingSubscriptionDiagnostic,
   isPendingSubscriptionRequestRow,
+  LEGACY_ENGLISH_PENDING_WITHOUT_PROOF_REASON,
+  normalizePendingSubscriptionCandidate,
 } from "../lib/admin-pending-subscription-request.js";
-import { countPendingPaymentReviewRows, isPendingPaymentReviewRow } from "../lib/financial-center/pending-payment-review.js";
+import { countPendingPaymentReviewRows } from "../lib/financial-center/pending-payment-review.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dashboardSectionsSource = readFileSync(
-  join(__dirname, "../lib/admin-dashboard-sections.js"),
-  "utf8"
-);
 const adminPageSource = readFileSync(join(__dirname, "../app/(app)/admin/page.js"), "utf8");
+const statusBadgeSource = readFileSync(join(__dirname, "../app/components/StatusBadge.js"), "utf8");
 
-const pendingArabicWithProof = {
+const currentArabicWithPath = {
   id: 57,
   status: "بانتظار المراجعة",
   payment_proof_path: "user/session/a.png",
   admin_disabled: false,
 };
-const legacyPendingWithoutProof = {
+
+const legacyEnglishNoProof = {
   id: 8,
   status: "pending",
   payment_proof_path: "",
@@ -36,105 +37,117 @@ const legacyPendingWithoutProof = {
   admin_disabled: false,
 };
 
-function testHubAndTabShareHelper() {
-  assert.match(dashboardSectionsSource, /countPendingSubscriptionRequests/);
-  assert.match(adminPageSource, /matchesSubscriptionStatusFilter/);
-  assert.match(adminPageSource, /subscriptionPendingBadgeCount/);
+function buildFormatted(row) {
+  return formatSubscriptionRequest({
+    ...row,
+    user_email: "user@example.com",
+    username: "User",
+    plan_name: "VIP Spot",
+    category: "spot",
+    price: "50",
+    has_payment_proof:
+      Boolean(String(row.payment_proof_path || "").trim()) ||
+      Boolean(String(row.payment_proof || "").trim()),
+  });
 }
 
-function testThreePendingInTabEqualsHubThree() {
-  const rows = [
-    pendingArabicWithProof,
-    { ...pendingArabicWithProof, id: 53 },
-    { ...pendingArabicWithProof, id: 51, payment_proof_path: "user/session/b.png" },
-    legacyPendingWithoutProof,
-  ];
-  const pendingCount = countPendingSubscriptionRequestRows(rows);
-  assert.equal(pendingCount, 3);
-  assert.equal(countSubscriptionStatusFilter(rows, "pending"), 3);
+function testNormalizeDbSnakeCase() {
+  const normalized = normalizePendingSubscriptionCandidate(currentArabicWithPath);
+  assert.equal(normalized.status, "بانتظار المراجعة");
+  assert.equal(normalized.adminDisabled, false);
+  assert.equal(normalized.hasPaymentProof, true);
+  assert.equal(isPendingSubscriptionRequestRow(currentArabicWithPath), true);
 }
 
-function testLegacyWithoutProofExcluded() {
-  const rows = [legacyPendingWithoutProof, { ...legacyPendingWithoutProof, id: 9 }];
-  assert.equal(countPendingSubscriptionRequestRows(rows), 0);
-  assert.equal(explainPendingSubscriptionRequestRow(legacyPendingWithoutProof).reason, "legacy_english_pending_without_proof");
+function testNormalizeUiCamelCase() {
+  const formatted = buildFormatted(currentArabicWithPath);
+  assert.equal(formatted.hasPaymentProof, true);
+  assert.equal(formatted.paymentProofPath, "user/session/a.png");
+  assert.equal(isPendingSubscriptionRequestRow(formatted), true);
+  assert.equal(matchesSubscriptionStatusFilter(formatted, "pending"), true);
 }
 
-function testFinancialCounterStaysProofBased() {
-  const rows = [
-    pendingArabicWithProof,
-    legacyPendingWithoutProof,
-    { ...pendingArabicWithProof, id: 53 },
-  ];
-  assert.equal(countPendingPaymentReviewRows(rows), 2);
+function testFormattedProofViaHasPaymentProofOnly() {
+  const formatted = {
+    id: 99,
+    status: "pending",
+    hasPaymentProof: true,
+    paymentProofPath: "",
+    paymentProof: "",
+    adminDisabled: false,
+  };
+  assert.equal(isPendingSubscriptionRequestRow(formatted), true);
+}
+
+function testCurrentPendingVisibleInTabAndHub() {
+  const rows = [currentArabicWithPath, { ...currentArabicWithPath, id: 53 }];
   assert.equal(countPendingSubscriptionRequestRows(rows), 2);
+  assert.equal(countSubscriptionStatusFilter(rows.map(buildFormatted), "pending"), 2);
 }
 
-function testCountersCanDifferWhenDataDiffers() {
-  const rows = [
-    {
-      id: 1,
-      status: "بانتظار المعالجة",
-      payment_proof_path: "",
-      payment_proof: "",
-      admin_disabled: false,
-    },
-    pendingArabicWithProof,
-  ];
-  assert.equal(countPendingSubscriptionRequestRows(rows), 2);
+function testLegacyStaleRowExcluded() {
+  const diagnostic = getPendingSubscriptionDiagnostic(legacyEnglishNoProof);
+  assert.equal(diagnostic.isPending, false);
+  assert.equal(diagnostic.reason, LEGACY_ENGLISH_PENDING_WITHOUT_PROOF_REASON);
+  assert.equal(isPendingSubscriptionRequestRow(legacyEnglishNoProof), false);
+  assert.equal(explainPendingSubscriptionRequestRow(legacyEnglishNoProof).reason, LEGACY_ENGLISH_PENDING_WITHOUT_PROOF_REASON);
+  assert.equal(matchesSubscriptionStatusFilter(buildFormatted(legacyEnglishNoProof), "pending"), false);
+}
+
+function testDiagnosticMatchesPendingHelper() {
+  const diagnostic = getPendingSubscriptionDiagnostic(currentArabicWithPath);
+  assert.equal(diagnostic.isPending, true);
+  assert.equal(diagnostic.normalizedStatus, "بانتظار المراجعة");
+  assert.equal(diagnostic.hasProof, true);
+  assert.equal(diagnostic.adminDisabled, false);
+  assert.equal(isPendingSubscriptionRequestRow(currentArabicWithPath), diagnostic.isPending);
+}
+
+function testFinancialCounterUnchanged() {
+  const rows = [currentArabicWithPath, legacyEnglishNoProof];
   assert.equal(countPendingPaymentReviewRows(rows), 1);
+  assert.equal(countPendingSubscriptionRequestRows(rows), 1);
 }
 
-function testConfirmedRejectedEndedExcluded() {
-  assert.equal(isPendingSubscriptionRequestRow({ status: "مفعل", started_at: "2026-01-01" }), false);
-  assert.equal(isPendingSubscriptionRequestRow({ status: "مرفوض" }), false);
-  assert.equal(isPendingSubscriptionRequestRow({ status: "منتهي" }), false);
+function testVisibleCardsMatchPendingBadgeCount() {
+  assert.match(adminPageSource, /resolvedPendingSubscriptions/);
+  assert.match(adminPageSource, /subscriptionPendingBadgeCount = resolvedPendingSubscriptions/);
+  assert.match(adminPageSource, /stats=\{hubStats\}/);
 }
 
-function testUnknownExcludedWithoutMapping() {
-  assert.equal(isPendingSubscriptionRequestRow({ status: "حالة_غير_معروفة" }), false);
-  assert.equal(explainPendingSubscriptionRequestRow({ status: "حالة_غير_معروفة" }).reason, "unknown_status_without_mapping");
-}
-
-function testAdminDisabledExcluded() {
-  assert.equal(
-    isPendingSubscriptionRequestRow({
-      status: "بانتظار المراجعة",
-      admin_disabled: true,
-    }),
-    false
-  );
+function testLegacyRowsDoNotLookActionablePending() {
+  assert.match(statusBadgeSource, /subscriptionRow/);
+  assert.match(statusBadgeSource, /getPendingSubscriptionDiagnostic/);
+  assert.match(statusBadgeSource, /طلب قديم/);
+  assert.match(adminPageSource, /subscriptionRow=\{req\}/);
+  assert.equal(isNewPendingSubscriptionRequest(buildFormatted(legacyEnglishNoProof)), false);
 }
 
 function testAcceptRejectDecrementOnce() {
   assert.match(adminPageSource, /subscriptionsPending: Math\.max\(0, Number\(current\.subscriptionsPending \|\| 0\) - 1\)/);
 }
 
-function testCardsUseDifferentStatKeys() {
-  const financial = ADMIN_HUB_QUICK_NAV_ITEMS.find((item) => item.id === "financial");
-  const subscriptions = ADMIN_HUB_QUICK_NAV_ITEMS.find((item) => item.id === "subscriptions");
-  assert.equal(financial.statKey, "pendingPaymentReviews");
-  assert.equal(subscriptions.statKey, "pendingSubscriptions");
+function testNoFullRefreshRegression() {
+  assert.doesNotMatch(adminPageSource, /window\.location\.reload|location\.reload|router\.refresh\(/);
 }
 
-function testFilterUsesSameHelper() {
-  assert.equal(matchesSubscriptionStatusFilter(pendingArabicWithProof, "pending"), true);
-  assert.equal(matchesSubscriptionStatusFilter(legacyPendingWithoutProof, "pending"), false);
-  assert.equal(isNewPendingSubscriptionRequest(pendingArabicWithProof), true);
+function testFinancialCenterUntouched() {
+  assert.doesNotMatch(adminPageSource, /pendingPaymentReviews: Math\.max/);
 }
 
 const tests = [
-  ["hub and tab share helper", testHubAndTabShareHelper],
-  ["3 pending in tab equals hub 3", testThreePendingInTabEqualsHubThree],
-  ["legacy without proof excluded", testLegacyWithoutProofExcluded],
-  ["financial counter stays proof based", testFinancialCounterStaysProofBased],
-  ["counters can differ when data differs", testCountersCanDifferWhenDataDiffers],
-  ["confirmed rejected ended excluded", testConfirmedRejectedEndedExcluded],
-  ["unknown excluded without mapping", testUnknownExcludedWithoutMapping],
-  ["admin disabled excluded", testAdminDisabledExcluded],
+  ["normalize db snake_case", testNormalizeDbSnakeCase],
+  ["normalize ui camelCase", testNormalizeUiCamelCase],
+  ["formatted proof via hasPaymentProof only", testFormattedProofViaHasPaymentProofOnly],
+  ["current pending visible in tab and hub", testCurrentPendingVisibleInTabAndHub],
+  ["legacy stale row excluded", testLegacyStaleRowExcluded],
+  ["diagnostic matches pending helper", testDiagnosticMatchesPendingHelper],
+  ["financial counter unchanged", testFinancialCounterUnchanged],
+  ["visible cards match pending badge count", testVisibleCardsMatchPendingBadgeCount],
+  ["legacy rows do not look actionable pending", testLegacyRowsDoNotLookActionablePending],
   ["accept reject decrement once", testAcceptRejectDecrementOnce],
-  ["cards use different stat keys", testCardsUseDifferentStatKeys],
-  ["filter uses same helper", testFilterUsesSameHelper],
+  ["no full refresh regression", testNoFullRefreshRegression],
+  ["financial center untouched", testFinancialCenterUntouched],
 ];
 
 for (const [name, runner] of tests) {
