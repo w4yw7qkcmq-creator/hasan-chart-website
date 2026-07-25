@@ -379,7 +379,10 @@ function PaymentReviewActions({
   onOpenSubscription,
 }) {
   const requestId = String(item.requestId || "");
-  const isBusy = proofLoadingId === requestId || actionLoadingId === requestId;
+  const proofBusy = proofLoadingId === requestId;
+  const activateBusy = actionLoadingId === `${requestId}:activate`;
+  const rejectBusy = actionLoadingId === `${requestId}:reject`;
+  const rowBusy = proofBusy || activateBusy || rejectBusy;
   const showDecisionActions = canActivatePaymentReviewItem(item) || canRejectPaymentReviewItem(item);
 
   return (
@@ -387,15 +390,15 @@ function PaymentReviewActions({
       <button
         type="button"
         className="admin-financial-action-button admin-financial-action-button--secondary"
-        disabled={isBusy}
+        disabled={rowBusy}
         onClick={() => onOpenProof(item)}
       >
-        {proofLoadingId === requestId ? "..." : "فتح الإثبات"}
+        {proofBusy ? "..." : "فتح الإثبات"}
       </button>
       <button
         type="button"
         className="admin-financial-action-button admin-financial-action-button--primary"
-        disabled={isBusy}
+        disabled={rowBusy}
         onClick={() => onOpenSubscription(item)}
       >
         فتح الطلب
@@ -405,18 +408,18 @@ function PaymentReviewActions({
           <button
             type="button"
             className="rounded-2xl bg-gradient-to-l from-emerald-700 via-emerald-500 to-green-300 px-4 py-2 text-sm font-black text-white"
-            disabled={isBusy}
+            disabled={rowBusy}
             onClick={() => onActivate(item)}
           >
-            قبول وتفعيل
+            {activateBusy ? "..." : "قبول وتفعيل"}
           </button>
           <button
             type="button"
             className="admin-btn--reject rounded-2xl px-4 py-2 text-sm font-black"
-            disabled={isBusy}
+            disabled={rowBusy}
             onClick={() => onReject(item)}
           >
-            رفض الطلب
+            {rejectBusy ? "..." : "رفض الطلب"}
           </button>
         </>
       ) : null}
@@ -453,7 +456,9 @@ export default function FinancialCenterPanel({ standalone = false }) {
   const [rejectApiError, setRejectApiError] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
   const [refreshWarning, setRefreshWarning] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
   const abortRef = useRef(null);
+  const backgroundAbortRef = useRef(null);
   const subscriptionActionInFlightRef = useRef(createAdminActionInFlightRegistry());
 
   const openUser = useCallback(
@@ -480,17 +485,37 @@ export default function FinancialCenterPanel({ standalone = false }) {
     setChartReport(revenueResult.report || null);
   }, [selectedPeriod.revenuePeriod]);
 
+  const refreshPendingOverviewCount = useCallback(async (signal) => {
+    const overviewResult = await fetchFinancialCenterSection(adminFetch, "overview", { signal });
+    if (!overviewResult?.overview) return;
+    setOverview((current) =>
+      current
+        ? {
+            ...current,
+            pendingReviews: overviewResult.overview.pendingReviews ?? current.pendingReviews,
+          }
+        : overviewResult.overview
+    );
+    setRecentPending(overviewResult.recentPending || []);
+  }, []);
+
   const loadSection = useCallback(
-    async (tab, { force = false } = {}) => {
-      abortRef.current?.abort();
+    async (tab, { force = false, background = false } = {}) => {
       const controller = new AbortController();
-      abortRef.current = controller;
-      setLoading(true);
-      setError("");
+
+      if (background) {
+        backgroundAbortRef.current?.abort();
+        backgroundAbortRef.current = controller;
+      } else {
+        abortRef.current?.abort();
+        abortRef.current = controller;
+        setLoading(true);
+        setError("");
+      }
 
       try {
         if (tab === "referrals") {
-          setLoading(false);
+          if (!background) setLoading(false);
           return;
         }
 
@@ -536,9 +561,10 @@ export default function FinancialCenterPanel({ standalone = false }) {
         }
       } catch (err) {
         if (err?.name === "AbortError") return;
+        if (background) throw err;
         setError(err?.message || "تعذر تحميل المركز المالي");
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted && !background) setLoading(false);
       }
     },
     [filters, loadOverviewBundle, paymentPagination.page, revenuePeriod, reviewStatus, search, subscriptionPagination.page]
@@ -630,19 +656,15 @@ export default function FinancialCenterPanel({ standalone = false }) {
 
   const refreshFinancialSections = useCallback(async () => {
     try {
-      if (activeTab === "payment-reviews") {
-        await loadSection("payment-reviews", { force: true });
-      }
-      if (activeTab === "overview" || activeTab === "payment-reviews") {
-        await loadOverviewBundle(abortRef.current?.signal);
-      }
+      await loadSection("payment-reviews", { force: true, background: true });
+      await refreshPendingOverviewCount(backgroundAbortRef.current?.signal);
     } catch (refreshError) {
-      setRefreshWarning("تم تنفيذ الإجراء، لكن تعذر تحديث القائمة تلقائياً.");
+      setRefreshWarning("تمت العملية، لكن تعذر تحديث البيانات تلقائيًا.");
       return { ok: false, message: refreshError?.message || String(refreshError) };
     }
     setRefreshWarning("");
     return { ok: true };
-  }, [activeTab, loadOverviewBundle, loadSection]);
+  }, [loadSection, refreshPendingOverviewCount]);
 
   const handleActivatePaymentReview = (item) => {
     setActivateApiError("");
@@ -656,7 +678,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
     const actionKey = `subscription:${request.id}:activate`;
     setActivateLoading(true);
     setActivateApiError("");
-    setActionLoadingId(String(request.id));
+    setActionLoadingId(`${request.id}:activate`);
 
     const flowResult = await runAdminUserActionFlow({
       actionKey,
@@ -675,6 +697,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
           source: "financial-center",
         });
         setActivateTarget(null);
+        setActionNotice("تم تفعيل الاشتراك");
       },
     });
 
@@ -684,16 +707,19 @@ export default function FinancialCenterPanel({ standalone = false }) {
     if (flowResult.blocked) return;
 
     if (!flowResult.success) {
+      if (flowResult.error?.status === 409) {
+        setActivateApiError("تم تغيير حالة الطلب من نافذة أخرى.");
+        void refreshFinancialSections();
+        return;
+      }
       const message =
-        flowResult.error?.status === 409
-          ? flowResult.error?.message || "لا يمكن تفعيل هذا الطلب في حالته الحالية"
-          : flowResult.error?.message || flowResult.errorMessage || "تعذر تفعيل طلب الاشتراك";
+        flowResult.error?.message || flowResult.errorMessage || "تعذر تفعيل طلب الاشتراك";
       setActivateApiError(message);
       return;
     }
 
     if (flowResult.refreshFailed) {
-      setRefreshWarning("تم تفعيل الاشتراك — تعذر تحديث القائمة تلقائياً.");
+      setRefreshWarning("تمت العملية، لكن تعذر تحديث البيانات تلقائيًا.");
     }
   };
 
@@ -709,7 +735,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
     const actionKey = `subscription:${request.id}:reject`;
     setRejectLoading(true);
     setRejectApiError("");
-    setActionLoadingId(String(request.id));
+    setActionLoadingId(`${request.id}:reject`);
 
     const flowResult = await runAdminUserActionFlow({
       actionKey,
@@ -732,6 +758,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
           source: "financial-center",
         });
         setRejectTarget(null);
+        setActionNotice("تم رفض طلب الاشتراك");
       },
     });
 
@@ -741,16 +768,19 @@ export default function FinancialCenterPanel({ standalone = false }) {
     if (flowResult.blocked) return;
 
     if (!flowResult.success) {
+      if (flowResult.error?.status === 409) {
+        setRejectApiError("تم تغيير حالة الطلب من نافذة أخرى.");
+        void refreshFinancialSections();
+        return;
+      }
       const message =
-        flowResult.error?.status === 409
-          ? flowResult.error?.message || "لا يمكن رفض هذا الطلب في حالته الحالية"
-          : flowResult.error?.message || flowResult.errorMessage || "تعذر رفض طلب الاشتراك";
+        flowResult.error?.message || flowResult.errorMessage || "تعذر رفض طلب الاشتراك";
       setRejectApiError(message);
       return;
     }
 
     if (flowResult.refreshFailed) {
-      setRefreshWarning("تم رفض طلب الاشتراك — تعذر تحديث القائمة تلقائياً.");
+      setRefreshWarning("تمت العملية، لكن تعذر تحديث البيانات تلقائيًا.");
     }
   };
 
@@ -842,6 +872,19 @@ export default function FinancialCenterPanel({ standalone = false }) {
       {refreshWarning ? (
         <div className="admin-section admin-financial-dashboard__warning">
           <p className="font-bold text-amber-700">{refreshWarning}</p>
+          <button
+            type="button"
+            className="admin-financial-action-button admin-financial-action-button--secondary mt-3 px-4 py-2"
+            onClick={() => void refreshFinancialSections()}
+          >
+            تحديث القسم
+          </button>
+        </div>
+      ) : null}
+
+      {actionNotice ? (
+        <div className="admin-section admin-financial-dashboard__notice">
+          <p className="font-bold text-emerald-700">{actionNotice}</p>
         </div>
       ) : null}
 
@@ -1038,7 +1081,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
               <option value="rejected">مرفوض</option>
             </select>
           </div>
-          {loading ? <SectionSkeleton /> : paymentReviews.length === 0 ? (
+          {loading && paymentReviews.length === 0 ? <SectionSkeleton /> : paymentReviews.length === 0 ? (
             <p className="text-center font-bold text-slate-500">لا توجد إثباتات دفع</p>
           ) : (
             <div className="admin-table-wrap overflow-x-auto">

@@ -91,6 +91,15 @@ function testStatsSourcesAreDocumented() {
   assert.doesNotMatch(statsBlock, /REVIEWED_DB_STATUSES/);
 }
 
+function testFinancialHubUsesPaymentReviewCounter() {
+  const financialCard = ADMIN_HUB_QUICK_NAV_ITEMS.find((item) => item.id === "financial");
+  const subscriptionsCard = ADMIN_HUB_QUICK_NAV_ITEMS.find((item) => item.id === "subscriptions");
+  assert.equal(financialCard.statKey, "pendingPaymentReviews");
+  assert.equal(subscriptionsCard.statKey, "pendingSubscriptions");
+  assert.match(dashboardSectionsSource, /countPendingPaymentReviews/);
+  assert.match(dashboardSectionsSource, /pendingPaymentReviews,/);
+}
+
 function testPartnerWithdrawalCounterSemantics() {
   const partnersCard = ADMIN_HUB_QUICK_NAV_ITEMS.find((item) => item.id === "partners");
   assert.ok(partnersCard);
@@ -145,6 +154,7 @@ const tests = [
   ["admin hub quick navigation links", testHubQuickNavLinks],
   ["analysis hub matches tab pending semantics", testAnalysisHubMatchesTabPendingSemantics],
   ["stats sources are documented", testStatsSourcesAreDocumented],
+  ["financial hub uses payment review counter", testFinancialHubUsesPaymentReviewCounter],
   ["partner withdrawal counter semantics", testPartnerWithdrawalCounterSemantics],
   ["reviewed statuses do not count as pending", testReviewedStatusesDoNotCountAsPending],
   ["subscription filters exclude upload statuses", testSubscriptionFiltersExcludeUploadStatuses],

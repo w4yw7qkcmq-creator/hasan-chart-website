@@ -15,9 +15,9 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     title: "المركز المالي",
     description: "إيرادات، اشتراكات، إثباتات.",
     href: "/admin/financial-center",
-    statKey: "pendingSubscriptions",
+    statKey: "pendingPaymentReviews",
     statLabel: "بانتظار المراجعة",
-    attentionKey: "pendingSubscriptions",
+    attentionKey: "pendingPaymentReviews",
   },
   {
     id: "subscriptions",
