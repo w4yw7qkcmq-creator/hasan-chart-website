@@ -3,13 +3,20 @@ import { CACHE_NO_STORE } from "../../../../../../lib/api-response.js";
 import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit.js";
 import { adminReadLimiter } from "../../../../../../lib/rate-limit.js";
 import {
+  buildInlineDataUrlPaymentProofResponse,
   buildInlinePaymentProofResponse,
+  buildSignedUrlPaymentProofResponse,
   buildUrlPaymentProofResponse,
   classifyPaymentProof,
+  INLINE_PAYMENT_PROOF_BINARY_MAX_BYTES,
 } from "../../../../../../lib/admin-payment-proof-response.js";
 import { requireValidSubscriptionRequestId } from "../../../../../../lib/id-validation.js";
-import { getPaymentProofForReview } from "../../../../../../lib/financial-center/payment-service.js";
+import {
+  createAdminPaymentProofSignedReadUrl,
+  getPaymentProofForReview,
+} from "../../../../../../lib/financial-center/payment-service.js";
 import { sanitizeFinancialError } from "../../../../../../lib/financial-center/financial-center-shared.js";
+import { PAYMENT_PROOF_SIGNED_READ_TTL_SECONDS } from "../../../../../../lib/payment-proof-storage.js";
 
 export const dynamic = "force-dynamic";
 
@@ -79,37 +86,57 @@ export async function GET(_request, { params }) {
     const dbStartedAt = Date.now();
     const proofRow = await getPaymentProofForReview(adminCheck.supabase, requestId);
     const dbDurationMs = Date.now() - dbStartedAt;
-    const proofMeta = classifyPaymentProof(proofRow.proof);
 
     logPaymentProofEvent("PAYMENT_PROOF_DB_DONE", {
       requestId,
       durationMs: dbDurationMs,
-      proofType: proofMeta.type,
-      proofBytes: proofMeta.type === "inline" ? proofRow.proofBytes || proofMeta.bytes : proofMeta.bytes,
+      proofType: proofRow.source,
+      proofBytes: proofRow.proofBytes || proofRow.sizeBytes || 0,
     });
 
     stage = "response";
     let response;
 
-    if (proofMeta.type === "inline") {
-      response = buildInlinePaymentProofResponse(proofRow.proof, { requestId });
-    } else {
-      response = buildUrlPaymentProofResponse({
-        requestId: proofRow.requestId,
-        url: proofRow.proof,
+    if (proofRow.source === "storage") {
+      const signedStartedAt = Date.now();
+      const signed = await createAdminPaymentProofSignedReadUrl(proofRow.storagePath);
+      logPaymentProofEvent("PAYMENT_PROOF_SIGNED_URL_READY", {
+        requestId,
+        durationMs: Date.now() - signedStartedAt,
+        expiresIn: signed.expiresIn,
       });
+
+      response = buildSignedUrlPaymentProofResponse({
+        requestId,
+        url: signed.signedUrl,
+        mimeType: proofRow.mimeType,
+        sizeBytes: proofRow.sizeBytes,
+        expiresIn: signed.expiresIn || PAYMENT_PROOF_SIGNED_READ_TTL_SECONDS,
+      });
+    } else {
+      const proofMeta = classifyPaymentProof(proofRow.proof);
+      const inlineBytes = proofRow.proofBytes || proofMeta.bytes || 0;
+
+      if (proofMeta.type === "inline") {
+        response =
+          inlineBytes > INLINE_PAYMENT_PROOF_BINARY_MAX_BYTES
+            ? buildInlineDataUrlPaymentProofResponse(proofRow.proof, { requestId })
+            : buildInlinePaymentProofResponse(proofRow.proof, { requestId });
+      } else {
+        response = buildUrlPaymentProofResponse({
+          requestId: proofRow.requestId,
+          url: proofRow.proof,
+        });
+      }
     }
 
     logPaymentProofEvent("PAYMENT_PROOF_RESPONSE_READY", {
       requestId,
       durationMs: Date.now() - startedAt,
-      proofType: proofMeta.type,
-      proofBytes:
-        proofMeta.type === "inline"
-          ? Number(response.headers.get("X-Payment-Proof-Bytes") || proofRow.proofBytes || 0)
-          : proofMeta.bytes,
+      proofType: proofRow.source === "storage" ? "signed-url" : proofRow.source,
+      proofBytes: proofRow.proofBytes || proofRow.sizeBytes || 0,
       statusCode: response.status,
-      responseType: proofMeta.type === "inline" ? "binary" : "json-url",
+      responseType: proofRow.source === "storage" ? "json-signed-url" : "legacy",
     });
 
     return response;

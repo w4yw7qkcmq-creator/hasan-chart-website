@@ -47,7 +47,8 @@ export default function SubscriptionsAuthenticated({ user }) {
   const [notification, setNotification] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [telegramUsername, setTelegramUsername] = useState("");
-  const [paymentProof, setPaymentProof] = useState("");
+  const [paymentProofFile, setPaymentProofFile] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
 
@@ -99,9 +100,9 @@ export default function SubscriptionsAuthenticated({ user }) {
     if (!file) return;
 
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    const maxBytes = 6 * 1024 * 1024;
+    const maxBytes = 8 * 1024 * 1024;
 
-    if (!allowedTypes.includes(file.type)) {
+    if (!allowedTypes.includes(String(file.type || "").toLowerCase())) {
       setNotification({
         type: "error",
         title: "ملف غير مدعوم",
@@ -114,36 +115,23 @@ export default function SubscriptionsAuthenticated({ user }) {
       setNotification({
         type: "error",
         title: "حجم الملف كبير",
-        message: "الحد الأقصى لحجم إثبات الدفع هو 6MB.",
+        message: "الحد الأقصى لحجم إثبات الدفع هو 8MB.",
       });
       return;
     }
 
-    const reader = new FileReader();
-
-    reader.onloadend = () => {
-      setPaymentProof(reader.result || "");
-    };
-
-    reader.onerror = () => {
-      setNotification({
-        type: "error",
-        title: "تعذر رفع الصورة",
-        message: "حاول رفع صورة أوضح لإشعار الدفع.",
-      });
-    };
-
-    reader.readAsDataURL(file);
+    setPaymentProofFile(file);
+    event.target.value = "";
   };
 
   const requestSubscription = (plan) => {
     setSelectedPlan(plan);
     setTelegramUsername("");
-    setPaymentProof("");
+    setPaymentProofFile(null);
   };
 
   const submitSubscriptionRequest = async () => {
-    if (!selectedPlan || !user?.email) return;
+    if (!selectedPlan || !user?.email || submitting) return;
 
     const cleanTelegramUsername = telegramUsername.trim();
 
@@ -156,7 +144,7 @@ export default function SubscriptionsAuthenticated({ user }) {
       return;
     }
 
-    if (!paymentProof) {
+    if (!paymentProofFile) {
       setNotification({
         type: "error",
         title: "أرفق إشعار الدفع",
@@ -165,53 +153,96 @@ export default function SubscriptionsAuthenticated({ user }) {
       return;
     }
 
+    setSubmitting(true);
     setLoadingPlan(selectedPlan.name);
+    const abortController = new AbortController();
 
     try {
-      const response = await fetch("/api/subscription-request", {
+      const initResponse = await fetch("/api/subscription-request/init", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: abortController.signal,
         body: JSON.stringify({
-          user_email: user.email,
           username: user.username || user.email,
           plan_name: selectedPlan.name,
           category: selectedPlan.category,
           price: selectedPlan.price,
           telegram_username: cleanTelegramUsername,
-          payment_proof: paymentProof,
         }),
       });
+      const initResult = await initResponse.json().catch(() => null);
+      if (!initResponse.ok || !initResult?.success) {
+        throw new Error(initResult?.error || "تعذر بدء طلب الاشتراك");
+      }
 
-      const result = await response.json().catch(() => null);
+      const sessionId = initResult.sessionId;
+      const authorizeResponse = await fetch("/api/subscription-request/upload-authorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: abortController.signal,
+        body: JSON.stringify({
+          sessionId,
+          mimeType: paymentProofFile.type,
+          sizeBytes: paymentProofFile.size,
+        }),
+      });
+      const authorizeResult = await authorizeResponse.json().catch(() => null);
+      if (!authorizeResponse.ok || !authorizeResult?.success) {
+        throw new Error(authorizeResult?.error || "تعذر إعداد رفع إثبات الدفع");
+      }
 
-      if (!response.ok || !result?.success) {
-        setNotification({
-          type: "error",
-          title: "فشل إرسال الطلب",
-          message: result?.error || "حدث خطأ غير معروف",
-        });
-        return;
+      const uploadResponse = await fetch(authorizeResult.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": paymentProofFile.type },
+        body: paymentProofFile,
+        signal: abortController.signal,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error("تعذر رفع ملف إثبات الدفع إلى التخزين الآمن");
+      }
+
+      const finalizeResponse = await fetch("/api/subscription-request/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: abortController.signal,
+        body: JSON.stringify({
+          sessionId,
+          objectPath: authorizeResult.objectPath,
+          mimeType: paymentProofFile.type,
+        }),
+      });
+      const finalizeResult = await finalizeResponse.json().catch(() => null);
+      if (!finalizeResponse.ok || !finalizeResult?.success) {
+        if (finalizeResult?.errorCode === "UPLOAD_SESSION_EXPIRED") {
+          throw new Error("انتهت صلاحية جلسة الرفع قبل إتمام الطلب.");
+        }
+        if (finalizeResult?.errorCode === "MIME_MISMATCH" || finalizeResult?.errorCode === "INVALID_UPLOAD_MIME") {
+          throw new Error("صيغة إثبات الدفع غير مدعومة أو لا تطابق محتوى الملف.");
+        }
+        throw new Error(finalizeResult?.error || "تعذr إتمام طلب الاشتراك");
       }
 
       setSelectedPlan(null);
       setTelegramUsername("");
-      setPaymentProof("");
+      setPaymentProofFile(null);
 
       setNotification({
         type: "success",
         title: "طلبك قيد المعالجة ✅",
         message: "تم استلام طلب الاشتراك وإثبات الدفع، وسيقوم الدعم بمراجعته وتفعيل الباقة.",
       });
-    } catch {
+    } catch (error) {
+      if (error?.name === "AbortError") return;
       setNotification({
         type: "error",
         title: "حدث خطأ أثناء إرسال الطلب",
-        message: "حاول مرة ثانية بعد قليل.",
+        message: error?.message || "حاول مرة ثانية بعد قليل.",
       });
     } finally {
+      setSubmitting(false);
       setLoadingPlan(null);
     }
   };
@@ -263,7 +294,7 @@ export default function SubscriptionsAuthenticated({ user }) {
                 onClick={() => {
                   setSelectedPlan(null);
                   setTelegramUsername("");
-                  setPaymentProof("");
+                  setPaymentProofFile(null);
                 }}
                 className="subscriptions-modal__close"
                 aria-label="إغلاق"
@@ -299,7 +330,7 @@ export default function SubscriptionsAuthenticated({ user }) {
                   onChange={handlePaymentProof}
                   className="subscriptions-file"
                 />
-                {paymentProof ? (
+                {paymentProofFile ? (
                   <div className="subscriptions-proof-ok">تم إرفاق صورة إثبات الدفع ✅</div>
                 ) : null}
               </label>
@@ -309,7 +340,7 @@ export default function SubscriptionsAuthenticated({ user }) {
               <button
                 type="button"
                 onClick={submitSubscriptionRequest}
-                disabled={loadingPlan === selectedPlan.name}
+                disabled={loadingPlan === selectedPlan.name || submitting}
                 className="subscriptions-btn subscriptions-btn--primary"
               >
                 {loadingPlan === selectedPlan.name ? "جاري إرسال الطلب..." : "إرسال الطلب للمراجعة"}
@@ -320,7 +351,7 @@ export default function SubscriptionsAuthenticated({ user }) {
                 onClick={() => {
                   setSelectedPlan(null);
                   setTelegramUsername("");
-                  setPaymentProof("");
+                  setPaymentProofFile(null);
                 }}
                 className="subscriptions-btn subscriptions-btn--secondary"
               >
