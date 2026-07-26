@@ -32,6 +32,8 @@ export async function GET(request) {
     return jsonResponse(
       {
         success: report.status !== "down",
+        service: "hasan-chart-website",
+        endpoint: "/api/health",
         ...report,
       },
       {
@@ -48,12 +50,15 @@ export async function GET(request) {
       route: "/api/health",
       method: "GET",
       responseTimeMs: Date.now() - startedAt,
+      healthStatus: "down",
       error: error?.message || String(error),
     });
 
     return jsonResponse(
       {
         success: false,
+        service: "hasan-chart-website",
+        endpoint: "/api/health",
         status: "down",
         error: "تعذر إنشاء تقرير الصحة.",
         timestamp: new Date().toISOString(),
@@ -61,6 +66,9 @@ export async function GET(request) {
       {
         status: 503,
         cacheControl: CACHE_NO_STORE,
+        extraHeaders: {
+          "x-request-id": logContext.requestId || "",
+        },
       }
     );
   }

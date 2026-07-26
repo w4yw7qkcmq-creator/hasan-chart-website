@@ -7,3 +7,11 @@ worker/last-news.json
 worker/news-card.png
 worker/.env
 .env.local
+.env.staging.local
+.staging-db-password.tmp
+.tmp-record-migration.sql
+.tmp-*.sql
+/tmp/staging-api-keys.json
+tmp/
+security-reports/
+supabase/.temp/

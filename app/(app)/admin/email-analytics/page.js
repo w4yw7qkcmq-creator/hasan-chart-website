@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityChart } from "./components/ActivityChart";
 import { EmailTable } from "./components/EmailTable";
 import { FilterBar } from "./components/FilterBar";
@@ -65,8 +65,21 @@ export default function EmailAnalyticsPage() {
     lastWebhookEventLabel: null,
   });
 
+  const mountedRef = useRef(true);
+  const loadRequestRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadRequestRef.current += 1;
+    };
+  }, []);
+
   const loadAnalytics = useCallback(
     async ({ syncResend = false, silent = false, nextFilters = appliedFilters } = {}) => {
+      const requestId = ++loadRequestRef.current;
+
       if (!silent) setLoading(true);
       else setRefreshing(true);
 
@@ -78,6 +91,8 @@ export default function EmailAnalyticsPage() {
         });
 
         const result = await response.json().catch(() => ({}));
+
+        if (!mountedRef.current || requestId !== loadRequestRef.current) return;
 
         if (response.status === 401 || response.status === 403) {
           throw new Error(result?.error || "تعذر تحميل تحليلات البريد");
@@ -104,10 +119,13 @@ export default function EmailAnalyticsPage() {
         setError("");
         setLastUpdatedAt(new Date().toLocaleString("ar"));
       } catch (loadError) {
+        if (!mountedRef.current || requestId !== loadRequestRef.current) return;
         setError(loadError?.message || "تعذر تحميل تحليلات البريد");
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (mountedRef.current && requestId === loadRequestRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [adminFetch, appliedFilters]

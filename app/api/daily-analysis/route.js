@@ -4,8 +4,11 @@ import { runApiRoute } from "../../../lib/api-route";
 import { verifyAdminSession } from "../../../lib/admin-auth";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { adminMutationLimiter, getClientIp } from "../../../lib/rate-limit";
-import { getSupabaseAdmin } from "../../../lib/auth-session";
+import { getSupabaseAdmin } from "../../../lib/supabase-admin";
 import { invalidateReadCache, withReadCache } from "../../../lib/server-read-cache";
+import { DAILY_ANALYSIS_API_CACHE_MS } from "../../../lib/public-cache-config";
+import { DAILY_ANALYSIS_COLUMNS } from "../../../lib/supabase-query-columns";
+import { trimText } from "../../../lib/text-sanitize";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +16,7 @@ const VALID_DIRECTIONS = new Set(["bullish", "bearish", "neutral"]);
 const VALID_ANALYSIS_TYPES = new Set(["daily", "weekly", "urgent"]);
 
 function sanitizeText(value, maxLength = 12000) {
-  return String(value || "").trim().slice(0, maxLength);
+  return trimText(value, maxLength);
 }
 
 function normalizeItem(row) {
@@ -38,12 +41,12 @@ export async function GET(request) {
     route: "/api/daily-analysis",
     handler: async (_req, logContext) => {
       try {
-        const { data } = await withReadCache("public:daily-analysis", 30_000, async () => {
+        const { data } = await withReadCache("public:daily-analysis", DAILY_ANALYSIS_API_CACHE_MS, async () => {
       const supabase = getSupabaseAdmin();
 
       const { data: rows, error } = await supabase
         .from("daily_analysis")
-        .select("*")
+        .select(DAILY_ANALYSIS_COLUMNS)
         .eq("published", true)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -156,7 +159,7 @@ export async function POST(request) {
         created_by: createdBy,
         published: true,
       })
-      .select("*")
+      .select(DAILY_ANALYSIS_COLUMNS)
       .single();
 
     if (error) {

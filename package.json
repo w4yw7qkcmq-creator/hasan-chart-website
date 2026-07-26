@@ -9,7 +9,10 @@
     "start:worker": "node worker/index.js",
     "start:worker:news": "node worker/news-worker.js",
     "subscription-worker": "node worker/subscription-maintenance-worker.js",
-    "install:worker": "npm install --prefix worker"
+    "install:worker": "npm ci --prefix worker --omit=dev || npm install --prefix worker --omit=dev",
+    "railway:worker:install": "npm ci --prefix worker --omit=dev",
+    "railway:worker:start": "npm start --prefix worker",
+    "load-test": "node scripts/load-test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DetailSkeleton } from "../components/Skeleton";
 import { IconRefresh } from "../components/icons";
 import { useAdminFetch } from "../lib/useAdminFetch";
@@ -74,8 +74,21 @@ export default function EmailMessageDetailPage({ params }) {
   const [events, setEvents] = useState([]);
   const [error, setError] = useState("");
 
+  const mountedRef = useRef(true);
+  const loadRequestRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadRequestRef.current += 1;
+    };
+  }, []);
+
   const loadDetail = useCallback(
     async ({ silent = false } = {}) => {
+      const requestId = ++loadRequestRef.current;
+
       if (!silent) setLoading(true);
       else setRefreshing(true);
 
@@ -86,6 +99,8 @@ export default function EmailMessageDetailPage({ params }) {
         });
 
         const result = await response.json().catch(() => ({}));
+
+        if (!mountedRef.current || requestId !== loadRequestRef.current) return;
 
         if (response.status === 401 || response.status === 403) {
           throw new Error(result?.error || "تعذر تحميل تفاصيل الرسالة");
@@ -104,10 +119,13 @@ export default function EmailMessageDetailPage({ params }) {
         setEvents(result.events || []);
         setError("");
       } catch (loadError) {
+        if (!mountedRef.current || requestId !== loadRequestRef.current) return;
         setError(loadError?.message || "تعذر تحميل تفاصيل الرسالة");
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (mountedRef.current && requestId === loadRequestRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [adminFetch, params.id]

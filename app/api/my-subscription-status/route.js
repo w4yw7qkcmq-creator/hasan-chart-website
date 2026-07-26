@@ -23,7 +23,8 @@ export async function GET() {
         .select("id,plan_name,category,price,status,started_at,expires_at,created_at")
         .eq("user_email", email)
         .eq("status", "مفعل")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(20);
 
       if (error) {
         throw new Error(error.message);

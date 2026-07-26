@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "../../../../lib/auth-session";
 import { recordResendWebhookEvent } from "../../../../lib/email-analytics-store";
 import { verifyResendWebhook } from "../../../../lib/resend-webhook";
+import { logApiError, logApiWarning } from "../../../../lib/structured-logger";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,28 +11,36 @@ export async function POST(request) {
     const payload = await request.text();
     const webhookSecret = process.env.RESEND_WEBHOOK_SECRET?.trim();
 
-    let event;
+    if (!webhookSecret) {
+      if (process.env.NODE_ENV === "production") {
+        return Response.json(
+          { success: false, error: "Webhook verification is not configured." },
+          { status: 503 }
+        );
+      }
 
-    if (webhookSecret) {
-      event = verifyResendWebhook(payload, request.headers, webhookSecret);
-    } else {
       console.warn("RESEND_WEBHOOK_SECRET missing — accepting webhook without signature verification");
-      event = JSON.parse(payload);
+      const event = JSON.parse(payload);
+      const supabase = getSupabaseAdmin();
+      await recordResendWebhookEvent(supabase, event);
+      return Response.json({ success: true });
     }
+
+    const event = verifyResendWebhook(payload, request.headers, webhookSecret);
 
     const supabase = getSupabaseAdmin();
     const eventType = String(event?.type || "").trim();
 
     if (eventType === "email.opened" || eventType === "email.clicked") {
       const data = event?.data || {};
-      console.log("RESEND_WEBHOOK_ENGAGEMENT", {
+      logApiWarning({
+        route: "/api/webhooks/resend",
+        event: "RESEND_WEBHOOK_ENGAGEMENT",
         type: eventType,
         emailId: data.email_id || data.id || null,
         recipient: Array.isArray(data.to) ? data.to[0] : data.to || null,
         subject: data.subject || null,
         clickLink: data.click?.link || null,
-        clickIp: data.click?.ipAddress || null,
-        clickUserAgent: data.click?.userAgent || null,
         createdAt: event.created_at || data.created_at || null,
       });
     }
@@ -40,7 +49,11 @@ export async function POST(request) {
 
     return Response.json({ success: true });
   } catch (error) {
-    console.error("RESEND_WEBHOOK_ERROR:", error?.message || error);
+    logApiError({
+      route: "/api/webhooks/resend",
+      method: "POST",
+      error: error?.message || String(error),
+    });
     return Response.json(
       {
         success: false,

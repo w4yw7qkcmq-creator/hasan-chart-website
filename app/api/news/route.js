@@ -8,13 +8,16 @@ import {
 } from "../../../lib/public-cache-config";
 import { withReadCache } from "../../../lib/server-read-cache";
 import { NEWS_LIST_COLUMNS } from "../../../lib/supabase-query-columns";
+import { instrumentSupabaseClient } from "../../../lib/supabase-dev-metrics";
 
 export const dynamic = "force-dynamic";
 
 function getSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  return instrumentSupabaseClient(
+    createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    )
   );
 }
 

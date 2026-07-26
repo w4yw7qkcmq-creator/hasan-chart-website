@@ -1,5 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { createHash } from "crypto";
 import { cookies } from "next/headers";
+import { CACHE_PRIVATE_SHORT } from "../../../lib/api-response";
+import { runApiRoute } from "../../../lib/api-route";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import {
   analysisReadLimiter,
@@ -7,24 +9,10 @@ import {
   getClientIp,
   RATE_LIMIT_ERROR,
 } from "../../../lib/rate-limit";
+import { getSupabaseAdmin } from "../../../lib/supabase-admin";
+import { withReadCache } from "../../../lib/server-read-cache";
 
 export const dynamic = "force-dynamic";
-
-const getSupabaseAdmin = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("إعدادات السيرفر ناقصة: تأكد من إضافة SUPABASE_SERVICE_ROLE_KEY في Vercel Production");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-};
 
 const ANALYSIS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -123,93 +111,125 @@ const getCooldownText = (remainingMs) => {
   return `يمكنك إرسال طلب تحليل جديد بعد ${hours} ساعة و ${minutes} دقيقة`;
 };
 
-export async function GET(req) {
-  try {
-    const rateLimited = await enforceRateLimit(analysisReadLimiter, getClientIp(req));
-    if (rateLimited) return rateLimited;
+function hashSessionToken(token) {
+  return createHash("sha256").update(String(token || "")).digest("hex").slice(0, 16);
+}
 
-    const supabase = getSupabaseAdmin();
+function cooldownResponse(body, status = 200) {
+  return Response.json(body, {
+    status,
+    headers: {
+      "Cache-Control": CACHE_PRIVATE_SHORT,
+      Vary: "Cookie",
+    },
+  });
+}
 
-    const cookieStore = await cookies();
-    const token = cookieStore.get("hc_access_token")?.value;
+export async function GET(request) {
+  return runApiRoute(request, {
+    route: "/api/analysis-request",
+    handler: async (req) => {
+      try {
+        const rateLimited = await enforceRateLimit(analysisReadLimiter, getClientIp(req));
+        if (rateLimited) return rateLimited;
 
-    if (!token) {
-      return Response.json({
-        success: true,
-        blocked: false,
-        text: "",
-        remainingMs: 0,
-        lastRequestAt: null,
-      });
-    }
+        const cookieStore = await cookies();
+        const token = cookieStore.get("hc_access_token")?.value;
 
-    const user = await getAuthenticatedUser(supabase, token);
-    const userEmail = String(user.email || "").trim().toLowerCase();
+        if (!token) {
+          return cooldownResponse({
+            success: true,
+            blocked: false,
+            text: "",
+            remainingMs: 0,
+            lastRequestAt: null,
+          });
+        }
 
-    if (!userEmail) {
-      return Response.json(
-        {
-          success: false,
-          error: "تعذر تحديد حساب المستخدم",
-        },
-        { status: 400 }
-      );
-    }
+        const cacheKey = `analysis-cooldown:${hashSessionToken(token)}`;
+        const payload = await withReadCache(cacheKey, 8_000, async () => {
+          const supabase = getSupabaseAdmin();
+          const user = await getAuthenticatedUser(supabase, token);
+          const userEmail = String(user.email || "").trim().toLowerCase();
 
-    const { data: latestRequest, error } = await supabase
-      .from("analysis_requests")
-      .select("created_at")
-      .eq("user_email", userEmail)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+          if (!userEmail) {
+            return {
+              success: false,
+              error: "تعذر تحديد حساب المستخدم",
+              status: 400,
+            };
+          }
 
-    if (error) {
-      console.error("ANALYSIS COOLDOWN GET ERROR:", error?.message || error);
+          const { data: latestRequest, error } = await supabase
+            .from("analysis_requests")
+            .select("created_at")
+            .eq("user_email", userEmail)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-      return Response.json({
-        success: true,
-        blocked: false,
-        text: "",
-        remainingMs: 0,
-        lastRequestAt: null,
-        warning: "تعذر التحقق من مدة الانتظار حالياً.",
-      });
-    }
+          if (error) {
+            console.error("ANALYSIS COOLDOWN GET ERROR:", error?.message || error);
 
-    if (!latestRequest?.created_at) {
-      return Response.json({
-        success: true,
-        blocked: false,
-        text: "",
-        remainingMs: 0,
-        lastRequestAt: null,
-      });
-    }
+            return {
+              success: true,
+              blocked: false,
+              text: "",
+              remainingMs: 0,
+              lastRequestAt: null,
+              warning: "تعذر التحقق من مدة الانتظار حالياً.",
+            };
+          }
 
-    const lastRequestTime = new Date(latestRequest.created_at).getTime();
-    const remainingMs = ANALYSIS_COOLDOWN_MS - (Date.now() - lastRequestTime);
-    const blocked = Number.isFinite(remainingMs) && remainingMs > 0;
+          if (!latestRequest?.created_at) {
+            return {
+              success: true,
+              blocked: false,
+              text: "",
+              remainingMs: 0,
+              lastRequestAt: null,
+            };
+          }
 
-    return Response.json({
-      success: true,
-      blocked,
-      text: blocked ? getCooldownText(remainingMs) : "",
-      remainingMs: blocked ? remainingMs : 0,
-      lastRequestAt: latestRequest.created_at,
-    });
-  } catch (err) {
-    console.error("API GET ERROR:", err?.message || err);
+          const lastRequestTime = new Date(latestRequest.created_at).getTime();
+          const remainingMs = ANALYSIS_COOLDOWN_MS - (Date.now() - lastRequestTime);
+          const blocked = Number.isFinite(remainingMs) && remainingMs > 0;
 
-    return Response.json({
-      success: true,
-      blocked: false,
-      text: "",
-      remainingMs: 0,
-      lastRequestAt: null,
-      warning: "تعذر التحقق من مدة الانتظار حالياً.",
-    });
-  }
+          return {
+            success: true,
+            blocked,
+            text: blocked ? getCooldownText(remainingMs) : "",
+            remainingMs: blocked ? remainingMs : 0,
+            lastRequestAt: latestRequest.created_at,
+          };
+        });
+
+        if (payload?.status === 400) {
+          return cooldownResponse(
+            {
+              success: false,
+              error: payload.error,
+            },
+            400
+          );
+        }
+
+        const { status: _status, ...body } = payload;
+        return cooldownResponse(body);
+      } catch (err) {
+        console.error("API GET ERROR:", err?.message || err);
+
+        return cooldownResponse({
+          success: true,
+          blocked: false,
+          text: "",
+          remainingMs: 0,
+          lastRequestAt: null,
+          warning: "تعذر التحقق من مدة الانتظار حالياً.",
+        });
+      }
+    },
+  });
 }
 
 const getAuthenticatedUser = async (supabase, token) => {
@@ -297,6 +317,10 @@ export async function POST(req) {
         { status: 401 }
       );
     }
+
+    const { guardActiveAccountForApi } = await import("../../../lib/guard-active-account-api.js");
+    const blocked = await guardActiveAccountForApi(supabase, user.id);
+    if (blocked) return blocked;
 
     const rateLimitResult = await analysisRequestLimiter(user.id);
 

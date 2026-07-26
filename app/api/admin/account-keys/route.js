@@ -1,24 +1,9 @@
-import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireValidUuid } from "../../../../lib/partner-security";
+import { getSupabaseAdmin } from "../../../../lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
-
-function getAdminSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase admin configuration");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
 
 const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
 
@@ -66,15 +51,9 @@ export async function POST(request) {
       );
     }
 
-    const supabase = getAdminSupabase();
-    const { requestId } = await request.json();
-
-    if (!requestId) {
-      return Response.json(
-        { success: false, error: "رقم الطلب غير موجود" },
-        { status: 400 }
-      );
-    }
+    const supabase = getSupabaseAdmin();
+    const body = await request.json().catch(() => ({}));
+    const requestId = requireValidUuid(body?.requestId, "request_id");
 
     const { data, error } = await supabase
       .from("account_management_requests")

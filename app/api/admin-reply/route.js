@@ -1,34 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSession } from "../../../lib/admin-auth";
 import { dispatchAnalysisReplyAlerts } from "../../../lib/analysis-reply-dispatch";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
+import { requireValidUuid } from "../../../lib/partner-security";
 import { adminMutationLimiter } from "../../../lib/rate-limit";
 import { invalidateReadCache } from "../../../lib/server-read-cache";
+import { trimText } from "../../../lib/text-sanitize";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
-
-const getSupabaseAdmin = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("إعدادات السيرفر ناقصة: تأكد من إضافة NEXT_PUBLIC_SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY في Vercel Production");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-};
-
-const normalizeText = (value, maxLength) => {
-  return String(value || "")
-    .trim()
-    .slice(0, maxLength);
-};
 
 export async function POST(req) {
   try {
@@ -49,18 +28,21 @@ export async function POST(req) {
 
     const body = await req.json().catch(() => null);
 
-    const requestId = body?.request_id;
-    const reply = normalizeText(body?.reply, 8000);
-    const replyImage = normalizeText(body?.reply_image, 2000);
-    const userEmail = normalizeText(body?.user_email, 254).toLowerCase();
-    const coin = normalizeText(body?.coin, 40).toUpperCase();
+    let requestId;
 
-    if (!requestId) {
+    try {
+      requestId = requireValidUuid(body?.request_id, "request_id");
+    } catch {
       return Response.json(
-        { success: false, error: "رقم الطلب غير موجود." },
+        { success: false, error: "رقم الطلب غير صالح." },
         { status: 400 }
       );
     }
+
+    const reply = trimText(body?.reply, 8000);
+    const replyImage = trimText(body?.reply_image, 2000);
+    const userEmail = trimText(body?.user_email, 254).toLowerCase();
+    const coin = trimText(body?.coin, 40).toUpperCase();
 
     if (!reply) {
       return Response.json(
@@ -69,7 +51,7 @@ export async function POST(req) {
       );
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabase = adminCheck.supabase;
 
     const { data: updatedRequest, error: updateError } = await supabase
       .from("analysis_requests")
