@@ -6,7 +6,7 @@ const path = require("path");
 const ROOT = process.cwd();
 
 const REQUIRED_FILES = [
-  "app/sitemap.js",
+  "app/(app)/sitemap.js",
   "app/robots.js",
   "app/api/health/route.js",
   "app/error.js",

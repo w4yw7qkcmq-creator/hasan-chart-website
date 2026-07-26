@@ -1,4 +1,4 @@
-import { PRIVATE_ROBOTS_PATHS, PUBLIC_ROBOTS_ALLOW_PATHS, SITE_URL } from "../../lib/seo";
+import { PRIVATE_ROBOTS_PATHS, PUBLIC_ROBOTS_ALLOW_PATHS, SITE_URL } from "../lib/seo";
 
 export default function robots() {
   return {
