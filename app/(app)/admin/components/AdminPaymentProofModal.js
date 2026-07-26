@@ -1,10 +1,29 @@
 "use client";
 
-import Image from "next/image";
 import { createPortal } from "react-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+function resolveProofImageSrc(proof) {
+  return String(proof?.proof || proof?.imageUrl || "").trim();
+}
+
+function isDisplayableProofImage(src) {
+  const value = String(src || "").trim();
+  if (!value) return false;
+  if (value.startsWith("data:image/")) return true;
+  if (value.startsWith("blob:")) return true;
+  if (/^https?:\/\//i.test(value)) return true;
+  return false;
+}
+
+function shouldUseNativeProofImage(imageUrl) {
+  const src = String(imageUrl || "").trim();
+  return src.startsWith("blob:") || src.startsWith("data:");
+}
 
 export default function AdminPaymentProofModal({ proof, onClose }) {
+  const [imageError, setImageError] = useState("");
+
   useEffect(() => {
     if (!proof) return undefined;
 
@@ -25,11 +44,15 @@ export default function AdminPaymentProofModal({ proof, onClose }) {
     };
   }, [onClose, proof]);
 
+  useEffect(() => {
+    setImageError("");
+  }, [proof?.proof, proof?.imageUrl, proof?.requestId]);
+
   if (!proof || typeof document === "undefined") return null;
 
-  const proofValue = String(proof.proof || "").trim();
-  const isInline = proof.isInline && proofValue.startsWith("data:image");
-  const canOpenFull = Boolean(proofValue) && !isInline;
+  const proofValue = resolveProofImageSrc(proof);
+  const canRenderImage = isDisplayableProofImage(proofValue);
+  const showImage = canRenderImage && !imageError;
 
   return createPortal(
     <div className="admin-financial-proof-modal" role="presentation">
@@ -76,16 +99,41 @@ export default function AdminPaymentProofModal({ proof, onClose }) {
         </header>
 
         <div className="admin-financial-proof-modal__body">
-          {isInline ? (
+          {showImage ? (
             <div className="admin-financial-proof-modal__image-wrap">
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={proofValue}
                 alt="إثبات الدفع"
-                width={900}
-                height={700}
-                unoptimized
-                className="max-h-[70vh] w-full rounded-2xl object-contain"
+                className="admin-financial-proof-modal__image"
+                referrerPolicy={shouldUseNativeProofImage(proofValue) ? undefined : "no-referrer"}
+                onError={() =>
+                  setImageError("تعذر عرض الصورة. قد يكون الرابط منتهيًا أو غير متاح.")
+                }
               />
+            </div>
+          ) : imageError ? (
+            <div className="admin-financial-proof-modal__fallback">
+              <p className="admin-financial-proof-modal__fallback-message">{imageError}</p>
+              <div className="admin-financial-proof-modal__fallback-actions">
+                <button
+                  type="button"
+                  className="admin-financial-action-button admin-financial-action-button--secondary"
+                  onClick={() => setImageError("")}
+                >
+                  إعادة المحاولة
+                </button>
+                {proofValue ? (
+                  <a
+                    href={proofValue}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="admin-financial-action-button admin-financial-action-button--primary"
+                  >
+                    فتح في تبويب جديد
+                  </a>
+                ) : null}
+              </div>
             </div>
           ) : proofValue ? (
             <a
@@ -97,7 +145,7 @@ export default function AdminPaymentProofModal({ proof, onClose }) {
               فتح رابط إثبات الدفع
             </a>
           ) : (
-            <p className="text-sm font-bold text-slate-300">لا يوجد إثبات متاح للعرض.</p>
+            <p className="admin-financial-proof-modal__empty">لا يوجد إثبات متاح للعرض.</p>
           )}
         </div>
 
@@ -105,7 +153,7 @@ export default function AdminPaymentProofModal({ proof, onClose }) {
           <button type="button" className="admin-financial-action-button admin-financial-action-button--secondary" onClick={onClose}>
             إغلاق
           </button>
-          {canOpenFull ? (
+          {proofValue ? (
             <a
               href={proofValue}
               target="_blank"

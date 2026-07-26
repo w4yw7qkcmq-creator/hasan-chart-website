@@ -2836,6 +2836,37 @@ html[data-theme="light"] .admin-user-stat-card {
   color: var(--admin-finance-primary);
 }
 
+.admin-financial-action-button--proof {
+  border-color: rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.14);
+  color: #1e3a8a;
+}
+
+html.dark .admin-theme-page .admin-financial-action-button--proof,
+html[data-theme="dark"] .admin-theme-page .admin-financial-action-button--proof {
+  border-color: rgba(96, 165, 250, 0.62);
+  background: rgba(37, 99, 235, 0.28);
+  color: #eff6ff;
+}
+
+html[data-theme="light"] .admin-theme-page .admin-financial-action-button--proof {
+  border-color: rgba(29, 78, 216, 0.45);
+  background: rgba(219, 234, 254, 0.95);
+  color: #1e3a8a;
+}
+
+.admin-financial-action-button--proof:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.72);
+  background: rgba(37, 99, 235, 0.22);
+  color: #1d4ed8;
+}
+
+html.dark .admin-theme-page .admin-financial-action-button--proof:hover:not(:disabled),
+html[data-theme="dark"] .admin-theme-page .admin-financial-action-button--proof:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.38);
+  color: #ffffff;
+}
+
 .admin-theme-page .admin-btn-surface.admin-financial-action-button--secondary,
 .admin-theme-page .admin-financial-dashboard .admin-btn-surface {
   border-color: var(--admin-finance-border);
@@ -3013,6 +3044,47 @@ html[data-theme="light"] .admin-financial-proof-modal__body {
   width: 100%;
   display: grid;
   place-items: center;
+}
+
+.admin-financial-proof-modal__image {
+  display: block;
+  max-height: 70vh;
+  width: 100%;
+  border-radius: 1rem;
+  object-fit: contain;
+}
+
+.admin-financial-proof-modal__fallback {
+  display: grid;
+  gap: 0.85rem;
+  justify-items: center;
+  text-align: center;
+  width: 100%;
+}
+
+.admin-financial-proof-modal__fallback-message {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fecaca;
+}
+
+html[data-theme="light"] .admin-financial-proof-modal__fallback-message {
+  color: #fee2e2;
+}
+
+.admin-financial-proof-modal__fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+}
+
+.admin-financial-proof-modal__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #cbd5e1;
 }
 
 .admin-financial-proof-modal__footer {

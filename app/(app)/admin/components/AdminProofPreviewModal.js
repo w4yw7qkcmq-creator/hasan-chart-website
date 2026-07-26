@@ -1,8 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+function shouldUseNativeProofImage(imageUrl) {
+  const src = String(imageUrl || "").trim();
+  return src.startsWith("blob:") || src.startsWith("data:");
+}
 
 export default function AdminProofPreviewModal({
   open = false,
@@ -14,6 +18,11 @@ export default function AdminProofPreviewModal({
 }) {
   const dialogRef = useRef(null);
   const [visible, setVisible] = useState(open);
+  const [imageError, setImageError] = useState("");
+
+  useEffect(() => {
+    setImageError("");
+  }, [imageUrl]);
 
   useEffect(() => {
     if (!open) {
@@ -97,16 +106,34 @@ export default function AdminProofPreviewModal({
                 </button>
               ) : null}
             </div>
-          ) : imageUrl ? (
-            <Image
+          ) : imageUrl && !imageError ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
               src={imageUrl}
               alt="معاينة إثبات الدفع"
-              width={1400}
-              height={1000}
-              sizes="100vw"
               className="admin-proof-preview__image"
-              priority
+              referrerPolicy={shouldUseNativeProofImage(imageUrl) ? undefined : "no-referrer"}
+              onError={() => setImageError("تعذر عرض الصورة. قد يكون الرابط منتهيًا أو غير متاح.")}
             />
+          ) : imageUrl && imageError ? (
+            <div className="admin-proof-preview__state admin-proof-preview__state--error">
+              <p className="admin-proof-preview__state-title">{imageError}</p>
+              <div className="admin-proof-preview__fallback-actions">
+                {typeof onRetry === "function" ? (
+                  <button type="button" className="admin-proof-preview__retry" onClick={onRetry}>
+                    إعادة المحاولة
+                  </button>
+                ) : null}
+                <a
+                  href={imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="admin-proof-preview__retry"
+                >
+                  فتح في تبويب جديد
+                </a>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>

@@ -145,6 +145,8 @@ function testFinanceUiMarkup() {
   );
   assert.match(modalSource, /admin-financial-proof-modal__close/);
   assert.match(modalSource, /admin-financial-action-button--primary/);
+  assert.match(modalSource, /admin-financial-proof-modal__image/);
+  assert.match(modalSource, /onError=/);
   assert.match(modalSource, /document\.body\.style\.overflow = "hidden"/);
 }
 

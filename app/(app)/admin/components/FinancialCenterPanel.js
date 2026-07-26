@@ -389,7 +389,7 @@ function PaymentReviewActions({
     <div className="flex flex-wrap gap-2 min-w-[220px]">
       <button
         type="button"
-        className="admin-financial-action-button admin-financial-action-button--secondary"
+        className="admin-financial-action-button admin-financial-action-button--proof"
         disabled={rowBusy}
         onClick={() => onOpenProof(item)}
       >
