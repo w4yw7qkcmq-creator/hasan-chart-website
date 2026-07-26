@@ -99,6 +99,7 @@ function testFinancialHubUsesPaymentReviewCounter() {
   assert.match(dashboardSectionsSource, /countPendingPaymentReviews/);
   assert.match(dashboardSectionsSource, /countPendingSubscriptionRequests/);
   assert.match(dashboardSectionsSource, /pendingPaymentReviews,/);
+  assert.doesNotMatch(dashboardSectionsSource, /subscriptionsPending: subscriptionsPending\.count/);
 }
 
 function testPartnerWithdrawalCounterSemantics() {

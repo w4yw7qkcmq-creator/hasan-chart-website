@@ -20,6 +20,9 @@ import { countPendingPaymentReviewRows } from "../lib/financial-center/pending-p
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const adminPageSource = readFileSync(join(__dirname, "../app/(app)/admin/page.js"), "utf8");
+const dashboardSectionsSource = readFileSync(join(__dirname, "../lib/admin-dashboard-sections.js"), "utf8");
+const pendingSubscriptionSource = readFileSync(join(__dirname, "../lib/admin-pending-subscription-request.js"), "utf8");
+const liveStatusSource = readFileSync(join(__dirname, "../app/(app)/admin/components/AdminHubLiveStatus.js"), "utf8");
 const statusBadgeSource = readFileSync(join(__dirname, "../app/components/StatusBadge.js"), "utf8");
 
 const currentArabicWithPath = {
@@ -135,6 +138,58 @@ function testFinancialCenterUntouched() {
   assert.doesNotMatch(adminPageSource, /pendingPaymentReviews: Math\.max/);
 }
 
+function testStatsPayloadUsesDirectPendingCount() {
+  assert.doesNotMatch(dashboardSectionsSource, /subscriptionsPending: subscriptionsPending\.count/);
+  const statsBlock = dashboardSectionsSource.match(
+    /if \(section === "stats"\) \{[\s\S]*?payload\.returnedRows = 0;\s*\} else if \(section === "analysis"\)/
+  )?.[0];
+  assert.ok(statsBlock, "stats section block missing");
+  assert.match(statsBlock, /countPendingSubscriptionRequests\(supabase\)/);
+  assert.match(statsBlock, /subscriptionsPending,\s*\n\s*pendingPaymentReviews/);
+}
+
+function testCountQueryExcludesPaymentProofBlob() {
+  assert.doesNotMatch(
+    pendingSubscriptionSource,
+    /countPendingSubscriptionRequests[\s\S]*?payment_proof[^_]/
+  );
+  assert.match(pendingSubscriptionSource, /payment_proof_path/);
+}
+
+function testDashboardLoadingNotConfirmedZero() {
+  assert.match(adminPageSource, /statsPending = !sectionStates\.stats\.loaded/);
+  assert.match(liveStatusSource, /loading = false/);
+  assert.match(liveStatusSource, /if \(loading\)/);
+  assert.match(liveStatusSource, /skeleton/);
+}
+
+function testHubCountIndependentOfSubscriptionSection() {
+  assert.match(adminPageSource, /resolvedPendingSubscriptions/);
+  assert.match(adminPageSource, /stats\.pendingSubscriptions/);
+  assert.match(adminPageSource, /apiStats\.subscriptionsPending/);
+  assert.doesNotMatch(adminPageSource, /sectionStates\.subscriptions\.loaded[\s\S]{0,120}loadSection\("stats"/);
+}
+
+function testLegacyBlobOnlyExcludedWhenLegacyDisabled() {
+  const legacyBlobOnly = {
+    id: 12,
+    status: "pending",
+    payment_proof_path: "",
+    admin_disabled: false,
+  };
+  assert.equal(
+    isPendingSubscriptionRequestRow(legacyBlobOnly, { legacyReadEnabled: false }),
+    false
+  );
+  assert.equal(
+    isPendingSubscriptionRequestRow(
+      { ...legacyBlobOnly, payment_proof: "data:image/png;base64,abc" },
+      { legacyReadEnabled: true }
+    ),
+    true
+  );
+}
+
 const tests = [
   ["normalize db snake_case", testNormalizeDbSnakeCase],
   ["normalize ui camelCase", testNormalizeUiCamelCase],
@@ -148,6 +203,11 @@ const tests = [
   ["accept reject decrement once", testAcceptRejectDecrementOnce],
   ["no full refresh regression", testNoFullRefreshRegression],
   ["financial center untouched", testFinancialCenterUntouched],
+  ["stats payload uses direct pending count", testStatsPayloadUsesDirectPendingCount],
+  ["count query excludes payment_proof blob", testCountQueryExcludesPaymentProofBlob],
+  ["dashboard loading not confirmed zero", testDashboardLoadingNotConfirmedZero],
+  ["hub count independent of subscription section", testHubCountIndependentOfSubscriptionSection],
+  ["legacy blob-only excluded when legacy disabled", testLegacyBlobOnlyExcludedWhenLegacyDisabled],
 ];
 
 for (const [name, runner] of tests) {
