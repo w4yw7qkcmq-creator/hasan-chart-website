@@ -7,10 +7,15 @@ import {
   buildPaymentProofObjectPath,
   detectImageMimeFromMagicBytes,
   extensionForMimeType,
+  extractImageDimensions,
   generatePaymentProofNonce,
+  getPaymentProofValidationFailureReason,
+  hashPaymentProofContent,
   isUploadSessionExpired,
+  listPaymentProofStorageObjectPaths,
   parsePaymentProofObjectPath,
   PAYMENT_PROOF_MAX_BYTES,
+  PAYMENT_PROOF_MIN_IMAGE_DIMENSION,
   PAYMENT_PROOF_SIGNED_READ_TTL_SECONDS,
   UPLOAD_SESSION_STATUS_COMPLETED,
   UPLOAD_SESSION_STATUS_FAILED,
@@ -96,6 +101,78 @@ function testMimeAllowlist() {
 function testMagicBytesPngJpegWebp() {
   assert.equal(detectImageMimeFromMagicBytes(PNG_1PX), "image/png");
   assert.equal(detectImageMimeFromMagicBytes(JPEG_HEADER), "image/jpeg");
+  assert.deepEqual(extractImageDimensions(PNG_1PX), { width: 1, height: 1, mime: "image/png" });
+}
+
+function testRejectEmptyBuffer() {
+  assert.equal(validatePaymentProofFileBuffer(Buffer.alloc(0)).code, "EMPTY_UPLOAD");
+  assert.equal(getPaymentProofValidationFailureReason({ ok: false, code: "EMPTY_UPLOAD" }), "empty-buffer");
+}
+
+function testRejectInvalidMagicBytes() {
+  assert.equal(validatePaymentProofFileBuffer(Buffer.from("hello")).code, "INVALID_UPLOAD_MIME");
+}
+
+function testReject1x1Placeholder() {
+  const result = validatePaymentProofFileBuffer(PNG_1PX, { declaredMime: "image/png" });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "INVALID_PLACEHOLDER_IMAGE");
+  assert.equal(result.reason, "image-dimensions-too-small");
+  assert.equal(result.width, 1);
+  assert.equal(result.height, 1);
+}
+
+function testAccept10x10PngDimensions() {
+  const png10 = Buffer.from(PNG_1PX);
+  png10.writeUInt32BE(10, 16);
+  png10.writeUInt32BE(10, 20);
+  const result = validatePaymentProofFileBuffer(png10, { declaredMime: "image/png" });
+  assert.equal(result.ok, true);
+  assert.equal(result.width, 10);
+  assert.equal(result.height, 10);
+  assert.equal(typeof result.contentHash, "string");
+}
+
+function testMinimumDimensionConstant() {
+  assert.equal(PAYMENT_PROOF_MIN_IMAGE_DIMENSION, 10);
+}
+
+function testContentHashStable() {
+  assert.equal(hashPaymentProofContent(PNG_1PX), hashPaymentProofContent(Buffer.from(PNG_1PX)));
+}
+
+function testMigrationSummaryFields() {
+  const source = read("scripts/migrate-payment-proofs-to-storage.js");
+  assert.match(source, /duplicateContentGroups/);
+  assert.match(source, /placeholderCount/);
+  assert.match(source, /getPaymentProofValidationFailureReason/);
+  assert.match(source, /validatePaymentProofFileBuffer/);
+  assert.match(source, /if \(!validated\.ok\)[\s\S]*status: "invalid"/);
+  assert.match(source, /if \(dryRun\)[\s\S]*status: "planned"/);
+  assert.doesNotMatch(
+    source.match(/if \(!validated\.ok\) \{[\s\S]*?\n  \}/)?.[0] || "",
+    /\.upload\(/
+  );
+}
+
+function testAuditRecursiveListing() {
+  const audit = read("scripts/audit-payment-proofs-storage.js");
+  assert.match(audit, /listPaymentProofStorageObjectPaths/);
+  assert.match(audit, /orphanObjectPaths/);
+  assert.match(audit, /duplicateContentGroups/);
+  assert.match(audit, /linkedInvalidPlaceholderObjects/);
+  assert.match(audit, /invalid-placeholder-object/);
+  assert.match(audit, /cleanupPlan/);
+  const storage = read("lib/payment-proof-storage.js");
+  assert.match(storage, /export async function listPaymentProofStorageObjectPaths/);
+}
+
+function testUploadFlowUsesSharedValidation() {
+  const source = read("lib/payment-proof-subscription-flow.js");
+  assert.match(source, /validatePaymentProofFileBuffer/);
+  const storage = read("lib/payment-proof-storage.js");
+  assert.match(storage, /INVALID_PLACEHOLDER_IMAGE/);
+  assert.match(storage, /PAYMENT_PROOF_MIN_IMAGE_DIMENSION/);
 }
 
 function testRejectSvgHtml() {
@@ -150,7 +227,7 @@ function testObjectMissingHandling() {
   const source = read("lib/payment-proof-storage.js");
   assert.match(source, /downloadPaymentProofObject/);
   assert.match(source, /OBJECT_NOT_FOUND/);
-  assert.doesNotMatch(source, /\.list\(/);
+  assert.match(source, /listPaymentProofStorageObjectPaths/);
 }
 
 function testPathUserMismatchInFinalize() {
@@ -287,6 +364,15 @@ const tests = [
   ["path spoofing rejected", testPathSpoofingRejected],
   ["mime allowlist", testMimeAllowlist],
   ["magic bytes png/jpeg", testMagicBytesPngJpegWebp],
+  ["reject empty buffer", testRejectEmptyBuffer],
+  ["reject invalid magic bytes", testRejectInvalidMagicBytes],
+  ["reject 1x1 placeholder", testReject1x1Placeholder],
+  ["accept 10x10 png dimensions", testAccept10x10PngDimensions],
+  ["minimum dimension constant", testMinimumDimensionConstant],
+  ["content hash stable", testContentHashStable],
+  ["migration summary fields", testMigrationSummaryFields],
+  ["audit recursive listing", testAuditRecursiveListing],
+  ["upload flow uses shared validation", testUploadFlowUsesSharedValidation],
   ["reject svg/html", testRejectSvgHtml],
   ["max size", testMaxSize],
   ["signed upload in flow", testSignedUploadInFlow],

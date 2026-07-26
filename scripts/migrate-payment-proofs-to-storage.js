@@ -19,6 +19,8 @@ import { decodeInlinePaymentProof } from "../lib/admin-payment-proof-response.js
 import {
   buildPaymentProofObjectPath,
   generatePaymentProofNonce,
+  getPaymentProofValidationFailureReason,
+  validatePaymentProofFileBuffer,
 } from "../lib/payment-proof-storage.js";
 
 const BUCKET = "payment-proofs";
@@ -44,6 +46,49 @@ function parseArgs(argv) {
   return args;
 }
 
+function createEmptySummary({ dryRun }) {
+  return {
+    dryRun,
+    candidates: 0,
+    valid: 0,
+    invalid: 0,
+    skipped: 0,
+    planned: 0,
+    migrated: 0,
+    failed: 0,
+    totalBytesPlanned: 0,
+    invalidReasons: {},
+    duplicateContentGroups: [],
+    placeholderCount: 0,
+  };
+}
+
+function recordInvalid(summary, validation) {
+  const reason = getPaymentProofValidationFailureReason(validation) || "invalid";
+  summary.invalid += 1;
+  summary.invalidReasons[reason] = (summary.invalidReasons[reason] || 0) + 1;
+  if (validation?.code === "INVALID_PLACEHOLDER_IMAGE") {
+    summary.placeholderCount += 1;
+  }
+}
+
+function trackDuplicateContent(summary, requestId, contentHash) {
+  if (!contentHash) return;
+  if (!summary._duplicateContentMap) {
+    summary._duplicateContentMap = new Map();
+  }
+  const ids = summary._duplicateContentMap.get(contentHash) || [];
+  ids.push(Number(requestId));
+  summary._duplicateContentMap.set(contentHash, ids);
+}
+
+function finalizeDuplicateContentGroups(summary) {
+  summary.duplicateContentGroups = [...(summary._duplicateContentMap || new Map()).entries()]
+    .filter(([, ids]) => ids.length > 1)
+    .map(([contentHash, requestIds]) => ({ contentHash, requestIds }));
+  delete summary._duplicateContentMap;
+}
+
 function buildObjectPath({ userId, requestId, mimeType }) {
   assert.ok(userId, "userId required for storage path");
   assert.ok(requestId, "requestId required for storage path");
@@ -67,6 +112,38 @@ async function resolveUserIdForEmail(supabase, email) {
 
 function isLegacyInlineProof(value) {
   return String(value || "").trim().startsWith("data:image/");
+}
+
+function validateDecodedInlineProof(decoded) {
+  const validation = validatePaymentProofFileBuffer(decoded.buffer, {
+    declaredMime: decoded.mimeType,
+  });
+
+  if (!validation.ok) {
+    return {
+      ok: false,
+      reason: getPaymentProofValidationFailureReason(validation),
+      validationCode: validation.code,
+      declaredMime: decoded.mimeType,
+      detectedMime: validation.mime || null,
+      bytes: decoded.buffer.length,
+      width: validation.width ?? null,
+      height: validation.height ?? null,
+      validation,
+    };
+  }
+
+  return {
+    ok: true,
+    mimeType: validation.mime,
+    bytes: validation.bytes,
+    width: validation.width,
+    height: validation.height,
+    contentHash: validation.contentHash,
+    declaredMime: decoded.mimeType,
+    detectedMime: validation.mime,
+    validation,
+  };
 }
 
 async function fetchLegacyBatch(supabase, { batchSize, limit, resumeFromId }) {
@@ -105,7 +182,27 @@ async function migrateRow(supabase, row, { dryRun }) {
   try {
     decoded = decodeInlinePaymentProof(legacyProof);
   } catch {
-    return { status: "invalid", reason: "decode-failed" };
+    return {
+      status: "invalid",
+      reason: "decode-failed",
+      validationCode: "DECODE_FAILED",
+      validation: { ok: false, code: "DECODE_FAILED" },
+    };
+  }
+
+  const validated = validateDecodedInlineProof(decoded);
+  if (!validated.ok) {
+    return {
+      status: "invalid",
+      reason: validated.reason,
+      validationCode: validated.validationCode,
+      declaredMime: validated.declaredMime,
+      detectedMime: validated.detectedMime,
+      bytes: validated.bytes,
+      width: validated.width,
+      height: validated.height,
+      validation: validated.validation,
+    };
   }
 
   const userId = await resolveUserIdForEmail(supabase, row.user_email);
@@ -116,23 +213,28 @@ async function migrateRow(supabase, row, { dryRun }) {
   const objectPath = buildObjectPath({
     userId,
     requestId,
-    mimeType: decoded.mimeType,
+    mimeType: validated.mimeType,
     uploadedAt: row.created_at,
   });
 
   if (dryRun) {
     return {
-      status: "dry-run",
+      status: "planned",
       objectPath,
-      bytes: decoded.buffer.length,
-      mimeType: decoded.mimeType,
+      bytes: validated.bytes,
+      width: validated.width,
+      height: validated.height,
+      contentHash: validated.contentHash,
+      mimeType: validated.mimeType,
+      declaredMime: validated.declaredMime,
+      detectedMime: validated.detectedMime,
     };
   }
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
     .upload(objectPath, decoded.buffer, {
-      contentType: decoded.mimeType,
+      contentType: validated.mimeType,
       upsert: false,
     });
 
@@ -144,8 +246,8 @@ async function migrateRow(supabase, row, { dryRun }) {
     .from("subscription_requests")
     .update({
       payment_proof_path: objectPath,
-      payment_proof_mime_type: decoded.mimeType,
-      payment_proof_size_bytes: decoded.buffer.length,
+      payment_proof_mime_type: validated.mimeType,
+      payment_proof_size_bytes: validated.bytes,
       payment_proof_uploaded_at: row.created_at || new Date().toISOString(),
       payment_proof_storage_provider: "supabase",
     })
@@ -157,7 +259,46 @@ async function migrateRow(supabase, row, { dryRun }) {
     return { status: "failed", reason: updateError.message || "db-update-failed" };
   }
 
-  return { status: "migrated", objectPath, bytes: decoded.buffer.length };
+  return {
+    status: "migrated",
+    objectPath,
+    bytes: validated.bytes,
+    width: validated.width,
+    height: validated.height,
+    contentHash: validated.contentHash,
+    mimeType: validated.mimeType,
+    declaredMime: validated.declaredMime,
+    detectedMime: validated.detectedMime,
+  };
+}
+
+function applySummary(summary, result, requestId) {
+  summary.candidates += 1;
+
+  switch (result.status) {
+    case "skipped":
+      summary.skipped += 1;
+      break;
+    case "invalid":
+      recordInvalid(summary, result.validation || { ok: false, code: result.validationCode || "INVALID" });
+      break;
+    case "failed":
+      summary.failed += 1;
+      break;
+    case "planned":
+      summary.valid += 1;
+      summary.planned += 1;
+      summary.totalBytesPlanned += Number(result.bytes || 0);
+      trackDuplicateContent(summary, requestId, result.contentHash);
+      break;
+    case "migrated":
+      summary.valid += 1;
+      summary.migrated += 1;
+      trackDuplicateContent(summary, requestId, result.contentHash);
+      break;
+    default:
+      break;
+  }
 }
 
 async function main() {
@@ -174,14 +315,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const summary = {
-    dryRun: args.dryRun,
-    migrated: 0,
-    skipped: 0,
-    failed: 0,
-    invalid: 0,
-    dryRunPlanned: 0,
-  };
+  const summary = createEmptySummary({ dryRun: args.dryRun });
 
   let resumeFromId = args.resumeFromId;
   let remaining = args.limit;
@@ -197,15 +331,20 @@ async function main() {
 
     for (const row of batch) {
       const result = await migrateRow(supabase, row, { dryRun: args.dryRun });
-      summary[result.status === "dry-run" ? "dryRunPlanned" : result.status] =
-        (summary[result.status === "dry-run" ? "dryRunPlanned" : result.status] || 0) + 1;
+      applySummary(summary, result, row.id);
 
       console.info("PAYMENT_PROOF_MIGRATE_ROW", {
         requestId: row.id,
         status: result.status,
         reason: result.reason || null,
+        validationCode: result.validationCode || null,
+        declaredMime: result.declaredMime || null,
+        detectedMime: result.detectedMime || null,
+        width: result.width ?? null,
+        height: result.height ?? null,
+        contentHash: result.contentHash || null,
         objectPath: result.objectPath || null,
-        bytes: result.bytes || null,
+        bytes: result.bytes ?? null,
       });
     }
 
@@ -213,6 +352,7 @@ async function main() {
     remaining -= batch.length;
   }
 
+  finalizeDuplicateContentGroups(summary);
   console.info("PAYMENT_PROOF_MIGRATE_SUMMARY", summary);
 }
 

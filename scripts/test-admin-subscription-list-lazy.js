@@ -56,7 +56,7 @@ function testSubscriptionListSelectExcludesPaymentProof() {
     /export const SUBSCRIPTION_LIST_SELECT_FIELDS\s*=\s*"([^"]+)"/
   );
   assert.ok(match, "SUBSCRIPTION_LIST_SELECT_FIELDS export missing");
-  assert.doesNotMatch(match[1], /payment_proof/);
+  assert.doesNotMatch(match[1], /payment_proof[^_]/);
 }
 
 function testFormattedSubscriptionRequestHasNoProofPayload() {
@@ -201,6 +201,9 @@ async function testPaymentProofServiceReturnsStorageMetadataFirst() {
 }
 
 async function testPaymentProofServiceReturnsEstimatedBytesForLegacyFallback() {
+  const previousLegacyFlag = process.env.PAYMENT_PROOF_LEGACY_READ_ENABLED;
+  process.env.PAYMENT_PROOF_LEGACY_READ_ENABLED = "true";
+
   let queryCount = 0;
   const supabase = {
     from() {
@@ -239,10 +242,18 @@ async function testPaymentProofServiceReturnsEstimatedBytesForLegacyFallback() {
     },
   };
 
-  const result = await getPaymentProofForReview(supabase, "11111111-1111-4111-8111-111111111111");
-  assert.equal(queryCount, 2);
-  assert.equal(result.isInline, true);
-  assert.ok(result.proofBytes > 0);
+  try {
+    const result = await getPaymentProofForReview(supabase, "11111111-1111-4111-8111-111111111111");
+    assert.equal(queryCount, 2);
+    assert.equal(result.isInline, true);
+    assert.ok(result.proofBytes > 0);
+  } finally {
+    if (previousLegacyFlag === undefined) {
+      delete process.env.PAYMENT_PROOF_LEGACY_READ_ENABLED;
+    } else {
+      process.env.PAYMENT_PROOF_LEGACY_READ_ENABLED = previousLegacyFlag;
+    }
+  }
 }
 
 function testPaymentProofResponseSizeImprovement() {
