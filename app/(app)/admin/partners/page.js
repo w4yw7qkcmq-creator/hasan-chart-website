@@ -2,7 +2,7 @@
 
 import "../admin-theme.css";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminFetch } from "../../../../lib/admin-fetch";
 import { formatPartnerMoney, WITHDRAWAL_NETWORKS } from "../../../../lib/partner-shared";
 import StatusBadge from "../components/StatusBadge";
@@ -92,6 +92,9 @@ export default function AdminPartnersPage() {
   const [healthResult, setHealthResult] = useState(null);
   const [healthError, setHealthError] = useState("");
 
+  const withdrawalsAbortRef = useRef(null);
+  const withdrawalsRequestRef = useRef(0);
+
   const loadPartners = useCallback(async () => {
     const response = await adminFetch("/api/admin/partners", {
       method: "GET",
@@ -123,6 +126,11 @@ export default function AdminPartnersPage() {
   }, []);
 
   const loadWithdrawals = useCallback(async () => {
+    withdrawalsAbortRef.current?.abort();
+    const controller = new AbortController();
+    withdrawalsAbortRef.current = controller;
+    const requestId = ++withdrawalsRequestRef.current;
+
     const params = new URLSearchParams();
 
     if (withdrawalStatus && withdrawalStatus !== "all") {
@@ -138,17 +146,26 @@ export default function AdminPartnersPage() {
     }
 
     const query = params.toString() ? `?${params.toString()}` : "";
-    const response = await adminFetch(`/api/admin/partner-withdrawals${query}`, {
-      method: "GET",
-      cache: "no-store",
-    });
-    const result = await response.json().catch(() => ({}));
 
-    if (!response.ok || !result?.success) {
-      throw new Error(result?.error || "تعذر تحميل طلبات السحب");
+    try {
+      const response = await adminFetch(`/api/admin/partner-withdrawals${query}`, {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (requestId !== withdrawalsRequestRef.current) return;
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "تعذر تحميل طلبات السحب");
+      }
+
+      setWithdrawals(result.withdrawals || []);
+    } catch (loadError) {
+      if (loadError?.name === "AbortError" || requestId !== withdrawalsRequestRef.current) return;
+      throw loadError;
     }
-
-    setWithdrawals(result.withdrawals || []);
   }, [withdrawalStatus, withdrawalNetwork, withdrawalSearch]);
 
   const loadAdminAnalytics = useCallback(async () => {
@@ -214,11 +231,16 @@ export default function AdminPartnersPage() {
 
   useEffect(() => {
     void reloadAll();
+    return () => {
+      withdrawalsRequestRef.current += 1;
+      withdrawalsAbortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
     if (loading) return;
     void loadWithdrawals().catch((loadError) => {
+      if (loadError?.name === "AbortError") return;
       setError(loadError?.message || "تعذر تحميل طلبات السحب");
     });
   }, [withdrawalStatus, withdrawalNetwork, withdrawalSearch, loading, loadWithdrawals]);

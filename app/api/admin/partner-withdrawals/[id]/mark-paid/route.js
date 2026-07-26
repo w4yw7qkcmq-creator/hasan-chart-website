@@ -8,6 +8,7 @@ const ERROR_MESSAGES = {
   INVALID_STATUS: "يجب اعتماد الطلب قبل تسجيل الدفع",
   ALREADY_PAID: "تم دفع هذا الطلب مسبقًا",
   INSUFFICIENT_BALANCE: "رصيد الشريك غير كافٍ لإتمام الدفع",
+  INVALID_PAYMENT_PROOF: "صيغة إثبات التحويل غير صالحة",
 };
 
 export async function POST(request, { params }) {

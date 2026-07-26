@@ -52,6 +52,18 @@ export async function POST(request) {
       );
     }
 
+    if (
+      amount == null ||
+      amount === "" ||
+      !String(network || "").trim() ||
+      !String(walletAddress || "").trim()
+    ) {
+      return NextResponse.json(
+        { success: false, error: "يرجى إكمال بيانات السحب" },
+        { status: 400 }
+      );
+    }
+
     const partner = await ensurePartner(session.supabase, {
       userId: session.id,
       username: session.username,
