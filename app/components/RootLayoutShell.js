@@ -1,60 +1,109 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { memo, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 import { resolveSupabaseAuthUser } from "../../lib/auth-session-client";
-import { supabase } from "../../lib/supabase";
-import {
-  ensureServiceWorkerRegistration,
-  getAnonymousPushId,
-  getExistingPushSubscription,
-  resolveBrowserPushState,
-  savePushSubscriptionViaApi,
-  serializePushSubscription,
-  setStoredPushEndpoint,
-  subscribeToWebPush,
-} from "../../lib/push-client";
-import { setupBrowserSoundUnlock } from "../../lib/notification-sound-manager";
 import { useAppModal } from "./AppModalProvider";
 import { useAuth } from "./AuthProvider";
 import { useBootstrapLoadingOverlay } from "../hooks/useBootstrapLoadingOverlay";
 import { useClientMounted } from "../hooks/useClientMounted";
-import { NotificationBell } from "./notifications/NotificationBell";
 import { useNotifications } from "./notifications/NotificationProvider";
 import { useTheme } from "./ThemeProvider";
 
-const menuItems = [
-  { href: "/", icon: "🏠", label: "الرئيسية" },
-  { href: "/#market-windows", icon: "▣", label: "نوافذ السوق" },
-  { href: "/#prices", icon: "📊", label: "الأسعار المباشرة" },
-  { href: "/#chart", icon: "📈", label: "الشارت الحي" },
-  { href: "/#analysis", icon: "🧠", label: "طلب تحليل عملة" },
-  { href: "/my-dashboard#instant-analysis", icon: "📈", label: "أطلب تحليل لحظي الآن", auth: true },
-  { href: "/#alerts", icon: "🔔", label: "تنبيه سعر" },
-  { href: "/#services", icon: "💼", label: "الخدمات" },
-  { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
-  { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء" },
-  { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
-  { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
-  { href: "/vip-spot", icon: "⭐", label: "توصيات VIP Spot", auth: true, plan: "spot" },
-  { href: "/vip-futures", icon: "🔥", label: "توصيات VIP Futures", auth: true, plan: "futures" },
-  { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
-  { href: "/daily-analysis", icon: "📝", label: "التحليلات اليومية" },
-  { href: "/news", icon: "📰", label: "الأخبار" },
+const NotificationBell = dynamic(
+  () => import("./notifications/NotificationBell").then((mod) => mod.NotificationBell),
+  {
+    ssr: false,
+    loading: () => (
+      <span
+        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
+        aria-hidden="true"
+      />
+    ),
+  }
+);
+
+const menuGroups = [
+  {
+    id: "markets",
+    label: "الأسواق",
+    icon: "📊",
+    defaultOpen: true,
+    items: [
+      { href: "/", icon: "🏠", label: "الرئيسية" },
+      { href: "/#market-windows", icon: "▣", label: "نوافذ السوق" },
+      { href: "/#prices", icon: "📊", label: "الأسعار المباشرة" },
+      { href: "/#chart", icon: "📈", label: "الشارت الحي" },
+      { href: "/news", icon: "📰", label: "الأخبار" },
+      { href: "/assets", icon: "🗂️", label: "الأصول والأسواق" },
+      { href: "/daily-analysis", icon: "📝", label: "التحليلات اليومية" },
+    ],
+  },
+  {
+    id: "services",
+    label: "الخدمات",
+    icon: "💼",
+    defaultOpen: true,
+    items: [
+      { href: "/#analysis", icon: "🧠", label: "طلب تحليل عملة" },
+      { href: "/#alerts", icon: "🔔", label: "تنبيه سعر" },
+      { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
+      { href: "/vip-spot", icon: "⭐", label: "توصيات VIP سبوت", auth: true, plan: "spot" },
+      { href: "/vip-futures", icon: "🔥", label: "توصيات VIP فيوتشر", auth: true, plan: "futures" },
+      { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
+      { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء" },
+    ],
+  },
+  {
+    id: "account",
+    label: "الحساب",
+    icon: "👤",
+    defaultOpen: true,
+    items: [
+      { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
+      { href: "/my-dashboard#instant-analysis", icon: "📈", label: "تحليل لحظي", auth: true },
+      { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
+      { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات", auth: true },
+    ],
+  },
+  {
+    id: "admin",
+    label: "الإدارة",
+    icon: "🛠",
+    adminOnly: true,
+    defaultOpen: false,
+    items: [{ href: "/admin", icon: "🛠", label: "لوحة الإدارة", adminOnly: true }],
+  },
 ];
 
-const bottomMenuItems = [
-  { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات 🔔", auth: true },
-];
+const HEAVY_PREFETCH_ROUTES = new Set([
+  "/partner-center",
+  "/subscriptions",
+  "/my-dashboard",
+  "/my-analysis",
+  "/vip-spot",
+  "/vip-futures",
+  "/account-management",
+  "/admin",
+  "/daily-analysis",
+  "/news",
+  "/assets",
+]);
+
+function shouldPrefetchSidebarHref(href) {
+  const path = String(href || "").split("#")[0];
+  return !HEAVY_PREFETCH_ROUTES.has(path);
+}
 
 const socialLinks = [
-  { label: "الدعم الفني", badge: "Telegram", icon: "🛟", href: "https://t.me/HasaNCharTSupport" },
-  { label: "القناة الرسمية", badge: "Telegram", icon: "📢", href: "https://t.me/HsaNCharT" },
-  { label: "د. حسن", badge: "Telegram", icon: "👨‍🏫", href: "https://t.me/CEOHasaNCharT" },
-  { label: "منصة X", badge: "X", icon: "𝕏", href: "https://x.com/HasanChart" },
+  { label: "الدعم الفني", badge: "تليجرام", icon: "🛟", href: "https://t.me/HasaNCharTSupport" },
+  { label: "القناة الرسمية", badge: "تليجرام", icon: "📢", href: "https://t.me/HsaNCharT" },
+  { label: "د. حسن", badge: "تليجرام", icon: "👨‍🏫", href: "https://t.me/CEOHasaNCharT" },
+  { label: "منصة إكس", badge: "إكس", icon: "𝕏", href: "https://x.com/HasanChart" },
 ];
 
 function getPlanAccess(subscriptionPlan) {
@@ -193,6 +242,7 @@ function SidebarMenuItem({
     <Link
       key={item.href}
       href={href}
+      prefetch={shouldPrefetchSidebarHref(href)}
       onClick={onNavigate}
       className={itemClass}
     >
@@ -207,6 +257,93 @@ function SidebarMenuItem({
       )}
     </Link>
   );
+}
+
+function SidebarMenuGroup({ group, isOpen, onToggle, children, variant = "desktop" }) {
+  const hasVisibleChildren = Array.isArray(children)
+    ? children.some(Boolean)
+    : Boolean(children);
+
+  if (!hasVisibleChildren) {
+    return null;
+  }
+
+  const summaryClass =
+    variant === "desktop"
+      ? "flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] border border-cyan-300/10 bg-white/[0.03] px-3 py-2.5 text-white transition hover:border-cyan-300/30 hover:bg-white/[0.06]"
+      : "flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] border border-cyan-300/10 bg-white/[0.03] px-3 py-2.5 text-white transition hover:border-cyan-300/30 hover:bg-white/[0.06]";
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => onToggle(group.id)}
+        className={`${summaryClass} w-full text-right`}
+        aria-expanded={isOpen}
+      >
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-sm">
+          {group.icon}
+        </span>
+        <span className="font-black leading-none">{group.label}</span>
+        <span className={`mr-auto text-cyan-100/60 transition ${isOpen ? "rotate-180" : ""}`}>⌄</span>
+      </button>
+      {isOpen ? <div className="space-y-2 pr-1">{children}</div> : null}
+    </div>
+  );
+}
+
+function renderSidebarGroups({
+  authResolved,
+  currentUser,
+  unreadAnalysisCount,
+  isAdmin,
+  collapsedGroups,
+  onToggleGroup,
+  onNavigate,
+  variant = "desktop",
+}) {
+  return menuGroups.map((group) => {
+    if (group.adminOnly && authResolved && !isAdmin) {
+      return null;
+    }
+
+    const isOpen = collapsedGroups[group.id] ?? group.defaultOpen;
+
+    const items = group.items
+      .map((item) => {
+        const state = resolveMenuItemState(item, authResolved, currentUser);
+
+        if (item.adminOnly && authResolved && !isAdmin) {
+          return null;
+        }
+
+        return (
+          <SidebarMenuItem
+            key={item.href}
+            item={item}
+            state={state}
+            authResolved={authResolved}
+            currentUser={currentUser}
+            unreadAnalysisCount={unreadAnalysisCount}
+            onNavigate={onNavigate}
+            variant={variant}
+          />
+        );
+      })
+      .filter(Boolean);
+
+    return (
+      <SidebarMenuGroup
+        key={group.id}
+        group={group}
+        isOpen={isOpen}
+        onToggle={onToggleGroup}
+        variant={variant}
+      >
+        {items}
+      </SidebarMenuGroup>
+    );
+  });
 }
 
 function AdminMenuSection({ authResolved, isAdmin, onNavigate, variant = "desktop" }) {
@@ -260,6 +397,12 @@ function resolveThemeToggleLabel(theme, { compact = false, mobile = false } = {}
   return isLight ? "🌙 الوضع الليلي" : "☀️ الوضع النهاري";
 }
 
+function LayoutPageSlot({ children }) {
+  return <main className="w-full p-3 pt-3 md:p-4 md:pt-4">{children}</main>;
+}
+
+const MemoizedLayoutPageSlot = memo(LayoutPageSlot);
+
 function RootLayoutShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -270,6 +413,12 @@ function RootLayoutShell({ children }) {
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState({
+    markets: true,
+    services: true,
+    account: true,
+    admin: false,
+  });
   const { unreadAnalysisCount } = useNotifications();
   const { theme, initialTheme, toggleTheme } = useTheme();
   const mounted = useClientMounted();
@@ -289,57 +438,106 @@ function RootLayoutShell({ children }) {
   const browserNotificationLabel = browserNotificationsActive
     ? "🔔 إشعارات المتصفح مفعّلة ✅"
     : "🔔 تفعيل إشعارات المتصفح";
+  const browserNotificationAriaLabel = browserNotificationsActive
+    ? "إشعارات المتصفح مفعّلة"
+    : "تفعيل إشعارات المتصفح";
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  const toggleMenuGroup = useCallback((groupId) => {
+    setCollapsedGroups((current) => ({
+      ...current,
+      [groupId]: !current[groupId],
+    }));
+  }, []);
+
   const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
     useBootstrapLoadingOverlay(authResolved, { enabled: !isAuthPage });
+
+  useEffect(() => {
+    if (!mobileMenuOpen || typeof document === "undefined") return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
     let active = true;
 
-    void (async () => {
-      const browserState = await resolveBrowserPushState();
-      if (!active) return;
+    const cancelDeferred = scheduleAfterPaint(() => {
+      void import("../../lib/push-client").then(({ resolveBrowserPushState, setStoredPushEndpoint }) => {
+        void (async () => {
+          const browserState = await resolveBrowserPushState();
+          if (!active) return;
 
-      setNotificationPermission(browserState.permission);
+          setNotificationPermission(browserState.permission);
 
-      if (browserState.permission === "granted" && browserState.hasSubscription) {
-        setWebPushEnabled(true);
+          if (browserState.permission === "granted" && browserState.hasSubscription) {
+            setWebPushEnabled(true);
 
-        const endpoint = browserState.subscription?.endpoint;
-        if (endpoint) {
-          setStoredPushEndpoint(endpoint);
-        }
+            const endpoint = browserState.subscription?.endpoint;
+            if (endpoint) {
+              setStoredPushEndpoint(endpoint);
+            }
 
-        console.log(
-          "push:ui:enabled",
-          JSON.stringify({
-            source: "browser_subscription",
-            hasEndpoint: Boolean(endpoint),
-          })
-        );
-      }
-    })();
+            console.log(
+              "push:ui:enabled",
+              JSON.stringify({
+                source: "browser_subscription",
+                hasEndpoint: Boolean(endpoint),
+              })
+            );
+          }
+        })();
+      });
+    }, 2000);
 
     return () => {
       active = false;
+      cancelDeferred();
     };
   }, []);
 
   useEffect(() => {
-    setupBrowserSoundUnlock();
+    const cancelDeferred = scheduleAfterPaint(() => {
+      void import("../../lib/notification-sound-manager").then(({ setupBrowserSoundUnlock }) => {
+        setupBrowserSoundUnlock();
+      });
+    }, 1800);
+
+    return cancelDeferred;
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return undefined;
 
-    ensureServiceWorkerRegistration().catch((err) => {
-      console.warn("Service worker registration skipped:", err?.message || err);
-    });
+    const cancelDeferred = scheduleAfterPaint(() => {
+      void import("../../lib/push-client").then(({ ensureServiceWorkerRegistration }) => {
+        ensureServiceWorkerRegistration().catch((err) => {
+          console.warn("Service worker registration skipped:", err?.message || err);
+        });
+      });
+    }, 2500);
+
+    return cancelDeferred;
   }, []);
 
   const savePushSubscription = async ({ existingSubscription = null } = {}) => {
+    const pushClient = await import("../../lib/push-client");
+
     console.log(
       "push:client:start",
       JSON.stringify({
@@ -364,12 +562,12 @@ function RootLayoutShell({ children }) {
     let subscription = existingSubscription;
 
     if (!subscription) {
-      subscription = await getExistingPushSubscription();
+      subscription = await pushClient.getExistingPushSubscription();
     }
 
     if (!subscription) {
       try {
-        subscription = await subscribeToWebPush();
+        subscription = await pushClient.subscribeToWebPush();
       } catch (error) {
         console.error(
           "push:api:error",
@@ -384,21 +582,21 @@ function RootLayoutShell({ children }) {
       }
     }
 
-    const payload = serializePushSubscription(subscription);
+    const payload = pushClient.serializePushSubscription(subscription);
 
     if (!payload?.endpoint || !payload?.keys?.p256dh || !payload?.keys?.auth) {
       throw new Error("تعذر قراءة بيانات اشتراك Push من المتصفح");
     }
 
-    const anonymousId = getAnonymousPushId();
-    const result = await savePushSubscriptionViaApi({
+    const anonymousId = pushClient.getAnonymousPushId();
+    const result = await pushClient.savePushSubscriptionViaApi({
       subscription: payload,
       anonymousId,
       userEmail: String(authUser.email).trim().toLowerCase(),
       userId: String(authUser.id).trim(),
     });
 
-    setStoredPushEndpoint(payload.endpoint);
+    pushClient.setStoredPushEndpoint(payload.endpoint);
     setWebPushEnabled(true);
 
     return {
@@ -456,6 +654,7 @@ function RootLayoutShell({ children }) {
     }
 
     try {
+      const { resolveBrowserPushState, setStoredPushEndpoint } = await import("../../lib/push-client");
       const browserState = await resolveBrowserPushState();
       setNotificationPermission(browserState.permission);
 
@@ -530,7 +729,9 @@ function RootLayoutShell({ children }) {
       );
     } catch (error) {
       setWebPushEnabled(false);
-      setStoredPushEndpoint("");
+      void import("../../lib/push-client").then(({ setStoredPushEndpoint }) => {
+        setStoredPushEndpoint("");
+      });
 
       showAppModal({
         type: "warning",
@@ -549,50 +750,52 @@ function RootLayoutShell({ children }) {
     const cancelDeferred = scheduleAfterPaint(() => {
       if (!active) return;
 
-      void (async () => {
-        const browserState = await resolveBrowserPushState();
-        if (!active) return;
-
-        setNotificationPermission(browserState.permission);
-
-        if (browserState.permission !== "granted" || !browserState.hasSubscription) {
-          return;
-        }
-
-        setWebPushEnabled(true);
-
-        if (browserState.subscription?.endpoint) {
-          setStoredPushEndpoint(browserState.subscription.endpoint);
-        }
-
-        console.log(
-          "push:ui:enabled",
-          JSON.stringify({
-            source: "login_sync",
-            email: currentUser.email,
-            userId: currentUser.id,
-          })
-        );
-
-        try {
-          const saved = await savePushSubscription({
-            existingSubscription: browserState.subscription,
-          });
-
+      void import("../../lib/push-client").then(({ resolveBrowserPushState, setStoredPushEndpoint }) => {
+        void (async () => {
+          const browserState = await resolveBrowserPushState();
           if (!active) return;
 
-          if (saved?.apiCalled && saved?.subscription?.id) {
-            console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN_DONE", {
-              subscriptionId: saved.subscription.id,
-              email: saved.subscription.email || currentUser.email,
-              userId: saved.subscription.user_id || currentUser.id,
-            });
+          setNotificationPermission(browserState.permission);
+
+          if (browserState.permission !== "granted" || !browserState.hasSubscription) {
+            return;
           }
-        } catch (err) {
-          if (!active) return;
-          console.warn("Push subscription sync skipped:", err?.message || err);
-        }
-      })();
+
+          setWebPushEnabled(true);
+
+          if (browserState.subscription?.endpoint) {
+            setStoredPushEndpoint(browserState.subscription.endpoint);
+          }
+
+          console.log(
+            "push:ui:enabled",
+            JSON.stringify({
+              source: "login_sync",
+              email: currentUser.email,
+              userId: currentUser.id,
+            })
+          );
+
+          try {
+            const saved = await savePushSubscription({
+              existingSubscription: browserState.subscription,
+            });
+
+            if (!active) return;
+
+            if (saved?.apiCalled && saved?.subscription?.id) {
+              console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN_DONE", {
+                subscriptionId: saved.subscription.id,
+                email: saved.subscription.email || currentUser.email,
+                userId: saved.subscription.user_id || currentUser.id,
+              });
+            }
+          } catch (err) {
+            if (!active) return;
+            console.warn("Push subscription sync skipped:", err?.message || err);
+          }
+        })();
+      });
     }, 3000);
 
     return () => {
@@ -668,23 +871,27 @@ function RootLayoutShell({ children }) {
 
       runRefresh();
 
-      channel = supabase
-        .channel(`global-subscription-refresh-${currentUser.email}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "subscription_requests",
-            filter: `user_email=eq.${currentUser.email}`,
-          },
-          (payload) => {
-            if (payload?.new?.status === "مفعل") {
-              runRefresh();
+      void import("../../lib/supabase").then(({ supabase }) => {
+        if (!active) return;
+
+        channel = supabase
+          .channel(`global-subscription-refresh-${currentUser.email}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "subscription_requests",
+              filter: `user_email=eq.${currentUser.email}`,
+            },
+            (payload) => {
+              if (payload?.new?.status === "مفعل") {
+                runRefresh();
+              }
             }
-          }
-        )
-        .subscribe();
+          )
+          .subscribe();
+      });
     }, 0);
 
     const handleVisibilityChange = () => {
@@ -699,8 +906,13 @@ function RootLayoutShell({ children }) {
       active = false;
       cancelDeferred();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (channel) {
-        supabase.removeChannel(channel);
+      const channelToRemove = channel;
+      channel = null;
+
+      if (channelToRemove) {
+        void import("../../lib/supabase").then(({ supabase }) => {
+          supabase.removeChannel(channelToRemove);
+        });
       }
     };
   }, [authResolved, currentUser?.email, refreshCurrentUserSubscription]);
@@ -714,7 +926,11 @@ function RootLayoutShell({ children }) {
     return (
       <>
         {globalNotice && (
-          <div className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl">
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">{globalNotice}</p>
@@ -736,13 +952,15 @@ function RootLayoutShell({ children }) {
                 )}
               </div>
               <button
+                type="button"
+                aria-label="إغلاق الإشعار"
                 onClick={() => {
                   setGlobalNotice("");
                   setGlobalNoticeHref("");
                 }}
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
               >
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
             <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
@@ -760,7 +978,11 @@ function RootLayoutShell({ children }) {
   return (
     <>
         {globalNotice && (
-          <div className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl">
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">{globalNotice}</p>
@@ -782,13 +1004,15 @@ function RootLayoutShell({ children }) {
                 )}
               </div>
               <button
+                type="button"
+                aria-label="إغلاق الإشعار"
                 onClick={() => {
                   setGlobalNotice("");
                   setGlobalNoticeHref("");
                 }}
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
               >
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
             <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
@@ -805,7 +1029,12 @@ function RootLayoutShell({ children }) {
                 className="absolute inset-0 bg-black/70 backdrop-blur-sm"
               />
 
-              <aside className="absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l border-cyan-300/20 bg-[#020817] p-4 shadow-[0_0_80px_rgba(0,102,255,0.30)]">
+              <aside
+                role="dialog"
+                aria-modal="true"
+                aria-label="قائمة التنقل"
+                className="absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l border-cyan-300/20 bg-[#020817] p-4 shadow-[0_0_80px_rgba(0,102,255,0.30)]"
+              >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
                 <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
@@ -814,51 +1043,31 @@ function RootLayoutShell({ children }) {
                     <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/30 bg-gradient-to-br from-blue-600/35 via-cyan-400/15 to-black/40 font-black text-white">HC</div>
                     <div>
                       <h2 className="font-black leading-5">HasaN CharT World</h2>
-                      <p className="text-xs text-cyan-100/60">Trading Intelligence</p>
+                      <p className="text-xs text-cyan-100/60">منصة التداول الذكية</p>
                     </div>
                   </Link>
 
                   <button
+                    type="button"
+                    aria-label="إغلاق القائمة"
                     onClick={() => setMobileMenuOpen(false)}
                     className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/10 text-xl font-black text-white"
                   >
-                    ✕
+                    <span aria-hidden="true">✕</span>
                   </button>
                 </div>
 
-                <nav className="relative z-10 flex-1 space-y-2 overflow-y-auto pr-1 pl-1 customScroll">
-                  {menuItems.map((item) => (
-                    <SidebarMenuItem
-                      key={item.href}
-                      item={item}
-                      state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
-                      authResolved={shellAuthResolved}
-                      currentUser={shellUser}
-                      unreadAnalysisCount={shellUnreadAnalysisCount}
-                      onNavigate={() => setMobileMenuOpen(false)}
-                      variant="mobile"
-                    />
-                  ))}
-
-                  <AdminMenuSection
-                    authResolved={shellAuthResolved}
-                    isAdmin={shellIsAdmin}
-                    onNavigate={() => setMobileMenuOpen(false)}
-                    variant="mobile"
-                  />
-
-                  {bottomMenuItems.map((item) => (
-                    <SidebarMenuItem
-                      key={item.href}
-                      item={item}
-                      state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
-                      authResolved={shellAuthResolved}
-                      currentUser={shellUser}
-                      unreadAnalysisCount={shellUnreadAnalysisCount}
-                      onNavigate={() => setMobileMenuOpen(false)}
-                      variant="mobile"
-                    />
-                  ))}
+                <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll">
+                  {renderSidebarGroups({
+                    authResolved: shellAuthResolved,
+                    currentUser: shellUser,
+                    unreadAnalysisCount: shellUnreadAnalysisCount,
+                    isAdmin: shellIsAdmin,
+                    collapsedGroups,
+                    onToggleGroup: toggleMenuGroup,
+                    onNavigate: () => setMobileMenuOpen(false),
+                    variant: "mobile",
+                  })}
                 </nav>
 
                 <div className="relative z-10 mt-4 space-y-3 rounded-[24px] border border-cyan-300/10 bg-white/[0.035] p-4 backdrop-blur-xl">
@@ -920,20 +1129,17 @@ function RootLayoutShell({ children }) {
               </div>
             </Link>
 
-            <nav className="relative z-10 flex-1 space-y-2 overflow-y-auto pr-1 pl-1 customScroll">
-              {menuItems.map((item) => (
-                <SidebarMenuItem
-                  key={item.href}
-                  item={item}
-                  state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
-                  authResolved={shellAuthResolved}
-                  currentUser={shellUser}
-                  unreadAnalysisCount={shellUnreadAnalysisCount}
-                  variant="desktop"
-                />
-              ))}
-
-              <AdminMenuSection authResolved={shellAuthResolved} isAdmin={shellIsAdmin} variant="desktop" />
+            <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll">
+              {renderSidebarGroups({
+                authResolved: shellAuthResolved,
+                currentUser: shellUser,
+                unreadAnalysisCount: shellUnreadAnalysisCount,
+                isAdmin: shellIsAdmin,
+                collapsedGroups,
+                onToggleGroup: toggleMenuGroup,
+                onNavigate: undefined,
+                variant: "desktop",
+              })}
 
               <details className="group/contact rounded-[18px] border border-cyan-300/15 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <summary className="flex min-h-[54px] cursor-pointer list-none items-center gap-3 rounded-[18px] px-4 py-3 text-white transition hover:-translate-x-1 hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10">
@@ -943,6 +1149,24 @@ function RootLayoutShell({ children }) {
                 </summary>
 
                 <div className="space-y-2 px-3 pb-3 pt-1">
+                  <Link
+                    href="/about"
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#07142f]/70 px-3 py-2.5 text-sm no-underline transition hover:border-cyan-300/35 hover:bg-cyan-400/10"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10">
+                        ℹ️
+                      </span>
+                      <div>
+                        <p className="font-bold text-white">من نحن</p>
+                        <p className="text-[11px] text-cyan-100/55">تعرف على المنصة</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-cyan-300/15 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold text-cyan-100">
+                      فتح
+                    </span>
+                  </Link>
+
                   {socialLinks.map((link) => (
                     <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#07142f]/70 px-3 py-2.5 text-sm transition hover:border-cyan-300/35 hover:bg-cyan-400/10">
                       <div className="flex items-center gap-2">
@@ -957,18 +1181,6 @@ function RootLayoutShell({ children }) {
                   ))}
                 </div>
               </details>
-
-              {bottomMenuItems.map((item) => (
-                <SidebarMenuItem
-                  key={item.href}
-                  item={item}
-                  state={resolveMenuItemState(item, shellAuthResolved, shellUser)}
-                  authResolved={shellAuthResolved}
-                  currentUser={shellUser}
-                  unreadAnalysisCount={shellUnreadAnalysisCount}
-                  variant="desktop"
-                />
-              ))}
             </nav>
 
             <div className="relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4 border border-cyan-300/10 bg-white/[0.035] backdrop-blur-xl">
@@ -1003,29 +1215,39 @@ function RootLayoutShell({ children }) {
           <div className="min-w-0 flex-1 overflow-x-hidden">
             <header className="sticky top-0 z-40 overflow-visible bg-[#020817]/90 border-b border-cyan-300/15 backdrop-blur-2xl px-4 md:px-6 py-4 shadow-[0_14px_50px_rgba(0,102,255,0.16)]">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.20),transparent_28%),linear-gradient(90deg,rgba(2,6,23,0.92),rgba(7,20,47,0.88),rgba(2,6,23,0.92))]" />
-              <div className="relative z-10 flex items-center justify-between gap-3">
+              <div className="relative z-10 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
                 <button
+                  type="button"
                   onClick={() => setMobileMenuOpen(true)}
-                  className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-2xl font-black text-cyan-100 shadow-[0_0_24px_rgba(0,163,255,0.18)] lg:hidden"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-2xl font-black text-cyan-100 shadow-[0_0_24px_rgba(0,163,255,0.18)] lg:hidden"
                   aria-label="فتح القائمة"
                 >
-                  ⋮
+                  <span aria-hidden="true">⋮</span>
                 </button>
-                <Link href="/" className="font-black text-lg whitespace-nowrap flex items-center gap-2">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-600/20 border border-cyan-300/25 shadow-[0_0_20px_rgba(0,163,255,0.18)]">HC</span>
-                  HasaN CharT
+                <Link href="/" className="site-header-brand font-black text-lg flex items-center gap-2 min-w-0">
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-blue-600/20 border border-cyan-300/25 shadow-[0_0_20px_rgba(0,163,255,0.18)]"
+                  >
+                    HC
+                  </span>
+                  <span className="site-header-brand__text">HasaN CharT</span>
                 </Link>
 
                 <button
                   type="button"
+                  aria-label={browserNotificationAriaLabel}
                   onClick={() => {
                     void enableBrowserNotifications();
                   }}
-                  className={`browserPushBtn inline-flex rounded-2xl px-4 py-2 text-sm font-black transition ${
+                  className={`browserPushBtn inline-flex shrink-0 items-center justify-center rounded-2xl px-3 py-2 text-sm font-black transition sm:px-4 ${
                     browserNotificationsActive ? "browserPushBtn--active" : ""
                   }`}
                 >
-                  {browserNotificationLabel}
+                  <span className="sm:hidden" aria-hidden="true">
+                    🔔
+                  </span>
+                  <span className="hidden sm:inline">{browserNotificationLabel}</span>
                 </button>
 
                 {authLoading ? (
@@ -1038,8 +1260,9 @@ function RootLayoutShell({ children }) {
                 ) : null}
 
                 <button
+                  type="button"
                   onClick={toggleTheme}
-                  className="hidden rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20 md:inline-flex"
+                  className="hidden shrink-0 rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20 md:inline-flex"
                 >
                   {headerThemeLabel}
                 </button>
@@ -1057,7 +1280,7 @@ function RootLayoutShell({ children }) {
               </div>
             </header>
 
-            <main className="w-full p-3 pt-3 md:p-4 md:pt-4">{children}</main>
+            <MemoizedLayoutPageSlot>{children}</MemoizedLayoutPageSlot>
           </div>
         </div>
         {bootstrapOverlay}

@@ -1,8 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import AppModal from "./AppModal";
+
+const AppModal = dynamic(() => import("./AppModal"), { ssr: false });
 
 const AppModalContext = createContext(null);
 
