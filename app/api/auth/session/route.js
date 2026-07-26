@@ -1,7 +1,10 @@
+import { createHash } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { isAdminUser, normalizeEmail } from "../../../../lib/admin-emails";
+import { CACHE_PRIVATE_SHORT } from "../../../../lib/api-response";
 import { getSupabaseAdmin } from "../../../../lib/auth-session";
+import { withReadCache } from "../../../../lib/server-read-cache";
 
 function buildSessionPayload(session) {
   if (!session?.access_token || !session?.refresh_token) return null;
@@ -78,11 +81,91 @@ async function resolveSessionFromCookies(supabase, cookieStore) {
   };
 }
 
+function hashSessionToken(token) {
+  return createHash("sha256").update(String(token || "")).digest("hex").slice(0, 16);
+}
+
+async function buildSessionResponse(resolved) {
+  const supabase = getSupabaseAdmin();
+  const normalizedEmail = normalizeEmail(resolved.user.email);
+
+  const { data: adminProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .or(`id.eq.${resolved.user.id},email.eq.${normalizedEmail}`)
+    .maybeSingle();
+
+  const role = adminProfile?.role || resolved.user.user_metadata?.role || "user";
+  const user = {
+    id: resolved.user.id,
+    email: resolved.user.email,
+    role,
+  };
+
+  const response = NextResponse.json({
+    ok: true,
+    authenticated: true,
+    user,
+    isAdmin: isAdminUser(user),
+    session: buildSessionPayload(resolved.session),
+  });
+
+  if (resolved.refreshed) {
+    attachSessionCookies(response, resolved.session);
+  }
+
+  response.headers.set("Cache-Control", CACHE_PRIVATE_SHORT);
+  response.headers.set("Vary", "Cookie");
+
+  return response;
+}
+
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
     const cookieStore = await cookies();
-    const resolved = await resolveSessionFromCookies(supabase, cookieStore);
+    const accessToken = cookieStore.get("hc_access_token")?.value;
+    const refreshToken = cookieStore.get("hc_refresh_token")?.value;
+
+    if (!accessToken && !refreshToken) {
+      return NextResponse.json({
+        ok: false,
+        authenticated: false,
+        user: null,
+      });
+    }
+
+    let resolved = null;
+
+    if (accessToken) {
+      const cacheKey = `auth-session:${hashSessionToken(accessToken)}`;
+      const { data } = await withReadCache(cacheKey, 4_000, async () => {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser(accessToken);
+
+        if (error || !user?.email) {
+          return null;
+        }
+
+        return {
+          user,
+          session: {
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            expires_in: 3600,
+          },
+          refreshed: false,
+        };
+      });
+
+      resolved = data;
+    }
+
+    if (!resolved?.user?.email) {
+      resolved = await resolveSessionFromCookies(supabase, cookieStore);
+    }
 
     if (!resolved?.user?.email) {
       return NextResponse.json({
@@ -92,34 +175,7 @@ export async function GET() {
       });
     }
 
-    const normalizedEmail = normalizeEmail(resolved.user.email);
-
-    const { data: adminProfile } = await supabase
-      .from("profiles")
-      .select("role")
-      .or(`id.eq.${resolved.user.id},email.eq.${normalizedEmail}`)
-      .maybeSingle();
-
-    const role = adminProfile?.role || resolved.user.user_metadata?.role || "user";
-    const user = {
-      id: resolved.user.id,
-      email: resolved.user.email,
-      role,
-    };
-
-    const response = NextResponse.json({
-      ok: true,
-      authenticated: true,
-      user,
-      isAdmin: isAdminUser(user),
-      session: buildSessionPayload(resolved.session),
-    });
-
-    if (resolved.refreshed) {
-      attachSessionCookies(response, resolved.session);
-    }
-
-    return response;
+    return buildSessionResponse(resolved);
   } catch (error) {
     return NextResponse.json(
       {

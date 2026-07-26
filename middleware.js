@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import { applySecurityHeaders } from "./lib/security-headers";
+import {
+  adminMutationLimiter,
+  adminReadLimiter,
+  getClientIp,
+  RATE_LIMIT_ERROR,
+} from "./lib/rate-limit";
 import {
   REFERRAL_COOKIE_MAX_AGE_SECONDS,
   REFERRAL_COOKIE_NAME,
@@ -17,18 +24,6 @@ function hasAccessToken(request) {
 
 function isProtectedAdminApi(pathname) {
   return pathname.startsWith(ADMIN_API_PREFIX) || pathname === ADMIN_REPLY_API;
-}
-
-function attachSecurityHeaders(response) {
-  response.headers.set("X-Frame-Options", "SAMEORIGIN");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Vary", "Accept-Encoding");
-  response.headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()"
-  );
-  return response;
 }
 
 function applyCaptureResultCookies(response, capturePayload) {
@@ -62,7 +57,7 @@ export async function middleware(request) {
   const isAdminApi = isProtectedAdminApi(pathname);
 
   if (isAdminApi && !hasAccessToken(request)) {
-    return attachSecurityHeaders(
+    return applySecurityHeaders(
       NextResponse.json(
         {
           success: false,
@@ -71,6 +66,24 @@ export async function middleware(request) {
         { status: 401 }
       )
     );
+  }
+
+  if (isAdminApi) {
+    const isReadMethod = request.method === "GET" || request.method === "HEAD";
+    const limiter = isReadMethod ? adminReadLimiter : adminMutationLimiter;
+    const rateLimitResult = await limiter(`admin-ip:${getClientIp(request)}`);
+
+    if (!rateLimitResult.success) {
+      return applySecurityHeaders(
+        NextResponse.json(
+          {
+            success: false,
+            error: RATE_LIMIT_ERROR,
+          },
+          { status: 429 }
+        )
+      );
+    }
   }
 
   if (pathname.startsWith("/api/")) {
@@ -92,16 +105,16 @@ export async function middleware(request) {
     });
 
     response.headers.set("x-request-id", requestId);
-    return attachSecurityHeaders(response);
+    return applySecurityHeaders(response);
   }
 
   if (pathname.startsWith("/r/")) {
-    return attachSecurityHeaders(NextResponse.next());
+    return applySecurityHeaders(NextResponse.next());
   }
 
   const referralCode = sanitizeReferralCode(request.nextUrl.searchParams.get("ref"));
   const existingReferralCookie = request.cookies.get(REFERRAL_COOKIE_NAME)?.value;
-  const response = attachSecurityHeaders(NextResponse.next());
+  const response = applySecurityHeaders(NextResponse.next());
 
   if (referralCode && !existingReferralCookie) {
     try {
