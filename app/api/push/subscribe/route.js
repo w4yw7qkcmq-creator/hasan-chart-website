@@ -1,8 +1,10 @@
 import { getSupabaseAdmin, requireSessionUser } from "../../../../lib/auth-session";
+import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import {
   backfillAnonymousPushSubscriptions,
   savePushSubscriptionRow,
 } from "../../../../lib/push-subscriptions-server";
+import { pushSubscribeLimiter } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -138,6 +140,12 @@ export async function POST(request) {
         },
         { status: 401 }
       );
+    }
+
+    const rateLimited = await enforceRateLimit(pushSubscribeLimiter, userId);
+
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const body = await request.json().catch(() => null);

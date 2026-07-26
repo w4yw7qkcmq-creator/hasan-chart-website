@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireSessionEmail } from "../../../lib/auth-session";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
+import { filterValidUuids } from "../../../lib/partner-security";
+import { userMutationLimiter } from "../../../lib/rate-limit";
 import { invalidateReadCache } from "../../../lib/server-read-cache";
+import { NOTIFICATION_COUNT_COLUMN } from "../../../lib/supabase-query-columns";
 
 export async function POST(request) {
   try {
@@ -13,16 +17,22 @@ export async function POST(request) {
       );
     }
 
+    const rateLimited = await enforceRateLimit(userMutationLimiter, session.email);
+
+    if (rateLimited) {
+      return rateLimited;
+    }
+
     const body = await request.json().catch(() => ({}));
     const { email, supabase } = session;
     const markAll = body?.all === true;
-    const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : [];
+    const ids = filterValidUuids(body?.ids);
 
     if (!markAll && ids.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "Missing notification ids",
+          error: "معرّفات الإشعارات غير صالحة",
         },
         { status: 400 }
       );
@@ -52,7 +62,7 @@ export async function POST(request) {
 
     const { count: unreadCount } = await supabase
       .from("notifications")
-      .select("*", { count: "exact", head: true })
+      .select(NOTIFICATION_COUNT_COLUMN, { count: "exact", head: true })
       .eq("user_email", email)
       .eq("is_read", false);
 

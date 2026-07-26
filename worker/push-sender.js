@@ -12,10 +12,7 @@ function isWebPushConfigured() {
 }
 
 function logPushEvent(event, payload = {}) {
-  console.log(event, {
-    ts: new Date().toISOString(),
-    ...payload,
-  });
+  logWorkerEvent(event, payload);
 }
 
 function configureWebPush() {
@@ -56,6 +53,10 @@ function formatPushError(error) {
 
 async function sendWebPushNotification(subscriptionRow, payload) {
   if (!configureWebPush()) {
+    logPushEvent("WEB_PUSH_SKIPPED", {
+      subscriptionId: subscriptionRow.id,
+      reason: "WEB_PUSH_NOT_CONFIGURED",
+    });
     return {
       success: false,
       skipped: true,
@@ -205,6 +206,12 @@ async function sendPriceAlertPushNotifications({
   }
 
   if (!configureWebPush()) {
+    logPushEvent("WEB_PUSH_SKIPPED", {
+      alertId,
+      email: normalizedEmail || null,
+      userId: alertUserId,
+      reason: "WEB_PUSH_NOT_CONFIGURED",
+    });
     logPushEvent("push:vapid:missing", {
       alertId,
       email: normalizedEmail || null,
@@ -216,6 +223,13 @@ async function sendPriceAlertPushNotifications({
   }
 
   let subscriptionLookup = { rows: [], foundBy: null };
+
+  logPushEvent("WEB_PUSH_LOOKUP_START", {
+    alertId,
+    email: normalizedEmail || null,
+    userId: alertUserId,
+    lookupOrder: ["user_id", "email"],
+  });
 
   logPushEvent("alert:push:lookup:start", {
     alertId,
@@ -244,6 +258,12 @@ async function sendPriceAlertPushNotifications({
   const subscriptionList = subscriptionLookup.rows || [];
 
   if (subscriptionList.length === 0) {
+    logPushEvent("WEB_PUSH_SUBSCRIPTION_NOT_FOUND", {
+      alertId,
+      email: normalizedEmail || null,
+      userId: alertUserId,
+      reason: "NO_PUSH_SUBSCRIPTIONS",
+    });
     logPushEvent("push:subscription:not_found", {
       alertId,
       email: normalizedEmail || null,
@@ -261,6 +281,14 @@ async function sendPriceAlertPushNotifications({
       subscriptionCount: 0,
     };
   }
+
+  logPushEvent("WEB_PUSH_SUBSCRIPTION_FOUND", {
+    alertId,
+    email: normalizedEmail || null,
+    userId: alertUserId,
+    foundBy: subscriptionLookup.foundBy || null,
+    count: subscriptionList.length,
+  });
 
   logPushEvent("alert:push:subscriptions:found", {
     alertId,
@@ -333,9 +361,22 @@ async function sendPriceAlertPushNotifications({
   let failed = 0;
 
   for (const subscriptionRow of subscriptionList) {
+    logPushEvent("WEB_PUSH_SEND_ATTEMPT", {
+      alertId,
+      subscriptionId: subscriptionRow.id,
+      endpointPrefix: String(subscriptionRow.endpoint || "").slice(0, 72),
+      hasP256dh: Boolean(subscriptionRow.p256dh),
+      hasAuth: Boolean(subscriptionRow.auth),
+    });
+
     const outcome = await sendWebPushNotification(subscriptionRow, payload);
 
     if (outcome.success) {
+      logPushEvent("WEB_PUSH_SENT", {
+        alertId,
+        subscriptionId: subscriptionRow.id,
+        statusCode: outcome.statusCode || 201,
+      });
       sent += 1;
       logWorkerEvent("PRICE_ALERT_PUSH_SENT", {
         worker: workerEntry,
@@ -351,10 +392,23 @@ async function sendPriceAlertPushNotifications({
     }
 
     if (outcome.skipped) {
+      logPushEvent("WEB_PUSH_SKIPPED", {
+        alertId,
+        subscriptionId: subscriptionRow.id,
+        reason: outcome.message || outcome.error || "WEB_PUSH_SKIPPED",
+        statusCode: outcome.statusCode || null,
+      });
       continue;
     }
 
     failed += 1;
+
+    logPushEvent("WEB_PUSH_FAILED", {
+      alertId,
+      subscriptionId: subscriptionRow.id,
+      statusCode: outcome.statusCode || null,
+      reason: outcome.message || outcome.error || "WEB_PUSH_SEND_FAILED",
+    });
 
     logPriceAlertPushFailed(workerEntry, {
       alertId,

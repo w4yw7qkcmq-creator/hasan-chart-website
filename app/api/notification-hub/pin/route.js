@@ -1,39 +1,38 @@
-import { NextResponse } from "next/server";
 import { requireSessionEmail } from "../../../../lib/auth-session";
+import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
+import { requireValidUuid } from "../../../../lib/partner-security";
+import { userMutationLimiter } from "../../../../lib/rate-limit";
 import { invalidateReadCache } from "../../../../lib/server-read-cache";
 import { enrichHubNotification } from "../../../../lib/notification-hub-registry";
 import { normalizeNotification } from "../../../../lib/notifications-shared";
+import { nextJsonError, nextJsonOk } from "../../../../lib/next-json-response";
+import { NOTIFICATION_LIST_COLUMNS } from "../../../../lib/supabase-query-columns";
 
 export const dynamic = "force-dynamic";
-
-function jsonOk(payload, status = 200) {
-  return NextResponse.json({ success: true, ...payload }, { status });
-}
-
-function jsonError(error, status = 400) {
-  return NextResponse.json(
-    {
-      success: false,
-      error: typeof error === "string" ? error : error?.message || "Server Error",
-    },
-    { status }
-  );
-}
 
 export async function POST(request) {
   try {
     const session = await requireSessionEmail();
 
     if (session.error) {
-      return jsonError("يجب تسجيل الدخول.", 401);
+      return nextJsonError("يجب تسجيل الدخول.", 401);
+    }
+
+    const rateLimited = await enforceRateLimit(userMutationLimiter, session.email);
+
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const body = await request.json().catch(() => ({}));
-    const id = String(body?.id || "").trim();
     const pinned = body?.pinned !== false;
 
-    if (!id) {
-      return jsonError("معرّف الإشعار مطلوب.", 400);
+    let id;
+
+    try {
+      id = requireValidUuid(body?.id, "notification_id");
+    } catch {
+      return nextJsonError("معرّف الإشعار غير صالح.", 400);
     }
 
     const { email, supabase } = session;
@@ -43,7 +42,7 @@ export async function POST(request) {
       .update({ is_pinned: pinned })
       .eq("user_email", email)
       .eq("id", id)
-      .select("*")
+      .select(NOTIFICATION_LIST_COLUMNS)
       .single();
 
     if (error) {
@@ -52,10 +51,10 @@ export async function POST(request) {
 
     invalidateReadCache(`notifications:${email}`);
 
-    return jsonOk({
+    return nextJsonOk({
       notification: enrichHubNotification(normalizeNotification(data)),
     });
   } catch (error) {
-    return jsonError(error, 500);
+    return nextJsonError(error, 500);
   }
 }

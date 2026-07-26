@@ -5,6 +5,10 @@ import { requireSessionEmail } from "../../../lib/auth-session";
 import { userReadLimiter } from "../../../lib/rate-limit";
 import { normalizeNotification } from "../../../lib/notifications-shared";
 import { withReadCache } from "../../../lib/server-read-cache";
+import {
+  NOTIFICATION_COUNT_COLUMN,
+  NOTIFICATION_LIST_COLUMNS,
+} from "../../../lib/supabase-query-columns";
 
 export async function GET(request) {
   return runApiRoute(request, {
@@ -31,28 +35,30 @@ export async function GET(request) {
         const cacheKey = `notifications:${email}:${includeRead ? "all" : "unread"}:${limit}`;
 
         const fetchNotifications = async () => {
-          let query = supabase
+          let listQuery = supabase
             .from("notifications")
-            .select("*")
+            .select(NOTIFICATION_LIST_COLUMNS)
             .eq("user_email", email)
             .order("created_at", { ascending: false })
             .limit(limit);
 
           if (!includeRead) {
-            query = query.eq("is_read", false);
+            listQuery = listQuery.eq("is_read", false);
           }
 
-          const { data: rows, error } = await query;
+          const [{ data: rows, error }, { count: unreadCount, error: countError }] =
+            await Promise.all([
+              listQuery,
+              supabase
+                .from("notifications")
+                .select(NOTIFICATION_COUNT_COLUMN, { count: "exact", head: true })
+                .eq("user_email", email)
+                .eq("is_read", false),
+            ]);
 
           if (error) {
             throw new Error(error.message);
           }
-
-          const { count: unreadCount, error: countError } = await supabase
-            .from("notifications")
-            .select("*", { count: "exact", head: true })
-            .eq("user_email", email)
-            .eq("is_read", false);
 
           if (countError) {
             throw new Error(countError.message);

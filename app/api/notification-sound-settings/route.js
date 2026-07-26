@@ -1,32 +1,21 @@
-import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../lib/auth-session";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import {
   applySettingsPatch,
   normalizeNotificationSoundSettings,
   pickNotificationSoundSettingsPayload,
   sanitizeNotificationSoundSettingsUpdate,
 } from "../../../lib/notification-sound-settings-shared";
+import { nextJsonError, nextJsonOk } from "../../../lib/next-json-response";
+import { userMutationLimiter, userReadLimiter } from "../../../lib/rate-limit";
+import { USER_NOTIFICATION_SETTINGS_COLUMNS } from "../../../lib/supabase-query-columns";
 
 export const dynamic = "force-dynamic";
-
-function jsonOk(payload, status = 200) {
-  return NextResponse.json({ success: true, ...payload }, { status });
-}
-
-function jsonError(error, status = 400) {
-  return NextResponse.json(
-    {
-      success: false,
-      error: typeof error === "string" ? error : error?.message || "Server Error",
-    },
-    { status }
-  );
-}
 
 async function fetchSettingsForUser(supabase, userId) {
   const { data, error } = await supabase
     .from("user_notification_settings")
-    .select("*")
+    .select(USER_NOTIFICATION_SETTINGS_COLUMNS)
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -46,7 +35,7 @@ async function createDefaultSettingsForUser(supabase, userId) {
   const { data, error } = await supabase
     .from("user_notification_settings")
     .insert(payload)
-    .select("*")
+    .select(USER_NOTIFICATION_SETTINGS_COLUMNS)
     .single();
 
   if (error) {
@@ -75,17 +64,23 @@ export async function GET() {
     const session = await requireSessionUser();
 
     if (session.error) {
-      return jsonError("يجب تسجيل الدخول.", 401);
+      return nextJsonError("يجب تسجيل الدخول.", 401);
+    }
+
+    const rateLimited = await enforceRateLimit(userReadLimiter, session.email);
+
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const row = await getOrCreateSettings(session);
 
-    return jsonOk({
+    return nextJsonOk({
       settings: serializeSettings(row),
       created: Boolean(row?.created_at),
     });
   } catch (error) {
-    return jsonError(error, 500);
+    return nextJsonError(error, 500);
   }
 }
 
@@ -94,14 +89,20 @@ export async function PUT(request) {
     const session = await requireSessionUser();
 
     if (session.error) {
-      return jsonError("يجب تسجيل الدخول.", 401);
+      return nextJsonError("يجب تسجيل الدخول.", 401);
+    }
+
+    const rateLimited = await enforceRateLimit(userMutationLimiter, session.email);
+
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const body = await request.json().catch(() => ({}));
     const patch = sanitizeNotificationSoundSettingsUpdate(body);
 
     if (Object.keys(patch).length === 0) {
-      return jsonError("لا توجد إعدادات صالحة للتحديث.", 400);
+      return nextJsonError("لا توجد إعدادات صالحة للتحديث.", 400);
     }
 
     const existing = await getOrCreateSettings(session);
@@ -115,17 +116,17 @@ export async function PUT(request) {
       .from("user_notification_settings")
       .update(payload)
       .eq("user_id", session.id)
-      .select("*")
+      .select(USER_NOTIFICATION_SETTINGS_COLUMNS)
       .single();
 
     if (error) {
       throw new Error(error.message);
     }
 
-    return jsonOk({
+    return nextJsonOk({
       settings: serializeSettings(data),
     });
   } catch (error) {
-    return jsonError(error, 500);
+    return nextJsonError(error, 500);
   }
 }

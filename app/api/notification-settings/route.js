@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../lib/auth-session";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import {
   applyNotificationSettingsPatch,
   normalizeNotificationSettings,
   sanitizeNotificationSettingsUpdate,
 } from "../../../lib/notification-settings-shared.js";
+import { nextJsonError, nextJsonOk } from "../../../lib/next-json-response";
+import { userMutationLimiter, userReadLimiter } from "../../../lib/rate-limit";
 import {
   getOrCreateUserNotificationSettingsRow,
   isNotificationSettingsSchemaMismatchError,
@@ -16,29 +18,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function jsonOk(payload, status = 200) {
-  return NextResponse.json({ success: true, ...payload }, { status });
-}
-
-function jsonError(error, status = 400) {
-  return NextResponse.json(
-    {
-      success: false,
-      error: typeof error === "string" ? error : error?.message || "Server Error",
-    },
-    { status }
-  );
-}
-
 function mapSettingsRouteError(error) {
   if (
     isNotificationSettingsTableMissingError(error) ||
     isNotificationSettingsSchemaMismatchError(error)
   ) {
-    return jsonError(error, 503);
+    return nextJsonError(error, 503);
   }
 
-  return jsonError(error, 500);
+  return nextJsonError(error, 500);
 }
 
 export async function GET() {
@@ -46,7 +34,13 @@ export async function GET() {
     const session = await requireSessionUser();
 
     if (session.error) {
-      return jsonError("يجب تسجيل الدخول.", 401);
+      return nextJsonError("يجب تسجيل الدخول.", 401);
+    }
+
+    const rateLimited = await enforceRateLimit(userReadLimiter, session.email);
+
+    if (rateLimited) {
+      return rateLimited;
     }
 
     logNotificationSettingsEvent("NOTIFICATION_SETTINGS_LOAD_START", {
@@ -64,7 +58,7 @@ export async function GET() {
       channel_preferences: settings.channel_preferences,
     });
 
-    return jsonOk({ settings });
+    return nextJsonOk({ settings });
   } catch (error) {
     logNotificationSettingsEvent("NOTIFICATION_SETTINGS_SAVE_ERROR", {
       phase: "load",
@@ -79,14 +73,20 @@ export async function PUT(request) {
     const session = await requireSessionUser();
 
     if (session.error) {
-      return jsonError("يجب تسجيل الدخول.", 401);
+      return nextJsonError("يجب تسجيل الدخول.", 401);
+    }
+
+    const rateLimited = await enforceRateLimit(userMutationLimiter, session.email);
+
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const body = await request.json().catch(() => ({}));
     const patch = sanitizeNotificationSettingsUpdate(body);
 
     if (Object.keys(patch).length === 0) {
-      return jsonError("لا توجد إعدادات صالحة للتحديث.", 400);
+      return nextJsonError("لا توجد إعدادات صالحة للتحديث.", 400);
     }
 
     logNotificationSettingsEvent("NOTIFICATION_SETTINGS_SAVE_START", {
@@ -109,7 +109,7 @@ export async function PUT(request) {
     const row = await upsertUserNotificationSettingsRow(session.supabase, session.id, merged);
     const settings = serializeUserNotificationSettings(row);
 
-    return jsonOk({ settings });
+    return nextJsonOk({ settings });
   } catch (error) {
     logNotificationSettingsEvent("NOTIFICATION_SETTINGS_SAVE_ERROR", {
       phase: "save",

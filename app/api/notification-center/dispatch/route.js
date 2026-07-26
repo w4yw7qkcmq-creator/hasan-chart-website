@@ -1,34 +1,31 @@
-import { NextResponse } from "next/server";
 import { requireSessionEmail } from "../../../../lib/auth-session";
+import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import {
   resolveSiteTypeForNotificationKey,
 } from "../../../../lib/notification-center-shared";
 import { normalizeNotificationKey } from "../../../../lib/notification-sound-keys";
 import { normalizeNotification } from "../../../../lib/notifications-shared";
+import { nextJsonError, nextJsonOk } from "../../../../lib/next-json-response";
+import { notificationDispatchLimiter } from "../../../../lib/rate-limit";
 import { dispatchSiteNotification } from "../../../../lib/site-notification-dispatch.js";
 
 export const dynamic = "force-dynamic";
-
-function jsonOk(payload, status = 200) {
-  return NextResponse.json({ success: true, ...payload }, { status });
-}
-
-function jsonError(error, status = 400) {
-  return NextResponse.json(
-    {
-      success: false,
-      error: typeof error === "string" ? error : error?.message || "Server Error",
-    },
-    { status }
-  );
-}
 
 export async function POST(request) {
   try {
     const session = await requireSessionEmail();
 
     if (session.error) {
-      return jsonError("يجب تسجيل الدخول.", 401);
+      return nextJsonError("يجب تسجيل الدخول.", 401);
+    }
+
+    const rateLimited = await enforceRateLimit(
+      notificationDispatchLimiter,
+      session.email
+    );
+
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const body = await request.json().catch(() => ({}));
@@ -42,7 +39,7 @@ export async function POST(request) {
     });
 
     if (!title) {
-      return jsonError("عنوان الإشعار مطلوب.", 400);
+      return nextJsonError("عنوان الإشعار مطلوب.", 400);
     }
 
     const result = await dispatchSiteNotification(session.supabase, {
@@ -56,7 +53,7 @@ export async function POST(request) {
     });
 
     if (result.skipped) {
-      return jsonOk({
+      return nextJsonOk({
         skipped: true,
         reason: result.reason || "delivery-blocked",
         notification: null,
@@ -67,10 +64,10 @@ export async function POST(request) {
       throw result.error;
     }
 
-    return jsonOk({
+    return nextJsonOk({
       notification: normalizeNotification(result.data),
     });
   } catch (error) {
-    return jsonError(error, 500);
+    return nextJsonError(error, 500);
   }
 }

@@ -1,8 +1,12 @@
+const { redactLogMeta } = require("./log-redaction");
+
 function logWorkerEvent(tag, payload = {}) {
-  const line = `${tag} ${JSON.stringify({
-    ...payload,
-    ts: new Date().toISOString(),
-  })}`;
+  const line = `${tag} ${JSON.stringify(
+    redactLogMeta({
+      ...payload,
+      ts: new Date().toISOString(),
+    })
+  )}`;
 
   const isError =
     tag.includes("FAILED") ||
