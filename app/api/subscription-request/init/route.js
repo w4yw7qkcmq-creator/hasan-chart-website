@@ -9,6 +9,7 @@ import {
   paymentProofStorageUnavailableMessage,
 } from "../../../../lib/payment-proof-storage.js";
 import { initUploadSession } from "../../../../lib/payment-proof-subscription-flow.js";
+import { validatePaymentNetwork } from "../../../../lib/payment-networks.js";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export async function POST(request) {
     const category = String(body.category || "").trim();
     const price = String(body.price || "").trim();
     const telegramUsername = String(body.telegram_username || "").trim().slice(0, 64);
+    const paymentNetworkInput = body.payment_network ?? body.paymentNetwork;
 
     if (!planName || !category || !price || !telegramUsername) {
       return NextResponse.json(
@@ -57,6 +59,18 @@ export async function POST(request) {
           success: false,
           error: "بيانات طلب الاشتراك غير مكتملة",
           errorCode: "INCOMPLETE_SUBSCRIPTION_DATA",
+        },
+        { status: 400 }
+      );
+    }
+
+    const networkValidation = validatePaymentNetwork(paymentNetworkInput);
+    if (!networkValidation.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: networkValidation.error,
+          errorCode: networkValidation.code,
         },
         { status: 400 }
       );
@@ -71,6 +85,7 @@ export async function POST(request) {
       category,
       price,
       telegramUsername,
+      paymentNetwork: networkValidation.value,
     });
 
     return NextResponse.json({

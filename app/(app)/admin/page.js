@@ -2669,6 +2669,11 @@ export default function AdminPage() {
                             تليجرام: <b>{req.telegramUsername}</b>
                           </span>
                         )}
+                        {req.paymentNetworkLabel ? (
+                          <span className="admin-chip">
+                            نوع الشبكة: <b>{req.paymentNetworkLabel}</b>
+                          </span>
+                        ) : null}
                         <span className="admin-chip">
                           التاريخ: <b>{req.createdAt}</b>
                         </span>
@@ -2727,7 +2732,7 @@ export default function AdminPage() {
                       ) : null}
                     </div>
                   </div>
-                  {(req.telegramUsername || req.hasPaymentProof) && (
+                  {(req.telegramUsername || req.hasPaymentProof || req.paymentNetworkLabel) && (
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                       {req.telegramUsername && (
                         <div className="admin-inline-panel">
@@ -2735,6 +2740,18 @@ export default function AdminPage() {
                           <p className="mt-2 break-all font-bold">{req.telegramUsername}</p>
                         </div>
                       )}
+
+                      {req.paymentNetworkLabel ? (
+                        <div className="admin-inline-panel">
+                          <p className="text-xs font-bold text-slate-800">نوع الشبكة</p>
+                          <p className="mt-2 font-bold">{req.paymentNetworkLabel}</p>
+                          {req.paymentNetworkAddress ? (
+                            <p className="mt-2 break-all font-mono text-sm font-bold text-slate-700">
+                              {req.paymentNetworkAddress}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
 
                       {req.hasPaymentProof ? (
                         <div className="admin-inline-panel">

@@ -98,6 +98,11 @@ export const isValidPreviewUrl = (value) => {
   return true;
 };
 
+import {
+  getPaymentNetworkAddress,
+  getPaymentNetworkLabel,
+} from "../../../lib/payment-networks.js";
+
 export const matchesAdminSearch = (item, searchValue, fields) => {
   const query = normalizeAdminSearch(searchValue);
   if (!query) return true;
@@ -125,6 +130,9 @@ export const formatSubscriptionRequest = (item) => ({
   category: item.category,
   price: item.price,
   telegramUsername: item.telegram_username || "",
+  paymentNetwork: item.payment_network || "",
+  paymentNetworkLabel: getPaymentNetworkLabel(item.payment_network) || "",
+  paymentNetworkAddress: getPaymentNetworkAddress(item.payment_network) || "",
   hasPaymentProof: Boolean(item.has_payment_proof),
   paymentProofPath: item.payment_proof_path || "",
   paymentProof: "",

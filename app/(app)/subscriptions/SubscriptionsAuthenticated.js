@@ -10,6 +10,12 @@ import {
   formatSubscriptionDate,
   getRemainingDays,
 } from "./subscriptionsHelpers";
+import {
+  PAYMENT_NETWORK_OPTIONS,
+  getPaymentNetworkAddress,
+  getPaymentNetworkLabel,
+  validatePaymentNetwork,
+} from "../../../lib/payment-networks.js";
 
 const PAGE_BREADCRUMBS = [
   { label: "الرئيسية", href: "/" },
@@ -47,6 +53,8 @@ export default function SubscriptionsAuthenticated({ user }) {
   const [notification, setNotification] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [telegramUsername, setTelegramUsername] = useState("");
+  const [paymentNetwork, setPaymentNetwork] = useState("");
+  const [addressCopied, setAddressCopied] = useState(false);
   const [paymentProofFile, setPaymentProofFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState(null);
@@ -127,7 +135,34 @@ export default function SubscriptionsAuthenticated({ user }) {
   const requestSubscription = (plan) => {
     setSelectedPlan(plan);
     setTelegramUsername("");
+    setPaymentNetwork("");
+    setAddressCopied(false);
     setPaymentProofFile(null);
+  };
+
+  const resetSubscriptionModal = () => {
+    setSelectedPlan(null);
+    setTelegramUsername("");
+    setPaymentNetwork("");
+    setAddressCopied(false);
+    setPaymentProofFile(null);
+  };
+
+  const copyPaymentAddress = async () => {
+    const address = getPaymentNetworkAddress(paymentNetwork);
+    if (!address) return;
+
+    try {
+      await navigator.clipboard.writeText(address);
+      setAddressCopied(true);
+      window.setTimeout(() => setAddressCopied(false), 2500);
+    } catch {
+      setNotification({
+        type: "error",
+        title: "تعذر نسخ العنوان",
+        message: "يرجى نسخ عنوان المحفظة يدوياً.",
+      });
+    }
   };
 
   const submitSubscriptionRequest = async () => {
@@ -140,6 +175,16 @@ export default function SubscriptionsAuthenticated({ user }) {
         type: "error",
         title: "أدخل يوزر التليجرام",
         message: "يرجى كتابة يوزر التليجرام حتى يستطيع الدعم التواصل معك.",
+      });
+      return;
+    }
+
+    const networkValidation = validatePaymentNetwork(paymentNetwork);
+    if (!networkValidation.ok) {
+      setNotification({
+        type: "error",
+        title: "اختر نوع الشبكة",
+        message: networkValidation.error,
       });
       return;
     }
@@ -169,6 +214,7 @@ export default function SubscriptionsAuthenticated({ user }) {
           category: selectedPlan.category,
           price: selectedPlan.price,
           telegram_username: cleanTelegramUsername,
+          payment_network: networkValidation.value,
         }),
       });
       const initResult = await initResponse.json().catch(() => null);
@@ -227,6 +273,8 @@ export default function SubscriptionsAuthenticated({ user }) {
 
       setSelectedPlan(null);
       setTelegramUsername("");
+      setPaymentNetwork("");
+      setAddressCopied(false);
       setPaymentProofFile(null);
 
       setNotification({
@@ -291,11 +339,7 @@ export default function SubscriptionsAuthenticated({ user }) {
 
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedPlan(null);
-                  setTelegramUsername("");
-                  setPaymentProofFile(null);
-                }}
+                onClick={resetSubscriptionModal}
                 className="subscriptions-modal__close"
                 aria-label="إغلاق"
               >
@@ -311,6 +355,66 @@ export default function SubscriptionsAuthenticated({ user }) {
                   <span>{selectedPlan.price}</span>
                 </div>
               </div>
+
+              <div className="subscriptions-field">
+                <span>نوع الشبكة</span>
+                <div className="subscriptions-network-options" role="radiogroup" aria-label="نوع الشبكة">
+                  {PAYMENT_NETWORK_OPTIONS.map((option) => {
+                    const selected = paymentNetwork === option.value;
+                    return (
+                      <label
+                        key={option.value}
+                        className={`subscriptions-network-option ${
+                          selected ? "subscriptions-network-option--selected" : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="payment-network"
+                          value={option.value}
+                          checked={selected}
+                          onChange={() => {
+                            setPaymentNetwork(option.value);
+                            setAddressCopied(false);
+                          }}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {paymentNetwork ? (
+                <div className="subscriptions-network-address">
+                  <div className="subscriptions-network-address__head">
+                    <p className="subscriptions-network-address__label">
+                      عنوان التحويل — {getPaymentNetworkLabel(paymentNetwork)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={copyPaymentAddress}
+                      className="subscriptions-network-address__copy"
+                    >
+                      نسخ العنوان
+                    </button>
+                  </div>
+                  <code className="subscriptions-network-address__value">
+                    {getPaymentNetworkAddress(paymentNetwork)}
+                  </code>
+                  {addressCopied ? (
+                    <p className="subscriptions-network-address__copied" role="status">
+                      تم نسخ العنوان
+                    </p>
+                  ) : null}
+                  <p className="subscriptions-network-address__warning">
+                    تأكد من إرسال المبلغ عبر الشبكة المختارة فقط، لأن التحويل عبر شبكة
+                    مختلفة قد يؤدي إلى فقدان الأموال.
+                  </p>
+                </div>
+              ) : (
+                <p className="subscriptions-network-placeholder">اختر الشبكة</p>
+              )}
 
               <label className="subscriptions-field">
                 <span>يوزر التليجرام</span>
@@ -348,11 +452,7 @@ export default function SubscriptionsAuthenticated({ user }) {
 
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedPlan(null);
-                  setTelegramUsername("");
-                  setPaymentProofFile(null);
-                }}
+                onClick={resetSubscriptionModal}
                 className="subscriptions-btn subscriptions-btn--secondary"
               >
                 إلغاء
