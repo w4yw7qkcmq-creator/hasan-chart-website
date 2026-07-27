@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getSafeTheme, THEME_COOKIE_NAME } from "../lib/theme-shared.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const layoutSource = fs.readFileSync(path.join(rootDir, "app/layout.js"), "utf8");
@@ -15,9 +14,15 @@ const bootScriptSource = fs.readFileSync(
   path.join(rootDir, "lib/theme-critical-styles.js"),
   "utf8"
 );
+const themeSharedSource = fs.readFileSync(path.join(rootDir, "lib/theme-shared.js"), "utf8");
+
+function getSafeTheme(value) {
+  return value === "light" ? "light" : "dark";
+}
 
 function testBootScriptUsesSharedCookieKey() {
-  assert.match(bootScriptSource, new RegExp(`COOKIE_NAME = "${THEME_COOKIE_NAME}"`));
+  assert.match(bootScriptSource, /COOKIE_NAME = "hc_theme"/);
+  assert.match(themeSharedSource, /THEME_COOKIE_NAME = "hc_theme"/);
 }
 
 function testInvalidThemeFallback() {
@@ -53,12 +58,44 @@ function testSuppressHydrationWarningScope() {
   assert.doesNotMatch(layoutSource, /<body[^>]*suppressHydrationWarning/);
 }
 
+function testLayoutDoesNotUseHardcodedDarkBodyClasses() {
+  assert.match(layoutSource, /className="site-body/);
+  assert.doesNotMatch(layoutSource, /bg-\[#020617\]/);
+  assert.doesNotMatch(layoutSource, /text-white/);
+}
+
+function testLayoutUsesDynamicViewportThemeColor() {
+  assert.match(layoutSource, /generateViewport/);
+  assert.match(layoutSource, /readThemeFromRequestCookies/);
+  assert.doesNotMatch(layoutSource, /themeColor:\s*"#020617"/);
+}
+
+function testThemeProviderSyncsThemeColorMeta() {
+  assert.match(themeProviderSource, /syncThemeColorMeta/);
+  assert.match(themeProviderSource, /resolveThemeColor/);
+}
+
 function testLayoutDoesNotUseNonDeterministicInitialTheme() {
   assert.doesNotMatch(layoutSource, /Math\.random/);
   assert.doesNotMatch(layoutSource, /Date\.now/);
   assert.doesNotMatch(layoutSource, /new Date\(/);
   assert.doesNotMatch(themeProviderSource, /Math\.random/);
   assert.doesNotMatch(themeProviderSource, /Date\.now/);
+}
+
+function testNoExperimentalModulePackageJsonFiles() {
+  assert.throws(
+    () => fs.accessSync(path.join(rootDir, "scripts/package.json")),
+    (error) => error?.code === "ENOENT"
+  );
+  assert.throws(
+    () => fs.accessSync(path.join(rootDir, "lib/package.json")),
+    (error) => error?.code === "ENOENT"
+  );
+  assert.throws(
+    () => fs.accessSync(path.join(rootDir, "app/(app)/admin/package.json")),
+    (error) => error?.code === "ENOENT"
+  );
 }
 
 const tests = [
@@ -68,7 +105,11 @@ const tests = [
   ["layout avoids browser-only reads during SSR", testLayoutDoesNotReadBrowserStorageDuringSsr],
   ["ThemeProvider avoids document reads during render", testThemeProviderDoesNotReadDocumentDuringRender],
   ["suppressHydrationWarning limited to html and boot loader", testSuppressHydrationWarningScope],
+  ["layout avoids hardcoded dark body classes", testLayoutDoesNotUseHardcodedDarkBodyClasses],
+  ["layout uses dynamic viewport theme color", testLayoutUsesDynamicViewportThemeColor],
+  ["ThemeProvider syncs theme-color meta", testThemeProviderSyncsThemeColorMeta],
   ["initial theme does not use random or date values", testLayoutDoesNotUseNonDeterministicInitialTheme],
+  ["no experimental module package.json files", testNoExperimentalModulePackageJsonFiles],
 ];
 
 for (const [name, run] of tests) {

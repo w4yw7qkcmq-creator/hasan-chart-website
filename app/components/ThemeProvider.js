@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getSafeTheme, writeThemeCookie } from "../../lib/theme-shared";
+import { getSafeTheme, resolveThemeColor, writeThemeCookie } from "../../lib/theme-shared";
 
 const ThemeContext = createContext(null);
 const THEME_REVEAL_TIMEOUT_MS = 2500;
@@ -21,6 +21,19 @@ function isThemeAlreadyReady() {
   return document.documentElement.classList.contains("theme-ready");
 }
 
+function syncThemeColorMeta(theme) {
+  const color = resolveThemeColor(theme);
+  let meta = document.querySelector('meta[name="theme-color"]:not([media])');
+
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "theme-color";
+    document.head.appendChild(meta);
+  }
+
+  meta.setAttribute("content", color);
+}
+
 export function ThemeProvider({ children, initialTheme = "dark" }) {
   const resolvedInitialTheme = getSafeTheme(initialTheme);
   const [theme, setTheme] = useState(resolvedInitialTheme);
@@ -28,6 +41,7 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    syncThemeColorMeta(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -74,6 +88,7 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
         body: JSON.stringify({ theme: nextTheme }),
       });
       document.documentElement.setAttribute("data-theme", nextTheme);
+      syncThemeColorMeta(nextTheme);
       return nextTheme;
     });
   }, []);

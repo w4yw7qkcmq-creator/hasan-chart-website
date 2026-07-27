@@ -5,6 +5,7 @@ import {
   THEME_CRITICAL_CSS,
 } from "../lib/theme-critical-styles";
 import { readThemeFromRequestCookies } from "../lib/theme-server";
+import { resolveThemeColor } from "../lib/theme-shared";
 import { ThemeProvider } from "./components/ThemeProvider";
 import {
   SITE_ORGANIZATION_NAME,
@@ -65,9 +66,13 @@ export const metadata = {
   },
 };
 
-export const viewport = {
-  themeColor: "#020617",
-};
+export async function generateViewport() {
+  const initialTheme = await readThemeFromRequestCookies();
+
+  return {
+    themeColor: resolveThemeColor(initialTheme),
+  };
+}
 
 export default async function RootLayout({ children }) {
   const supabaseOrigin = getSupabaseOrigin();
@@ -98,7 +103,7 @@ export default async function RootLayout({ children }) {
           }}
         />
       </head>
-      <body className="min-h-screen bg-[#020617] text-white antialiased overflow-x-hidden theme-pending-body">
+      <body className="site-body min-h-screen antialiased theme-pending-body">
         <div
           id="theme-boot-loader"
           aria-live="polite"
