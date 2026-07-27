@@ -94,8 +94,8 @@ const SENSITIVE_CONSOLE_REGEX =
   /console\.(log|info|debug)\([^;\n]*(password|api[_-]?key|secret|service[_-]?role|authorization|bearer\s)/i;
 
 const CONSOLE_SCAN_IGNORE = new Set([
-  "scripts/preflight-check.js",
-  "scripts/security-audit.js",
+  "scripts/preflight-check.cjs",
+  "scripts/security-audit.cjs",
   "lib/log-redaction.js",
   "lib/dev-log.js",
   "lib/structured-logger.js",
