@@ -11,6 +11,7 @@ import {
 } from "../lib/market-data/aggregation.js";
 import { assertNoMockInProduction, validateMarketDepthQuery } from "../lib/market-data/validation.js";
 import { LocalOrderBook } from "../lib/market-data/order-book.js";
+import { WS_BACKOFF_MS } from "../lib/market-data/constants.js";
 import {
   classifyBinanceTrade,
   ExecutedFlowTracker,
@@ -23,6 +24,16 @@ import {
   normalizeSiteSymbol,
   toExchangeSymbol,
 } from "../lib/market-data/symbols.js";
+import {
+  BINANCE_REST_BASES,
+  BINANCE_WS_ENDPOINTS,
+  buildBinanceRestDepthUrl,
+  buildBinanceStreamNames,
+  buildBinanceWsUrl,
+  computeBinanceReconnectDelay,
+  isBinanceLiveConnected,
+  resolveBinanceEndpointRotation,
+} from "../lib/market-data/exchanges/binance.js";
 
 function testSymbolNormalization() {
   assert.equal(normalizeSiteSymbol("btc/usdt"), "BTCUSDT");
@@ -341,6 +352,106 @@ function testHookUsesStableEmptyOverrides() {
   assert.doesNotMatch(hookSource, /\[overrides\]/);
 }
 
+function testBinanceEndpointFallbackUrls() {
+  assert.equal(BINANCE_WS_ENDPOINTS.length, 3);
+  assert.equal(BINANCE_REST_BASES.length, 6);
+  assert.equal(buildBinanceStreamNames("BTCUSDT"), "btcusdt@depth@100ms/btcusdt@trade");
+  assert.match(
+    buildBinanceWsUrl(BINANCE_WS_ENDPOINTS[0], "BTCUSDT"),
+    /^wss:\/\/stream\.binance\.com:9443\/stream\?streams=btcusdt@depth@100ms\/btcusdt@trade$/
+  );
+  assert.match(
+    buildBinanceWsUrl(BINANCE_WS_ENDPOINTS[2], "ETHUSDT"),
+    /^wss:\/\/data-stream\.binance\.vision:443\/stream\?streams=ethusdt@depth@100ms\/ethusdt@trade$/
+  );
+  assert.equal(
+    buildBinanceRestDepthUrl("https://data-api.binance.vision", "BTCUSDT"),
+    "https://data-api.binance.vision/api/v3/depth?symbol=BTCUSDT&limit=1000"
+  );
+}
+
+function testBinanceEndpointRotation() {
+  const firstFail = resolveBinanceEndpointRotation({
+    pinnedIndex: null,
+    activeIndex: 0,
+    endpointFailures: 1,
+    rotate: false,
+  });
+  assert.equal(firstFail.nextIndex, 0);
+  assert.equal(firstFail.pinnedIndex, null);
+
+  const rotated = resolveBinanceEndpointRotation({
+    pinnedIndex: 0,
+    activeIndex: 0,
+    endpointFailures: 2,
+    rotate: true,
+  });
+  assert.equal(rotated.nextIndex, 1);
+  assert.equal(rotated.pinnedIndex, null);
+  assert.equal(rotated.endpointFailures, 0);
+
+  const pinned = resolveBinanceEndpointRotation({
+    pinnedIndex: 2,
+    activeIndex: 2,
+    endpointFailures: 0,
+    rotate: false,
+  });
+  assert.equal(pinned.nextIndex, 2);
+  assert.equal(pinned.pinnedIndex, 2);
+}
+
+function testBinanceReconnectDelayHasJitter() {
+  const delays = new Set();
+  for (let i = 0; i < 20; i += 1) {
+    delays.add(computeBinanceReconnectDelay(0));
+  }
+  assert.ok(delays.size > 1);
+  for (const delay of delays) {
+    assert.ok(delay >= WS_BACKOFF_MS[0]);
+    assert.ok(delay <= WS_BACKOFF_MS[0] * 1.25);
+  }
+}
+
+function testBinanceLiveConnectedGate() {
+  assert.equal(
+    isBinanceLiveConnected({
+      wsOpen: true,
+      snapshotReceived: true,
+      firstDeltaApplied: true,
+    }),
+    true
+  );
+  assert.equal(
+    isBinanceLiveConnected({
+      wsOpen: true,
+      snapshotReceived: true,
+      firstDeltaApplied: false,
+    }),
+    false
+  );
+  assert.equal(
+    isBinanceLiveConnected({
+      wsOpen: false,
+      snapshotReceived: true,
+      firstDeltaApplied: true,
+    }),
+    false
+  );
+}
+
+function testBinanceAdapterUsesFallbackAndIpv4() {
+  const source = readFileSync(
+    fileURLToPath(new URL("../lib/market-data/exchanges/binance.js", import.meta.url)),
+    "utf8"
+  );
+  assert.match(source, /BINANCE_WS_ENDPOINTS/);
+  assert.match(source, /data-stream\.binance\.vision/);
+  assert.match(source, /data-api\.binance\.vision/);
+  assert.match(source, /lookupIpv4/);
+  assert.match(source, /first_delta/);
+  assert.match(source, /endpoint_rotate/);
+}
+
 const tests = [
   testSymbolNormalization,
   testSnapshotAndDelta,
@@ -365,6 +476,11 @@ const tests = [
   testConnectionStatusOffline,
   testConnectionStatusZeroHealthyExchanges,
   testHookUsesStableEmptyOverrides,
+  testBinanceEndpointFallbackUrls,
+  testBinanceEndpointRotation,
+  testBinanceReconnectDelayHasJitter,
+  testBinanceLiveConnectedGate,
+  testBinanceAdapterUsesFallbackAndIpv4,
 ];
 
 let passed = 0;
