@@ -6381,12 +6381,12 @@ html.dark .subscriptions-page .subscriptions-plan-card__price {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: #ffffff;
+  color: #0f172a;
   white-space: nowrap;
 }
 
 .subscriptions-page .subscriptions-plan-card__price small {
-  color: rgba(255, 255, 255, 0.8);
+  color: #475569;
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.35;
