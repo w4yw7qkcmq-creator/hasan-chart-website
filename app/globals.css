@@ -5716,8 +5716,26 @@ html[data-theme="light"] .analysis-request-input {
   --sub-panel-border: rgba(56, 168, 242, 0.18);
   --sub-text: #ffffff;
   --sub-muted: #94a3b8;
-  --sub-card-shadow: 0 8px 24px rgba(2, 6, 23, 0.18);
-  --sub-card-shadow-hover: 0 14px 32px rgba(2, 6, 23, 0.24);
+  --sub-card-bg: linear-gradient(
+    145deg,
+    rgba(239, 248, 255, 0.98),
+    rgba(214, 238, 255, 0.96),
+    rgba(180, 222, 252, 0.92)
+  );
+  --sub-card-border: rgba(125, 211, 252, 0.55);
+  --sub-glow-primary: rgba(56, 189, 248, 0.35);
+  --sub-glow-secondary: rgba(37, 99, 235, 0.22);
+  --sub-text-primary: #0c4a6e;
+  --sub-text-muted: #0369a1;
+  --sub-panel-bg: rgba(255, 255, 255, 0.38);
+  --sub-card-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.65) inset,
+    0 18px 40px rgba(37, 99, 235, 0.14),
+    0 6px 16px rgba(14, 165, 233, 0.08);
+  --sub-card-shadow-hover:
+    0 1px 0 rgba(255, 255, 255, 0.72) inset,
+    0 24px 48px rgba(37, 99, 235, 0.18),
+    0 10px 22px rgba(14, 165, 233, 0.12);
 
   position: relative;
   overflow: hidden;
@@ -5729,67 +5747,29 @@ html[data-theme="light"] .analysis-request-input {
 }
 
 html[data-theme="light"] .subscriptions-page {
-  --sub-panel: rgba(255, 255, 255, 0.96);
+  --sub-panel: rgba(255, 255, 255, 0.72);
   --sub-panel-border: rgba(37, 99, 235, 0.12);
   --sub-text: #0f172a;
   --sub-muted: #64748b;
-  --sub-card-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
-  --sub-card-shadow-hover: 0 14px 36px rgba(15, 23, 42, 0.1);
 }
 
 html[data-theme="light"] .subscriptions-page__bg {
   background:
-    radial-gradient(circle at 14% 6%, rgba(37, 99, 235, 0.08), transparent 34%),
-    radial-gradient(circle at 88% 18%, rgba(14, 165, 233, 0.06), transparent 28%),
-    linear-gradient(160deg, #ffffff 0%, #f8fafc 42%, #eef4fb 100%);
+    radial-gradient(circle at 20% 10%, rgba(14, 165, 233, 0.08), transparent 35%),
+    radial-gradient(circle at 80% 60%, rgba(37, 99, 235, 0.07), transparent 40%),
+    #f8fbff;
 }
 
-html[data-theme="light"] .subscriptions-plan-card,
-html[data-theme="light"] .subscriptions-plan-card--featured {
-  background: #ffffff;
-  border-color: rgba(37, 99, 235, 0.14);
-  box-shadow: var(--sub-card-shadow);
-}
-
-html[data-theme="light"] .subscriptions-plan-card--featured {
-  border-color: rgba(37, 99, 235, 0.32);
-  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.1);
-}
-
-html[data-theme="light"] .subscriptions-plan-card__head h3,
 html[data-theme="light"] .subscriptions-plans-group__head h2,
 html[data-theme="light"] .subscriptions-support h2,
 html[data-theme="light"] .subscriptions-hub__title {
   color: #0f172a;
 }
 
-html[data-theme="light"] .subscriptions-plan-feature {
-  background: #f8fafc;
-  border-color: #e2e8f0;
-  color: #334155;
-}
-
-html[data-theme="light"] .subscriptions-plan-card__icon {
-  background: linear-gradient(145deg, rgba(37, 99, 235, 0.08), rgba(14, 165, 233, 0.06));
-  border-color: rgba(37, 99, 235, 0.12);
-}
-
-html[data-theme="light"] .subscriptions-plan-card__badge {
-  background: rgba(37, 99, 235, 0.07);
-  border-color: rgba(37, 99, 235, 0.14);
-  color: #1e40af;
-}
-
 html[data-theme="light"] .subscriptions-btn--secondary {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.34);
   color: #0f172a;
-  border-color: rgba(37, 99, 235, 0.18);
-}
-
-html[data-theme="light"] .subscriptions-plans-group__badge {
-  background: rgba(37, 99, 235, 0.07);
-  border-color: rgba(37, 99, 235, 0.14);
-  color: #1d4ed8;
+  border-color: rgba(255, 255, 255, 0.65);
 }
 
 html[data-theme="dark"] .subscriptions-page,
@@ -5798,49 +5778,36 @@ html.dark .subscriptions-page {
   --sub-panel-border: rgba(96, 165, 250, 0.18);
   --sub-text: #f1f5f9;
   --sub-muted: #94a3b8;
-  --sub-card-shadow: 0 10px 28px rgba(2, 6, 23, 0.35);
-  --sub-card-shadow-hover: 0 16px 40px rgba(2, 6, 23, 0.45);
+  --sub-card-bg: linear-gradient(145deg, #0f2745 0%, #12365d 48%, #164b78 100%);
+  --sub-card-border: rgba(148, 203, 255, 0.22);
+  --sub-glow-primary: rgba(56, 189, 248, 0.28);
+  --sub-glow-secondary: rgba(37, 99, 235, 0.24);
+  --sub-text-primary: #f1f5f9;
+  --sub-text-muted: #cbd5e1;
+  --sub-panel-bg: rgba(255, 255, 255, 0.08);
+  --sub-card-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 18px 42px rgba(2, 6, 23, 0.42),
+    0 0 24px rgba(37, 99, 235, 0.12);
+  --sub-card-shadow-hover:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 24px 52px rgba(2, 6, 23, 0.48),
+    0 0 32px rgba(37, 99, 235, 0.16);
 }
 
 html[data-theme="dark"] .subscriptions-page__bg,
 html.dark .subscriptions-page__bg {
   background:
-    radial-gradient(circle at 12% 8%, rgba(37, 99, 235, 0.2), transparent 32%),
-    radial-gradient(circle at 88% 14%, rgba(14, 165, 233, 0.1), transparent 28%),
-    linear-gradient(160deg, #0f172a 0%, #1e293b 48%, #0f172a 100%);
+    radial-gradient(circle at 18% 8%, rgba(37, 99, 235, 0.12), transparent 34%),
+    radial-gradient(circle at 82% 72%, rgba(14, 165, 233, 0.08), transparent 38%),
+    linear-gradient(160deg, #0b1220 0%, #0f172a 50%, #0b1220 100%);
 }
 
-html[data-theme="dark"] .subscriptions-plan-card,
-html.dark .subscriptions-plan-card {
-  background: rgba(30, 41, 59, 0.88);
-  box-shadow: var(--sub-card-shadow);
-}
-
-html[data-theme="dark"] .subscriptions-plan-card--featured,
-html.dark .subscriptions-plan-card--featured {
-  background: rgba(30, 41, 59, 0.94);
-  border-color: rgba(96, 165, 250, 0.38);
-  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.16);
-}
-
-html[data-theme="dark"] .subscriptions-plan-card__head h3,
 html[data-theme="dark"] .subscriptions-plans-group__head h2,
 html[data-theme="dark"] .subscriptions-support h2,
-html.dark .subscriptions-plan-card__head h3,
 html.dark .subscriptions-plans-group__head h2,
 html.dark .subscriptions-support h2 {
   color: var(--sub-text);
-}
-
-html[data-theme="dark"] .subscriptions-plan-feature,
-html.dark .subscriptions-plan-feature {
-  background: rgba(2, 6, 23, 0.35);
-  color: var(--sub-muted);
-}
-
-html[data-theme="dark"] .subscriptions-plan-card__icon,
-html.dark .subscriptions-plan-card__icon {
-  background: rgba(2, 6, 23, 0.35);
 }
 
 html[data-theme="dark"] .subscriptions-status-card,
@@ -6073,25 +6040,63 @@ html[data-theme="light"] .subscriptions-status-card {
 
 .subscriptions-plans {
   display: grid;
-  gap: 1.5rem;
+  gap: 1.75rem;
 }
 
-.subscriptions-plans-group__head {
+.subscriptions-page .subscriptions-plans-group {
+  position: relative;
+}
+
+.subscriptions-page .subscriptions-plans-group::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -0.5rem -0.25rem auto;
+  height: 7rem;
+  border-radius: 1.5rem;
+  background: radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.1), transparent 68%);
+  opacity: 0.85;
+}
+
+.subscriptions-page .subscriptions-plans-group__head {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 1.25rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--sub-panel-border);
+  margin-bottom: 1rem;
+  padding: 1rem 1.125rem;
+  border-radius: 1.125rem;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.06);
+}
+
+html[data-theme="dark"] .subscriptions-page .subscriptions-plans-group__head,
+html.dark .subscriptions-page .subscriptions-plans-group__head {
+  border-color: rgba(148, 203, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.28);
+}
+
+.subscriptions-page .subscriptions-plans-group__head::after {
+  content: "";
+  flex-basis: 100%;
+  height: 1px;
+  margin-top: 0.25rem;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.28), transparent);
 }
 
 .subscriptions-plans-group__head h2 {
   margin: 0;
-  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-size: clamp(1.25rem, 3vw, 1.625rem);
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  color: var(--sub-text);
 }
 
 .subscriptions-plans-group__head p {
@@ -6103,18 +6108,30 @@ html[data-theme="light"] .subscriptions-status-card {
   max-width: 36rem;
 }
 
-.subscriptions-plans-group__badge {
-  padding: 0.4rem 0.75rem;
+.subscriptions-page .subscriptions-plans-group__badge {
+  padding: 0.4rem 0.8rem;
   border-radius: 999px;
-  border: 1px solid var(--sub-panel-border);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--sub-cyan-soft);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #1d4ed8;
   font-size: 0.6875rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+html[data-theme="dark"] .subscriptions-page .subscriptions-plans-group__badge,
+html.dark .subscriptions-page .subscriptions-plans-group__badge {
+  border-color: rgba(148, 203, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #93c5fd;
 }
 
 .subscriptions-plans-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 1rem;
   grid-template-columns: minmax(0, 1fr);
@@ -6131,36 +6148,145 @@ html[data-theme="light"] .subscriptions-status-card {
 @media (min-width: 1024px) {
   .subscriptions-plans-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.25rem;
+    gap: 1.35rem;
   }
 }
 
-.subscriptions-plan-card {
+.subscriptions-page .subscriptions-plans-group:first-of-type .subscriptions-plan-card {
+  --sub-card-bg: linear-gradient(
+    145deg,
+    rgba(239, 248, 255, 0.98),
+    rgba(214, 238, 255, 0.96),
+    rgba(180, 222, 252, 0.92)
+  );
+  --sub-card-border: rgba(125, 211, 252, 0.55);
+  --sub-glow-primary: rgba(56, 189, 248, 0.35);
+  --sub-glow-secondary: rgba(37, 99, 235, 0.22);
+  --sub-text-primary: #0c4a6e;
+  --sub-text-muted: #0369a1;
+}
+
+.subscriptions-page .subscriptions-plans-group:last-of-type .subscriptions-plan-card {
+  --sub-card-bg: linear-gradient(
+    145deg,
+    rgba(236, 242, 255, 0.98),
+    rgba(207, 225, 255, 0.96),
+    rgba(190, 211, 255, 0.92)
+  );
+  --sub-card-border: rgba(147, 197, 253, 0.58);
+  --sub-glow-primary: rgba(96, 165, 250, 0.32);
+  --sub-glow-secondary: rgba(79, 70, 229, 0.16);
+  --sub-text-primary: #1e3a8a;
+  --sub-text-muted: #1d4ed8;
+}
+
+html[data-theme="dark"] .subscriptions-page .subscriptions-plans-group:first-of-type .subscriptions-plan-card,
+html.dark .subscriptions-page .subscriptions-plans-group:first-of-type .subscriptions-plan-card {
+  --sub-card-bg: linear-gradient(145deg, #0f2745 0%, #12365d 48%, #164b78 100%);
+  --sub-glow-primary: rgba(56, 189, 248, 0.28);
+  --sub-glow-secondary: rgba(37, 99, 235, 0.24);
+  --sub-text-primary: #f1f5f9;
+  --sub-text-muted: #cbd5e1;
+}
+
+html[data-theme="dark"] .subscriptions-page .subscriptions-plans-group:last-of-type .subscriptions-plan-card,
+html.dark .subscriptions-page .subscriptions-plans-group:last-of-type .subscriptions-plan-card {
+  --sub-card-bg: linear-gradient(145deg, #101f3d 0%, #152f57 48%, #183f6e 100%);
+  --sub-glow-primary: rgba(96, 165, 250, 0.26);
+  --sub-glow-secondary: rgba(99, 102, 241, 0.2);
+  --sub-text-primary: #f1f5f9;
+  --sub-text-muted: #cbd5e1;
+}
+
+html[data-theme="light"] .subscriptions-plan-card {
+  color: var(--sub-text-primary);
+}
+
+html[data-theme="dark"] .subscriptions-plan-card,
+html.dark .subscriptions-plan-card {
+  color: var(--sub-text-primary);
+}
+
+.subscriptions-page .subscriptions-plan-card {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-width: 0;
-  padding: 1.25rem;
-  border-radius: 1.25rem;
-  border: 1px solid var(--sub-panel-border);
-  background: rgba(255, 255, 255, 0.05);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1.35rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--sub-card-border);
+  background: var(--sub-card-bg);
   box-shadow: var(--sub-card-shadow);
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.subscriptions-page .subscriptions-plan-card::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: -3.5rem;
+  right: -2.5rem;
+  width: 11rem;
+  height: 11rem;
+  border-radius: 999px;
+  background: var(--sub-glow-primary);
+  filter: blur(42px);
+  opacity: 0.55;
+  z-index: 0;
+}
+
+.subscriptions-page .subscriptions-plan-card::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  bottom: -4rem;
+  left: -2rem;
+  width: 10rem;
+  height: 10rem;
+  border-radius: 999px;
+  background: var(--sub-glow-secondary);
+  filter: blur(48px);
+  opacity: 0.45;
+  z-index: 0;
+}
+
+.subscriptions-page .subscriptions-plan-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 @media (hover: hover) {
-  .subscriptions-plan-card:hover {
-    transform: translateY(-2px);
+  .subscriptions-page .subscriptions-plan-card:hover {
+    transform: translateY(-3px);
     box-shadow: var(--sub-card-shadow-hover);
-    border-color: rgba(96, 165, 250, 0.28);
+    border-color: rgba(96, 165, 250, 0.42);
   }
 }
 
-.subscriptions-plan-card--featured {
-  border-color: rgba(96, 165, 250, 0.32);
+.subscriptions-page .subscriptions-plan-card--featured {
+  border-color: rgba(37, 99, 235, 0.62);
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.12),
+    0 0 28px rgba(37, 99, 235, 0.18),
+    var(--sub-card-shadow);
+}
+
+@media (min-width: 1024px) {
+  .subscriptions-page .subscriptions-plan-card--featured {
+    transform: scale(1.015);
+  }
+
+  @media (hover: hover) {
+    .subscriptions-page .subscriptions-plan-card--featured:hover {
+      transform: scale(1.015) translateY(-3px);
+    }
+  }
 }
 
 .subscriptions-plan-card__head {
@@ -6170,96 +6296,144 @@ html[data-theme="light"] .subscriptions-status-card {
   gap: 0.75rem;
 }
 
-.subscriptions-plan-card__badge {
+.subscriptions-page .subscriptions-plan-card__badge {
   display: inline-flex;
-  padding: 0.25rem 0.6rem;
+  padding: 0.28rem 0.65rem;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--sub-cyan-soft);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--sub-text-primary);
   font-size: 0.625rem;
   font-weight: 800;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
-.subscriptions-plan-card__head h3 {
+html[data-theme="dark"] .subscriptions-page .subscriptions-plan-card__badge,
+html.dark .subscriptions-page .subscriptions-plan-card__badge {
+  border-color: rgba(148, 203, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.subscriptions-page .subscriptions-plan-card__head h3 {
   margin: 0.625rem 0 0;
-  font-size: clamp(1.125rem, 2.5vw, 1.375rem);
+  font-size: clamp(1.125rem, 2.5vw, 1.45rem);
   font-weight: 800;
   line-height: 1.35;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  color: var(--sub-text-primary);
 }
 
-.subscriptions-plan-card__icon {
+.subscriptions-page .subscriptions-plan-card__icon {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.65rem;
+  height: 2.65rem;
   border-radius: 0.875rem;
-  border: 1px solid var(--sub-panel-border);
-  background: linear-gradient(145deg, rgba(37, 99, 235, 0.12), rgba(14, 165, 233, 0.08));
-  font-size: 1.125rem;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 6px 16px rgba(37, 99, 235, 0.1);
+  font-size: 1.05rem;
   line-height: 1;
 }
 
-.subscriptions-plan-card__price {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.625rem;
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
-  min-height: 3.25rem;
-  border-radius: 0.875rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(135deg, var(--sub-royal-soft) 0%, var(--sub-cyan) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 4px 14px rgba(37, 99, 235, 0.18);
+html[data-theme="dark"] .subscriptions-page .subscriptions-plan-card__icon,
+html.dark .subscriptions-page .subscriptions-plan-card__icon {
+  border-color: rgba(148, 203, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.subscriptions-plan-card__price span {
+.subscriptions-page .subscriptions-plan-card__price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: var(--sub-panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 8px 20px rgba(37, 99, 235, 0.08);
+}
+
+html[data-theme="dark"] .subscriptions-page .subscriptions-plan-card__price,
+html.dark .subscriptions-page .subscriptions-plan-card__price {
+  border-color: rgba(148, 203, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 22px rgba(2, 6, 23, 0.28);
+}
+
+.subscriptions-page .subscriptions-plan-card__price span {
   direction: ltr;
   unicode-bidi: embed;
-  font-size: clamp(1.625rem, 4.5vw, 2.125rem);
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   line-height: 1;
-  color: #ffffff;
+  color: var(--sub-text-primary);
   white-space: nowrap;
 }
 
-.subscriptions-plan-card__price small {
-  padding-bottom: 0.1rem;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.75rem;
+.subscriptions-page .subscriptions-plan-card__price small {
+  color: var(--sub-text-muted);
+  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.3;
-  text-align: end;
+  line-height: 1.35;
 }
 
 .subscriptions-plan-card__features {
   display: grid;
   flex: 1;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
 }
 
-.subscriptions-plan-feature {
+.subscriptions-page .subscriptions-plan-feature {
   display: flex;
   align-items: flex-start;
   gap: 0.625rem;
-  padding: 0.625rem 0.75rem;
-  min-height: 2.75rem;
+  padding: 0.58rem 0.72rem;
+  min-height: 2.5rem;
   border-radius: 0.75rem;
-  border: 1px solid var(--sub-panel-border);
-  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.32);
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.55;
-  color: var(--sub-muted);
+  color: var(--sub-text-primary);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+html[data-theme="dark"] .subscriptions-page .subscriptions-plan-feature,
+html.dark .subscriptions-page .subscriptions-plan-feature {
+  border-color: rgba(148, 203, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sub-text-primary);
+}
+
+@media (hover: hover) {
+  .subscriptions-page .subscriptions-plan-feature:hover {
+    background: rgba(255, 255, 255, 0.42);
+    border-color: rgba(255, 255, 255, 0.62);
+  }
+
+  html[data-theme="dark"] .subscriptions-page .subscriptions-plan-feature:hover,
+  html.dark .subscriptions-page .subscriptions-plan-feature:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(148, 203, 255, 0.24);
+  }
 }
 
 .subscriptions-plan-feature > span:last-child {
@@ -6268,20 +6442,21 @@ html[data-theme="light"] .subscriptions-status-card {
   word-break: break-word;
 }
 
-.subscriptions-plan-feature__icon {
+.subscriptions-page .subscriptions-plan-feature__icon {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-top: 0.1rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-top: 0.12rem;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.18);
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--sub-cyan-soft);
-  font-size: 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: linear-gradient(135deg, #1d4ed8, #0ea5e9);
+  color: #ffffff;
+  font-size: 0.5625rem;
   font-weight: 800;
   line-height: 1;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.22);
 }
 
 .subscriptions-plan-card__actions {
@@ -6295,19 +6470,55 @@ html[data-theme="light"] .subscriptions-status-card {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
+  min-height: 2.85rem;
   padding: 0.75rem 1.25rem;
-  border-radius: 0.875rem;
+  border-radius: 1rem;
   font-size: 0.875rem;
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease,
-    border-color 0.2s ease,
-    opacity 0.2s ease;
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease,
+    border-color 0.22s ease,
+    opacity 0.22s ease;
+}
+
+.subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--primary {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, #1d4ed8, #2563eb, #0ea5e9);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 12px 30px rgba(37, 99, 235, 0.28);
+}
+
+.subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  transform: translateX(-130%);
+  transition: transform 0.55s ease;
+  pointer-events: none;
+}
+
+.subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--secondary {
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--sub-text-primary);
+}
+
+html[data-theme="dark"] .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--secondary,
+html.dark .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--secondary {
+  border-color: rgba(148, 203, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
 }
 
 .subscriptions-btn--block {
@@ -6328,6 +6539,29 @@ html[data-theme="light"] .subscriptions-status-card {
 }
 
 @media (hover: hover) {
+  .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.32),
+      0 16px 36px rgba(37, 99, 235, 0.34);
+  }
+
+  .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--primary:hover:not(:disabled)::after {
+    transform: translateX(130%);
+  }
+
+  .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--secondary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.48);
+    border-color: rgba(255, 255, 255, 0.78);
+  }
+
+  html[data-theme="dark"] .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--secondary:hover:not(:disabled),
+  html.dark .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(148, 203, 255, 0.28);
+  }
+
   .subscriptions-btn--primary:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
@@ -6360,6 +6594,16 @@ html[data-theme="light"] .subscriptions-status-card {
   box-shadow: none;
 }
 
+@media (max-width: 767px) {
+  .subscriptions-page .subscriptions-plan-card {
+    padding: 1.05rem;
+  }
+
+  .subscriptions-page .subscriptions-plan-card--featured {
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .subscriptions-page .subscriptions-plan-card,
   .subscriptions-page .subscriptions-btn {
@@ -6367,8 +6611,13 @@ html[data-theme="light"] .subscriptions-status-card {
   }
 
   .subscriptions-page .subscriptions-plan-card:hover,
-  .subscriptions-page .subscriptions-btn:hover:not(:disabled) {
+  .subscriptions-page .subscriptions-btn:hover:not(:disabled),
+  .subscriptions-page .subscriptions-plan-card--featured {
     transform: none;
+  }
+
+  .subscriptions-page .subscriptions-plan-card__actions .subscriptions-btn--primary::after {
+    display: none;
   }
 }
 
