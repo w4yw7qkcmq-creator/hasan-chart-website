@@ -6357,21 +6357,20 @@ html.dark .subscriptions-page .subscriptions-plan-card__icon {
   margin-top: 1rem;
   padding: 0.9rem 1rem;
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: var(--sub-panel-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, #1d4ed8, #2563eb, #0ea5e9);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 8px 20px rgba(37, 99, 235, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 12px 30px rgba(37, 99, 235, 0.28);
 }
 
 html[data-theme="dark"] .subscriptions-page .subscriptions-plan-card__price,
 html.dark .subscriptions-page .subscriptions-plan-card__price {
-  border-color: rgba(148, 203, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, #1d4ed8, #2563eb, #0ea5e9);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 8px 22px rgba(2, 6, 23, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 12px 30px rgba(37, 99, 235, 0.28);
 }
 
 .subscriptions-page .subscriptions-plan-card__price span {
@@ -6382,12 +6381,12 @@ html.dark .subscriptions-page .subscriptions-plan-card__price {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: var(--sub-text-primary);
+  color: #ffffff;
   white-space: nowrap;
 }
 
 .subscriptions-page .subscriptions-plan-card__price small {
-  color: var(--sub-text-muted);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.35;
