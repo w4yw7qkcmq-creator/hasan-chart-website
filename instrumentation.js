@@ -8,5 +8,8 @@ export async function register() {
 
     const { startMarketStream } = await import("./lib/okx-market-stream.js");
     startMarketStream("instrumentation-register");
+
+    const { startMarketDepth } = await import("./lib/market-data/market-depth-hub.js");
+    startMarketDepth("instrumentation-register");
   }
 }

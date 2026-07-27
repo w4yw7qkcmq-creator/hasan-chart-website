@@ -16,7 +16,13 @@ import {
 
 const ADMIN_API_PREFIX = "/api/admin";
 const ADMIN_REPLY_API = "/api/admin-reply";
-const PUBLIC_API_ROUTES = new Set(["/api/market-pulse", "/api/market-stream"]);
+const PUBLIC_API_ROUTES = new Set([
+  "/api/market-pulse",
+  "/api/market-stream",
+  "/api/market-depth/snapshot",
+  "/api/market-depth/stream",
+  "/api/market-sentiment/fear-greed",
+]);
 
 function hasAccessToken(request) {
   return Boolean(request.cookies.get("hc_access_token")?.value);
