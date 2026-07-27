@@ -40,6 +40,7 @@ const menuGroups = [
       { href: "/#chart", icon: "📈", label: "الشارت الحي" },
       { href: "/news", icon: "📰", label: "الأخبار" },
       { href: "/assets", icon: "🗂️", label: "الأصول والأسواق" },
+      { href: "/order-book", icon: "📒", label: "دفتر الأوامر والسيولة" },
       { href: "/daily-analysis", icon: "📝", label: "التحليلات اليومية" },
     ],
   },
