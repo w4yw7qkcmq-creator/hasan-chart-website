@@ -5728,6 +5728,11 @@ html[data-theme="light"] .analysis-request-input {
   --sub-text-primary: #0c4a6e;
   --sub-text-muted: #0369a1;
   --sub-panel-bg: rgba(255, 255, 255, 0.38);
+  --sub-cta-gradient: linear-gradient(135deg, #1d4ed8, #2563eb, #0ea5e9);
+  --sub-cta-border: rgba(255, 255, 255, 0.28);
+  --sub-cta-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 12px 30px rgba(37, 99, 235, 0.28);
   --sub-card-shadow:
     0 1px 0 rgba(255, 255, 255, 0.65) inset,
     0 18px 40px rgba(37, 99, 235, 0.14),
@@ -6357,20 +6362,10 @@ html.dark .subscriptions-page .subscriptions-plan-card__icon {
   margin-top: 1rem;
   padding: 0.9rem 1rem;
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: linear-gradient(135deg, #1d4ed8, #2563eb, #0ea5e9);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 12px 30px rgba(37, 99, 235, 0.28);
-}
-
-html[data-theme="dark"] .subscriptions-page .subscriptions-plan-card__price,
-html.dark .subscriptions-page .subscriptions-plan-card__price {
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: linear-gradient(135deg, #1d4ed8, #2563eb, #0ea5e9);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 12px 30px rgba(37, 99, 235, 0.28);
+  border: 1px solid var(--sub-cta-border);
+  background-color: #1d4ed8;
+  background-image: var(--sub-cta-gradient);
+  box-shadow: var(--sub-cta-shadow);
 }
 
 .subscriptions-page .subscriptions-plan-card__price span {
@@ -6381,12 +6376,12 @@ html.dark .subscriptions-page .subscriptions-plan-card__price {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: #0f172a;
+  color: var(--sub-text-primary);
   white-space: nowrap;
 }
 
 .subscriptions-page .subscriptions-plan-card__price small {
-  color: #475569;
+  color: var(--sub-text-muted);
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.35;
