@@ -21,17 +21,9 @@ function isThemeAlreadyReady() {
   return document.documentElement.classList.contains("theme-ready");
 }
 
-function readBootTheme() {
-  if (typeof document === "undefined") {
-    return "dark";
-  }
-
-  return getSafeTheme(document.documentElement.getAttribute("data-theme"));
-}
-
-export function ThemeProvider({ children, initialTheme }) {
-  const resolvedInitialTheme = getSafeTheme(initialTheme ?? readBootTheme());
-  const [theme, setTheme] = useState(() => resolvedInitialTheme);
+export function ThemeProvider({ children, initialTheme = "dark" }) {
+  const resolvedInitialTheme = getSafeTheme(initialTheme);
+  const [theme, setTheme] = useState(resolvedInitialTheme);
   const [themeReady, setThemeReady] = useState(false);
 
   useEffect(() => {

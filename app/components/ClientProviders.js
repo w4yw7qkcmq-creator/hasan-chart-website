@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { AppModalProvider } from "./AppModalProvider";
 import { AuthProvider } from "./AuthProvider";
 import { NotificationProvider } from "./notifications/NotificationProvider";
-import { ThemeProvider } from "./ThemeProvider";
 import { useClientMounted } from "../hooks/useClientMounted";
 
 const NotificationSoundSettingsBootstrap = dynamic(
@@ -40,15 +39,13 @@ function DeferredNotificationUi() {
 
 export function ClientProviders({ children }) {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <AppModalProvider>
-            <DeferredNotificationUi />
-            {children}
-          </AppModalProvider>
-        </NotificationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <AppModalProvider>
+          <DeferredNotificationUi />
+          {children}
+        </AppModalProvider>
+      </NotificationProvider>
+    </AuthProvider>
   );
 }

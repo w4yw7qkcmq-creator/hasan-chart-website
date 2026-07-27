@@ -4,6 +4,8 @@ import {
   THEME_COOKIE_BOOT_SCRIPT,
   THEME_CRITICAL_CSS,
 } from "../lib/theme-critical-styles";
+import { readThemeFromRequestCookies } from "../lib/theme-server";
+import { ThemeProvider } from "./components/ThemeProvider";
 import {
   SITE_ORGANIZATION_NAME,
   buildPublicMetadata,
@@ -67,14 +69,15 @@ export const viewport = {
   themeColor: "#020617",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
   const supabaseOrigin = getSupabaseOrigin();
+  const initialTheme = await readThemeFromRequestCookies();
 
   return (
     <html
       lang="ar"
       dir="rtl"
-      data-theme="dark"
+      data-theme={initialTheme}
       className="theme-pending"
       suppressHydrationWarning
     >
@@ -101,13 +104,16 @@ export default function RootLayout({ children }) {
           aria-live="polite"
           aria-busy="true"
           aria-label="جاري تحميل منصة HasaN CharT World"
+          suppressHydrationWarning
         >
           <div className="theme-boot-logo">HC</div>
           <div className="theme-boot-spinner" aria-hidden="true" />
           <p className="theme-boot-title">HasaN CharT World</p>
           <p className="theme-boot-subtitle">جاري تجهيز الواجهة...</p>
         </div>
-        <div id="site-root">{children}</div>
+        <ThemeProvider initialTheme={initialTheme}>
+          <div id="site-root">{children}</div>
+        </ThemeProvider>
       </body>
     </html>
   );
