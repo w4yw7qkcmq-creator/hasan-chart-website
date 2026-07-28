@@ -5,10 +5,12 @@ import Breadcrumbs from "../seo/Breadcrumbs";
 import { useMarketDepthStream } from "../../hooks/useMarketDepthStream";
 import {
   DEFAULT_LARGE_TRADE_THRESHOLD,
+  DEFAULT_LARGE_TRADE_WINDOW,
   DEFAULT_LIQUIDITY_RANGE_PERCENT,
   DEPTH_LEVEL_OPTIONS,
   FLOW_WINDOW_OPTIONS,
   LARGE_TRADE_THRESHOLDS,
+  LARGE_TRADE_WINDOW_OPTIONS,
   LIQUIDITY_RANGE_OPTIONS,
 } from "../../../lib/market-data/constants";
 import {
@@ -21,8 +23,16 @@ import {
 import FearGreedCard from "./FearGreedCard";
 import LiquidityDepthChart from "./LiquidityDepthChart";
 import OrderBookPanel from "./OrderBookPanel";
-import { formatPercent, formatPrice, formatTime, formatUsd, statusLabelAr } from "./formatters";
-import { formatExchangeConnectionHint } from "../../../lib/market-data/connection-status";
+import {
+  formatLargeTradeEmptyMessage,
+  formatPercent,
+  formatPrice,
+  formatQuantity,
+  formatThresholdLabel,
+  formatTime,
+  formatUsd,
+  statusLabelAr,
+} from "./formatters";
 
 const breadcrumbs = [
   { label: "الرئيسية", href: "/" },
@@ -31,7 +41,7 @@ const breadcrumbs = [
 ];
 
 export default function OrderBookPageContent() {
-  const { data, prefs, setPrefs, connection, hydrated } = useMarketDepthStream();
+  const { data, prefs, setPrefs, hydrated } = useMarketDepthStream();
 
   const precisionOptions = useMemo(() => {
     const base = getDefaultPrecision(prefs.symbol);
@@ -39,6 +49,16 @@ export default function OrderBookPageContent() {
     set.add(base);
     return [...set].sort((a, b) => a - b);
   }, [prefs.symbol]);
+
+  const largeTradeThreshold = prefs.largeTradeThreshold ?? DEFAULT_LARGE_TRADE_THRESHOLD;
+  const largeTradeWindow = prefs.largeTradeWindow ?? DEFAULT_LARGE_TRADE_WINDOW;
+  const dominanceWindow = prefs.dominanceWindow ?? prefs.flowWindow;
+  const dominanceFlow = data?.dominanceFlow;
+
+  const largeTradeEmptyMessage = useMemo(
+    () => formatLargeTradeEmptyMessage(largeTradeThreshold, largeTradeWindow),
+    [largeTradeThreshold, largeTradeWindow]
+  );
 
   if (!hydrated) {
     return (
@@ -61,7 +81,7 @@ export default function OrderBookPageContent() {
         </p>
       </header>
 
-      <section className="mb-6 grid gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-4 dark:border-white/10 dark:bg-slate-900/70 lg:grid-cols-4 xl:grid-cols-8">
+      <section className="mb-6 grid gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-4 dark:border-white/10 dark:bg-slate-900/70 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <ControlSelect
           label="العملة"
           value={prefs.symbol}
@@ -107,14 +127,20 @@ export default function OrderBookPageContent() {
         />
         <ControlSelect
           label="صفقة كبيرة"
-          value={String(prefs.largeTradeThreshold ?? DEFAULT_LARGE_TRADE_THRESHOLD)}
+          value={String(largeTradeThreshold)}
           onChange={(value) => setPrefs({ largeTradeThreshold: Number(value) })}
           options={LARGE_TRADE_THRESHOLDS.map((value) => ({
             value: String(value),
-            label: formatUsd(value, { compact: true }),
+            label: formatThresholdLabel(value),
           }))}
         />
-        <div className="flex flex-col gap-1 lg:col-span-1 xl:col-span-1">
+        <ControlSelect
+          label="نافذة الصفقات الكبيرة"
+          value={largeTradeWindow}
+          onChange={(value) => setPrefs({ largeTradeWindow: value })}
+          options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+        />
+        <div className="flex flex-col gap-1">
           <span className="text-xs text-slate-500 dark:text-slate-400">عرض الجوال</span>
           <div className="flex rounded-xl border border-slate-200 dark:border-white/10">
             {[
@@ -139,22 +165,12 @@ export default function OrderBookPageContent() {
         </div>
       </section>
 
-      <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid gap-4 md:grid-cols-2">
         <SummaryCard title="آخر سعر" value={formatPrice(data?.lastPrice)} />
-        <SummaryCard
-          title="حالة الاتصال"
-          value={connection.label}
-          hint={`${formatExchangeConnectionHint(connection)} · تأخير تقريبي: ${data?.latencyMs ?? "—"}ms`}
-        />
         <SummaryCard
           title="مصادر البيانات"
           value={data?.exchanges?.length ? data.exchanges.map((e) => EXCHANGE_LABELS[e] || e).join("، ") : "—"}
           hint={data?.disclaimer}
-        />
-        <SummaryCard
-          title="آخر تحديث"
-          value={data?.updatedAt ? formatTime(data.updatedAt) : "—"}
-          hint={data?.stale ? "بيانات متأخرة" : "تحديث حي"}
         />
       </section>
 
@@ -167,49 +183,80 @@ export default function OrderBookPageContent() {
           </Panel>
 
           <Panel title="الصفقات الكبيرة اللحظية">
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto overflow-x-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-slate-500 dark:text-slate-400">
                     <th className="py-2 text-right">الوقت</th>
                     <th className="py-2 text-right">المنصة</th>
                     <th className="py-2 text-right">الاتجاه</th>
-                    <th className="py-2 text-left tabular-nums">القيمة</th>
+                    <th className="py-2 text-left">القيمة</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data?.largeTrades || []).map((trade) => (
                     <tr
-                      key={`${trade.exchange}-${trade.ts}-${trade.price}`}
+                      key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
                       className="border-t border-slate-100 dark:border-white/5"
                     >
-                      <td className="py-2">{formatTime(trade.ts)}</td>
+                      <td className="py-2">
+                        <NumericValue>{formatTime(trade.ts)}</NumericValue>
+                      </td>
                       <td className="py-2">{EXCHANGE_LABELS[trade.exchange] || trade.exchange}</td>
                       <td className="py-2">{trade.side === "buy" ? "شراء منفذ" : "بيع منفذ"}</td>
-                      <td className="py-2 text-left tabular-nums">{formatUsd(trade.notional, { compact: true })}</td>
+                      <td className="py-2 text-left">
+                        <NumericValue>{formatUsd(trade.notional, { compact: true })}</NumericValue>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {!data?.largeTrades?.length ? (
-                <p className="py-6 text-center text-sm text-slate-500">لا توجد صفقات كبيرة ضمن العتبة الحالية.</p>
+                <p className="py-6 text-center text-sm text-slate-500">{largeTradeEmptyMessage}</p>
               ) : null}
             </div>
           </Panel>
         </div>
 
         <div className="space-y-6">
-          <Panel title="سيطرة الشراء والبيع">
+          <Panel
+            title="سيطرة الشراء والبيع"
+            action={
+              <ControlSelect
+                compact
+                label="إطار السيطرة"
+                value={dominanceWindow}
+                onChange={(value) => setPrefs({ dominanceWindow: value })}
+                options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+              />
+            }
+          >
             <div className="space-y-3 text-sm">
-              <MetricLine label="سيولة الشراء" value={formatUsd(data?.liquidity?.bidNotional, { compact: true })} />
-              <MetricLine label="سيولة البيع" value={formatUsd(data?.liquidity?.askNotional, { compact: true })} />
-              <MetricLine label="سيطرة المشترين" value={formatPercent(data?.liquidity?.bidPercent)} />
-              <MetricLine label="سيطرة البائعين" value={formatPercent(data?.liquidity?.askPercent)} />
+              <MetricLine
+                label="شراء منفذ"
+                value={formatUsd(dominanceFlow?.buyNotional, { compact: true })}
+              />
+              <MetricLine
+                label="بيع منفذ"
+                value={formatUsd(dominanceFlow?.sellNotional, { compact: true })}
+              />
+              <MetricLine
+                label="صافي التدفق"
+                value={formatUsd(dominanceFlow?.netNotional, { compact: true })}
+              />
+              <MetricLine label="نسبة المشترين" value={formatPercent(dominanceFlow?.buyPercent)} />
+              <MetricLine label="نسبة البائعين" value={formatPercent(dominanceFlow?.sellPercent)} />
+              <MetricLine label="الطرف الغالب" value={dominanceFlow?.dominantSideLabel || "متوازن"} />
+              <MetricLine
+                label="قوة الغلبة"
+                value={formatPercent(dominanceFlow?.dominanceStrength)}
+              />
               <p className="rounded-xl bg-slate-100 px-3 py-2 text-center font-medium text-slate-800 dark:bg-white/5 dark:text-slate-100">
-                {data?.liquidity?.dominance || "متوازن"}
+                {dominanceFlow?.dominanceLabel || dominanceFlow?.dominanceClassification || "متوازن"}
               </p>
               <p className="text-xs leading-6 text-slate-500 dark:text-slate-400">
-                وجود أوامر كبيرة لا يضمن تنفيذها، وقد يتم إلغاؤها قبل الوصول إليها.
+                هذا القسم يقيس الصفقات المنفذة فعلياً ضمن الإطار المختار، وليس السيولة الموضوعة في دفتر
+                الأوامر.
               </p>
             </div>
           </Panel>
@@ -262,9 +309,17 @@ export default function OrderBookPageContent() {
   );
 }
 
-function ControlSelect({ label, value, onChange, options }) {
+function NumericValue({ children, className = "" }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
+    <span dir="ltr" className={`inline-block tabular-nums ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function ControlSelect({ label, value, onChange, options, compact = false }) {
+  return (
+    <label className={`flex flex-col gap-1 text-sm ${compact ? "min-w-[7rem]" : ""}`}>
       <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
       <select
         value={value}
@@ -285,16 +340,21 @@ function SummaryCard({ title, value, hint }) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 dark:border-white/10 dark:bg-slate-900/70">
       <p className="text-xs text-slate-500 dark:text-slate-400">{title}</p>
-      <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{value || "—"}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+        <NumericValue>{value || "—"}</NumericValue>
+      </p>
       {hint ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
     </div>
   );
 }
 
-function Panel({ title, children }) {
+function Panel({ title, children, action }) {
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-5 dark:border-white/10 dark:bg-slate-900/70">
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   );
@@ -304,7 +364,7 @@ function MetricLine({ label, value }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-slate-600 dark:text-slate-300">{label}</span>
-      <span className="tabular-nums font-medium text-slate-900 dark:text-white">{value}</span>
+      <NumericValue className="font-medium text-slate-900 dark:text-white">{value}</NumericValue>
     </div>
   );
 }
@@ -321,11 +381,19 @@ function WallBlock({ title, wall }) {
   return (
     <div className="mb-3 rounded-xl border border-slate-200 p-3 text-sm dark:border-white/10">
       <p className="mb-2 font-medium text-slate-800 dark:text-slate-100">{title}</p>
-      <div className="space-y-1 tabular-nums text-slate-600 dark:text-slate-300">
-        <p>السعر: {formatPrice(wall.price)}</p>
-        <p>الكمية: {wall.quantity}</p>
-        <p>القيمة: {formatUsd(wall.notional, { compact: true })}</p>
-        <p>البعد عن السعر: {formatPercent(wall.distancePercent)}</p>
+      <div className="space-y-1 text-slate-600 dark:text-slate-300">
+        <p>
+          السعر: <NumericValue>{formatPrice(wall.price)}</NumericValue>
+        </p>
+        <p>
+          الكمية: <NumericValue>{formatQuantity(wall.quantity)}</NumericValue>
+        </p>
+        <p>
+          القيمة: <NumericValue>{formatUsd(wall.notional, { compact: true })}</NumericValue>
+        </p>
+        <p>
+          البعد عن السعر: <NumericValue>{formatPercent(wall.distancePercent)}</NumericValue>
+        </p>
       </div>
     </div>
   );

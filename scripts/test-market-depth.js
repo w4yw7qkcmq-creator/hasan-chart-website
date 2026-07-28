@@ -14,8 +14,11 @@ import { LocalOrderBook } from "../lib/market-data/order-book.js";
 import { WS_BACKOFF_MS } from "../lib/market-data/constants.js";
 import {
   classifyBinanceTrade,
+  classifyDominanceStrength,
+  dominantSideLabelAr,
   ExecutedFlowTracker,
 } from "../lib/market-data/executed-flow.js";
+import { formatLargeTradeEmptyMessage } from "../app/components/order-book/formatters.js";
 import {
   countHealthyExchanges,
   resolveMarketDepthConnectionStatus,
@@ -202,9 +205,277 @@ function testLargeTradeThreshold() {
     symbol: "BTCUSDT",
   });
 
-  const large = tracker.getLargeTrades(100_000, 10);
-  assert.equal(large.length, 1);
-  assert.ok(large[0].notional >= 100_000);
+  const large = tracker.getLargeTrades(100_000, "1h", 10);
+  assert.equal(large.trades.length, 1);
+  assert.ok(large.trades[0].notional >= 100_000);
+  assert.equal(large.tradesAboveThreshold, 1);
+}
+
+function testLargeTradeWindowsAndThresholds() {
+  const tracker = new ExecutedFlowTracker();
+  const now = Date.now();
+
+  tracker.addTrade({
+    ts: now - 2 * 60_000,
+    price: 100,
+    quantity: 600,
+    side: "buy",
+    exchange: "okx",
+    symbol: "BTCUSDT",
+  });
+  tracker.addTrade({
+    ts: now - 20 * 60_000,
+    price: 100,
+    quantity: 400,
+    side: "sell",
+    exchange: "binance",
+    symbol: "BTCUSDT",
+  });
+  tracker.addTrade({
+    ts: now - 70 * 60_000,
+    price: 100,
+    quantity: 1000,
+    side: "buy",
+    exchange: "bybit",
+    symbol: "BTCUSDT",
+  });
+
+  const fiveMinute = tracker.getLargeTrades(25_000, "5m", 10);
+  assert.equal(fiveMinute.trades.length, 1);
+  assert.equal(fiveMinute.trades[0].notional, 60_000);
+  assert.equal(fiveMinute.tradesInWindow, 1);
+
+  const fifteenMinute = tracker.getLargeTrades(50_000, "15m", 10);
+  assert.equal(fifteenMinute.trades.length, 1);
+  assert.equal(fifteenMinute.tradesAboveThreshold, 1);
+
+  const oneHour = tracker.getLargeTrades(25_000, "1h", 10);
+  assert.equal(oneHour.trades.length, 2);
+  assert.equal(oneHour.trades[0].ts, now - 2 * 60_000);
+  assert.equal(oneHour.trades[1].ts, now - 20 * 60_000);
+
+  const empty = tracker.getLargeTrades(100_000, "15m", 10);
+  assert.equal(empty.trades.length, 0);
+  assert.equal(empty.tradesAboveThreshold, 0);
+}
+
+function testExecutedDominanceFlow() {
+  const tracker = new ExecutedFlowTracker();
+  const now = Date.now();
+
+  tracker.addTrade({
+    ts: now - 1000,
+    price: 100,
+    quantity: 10,
+    side: "buy",
+    exchange: "okx",
+    symbol: "BTCUSDT",
+  });
+  tracker.addTrade({
+    ts: now - 500,
+    price: 100,
+    quantity: 2,
+    side: "sell",
+    exchange: "binance",
+    symbol: "BTCUSDT",
+  });
+
+  const buyers = tracker.computeFlow("5m");
+  assert.equal(buyers.dominantSide, "buyers");
+  assert.equal(buyers.dominantSideLabel, "المشترون");
+  assert.equal(buyers.dominanceClassification, "غلبة شديدة");
+  assert.ok(buyers.dominanceStrength >= 65);
+
+  const sellers = new ExecutedFlowTracker();
+  sellers.addTrade({
+    ts: now,
+    price: 100,
+    quantity: 1,
+    side: "buy",
+    exchange: "okx",
+    symbol: "BTCUSDT",
+  });
+  sellers.addTrade({
+    ts: now,
+    price: 100,
+    quantity: 9,
+    side: "sell",
+    exchange: "binance",
+    symbol: "BTCUSDT",
+  });
+
+  const sellFlow = sellers.computeFlow("5m");
+  assert.equal(sellFlow.dominantSide, "sellers");
+  assert.equal(sellFlow.dominantSideLabel, "البائعون");
+
+  const balanced = new ExecutedFlowTracker();
+  balanced.addTrade({
+    ts: now,
+    price: 100,
+    quantity: 5,
+    side: "buy",
+    exchange: "okx",
+    symbol: "BTCUSDT",
+  });
+  balanced.addTrade({
+    ts: now,
+    price: 100,
+    quantity: 5,
+    side: "sell",
+    exchange: "binance",
+    symbol: "BTCUSDT",
+  });
+
+  const balancedFlow = balanced.computeFlow("5m");
+  assert.equal(balancedFlow.dominantSide, "balanced");
+  assert.equal(balancedFlow.dominanceStrength, 0);
+  assert.equal(balancedFlow.dominanceClassification, "متوازن");
+
+  const emptyTracker = new ExecutedFlowTracker();
+  const zeroFlow = emptyTracker.computeFlow("5m");
+  assert.equal(zeroFlow.dominanceStrength, 0);
+  assert.equal(zeroFlow.dominantSide, "balanced");
+}
+
+function testDominanceStrengthBoundaries() {
+  assert.equal(classifyDominanceStrength(0), "متوازن");
+  assert.equal(classifyDominanceStrength(9.9), "متوازن");
+  assert.equal(classifyDominanceStrength(10), "غلبة ضعيفة");
+  assert.equal(classifyDominanceStrength(24.9), "غلبة ضعيفة");
+  assert.equal(classifyDominanceStrength(25), "غلبة متوسطة");
+  assert.equal(classifyDominanceStrength(44.9), "غلبة متوسطة");
+  assert.equal(classifyDominanceStrength(45), "غلبة قوية");
+  assert.equal(classifyDominanceStrength(64.9), "غلبة قوية");
+  assert.equal(classifyDominanceStrength(65), "غلبة شديدة");
+  assert.equal(dominantSideLabelAr("buyers"), "المشترون");
+  assert.equal(dominantSideLabelAr("sellers"), "البائعون");
+  assert.equal(dominantSideLabelAr("balanced"), "متوازن");
+}
+
+function testOrderBookUiSourceGuards() {
+  const pageSource = readFileSync(
+    fileURLToPath(new URL("../app/components/order-book/OrderBookPageContent.js", import.meta.url)),
+    "utf8"
+  );
+  const panelSource = readFileSync(
+    fileURLToPath(new URL("../app/components/order-book/OrderBookPanel.js", import.meta.url)),
+    "utf8"
+  );
+  const formatterSource = readFileSync(
+    fileURLToPath(new URL("../app/components/order-book/formatters.js", import.meta.url)),
+    "utf8"
+  );
+
+  assert.equal(pageSource.includes('title="حالة الاتصال"'), false);
+  assert.equal(pageSource.includes('title="آخر تحديث"'), false);
+  assert.equal(pageSource.includes("data?.liquidity?.bidNotional"), false);
+  assert.match(pageSource, /dominanceFlow\?\.buyNotional/);
+  assert.match(formatterSource, /en-US/);
+  assert.match(formatterSource, /numberingSystem: "latn"/);
+  assert.match(panelSource, /bg-green-500/);
+  assert.match(panelSource, /bg-red-500/);
+  assert.equal(/teal|blue/i.test(panelSource), false);
+  assert.match(pageSource, /formatLargeTradeEmptyMessage/);
+  assert.equal((pageSource.match(/<SummaryCard/g) || []).length, 2);
+}
+
+function testIndependentFlowDominanceWindows() {
+  const tracker = new ExecutedFlowTracker();
+  const now = Date.now();
+
+  tracker.addTrade({
+    ts: now - 30_000,
+    price: 100,
+    quantity: 10,
+    side: "buy",
+    exchange: "okx",
+    symbol: "BTCUSDT",
+  });
+  tracker.addTrade({
+    ts: now - 45 * 60_000,
+    price: 100,
+    quantity: 50,
+    side: "sell",
+    exchange: "binance",
+    symbol: "BTCUSDT",
+  });
+
+  const oneMinute = tracker.computeFlow("1m");
+  const oneHour = tracker.computeFlow("1h");
+
+  assert.equal(oneMinute.buyNotional, 1000);
+  assert.equal(oneMinute.sellNotional, 0);
+  assert.equal(oneHour.buyNotional, 1000);
+  assert.equal(oneHour.sellNotional, 5000);
+  assert.notEqual(oneMinute.dominanceStrength, oneHour.dominanceStrength);
+  assert.equal(oneMinute.window, "1m");
+  assert.equal(oneHour.window, "1h");
+}
+
+function testLargeTradeStatsBeforeLimit() {
+  const tracker = new ExecutedFlowTracker();
+  const now = Date.now();
+
+  for (let i = 0; i < 5; i += 1) {
+    tracker.addTrade({
+      ts: now - i * 1000,
+      price: 100,
+      quantity: 300,
+      side: "buy",
+      exchange: "okx",
+      symbol: "BTCUSDT",
+    });
+  }
+
+  const result = tracker.getLargeTrades(25_000, "15m", 2);
+  assert.equal(result.trades.length, 2);
+  assert.equal(result.tradesAboveThreshold, 5);
+  assert.equal(result.tradesInWindow, 5);
+  assert.ok(result.trades[0].ts >= result.trades[1].ts);
+}
+
+function testDominanceLabelAndZeroVolume() {
+  const tracker = new ExecutedFlowTracker();
+  const flow = tracker.computeFlow("5m");
+
+  assert.equal(flow.totalNotional, 0);
+  assert.equal(flow.dominantSide, "balanced");
+  assert.equal(flow.dominanceStrength, 0);
+  assert.equal(flow.dominanceLabel, "متوازن");
+}
+
+function testHubPayloadScopeGuard() {
+  const hubSource = readFileSync(
+    fileURLToPath(new URL("../lib/market-data/market-depth-hub.js", import.meta.url)),
+    "utf8"
+  );
+
+  assert.match(hubSource, /computeFlow\(flowWindow\)/);
+  assert.match(hubSource, /computeFlow\(dominanceWindow/);
+  assert.match(hubSource, /getLargeTrades\(\s*largeTradeThreshold,\s*largeTradeWindow/);
+  assert.match(hubSource, /dominanceFlow/);
+  assert.match(hubSource, /largeTradeStats/);
+  assert.match(hubSource, /computeLiquidityDominance/);
+  assert.doesNotMatch(hubSource, /this\.largeTrades/);
+  assert.doesNotMatch(hubSource, /recentTrades:\s*flowTracker\.trades/);
+}
+
+function testArabicLargeTradeEmptyState() {
+  const message = formatLargeTradeEmptyMessage(50_000, "15m");
+  assert.match(message, /15 دقيقة/);
+  assert.match(message, /\$50\.0K/);
+}
+
+function testApiValidationExtended() {
+  const valid = validateMarketDepthQuery(
+    new URLSearchParams(
+      "symbol=BTCUSDT&mode=aggregated&levels=20&precision=1&largeTradeThreshold=25000&largeTradeWindow=15m&dominanceWindow=1h"
+    )
+  );
+  assert.equal(valid.valid, true);
+  assert.equal(valid.params.largeTradeThreshold, 25_000);
+  assert.equal(valid.params.largeTradeWindow, "15m");
+  assert.equal(valid.params.dominanceWindow, "1h");
 }
 
 function testApiValidation() {
@@ -463,7 +734,17 @@ const tests = [
   testEmptyBookAndSingleExchangeDown,
   testExecutedTradeClassificationAndWindows,
   testLargeTradeThreshold,
+  testLargeTradeWindowsAndThresholds,
+  testExecutedDominanceFlow,
+  testDominanceStrengthBoundaries,
+  testOrderBookUiSourceGuards,
+  testIndependentFlowDominanceWindows,
+  testLargeTradeStatsBeforeLimit,
+  testDominanceLabelAndZeroVolume,
+  testHubPayloadScopeGuard,
+  testArabicLargeTradeEmptyState,
   testApiValidation,
+  testApiValidationExtended,
   testNoMockInProductionGuard,
   testStaleDataExclusionInSpread,
   testWallDetection,

@@ -60,7 +60,9 @@ export function useMarketDepthStream(overrides = EMPTY_OVERRIDES) {
     setPrefsState((current) => {
       const next = { ...current, ...patch };
       prefsRef.current = next;
-      writeOrderBookPreferences(next);
+      writeOrderBookPreferences(next, {
+        explicitLargeTradeThreshold: patch.largeTradeThreshold != null ? true : undefined,
+      });
       return next;
     });
   }, []);

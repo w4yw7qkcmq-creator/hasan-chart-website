@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatPrice, formatQuantity, formatUsd } from "./formatters";
+import { formatPrice, formatQuantity, formatSpreadPercent, formatUsd } from "./formatters";
 
 function DepthRow({ level, side }) {
   const isAsk = side === "ask";
-  const barColor = isAsk ? "bg-red-500/15 dark:bg-red-400/10" : "bg-emerald-500/15 dark:bg-teal-400/10";
-  const textColor = isAsk ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-teal-300";
+  const barColor = isAsk ? "bg-red-500/15 dark:bg-red-500/10" : "bg-green-500/15 dark:bg-green-500/10";
+  const textColor = isAsk ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400";
 
   return (
     <div className="relative grid grid-cols-3 gap-2 px-3 py-1.5 text-sm tabular-nums">
@@ -15,11 +15,13 @@ function DepthRow({ level, side }) {
         style={{ width: `${Math.min(100, level.depthPercent || 0)}%` }}
         aria-hidden="true"
       />
-      <span className={`relative z-[1] text-left ${textColor}`}>{formatPrice(level.price)}</span>
-      <span className="relative z-[1] text-center text-slate-700 dark:text-slate-200">
+      <span dir="ltr" className={`relative z-[1] text-left ${textColor}`}>
+        {formatPrice(level.price)}
+      </span>
+      <span dir="ltr" className="relative z-[1] text-center text-slate-700 dark:text-slate-200">
         {formatQuantity(level.quantity)}
       </span>
-      <span className="relative z-[1] text-right text-slate-600 dark:text-slate-300">
+      <span dir="ltr" className="relative z-[1] text-right text-slate-600 dark:text-slate-300">
         {formatUsd(level.notional, { compact: true })}
       </span>
     </div>
@@ -49,13 +51,19 @@ export default function OrderBookPanel({ data, mobileSide = "all" }) {
       )}
 
       <div className="border-y border-slate-200/80 bg-slate-50 px-4 py-4 text-center dark:border-white/10 dark:bg-slate-950/60">
-        <div className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-white">
+        <div dir="ltr" className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-white">
           {formatPrice(data?.lastPrice)}
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-          <span>Mid: {formatPrice(data?.midPrice)}</span>
-          <span>Spread: {formatPrice(data?.spread, 4)}</span>
-          <span>{data?.spreadPercent != null ? `${Number(data.spreadPercent).toFixed(4)}%` : "—"}</span>
+          <span>
+            Mid: <span dir="ltr" className="tabular-nums">{formatPrice(data?.midPrice)}</span>
+          </span>
+          <span>
+            Spread: <span dir="ltr" className="tabular-nums">{formatPrice(data?.spread, 4)}</span>
+          </span>
+          <span dir="ltr" className="tabular-nums">
+            {formatSpreadPercent(data?.spreadPercent)}
+          </span>
         </div>
       </div>
 

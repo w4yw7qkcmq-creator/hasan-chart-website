@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchWithTimeout } from "../../../lib/fetch-with-timeout";
+import { formatInteger } from "./formatters";
 
 function gaugeColor(value) {
   if (value <= 25) return "#dc2626";
@@ -32,7 +33,9 @@ export default function FearGreedCard() {
   }, []);
 
   const value = payload?.current?.value;
-  const color = gaugeColor(Number(value) || 50);
+  const numericValue = Number(value);
+  const formattedValue = formatInteger(value);
+  const color = gaugeColor(Number.isFinite(numericValue) ? numericValue : 50);
 
   return (
     <div className="site-price-card rounded-2xl border border-slate-200/80 bg-white/90 p-5 dark:border-white/10 dark:bg-slate-900/70">
@@ -60,10 +63,10 @@ export default function FearGreedCard() {
                 fill="none"
                 stroke={color}
                 strokeWidth="12"
-                strokeDasharray={`${(value / 100) * 251} 251`}
+                strokeDasharray={`${((Number.isFinite(numericValue) ? numericValue : 0) / 100) * 251} 251`}
               />
               <text x="100" y="78" textAnchor="middle" className="fill-slate-900 text-3xl font-semibold dark:fill-white">
-                {value}
+                {formattedValue}
               </text>
             </svg>
             <p className="text-lg font-medium text-slate-800 dark:text-slate-100">
@@ -78,7 +81,7 @@ export default function FearGreedCard() {
                   key={entry.timestamp}
                   className="flex-1 rounded-t bg-slate-200 dark:bg-slate-700"
                   style={{ height: `${Math.max(8, entry.value)}%`, backgroundColor: gaugeColor(entry.value) }}
-                  title={`${entry.value} - ${entry.classificationAr}`}
+                  title={`${formatInteger(entry.value)} - ${entry.classificationAr}`}
                 />
               ))}
             </div>
