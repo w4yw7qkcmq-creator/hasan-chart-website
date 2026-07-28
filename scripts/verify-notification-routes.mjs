@@ -12,7 +12,7 @@ import {
 } from "../lib/notifications-shared.js";
 
 const expectations = [
-  [NOTIFICATION_TYPES.PRICE_ALERT, "/alerts", "🔔", "price-alert"],
+  [NOTIFICATION_TYPES.PRICE_ALERT, "/alerts?tab=notifications", "🔔", "price-alert"],
   [NOTIFICATION_TYPES.ANALYSIS_REPLY, "/my-analysis", "🧠", "analysis-reply"],
   [NOTIFICATION_TYPES.VIP_SPOT, "/vip-spot", "⭐", "vip"],
   [NOTIFICATION_TYPES.VIP_FUTURES, "/vip-futures", "⭐", "vip"],

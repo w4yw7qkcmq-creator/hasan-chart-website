@@ -83,11 +83,12 @@ function testLayoutDoesNotUseNonDeterministicInitialTheme() {
   assert.doesNotMatch(themeProviderSource, /Date\.now/);
 }
 
-function testNoExperimentalModulePackageJsonFiles() {
-  assert.throws(
-    () => fs.accessSync(path.join(rootDir, "scripts/package.json")),
-    (error) => error?.code === "ENOENT"
-  );
+function testModulePackageJsonBoundaries() {
+  const scriptsPackageJsonPath = path.join(rootDir, "scripts/package.json");
+  assert.doesNotThrow(() => fs.accessSync(scriptsPackageJsonPath));
+  const scriptsPackageJson = JSON.parse(fs.readFileSync(scriptsPackageJsonPath, "utf8"));
+  assert.equal(scriptsPackageJson.type, "module");
+
   assert.throws(
     () => fs.accessSync(path.join(rootDir, "lib/package.json")),
     (error) => error?.code === "ENOENT"
@@ -96,6 +97,11 @@ function testNoExperimentalModulePackageJsonFiles() {
     () => fs.accessSync(path.join(rootDir, "app/(app)/admin/package.json")),
     (error) => error?.code === "ENOENT"
   );
+
+  const rootPackageJson = JSON.parse(
+    fs.readFileSync(path.join(rootDir, "package.json"), "utf8")
+  );
+  assert.notEqual(rootPackageJson.type, "module");
 }
 
 const tests = [
@@ -109,7 +115,7 @@ const tests = [
   ["layout uses dynamic viewport theme color", testLayoutUsesDynamicViewportThemeColor],
   ["ThemeProvider syncs theme-color meta", testThemeProviderSyncsThemeColorMeta],
   ["initial theme does not use random or date values", testLayoutDoesNotUseNonDeterministicInitialTheme],
-  ["no experimental module package.json files", testNoExperimentalModulePackageJsonFiles],
+  ["module package.json boundaries stay scoped to scripts", testModulePackageJsonBoundaries],
 ];
 
 for (const [name, run] of tests) {
