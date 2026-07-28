@@ -89,6 +89,9 @@ test("UI uses history hook and partial badge", () => {
   assert.match(source, /useOrderBookHistory/);
   assert.match(source, /HistoryState/);
   assert.match(source, /البيانات التاريخية قيد التجميع/);
+  assert.match(source, /coveragePercent/);
+  assert.match(source, /formatCoveragePercent/);
+  assert.doesNotMatch(source, /Math\.round\(\(Number\(completeness\)/);
   assert.match(source, /dir="ltr"/);
   assert.match(source, /overflow-x-hidden/);
 });

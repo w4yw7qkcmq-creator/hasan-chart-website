@@ -119,6 +119,62 @@ test("flow query aggregates rows", async () => {
   assert.equal(payload.bucketCount, 1);
 });
 
+test("flow coverage contract for partial 4h window", async () => {
+  clearHistoryQueryCacheForTests();
+  const rows = Array.from({ length: 34 }, (_, index) => ({
+    bucket_start: new Date(1_700_000_000_000 + index * 60_000).toISOString(),
+    buy_notional: 10,
+    sell_notional: 5,
+    buy_count: 1,
+    sell_count: 1,
+  }));
+  const payload = await queryHistoricalFlow({
+    client: fakeClient({ flowRows: rows }),
+    symbol: "BTCUSDT",
+    window: "4h",
+    scope: "aggregated",
+    now: 1_700_000_000_000 + 4 * 60 * 60_000,
+  });
+  assert.equal(payload.bucketCount, 34);
+  assert.equal(payload.expectedBucketCount, 240);
+  assert.equal(payload.missingBucketCount, 206);
+  assert.ok(Math.abs(payload.coverageRatio - 34 / 240) < 1e-9);
+  assert.ok(Math.abs(payload.coveragePercent - (34 / 240) * 100) < 1e-6);
+  assert.equal(payload.completeness, payload.coverageRatio);
+  assert.equal(payload.partialData, true);
+});
+
+test("duplicate bucket timestamps count once", async () => {
+  clearHistoryQueryCacheForTests();
+  const ts = new Date(1_700_000_000_000).toISOString();
+  const payload = await queryHistoricalFlow({
+    client: fakeClient({
+      flowRows: [
+        {
+          bucket_start: ts,
+          buy_notional: 100,
+          sell_notional: 50,
+          buy_count: 2,
+          sell_count: 1,
+        },
+        {
+          bucket_start: ts,
+          buy_notional: 20,
+          sell_notional: 10,
+          buy_count: 1,
+          sell_count: 1,
+        },
+      ],
+    }),
+    symbol: "BTCUSDT",
+    window: "4h",
+    scope: "aggregated",
+    now: 1_700_000_000_000 + 4 * 60 * 60_000,
+  });
+  assert.equal(payload.bucketCount, 1);
+  assert.equal(payload.buyNotional, 120);
+});
+
 test("large trades limit maximum", () => {
   const result = validateHistoryLargeTradesQuery(
     new URLSearchParams({ symbol: "BTCUSDT", window: "4h", limit: "500" }),

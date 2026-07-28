@@ -11,6 +11,7 @@ import {
   resolveOverallStatus,
   resolveReadiness,
 } from "../lib/health-check-status.js";
+import { formatCoveragePercent } from "../lib/market-data/history/window-utils.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const healthSource = fs.readFileSync(path.join(rootDir, "lib/health-check.js"), "utf8");
@@ -202,6 +203,22 @@ function testReadinessFieldAddedWithoutBreakingStatusContract() {
   assert.doesNotMatch(healthSource, /status:\s*"warming_up"/);
 }
 
+function testMarketHistoryMetricsExposure() {
+  assert.match(healthSource, /tradesReceived/);
+  assert.match(healthSource, /flushFailures/);
+  assert.match(healthSource, /lastErrorSafe/);
+  assert.match(healthSource, /rowsWrittenFlow/);
+  assert.match(healthSource, /droppedEvents/);
+  assert.match(healthSource, /function checkMarketHistoryHealth\(\)/);
+  assert.match(healthSource, /status:\s*"ok"/);
+}
+
+function testCoveragePercentFormattingForUi() {
+  assert.equal(formatCoveragePercent(0.34), "0.3");
+  assert.equal(formatCoveragePercent(14.17), "14");
+  assert.notEqual(formatCoveragePercent(14.17), "97");
+}
+
 const tests = [
   ["redis lazy does not degrade overall", testRedisLazyDoesNotDegradeOverall],
   ["transient database timeout keeps overall ok", testTransientDatabaseTimeoutWithRecentSuccess],
@@ -215,6 +232,8 @@ const tests = [
   ["database constants documented", testDatabaseConstantsDocumented],
   ["cache and in-flight dedup present", testCacheAndInflightPresentInSource],
   ["readiness field without breaking status contract", testReadinessFieldAddedWithoutBreakingStatusContract],
+  ["market history metrics exposure", testMarketHistoryMetricsExposure],
+  ["coverage percent formatting for ui", testCoveragePercentFormattingForUi],
 ];
 
 for (const [name, run] of tests) {

@@ -18,6 +18,8 @@ import {
 } from "../lib/market-data/history/constants.js";
 import {
   calculateCompleteness,
+  calculateCoverage,
+  formatCoveragePercent,
   floorToMinute,
   getExpectedBucketCount,
   getWindowMs,
@@ -372,48 +374,55 @@ function testWindowStartAndFloorUtc() {
   assert.equal(floorToMinute(1_700_001_081_234), 1_700_001_060_000);
 }
 
-function testCompletenessPartialAndFull() {
-  const now = 1_700_001_140_000;
-  const collectingSince = now - 30 * BUCKET_MS;
-  const partial = calculateCompleteness({
-    bucketCount: 10,
-    window: "1h",
-    collectingSince,
-    now,
-  });
-  assert.equal(partial.expectedBuckets, 60);
-  assert.equal(partial.availableExpectedBuckets, 30);
-  assert.equal(partial.completeness, 10 / 30);
-  assert.equal(partial.partialData, true);
+function testCoverageWindowRatios() {
+  const actual = 34;
+  const cases = [
+    ["4h", 240, 14.166666666666666],
+    ["12h", 720, 4.722222222222222],
+    ["1d", 1440, 2.361111111111111],
+    ["3d", 4320, 0.787037037037037],
+    ["7d", 10080, 0.3373015873015873],
+    ["1h", 60, 56.666666666666664],
+  ];
 
-  const full = calculateCompleteness({
-    bucketCount: 60,
-    window: "1h",
-    collectingSince: now - 60 * BUCKET_MS,
-    now,
-  });
-  assert.equal(full.completeness, 1);
-  assert.equal(full.partialData, false);
+  for (const [window, expectedCount, expectedPercent] of cases) {
+    const coverage = calculateCoverage({ bucketCount: actual, window });
+    assert.equal(coverage.expectedBucketCount, expectedCount, window);
+    assert.equal(coverage.actualBucketCount, actual, window);
+    assert.equal(
+      coverage.missingBucketCount,
+      expectedCount - actual,
+      window,
+    );
+    assert.ok(Math.abs(coverage.coveragePercent - expectedPercent) < 1e-9, window);
+    assert.equal(coverage.partialData, true, window);
+  }
 }
 
-function testCompletenessClampAndZero() {
-  const now = 1_700_001_200_000;
-  const over = calculateCompleteness({
-    bucketCount: 100,
-    window: "1h",
-    collectingSince: now - 60 * BUCKET_MS,
-    now,
-  });
-  assert.equal(over.completeness, 1);
+function testCoverageClampDuplicatesAndZero() {
+  const full = calculateCoverage({ bucketCount: 240, window: "4h" });
+  assert.equal(full.coverageRatio, 1);
+  assert.equal(full.partialData, false);
 
-  const zero = calculateCompleteness({
-    bucketCount: 0,
-    window: "5m",
-    collectingSince: now,
-    now,
-  });
-  assert.equal(zero.completeness, 0);
-  assert.equal(zero.actualBuckets, 0);
+  const over = calculateCoverage({ bucketCount: 300, window: "4h" });
+  assert.equal(over.coverageRatio, 1);
+  assert.equal(over.coveragePercent, 100);
+
+  const zero = calculateCoverage({ bucketCount: 0, window: "5m" });
+  assert.equal(zero.coverageRatio, 0);
+  assert.equal(zero.actualBucketCount, 0);
+  assert.equal(zero.partialData, true);
+
+  const alias = calculateCompleteness({ bucketCount: 34, window: "4h" });
+  assert.equal(alias.coverageRatio, 34 / 240);
+  assert.equal(alias.completeness, alias.coverageRatio);
+}
+
+function testFormatCoveragePercentDisplay() {
+  assert.equal(formatCoveragePercent(14.17), "14");
+  assert.equal(formatCoveragePercent(9.99), "10.0");
+  assert.equal(formatCoveragePercent(0.34), "0.3");
+  assert.equal(formatCoveragePercent(0), "0");
 }
 
 function testUpsertSemanticsConstant() {
@@ -491,8 +500,9 @@ const tests = [
   ["all history windows", testAllHistoryWindows],
   ["invalid window", testInvalidWindow],
   ["window start and UTC floor", testWindowStartAndFloorUtc],
-  ["completeness partial and full", testCompletenessPartialAndFull],
-  ["completeness clamp and zero", testCompletenessClampAndZero],
+  ["coverage window ratios", testCoverageWindowRatios],
+  ["coverage clamp duplicates and zero", testCoverageClampDuplicatesAndZero],
+  ["format coverage percent display", testFormatCoveragePercentDisplay],
   ["upsert semantics constant", testUpsertSemanticsConstant],
   ["dedup defaults documented", testDedupDefaultsDocumented],
   ["migration static checks", testMigrationStaticChecks],
