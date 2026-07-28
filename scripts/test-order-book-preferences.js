@@ -57,12 +57,27 @@ function testModernExplicit100KRemains() {
 function testInvalidStoredFallback() {
   const prefs = normalizeOrderBookPreferences({
     largeTradeThreshold: 999_999,
-    largeTradeWindow: "7d",
+    largeTradeWindow: "2d",
+    flowWindow: "bad",
     symbol: "BTCUSDT",
   });
 
   assert.equal(prefs.largeTradeThreshold, 50_000);
   assert.equal(prefs.largeTradeWindow, "15m");
+  assert.equal(prefs.flowWindow, "5m");
+}
+
+function testHistoricalWindowsAccepted() {
+  const prefs = normalizeOrderBookPreferences({
+    flowWindow: "7d",
+    dominanceWindow: "4h",
+    largeTradeWindow: "1d",
+    symbol: "BTCUSDT",
+  });
+
+  assert.equal(prefs.flowWindow, "7d");
+  assert.equal(prefs.dominanceWindow, "4h");
+  assert.equal(prefs.largeTradeWindow, "1d");
 }
 
 function testBuildQueryIndependentWindows() {
@@ -113,6 +128,7 @@ const tests = [
   testLegacy100KMigratesTo50K,
   testModernExplicit100KRemains,
   testInvalidStoredFallback,
+  testHistoricalWindowsAccepted,
   testBuildQueryIndependentWindows,
   testSchemaMetadata,
   testArabicEmptyStateLabels,

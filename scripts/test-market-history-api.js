@@ -1,0 +1,163 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  validateHistoryFlowQuery,
+  validateHistoryLargeTradesQuery,
+} from "../lib/market-data/history/history-api-validation.js";
+import {
+  buildFlowDominance,
+  clearHistoryQueryCacheForTests,
+  queryHistoricalFlow,
+  queryHistoricalLargeTrades,
+} from "../lib/market-data/history/history-query.js";
+import { HISTORY_FLOW_API_WINDOWS, HISTORY_LARGE_TRADE_API_WINDOWS } from "../lib/market-data/constants.js";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+let passed = 0;
+
+function test(name, fn) {
+  fn();
+  passed += 1;
+}
+
+function fakeClient({ flowRows = [], largeRows = [] } = {}) {
+  return {
+    restGet(path) {
+      if (path.includes("market_flow_buckets")) return Promise.resolve(flowRows);
+      if (path.includes("market_large_trades")) return Promise.resolve(largeRows);
+      return Promise.resolve([]);
+    },
+  };
+}
+
+test("flow validation all windows", () => {
+  for (const window of HISTORY_FLOW_API_WINDOWS) {
+    const result = validateHistoryFlowQuery(
+      new URLSearchParams({ symbol: "BTCUSDT", window, scope: "aggregated" }),
+    );
+    assert.equal(result.valid, true, window);
+  }
+});
+
+test("large trades validation all windows", () => {
+  for (const window of HISTORY_LARGE_TRADE_API_WINDOWS) {
+    const result = validateHistoryLargeTradesQuery(
+      new URLSearchParams({ symbol: "BTCUSDT", window, minNotional: "50000" }),
+    );
+    assert.equal(result.valid, true, window);
+  }
+});
+
+test("invalid symbol rejected", () => {
+  assert.equal(validateHistoryFlowQuery(new URLSearchParams({ symbol: "BAD", window: "4h" })).valid, false);
+});
+
+test("invalid window rejected", () => {
+  assert.equal(
+    validateHistoryFlowQuery(new URLSearchParams({ symbol: "BTCUSDT", window: "2h" })).valid,
+    false,
+  );
+});
+
+test("invalid scope rejected", () => {
+  assert.equal(
+    validateHistoryFlowQuery(
+      new URLSearchParams({ symbol: "BTCUSDT", window: "4h", scope: "fake" }),
+    ).valid,
+    false,
+  );
+});
+
+test("dominance calculations", () => {
+  const result = buildFlowDominance({
+    buyNotional: 600,
+    sellNotional: 400,
+    buyCount: 6,
+    sellCount: 4,
+  });
+  assert.equal(result.buyPercent, 60);
+  assert.equal(result.dominantSide, "buyers");
+  assert.equal(result.netFlow, 200);
+});
+
+test("completeness partial when empty", async () => {
+  clearHistoryQueryCacheForTests();
+  const payload = await queryHistoricalFlow({
+    client: fakeClient({ flowRows: [] }),
+    symbol: "BTCUSDT",
+    window: "4h",
+    scope: "aggregated",
+    now: 1_700_000_000_000,
+  });
+  assert.equal(payload.partialData, true);
+  assert.equal(payload.bucketCount, 0);
+});
+
+test("flow query aggregates rows", async () => {
+  clearHistoryQueryCacheForTests();
+  const payload = await queryHistoricalFlow({
+    client: fakeClient({
+      flowRows: [
+        {
+          bucket_start: new Date(1_700_000_000_000).toISOString(),
+          buy_notional: 100,
+          sell_notional: 50,
+          buy_count: 2,
+          sell_count: 1,
+        },
+      ],
+    }),
+    symbol: "BTCUSDT",
+    window: "4h",
+    scope: "aggregated",
+    now: 1_700_000_000_000 + 4 * 60 * 60_000,
+  });
+  assert.equal(payload.buyNotional, 100);
+  assert.equal(payload.bucketCount, 1);
+});
+
+test("large trades limit maximum", () => {
+  const result = validateHistoryLargeTradesQuery(
+    new URLSearchParams({ symbol: "BTCUSDT", window: "4h", limit: "500" }),
+  );
+  assert.equal(result.valid, true);
+  assert.equal(result.params.limit, 100);
+});
+
+test("large trades empty DB", async () => {
+  clearHistoryQueryCacheForTests();
+  const payload = await queryHistoricalLargeTrades({
+    client: fakeClient({ largeRows: [] }),
+    symbol: "BTCUSDT",
+    window: "4h",
+    minNotional: 25_000,
+    limit: 50,
+    now: 1_700_000_000_000,
+  });
+  assert.deepEqual(payload.rows, []);
+  assert.equal(payload.totalCount, 0);
+});
+
+test("route files exist and avoid secret leakage patterns", () => {
+  const flowRoute = readFileSync(
+    join(ROOT, "app/api/market-depth/history/flow/route.js"),
+    "utf8",
+  );
+  const largeRoute = readFileSync(
+    join(ROOT, "app/api/market-depth/history/large-trades/route.js"),
+    "utf8",
+  );
+  assert.match(flowRoute, /marketHistoryLimiter/);
+  assert.match(largeRoute, /marketHistoryLimiter/);
+  assert.doesNotMatch(flowRoute, /SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(largeRoute, /console\.log/);
+});
+
+test("rate limit wired", () => {
+  const source = readFileSync(join(ROOT, "lib/rate-limit.js"), "utf8");
+  assert.match(source, /marketHistoryLimiter/);
+});
+
+console.log(`market-history-api tests passed: ${passed}/${passed}`);

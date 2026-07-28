@@ -4,8 +4,11 @@ import {
   DEFAULT_LARGE_TRADE_THRESHOLD,
   DEFAULT_LARGE_TRADE_WINDOW,
   DEFAULT_FLOW_WINDOW,
+  FLOW_WINDOW_OPTIONS,
   LARGE_TRADE_THRESHOLDS,
   LARGE_TRADE_WINDOW_OPTIONS,
+  LIVE_FLOW_WINDOWS,
+  LIVE_LARGE_TRADE_WINDOWS,
 } from "../../lib/market-data/constants.js";
 
 export const PREFERENCES_SCHEMA_VERSION = 3;
@@ -35,6 +38,10 @@ function sanitizeThreshold(value) {
   return LARGE_TRADE_THRESHOLDS.includes(parsed) ? parsed : DEFAULT_LARGE_TRADE_THRESHOLD;
 }
 
+function sanitizeFlowWindow(value) {
+  return FLOW_WINDOW_OPTIONS.includes(value) ? value : DEFAULT_FLOW_WINDOW;
+}
+
 function sanitizeLargeTradeWindow(value) {
   return LARGE_TRADE_WINDOW_OPTIONS.includes(value) ? value : DEFAULT_LARGE_TRADE_WINDOW;
 }
@@ -50,6 +57,12 @@ export function migrateOrderBookPreferences(stored = {}, { legacy = false } = {}
 
   if (!next.dominanceWindow && next.flowWindow) {
     next.dominanceWindow = next.flowWindow;
+  }
+  if (next.flowWindow) {
+    next.flowWindow = sanitizeFlowWindow(next.flowWindow);
+  }
+  if (next.dominanceWindow) {
+    next.dominanceWindow = sanitizeFlowWindow(next.dominanceWindow);
   }
 
   const explicitThreshold = next.__explicitLargeTradeThreshold === true;
@@ -79,6 +92,8 @@ export function normalizeOrderBookPreferences(stored = {}) {
 
   merged.largeTradeThreshold = sanitizeThreshold(merged.largeTradeThreshold);
   merged.largeTradeWindow = sanitizeLargeTradeWindow(merged.largeTradeWindow);
+  merged.flowWindow = sanitizeFlowWindow(merged.flowWindow);
+  merged.dominanceWindow = sanitizeFlowWindow(merged.dominanceWindow || merged.flowWindow);
 
   if (!merged.dominanceWindow) {
     merged.dominanceWindow = merged.flowWindow || DEFAULT_FLOW_WINDOW;
@@ -169,9 +184,19 @@ export function buildMarketDepthQuery(prefs) {
   if (prefs.precision != null) params.set("precision", String(prefs.precision));
   params.set("levels", String(prefs.levels));
   params.set("liquidityRange", String(prefs.liquidityRange));
-  params.set("flowWindow", prefs.flowWindow);
-  params.set("dominanceWindow", prefs.dominanceWindow || prefs.flowWindow);
-  params.set("largeTradeWindow", prefs.largeTradeWindow || DEFAULT_LARGE_TRADE_WINDOW);
+  params.set("flowWindow", LIVE_FLOW_WINDOWS.has(prefs.flowWindow) ? prefs.flowWindow : DEFAULT_FLOW_WINDOW);
+  params.set(
+    "dominanceWindow",
+    LIVE_FLOW_WINDOWS.has(prefs.dominanceWindow || prefs.flowWindow)
+      ? prefs.dominanceWindow || prefs.flowWindow
+      : DEFAULT_FLOW_WINDOW,
+  );
+  params.set(
+    "largeTradeWindow",
+    LIVE_LARGE_TRADE_WINDOWS.has(prefs.largeTradeWindow || DEFAULT_LARGE_TRADE_WINDOW)
+      ? prefs.largeTradeWindow || DEFAULT_LARGE_TRADE_WINDOW
+      : DEFAULT_LARGE_TRADE_WINDOW,
+  );
   params.set("largeTradeThreshold", String(prefs.largeTradeThreshold));
   return params.toString();
 }

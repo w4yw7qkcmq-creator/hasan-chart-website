@@ -4,6 +4,9 @@ import { useMemo } from "react";
 import Breadcrumbs from "../seo/Breadcrumbs";
 import { useMarketDepthStream } from "../../hooks/useMarketDepthStream";
 import {
+  useOrderBookHistory,
+} from "../../hooks/useOrderBookHistory";
+import {
   DEFAULT_LARGE_TRADE_THRESHOLD,
   DEFAULT_LARGE_TRADE_WINDOW,
   DEFAULT_LIQUIDITY_RANGE_PERCENT,
@@ -42,6 +45,16 @@ const breadcrumbs = [
 
 export default function OrderBookPageContent() {
   const { data, prefs, setPrefs, hydrated } = useMarketDepthStream();
+  const {
+    flowHistory,
+    dominanceHistory,
+    largeTradeHistory,
+    loading: historyLoading,
+    error: historyError,
+    needsFlowHistory,
+    needsDominanceHistory,
+    needsLargeTradeHistory,
+  } = useOrderBookHistory({ prefs, hydrated });
 
   const precisionOptions = useMemo(() => {
     const base = getDefaultPrecision(prefs.symbol);
@@ -53,7 +66,19 @@ export default function OrderBookPageContent() {
   const largeTradeThreshold = prefs.largeTradeThreshold ?? DEFAULT_LARGE_TRADE_THRESHOLD;
   const largeTradeWindow = prefs.largeTradeWindow ?? DEFAULT_LARGE_TRADE_WINDOW;
   const dominanceWindow = prefs.dominanceWindow ?? prefs.flowWindow;
-  const dominanceFlow = data?.dominanceFlow;
+  const dominanceFlow = needsDominanceHistory
+    ? dominanceHistory
+    : data?.dominanceFlow;
+
+  const executedFlow = needsFlowHistory ? flowHistory : data?.executedFlow;
+
+  const displayedLargeTrades = needsLargeTradeHistory
+    ? largeTradeHistory?.rows || []
+    : data?.largeTrades || [];
+
+  const largeTradesTitle = needsLargeTradeHistory
+    ? "الصفقات الكبيرة التاريخية"
+    : "الصفقات الكبيرة اللحظية";
 
   const largeTradeEmptyMessage = useMemo(
     () => formatLargeTradeEmptyMessage(largeTradeThreshold, largeTradeWindow),
@@ -182,7 +207,13 @@ export default function OrderBookPageContent() {
             <LiquidityDepthChart points={data?.depthMap || []} midPrice={data?.midPrice} />
           </Panel>
 
-          <Panel title="الصفقات الكبيرة اللحظية">
+          <Panel title={largeTradesTitle}>
+            <HistoryState
+              loading={needsLargeTradeHistory && historyLoading}
+              error={needsLargeTradeHistory && historyError}
+              partial={largeTradeHistory?.partialData}
+              completeness={largeTradeHistory?.completeness}
+            />
             <div className="max-h-80 overflow-y-auto overflow-x-hidden">
               <table className="w-full text-sm">
                 <thead>
@@ -194,7 +225,7 @@ export default function OrderBookPageContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(data?.largeTrades || []).map((trade) => (
+                  {displayedLargeTrades.map((trade) => (
                     <tr
                       key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
                       className="border-t border-slate-100 dark:border-white/5"
@@ -211,7 +242,7 @@ export default function OrderBookPageContent() {
                   ))}
                 </tbody>
               </table>
-              {!data?.largeTrades?.length ? (
+              {!displayedLargeTrades.length && !(needsLargeTradeHistory && historyLoading) ? (
                 <p className="py-6 text-center text-sm text-slate-500">{largeTradeEmptyMessage}</p>
               ) : null}
             </div>
@@ -231,6 +262,12 @@ export default function OrderBookPageContent() {
               />
             }
           >
+            <HistoryState
+              loading={needsDominanceHistory && historyLoading}
+              error={needsDominanceHistory && historyError}
+              partial={dominanceHistory?.partialData}
+              completeness={dominanceHistory?.completeness}
+            />
             <div className="space-y-3 text-sm">
               <MetricLine
                 label="شراء منفذ"
@@ -242,11 +279,17 @@ export default function OrderBookPageContent() {
               />
               <MetricLine
                 label="صافي التدفق"
-                value={formatUsd(dominanceFlow?.netNotional, { compact: true })}
+                value={formatUsd(
+                  dominanceFlow?.netNotional ?? dominanceFlow?.netFlow,
+                  { compact: true },
+                )}
               />
               <MetricLine label="نسبة المشترين" value={formatPercent(dominanceFlow?.buyPercent)} />
               <MetricLine label="نسبة البائعين" value={formatPercent(dominanceFlow?.sellPercent)} />
-              <MetricLine label="الطرف الغالب" value={dominanceFlow?.dominantSideLabel || "متوازن"} />
+              <MetricLine
+                label="الطرف الغالب"
+                value={dominanceFlow?.dominantSideLabel || "متوازن"}
+              />
               <MetricLine
                 label="قوة الغلبة"
                 value={formatPercent(dominanceFlow?.dominanceStrength)}
@@ -255,30 +298,52 @@ export default function OrderBookPageContent() {
                 {dominanceFlow?.dominanceLabel || dominanceFlow?.dominanceClassification || "متوازن"}
               </p>
               <p className="text-xs leading-6 text-slate-500 dark:text-slate-400">
-                هذا القسم يقيس الصفقات المنفذة فعلياً ضمن الإطار المختار، وليس السيولة الموضوعة في دفتر
-                الأوامر.
+                {needsDominanceHistory
+                  ? "هذا القسم يعرض الصفقات المنفذة من السجل التاريخي ضمن الإطار المختار."
+                  : "هذا القسم يقيس الصفقات المنفذة فعلياً ضمن الإطار المختار، وليس السيولة الموضوعة في دفتر الأوامر."}
               </p>
             </div>
           </Panel>
 
-          <Panel title="حجم الشراء/البيع المنفذ">
+          <Panel
+            title="حجم الشراء/البيع المنفذ"
+            action={
+              <ControlSelect
+                compact
+                label="إطار الحجم"
+                value={prefs.flowWindow}
+                onChange={(value) => setPrefs({ flowWindow: value })}
+                options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+              />
+            }
+          >
+            <HistoryState
+              loading={needsFlowHistory && historyLoading}
+              error={needsFlowHistory && historyError}
+              partial={flowHistory?.partialData}
+              completeness={flowHistory?.completeness}
+            />
             <div className="space-y-3 text-sm">
               <MetricLine
                 label="شراء منفذ"
-                value={formatUsd(data?.executedFlow?.buyNotional, { compact: true })}
+                value={formatUsd(executedFlow?.buyNotional, { compact: true })}
               />
               <MetricLine
                 label="بيع منفذ"
-                value={formatUsd(data?.executedFlow?.sellNotional, { compact: true })}
+                value={formatUsd(executedFlow?.sellNotional, { compact: true })}
               />
               <MetricLine
                 label="صافي التدفق"
-                value={formatUsd(data?.executedFlow?.netNotional, { compact: true })}
+                value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, {
+                  compact: true,
+                })}
               />
-              <MetricLine label="نسبة الشراء" value={formatPercent(data?.executedFlow?.buyPercent)} />
-              <MetricLine label="نسبة البيع" value={formatPercent(data?.executedFlow?.sellPercent)} />
+              <MetricLine label="نسبة الشراء" value={formatPercent(executedFlow?.buyPercent)} />
+              <MetricLine label="نسبة البيع" value={formatPercent(executedFlow?.sellPercent)} />
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                هذا القسم يقيس الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر.
+                {needsFlowHistory
+                  ? "هذا القسم يعرض الحجم المنفذ من السجل التاريخي."
+                  : "هذا القسم يقيس الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر."}
               </p>
             </div>
           </Panel>
@@ -307,6 +372,36 @@ export default function OrderBookPageContent() {
       </div>
     </div>
   );
+}
+
+function HistoryState({ loading, error, partial, completeness }) {
+  if (loading) {
+    return (
+      <p className="mb-3 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+        جاري تحميل البيانات التاريخية...
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+        تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.
+      </p>
+    );
+  }
+
+  if (partial) {
+    const percent = Math.round((Number(completeness) || 0) * 100);
+    return (
+      <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+        البيانات التاريخية قيد التجميع — التغطية{" "}
+        <NumericValue>{percent}%</NumericValue>
+      </p>
+    );
+  }
+
+  return null;
 }
 
 function NumericValue({ children, className = "" }) {

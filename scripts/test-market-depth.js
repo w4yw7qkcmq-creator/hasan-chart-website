@@ -723,6 +723,19 @@ function testBinanceAdapterUsesFallbackAndIpv4() {
   assert.match(source, /endpoint_rotate/);
 }
 
+function testHubHistoryIntegrationGuards() {
+  const source = readFileSync(
+    fileURLToPath(new URL("../lib/market-data/market-depth-hub.js", import.meta.url)),
+    "utf8"
+  );
+  assert.match(source, /getHistoricalMarketRecorder/);
+  assert.match(source, /startHistoricalMarketRecorder/);
+  assert.match(source, /historyRecorder\.recordTrade\(trade\)/);
+  assert.doesNotMatch(source, /await\s+this\.historyRecorder\.recordTrade/);
+  const buildPayload = source.slice(source.indexOf("buildPayload(params)"));
+  assert.doesNotMatch(buildPayload, /historyWriter|historyRecorder|getHistoryWriterStatus/);
+}
+
 const tests = [
   testSymbolNormalization,
   testSnapshotAndDelta,
@@ -762,6 +775,7 @@ const tests = [
   testBinanceReconnectDelayHasJitter,
   testBinanceLiveConnectedGate,
   testBinanceAdapterUsesFallbackAndIpv4,
+  testHubHistoryIntegrationGuards,
 ];
 
 let passed = 0;
