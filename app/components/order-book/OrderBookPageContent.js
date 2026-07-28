@@ -1,17 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Breadcrumbs from "../seo/Breadcrumbs";
 import { useMarketDepthStream } from "../../hooks/useMarketDepthStream";
 import {
   useOrderBookHistory,
 } from "../../hooks/useOrderBookHistory";
+import { useOrderBookLiquidityWalls } from "../../hooks/useOrderBookLiquidityWalls";
 import {
   DEFAULT_LARGE_TRADE_THRESHOLD,
   DEFAULT_LARGE_TRADE_WINDOW,
   DEFAULT_LIQUIDITY_RANGE_PERCENT,
+  DEFAULT_LIQUIDITY_WALL_WINDOW,
   DEPTH_LEVEL_OPTIONS,
   FLOW_WINDOW_OPTIONS,
+  HISTORICAL_LIQUIDITY_WALL_WINDOWS,
   LARGE_TRADE_THRESHOLDS,
   LARGE_TRADE_WINDOW_OPTIONS,
   LIQUIDITY_RANGE_OPTIONS,
@@ -46,6 +49,7 @@ const breadcrumbs = [
 
 export default function OrderBookPageContent() {
   const { data, prefs, setPrefs, hydrated } = useMarketDepthStream();
+  const [liquidityWallWindow, setLiquidityWallWindow] = useState(DEFAULT_LIQUIDITY_WALL_WINDOW);
   const {
     flowHistory,
     dominanceHistory,
@@ -56,6 +60,11 @@ export default function OrderBookPageContent() {
     needsDominanceHistory,
     needsLargeTradeHistory,
   } = useOrderBookHistory({ prefs, hydrated });
+  const {
+    liquidityWallsHistory,
+    loading: liquidityWallsLoading,
+    error: liquidityWallsError,
+  } = useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow: liquidityWallWindow });
 
   const precisionOptions = useMemo(() => {
     const base = getDefaultPrecision(prefs.symbol);
@@ -354,6 +363,42 @@ export default function OrderBookPageContent() {
             <WallBlock title="أكبر جدار بيع" wall={data?.walls?.largestAsk} />
           </Panel>
 
+          <Panel
+            title="Historical Liquidity Walls"
+            action={
+              <ControlSelect
+                compact
+                label="إطار الجدران التاريخية"
+                value={liquidityWallWindow}
+                onChange={setLiquidityWallWindow}
+                options={HISTORICAL_LIQUIDITY_WALL_WINDOWS.map((value) => ({
+                  value,
+                  label: value,
+                }))}
+              />
+            }
+          >
+            <HistoryState
+              loading={liquidityWallsLoading}
+              error={liquidityWallsError}
+              partial={liquidityWallsHistory?.partialData}
+              coveragePercent={liquidityWallsHistory?.coveragePercent}
+            />
+            <LiquidityWallAnalytics analytics={liquidityWallsHistory?.analytics} />
+            <HistoricalLiquidityWallsSection
+              title="Top Persistent Walls"
+              rows={liquidityWallsHistory?.topPersistent || []}
+            />
+            <HistoricalLiquidityWallsSection
+              title="Top Appeared Walls"
+              rows={liquidityWallsHistory?.topAppeared || []}
+            />
+            <HistoricalLiquidityWallsSection
+              title="Recently Disappeared"
+              rows={liquidityWallsHistory?.recentlyDisappeared || []}
+            />
+          </Panel>
+
           <Panel title="حالة المنصات">
             <div className="space-y-2">
               {(data?.exchangeStatuses || []).map((item) => (
@@ -491,6 +536,109 @@ function WallBlock({ title, wall }) {
           البعد عن السعر: <NumericValue>{formatPercent(wall.distancePercent)}</NumericValue>
         </p>
       </div>
+    </div>
+  );
+}
+
+function LiquidityWallAnalytics({ analytics }) {
+  if (!analytics) return null;
+
+  const items = [
+    { label: "Strongest Wall", row: analytics.strongestWall },
+    { label: "Longest Living Wall", row: analytics.longestLivingWall },
+    { label: "Most Reappeared Wall", row: analytics.mostReappearedWall },
+    { label: "Largest Notional Wall", row: analytics.largestNotionalWall },
+  ].filter((item) => item.row);
+
+  if (!items.length) return null;
+
+  return (
+    <div className="mb-4 grid gap-2 sm:grid-cols-2">
+      {items.map(({ label, row }) => {
+        const isBid = row.side === "bid";
+        return (
+          <div
+            key={label}
+            className="rounded-xl border border-slate-200 p-3 text-xs dark:border-white/10"
+          >
+            <p className="mb-1 font-medium text-slate-700 dark:text-slate-200">{label}</p>
+            <p className={isBid ? "text-emerald-600" : "text-rose-600"}>
+              {isBid ? "Buy" : "Sell"} · <NumericValue>{formatPrice(row.price)}</NumericValue>
+            </p>
+            <p className="text-slate-500 dark:text-slate-400">
+              Persistence: <NumericValue>{Math.round(row.persistenceScore)}%</NumericValue>
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function HistoricalLiquidityWallsSection({ title, rows }) {
+  return (
+    <div className="mb-4">
+      <p className="mb-2 text-sm font-medium text-slate-800 dark:text-slate-100">{title}</p>
+      <HistoricalLiquidityWallsTable rows={rows} />
+    </div>
+  );
+}
+
+function HistoricalLiquidityWallsTable({ rows }) {
+  if (!rows.length) {
+    return (
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        لا توجد جدران تاريخية مهمة ضمن الإطار المختار بعد.
+      </p>
+    );
+  }
+
+  return (
+    <div className="max-h-96 overflow-y-auto overflow-x-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs text-slate-500 dark:text-slate-400">
+            <th className="py-2 text-right">الاتجاه</th>
+            <th className="py-2 text-right">السعر</th>
+            <th className="py-2 text-right">الحجم</th>
+            <th className="py-2 text-right">Persistence</th>
+            <th className="py-2 text-right">المدة</th>
+            <th className="py-2 text-right">الظهور</th>
+            <th className="py-2 text-right">البورصة</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const isBid = row.side === "bid";
+            return (
+              <tr
+                key={row.wallKey}
+                className="border-t border-slate-100 dark:border-white/5"
+              >
+                <td className={`py-2 ${isBid ? "text-emerald-600" : "text-rose-600"}`}>
+                  {isBid ? "Buy" : "Sell"}
+                </td>
+                <td className="py-2">
+                  <NumericValue>{formatPrice(row.price)}</NumericValue>
+                </td>
+                <td className="py-2">
+                  <NumericValue>{formatQuantity(row.size)}</NumericValue>
+                </td>
+                <td className="py-2">
+                  <NumericValue>{Math.round(row.persistenceScore)}%</NumericValue>
+                </td>
+                <td className="py-2">
+                  <NumericValue>{row.lifetimeSeconds}s</NumericValue>
+                </td>
+                <td className="py-2">
+                  <NumericValue>{row.appearanceCount}</NumericValue>
+                </td>
+                <td className="py-2">{EXCHANGE_LABELS[row.exchange] || row.exchange}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

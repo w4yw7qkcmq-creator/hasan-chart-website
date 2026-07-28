@@ -219,6 +219,14 @@ function testCoveragePercentFormattingForUi() {
   assert.notEqual(formatCoveragePercent(14.17), "97");
 }
 
+function testMarketLiquidityHistoryMetricsExposure() {
+  assert.match(healthSource, /marketLiquidityHistory/);
+  assert.match(healthSource, /function checkMarketLiquidityHistoryHealth\(\)/);
+  assert.match(healthSource, /trackedWalls/);
+  assert.match(healthSource, /storedWalls/);
+  assert.match(healthSource, /getLiquidityWallWriterStatus/);
+}
+
 const tests = [
   ["redis lazy does not degrade overall", testRedisLazyDoesNotDegradeOverall],
   ["transient database timeout keeps overall ok", testTransientDatabaseTimeoutWithRecentSuccess],
@@ -233,6 +241,7 @@ const tests = [
   ["cache and in-flight dedup present", testCacheAndInflightPresentInSource],
   ["readiness field without breaking status contract", testReadinessFieldAddedWithoutBreakingStatusContract],
   ["market history metrics exposure", testMarketHistoryMetricsExposure],
+  ["market liquidity history metrics exposure", testMarketLiquidityHistoryMetricsExposure],
   ["coverage percent formatting for ui", testCoveragePercentFormattingForUi],
 ];
 

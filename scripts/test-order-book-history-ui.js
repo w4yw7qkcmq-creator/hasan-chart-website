@@ -101,13 +101,26 @@ test("UI window options include long frames", () => {
   assert.ok(LARGE_TRADE_WINDOW_OPTIONS.includes("7d"));
 });
 
-test("no historical walls claim", () => {
+test("historical liquidity walls panel present", () => {
   const source = readFileSync(
     join(ROOT, "app/components/order-book/OrderBookPageContent.js"),
     "utf8",
   );
-  assert.match(source, /جدران السيولة/);
-  assert.doesNotMatch(source, /جدران.*تاريخ/i);
+  assert.match(source, /Historical Liquidity Walls/);
+  assert.match(source, /useOrderBookLiquidityWalls/);
+  assert.match(source, /HistoricalLiquidityWallsTable/);
+  assert.match(source, /LiquidityWallAnalytics/);
+  assert.match(source, /Top Persistent Walls/);
+  assert.match(source, /Recently Disappeared/);
+  assert.match(source, /HISTORICAL_LIQUIDITY_WALL_WINDOWS/);
+  assert.match(source, /text-emerald-600/);
+  assert.match(source, /text-rose-600/);
+});
+
+test("liquidity walls hook calls history API", () => {
+  const source = readFileSync(join(ROOT, "app/hooks/useOrderBookLiquidityWalls.js"), "utf8");
+  assert.match(source, /\/api\/market-depth\/history\/liquidity-walls/);
+  assert.match(source, /HISTORICAL_LIQUIDITY_WALL_WINDOWS/);
 });
 
 test("history API routes referenced by hook", () => {
