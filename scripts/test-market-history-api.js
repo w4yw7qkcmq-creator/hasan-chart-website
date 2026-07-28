@@ -9,6 +9,7 @@ import {
 import {
   buildFlowDominance,
   clearHistoryQueryCacheForTests,
+  createHistoryQueryClient,
   queryHistoricalFlow,
   queryHistoricalLargeTrades,
 } from "../lib/market-data/history/history-query.js";
@@ -158,6 +159,22 @@ test("route files exist and avoid secret leakage patterns", () => {
 test("rate limit wired", () => {
   const source = readFileSync(join(ROOT, "lib/rate-limit.js"), "utf8");
   assert.match(source, /marketHistoryLimiter/);
+});
+
+test("history query client uses NEXT_PUBLIC_SUPABASE_URL fallback", () => {
+  const prevPublic = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const prevPrivate = process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  try {
+    const client = createHistoryQueryClient({ serviceKey: "test-service-key" });
+    assert.equal(client.url, "https://example.supabase.co");
+  } finally {
+    if (prevPublic === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = prevPublic;
+    if (prevPrivate === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = prevPrivate;
+  }
 });
 
 console.log(`market-history-api tests passed: ${passed}/${passed}`);
