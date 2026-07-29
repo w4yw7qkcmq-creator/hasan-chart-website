@@ -126,13 +126,34 @@ function RealtimeTable({ rows }) {
   );
 }
 
-export default function LiquidationsPanel({ data, loading, error }) {
-  const unavailable = error || data?.available === false || data?.success === false;
+function hasDisplayableData(data) {
+  if (!data?.summary) return false;
+  return Object.values(data.summary).some(
+    (bucket) => bucket?.total != null && Number.isFinite(Number(bucket.total)),
+  );
+}
+
+export default function LiquidationsPanel({ data, initialLoading, isRefreshing, error }) {
+  const hasData = hasDisplayableData(data);
+  const unavailable =
+    !hasData &&
+    !initialLoading &&
+    (error === "UNAVAILABLE" || error === "FETCH_FAILED" || data?.available === false || data?.success === false);
   const summary = data?.summary;
   const exchanges = data?.exchanges || [];
   const realtime = data?.realtime || [];
+  const showStaleBadge = Boolean(data?.stale);
+  const statusAction = showStaleBadge ? (
+    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+      بيانات قديمة
+    </span>
+  ) : isRefreshing ? (
+    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
+      جاري التحديث...
+    </span>
+  ) : null;
 
-  if (loading && !data) {
+  if (initialLoading && !hasData) {
     return (
       <section className="mb-5 space-y-5">
         <Panel title="تصفيات السوق" description="جاري تحميل بيانات التصفيات...">
@@ -161,13 +182,7 @@ export default function LiquidationsPanel({ data, loading, error }) {
       <Panel
         title="ملخص التصفيات"
         description="إجمالي تصفيات Long وShort عبر الإطارات الزمنية."
-        action={
-          data?.stale ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-              بيانات قديمة
-            </span>
-          ) : null
-        }
+        action={statusAction}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryWindowCard title="1h" bucket={summary?.["1h"]} />

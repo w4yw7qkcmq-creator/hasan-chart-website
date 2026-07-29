@@ -110,7 +110,8 @@ export default function OrderBookPageContent() {
   } = useLiquidityDepthHistory({ prefs, hydrated, depthWindow: liquidityDepthWindow });
   const {
     data: liquidationsData,
-    loading: liquidationsLoading,
+    initialLoading: liquidationsInitialLoading,
+    isRefreshing: liquidationsRefreshing,
     error: liquidationsError,
   } = useOrderBookLiquidations({ hydrated });
 
@@ -595,7 +596,8 @@ export default function OrderBookPageContent() {
 
       <LiquidationsPanel
         data={liquidationsData}
-        loading={liquidationsLoading}
+        initialLoading={liquidationsInitialLoading}
+        isRefreshing={liquidationsRefreshing}
         error={liquidationsError}
       />
 

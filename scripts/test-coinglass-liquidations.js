@@ -15,7 +15,9 @@ import {
   parseRealtimeOrders,
   parseSummaryFromCoinLiquidation,
   resetCoinglassLiquidationsCacheForTests,
+  sortRealtimeOrdersDescending,
 } from "../lib/market-data/liquidations/coinglass-public-source.js";
+import { LIQUIDATIONS_CLIENT_TIMEOUT_MS } from "../app/hooks/useOrderBookLiquidations.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_DIR = join(__dirname, "fixtures/coinglass-liquidations");
@@ -89,6 +91,74 @@ test("parseRealtimeOrders maps side and exchange fields", () => {
   assert.equal(rows[1].side, "long");
 });
 
+test("sortRealtimeOrdersDescending orders newest first with invalid timestamps last", () => {
+  const sorted = sortRealtimeOrdersDescending([
+    { id: "old", time: 1000, symbol: "A" },
+    { id: "new", time: 5000, symbol: "B" },
+    { id: "invalid", time: null, symbol: "C" },
+    { id: "mid", liquidatedAt: 3000, symbol: "D" },
+  ]);
+  assert.deepEqual(
+    sorted.map((row) => row.id),
+    ["new", "mid", "old", "invalid"],
+  );
+});
+
+test("parseRealtimeOrders sorts descending without mutating source list", () => {
+  const source = {
+    list: [
+      { symbol: "A", volUsd: 1, createTime: 1000, side: 1, exchangeName: "Binance" },
+      { symbol: "B", volUsd: 2, createTime: 3000, side: 2, exchangeName: "OKX" },
+      { symbol: "C", volUsd: 3, createTime: 2000, side: 1, exchangeName: "Bybit" },
+    ],
+  };
+  const originalTimes = source.list.map((row) => row.createTime);
+  const rows = parseRealtimeOrders(source);
+  assert.deepEqual(
+    rows.map((row) => row.symbol),
+    ["B", "C", "A"],
+  );
+  assert.deepEqual(
+    source.list.map((row) => row.createTime),
+    originalTimes,
+  );
+});
+
+test("useOrderBookLiquidations uses 18s client timeout", () => {
+  assert.equal(LIQUIDATIONS_CLIENT_TIMEOUT_MS, 18_000);
+  const hook = readFileSync(
+    join(__dirname, "../app/hooks/useOrderBookLiquidations.js"),
+    "utf8",
+  );
+  assert.match(hook, /LIQUIDATIONS_CLIENT_TIMEOUT_MS/);
+  assert.doesNotMatch(hook, /10_000/);
+});
+
+test("useOrderBookLiquidations keeps prior data on refresh failure", () => {
+  const hook = readFileSync(
+    join(__dirname, "../app/hooks/useOrderBookLiquidations.js"),
+    "utf8",
+  );
+  assert.match(hook, /initialLoading/);
+  assert.match(hook, /isRefreshing/);
+  assert.match(hook, /lastSuccessfulRef/);
+  assert.match(hook, /REFRESH_FAILED/);
+  assert.match(hook, /stale: true/);
+  assert.match(hook, /setData\(null\)/);
+});
+
+test("LiquidationsPanel only shows unavailable without successful data", () => {
+  const ui = readFileSync(
+    join(__dirname, "../app/components/order-book/LiquidationsPanel.js"),
+    "utf8",
+  );
+  assert.match(ui, /initialLoading/);
+  assert.match(ui, /isRefreshing/);
+  assert.match(ui, /!hasData/);
+  assert.match(ui, /!initialLoading/);
+  assert.match(ui, /جاري التحديث/);
+});
+
 test("missing encrypted fields throws without fake numbers", () => {
   assert.throws(
     () =>
@@ -114,6 +184,20 @@ test("cache and stale constants stay within requested bounds", () => {
   assert.ok(CACHE_TTL_MS >= 10_000 && CACHE_TTL_MS <= 30_000);
   assert.ok(STALE_TTL_MS >= 60_000);
   resetCoinglassLiquidationsCacheForTests();
+});
+
+test("useOrderBookLiquidations cold load waits for timeout before unavailable", () => {
+  const hook = readFileSync(
+    join(__dirname, "../app/hooks/useOrderBookLiquidations.js"),
+    "utf8",
+  );
+  const ui = readFileSync(
+    join(__dirname, "../app/components/order-book/LiquidationsPanel.js"),
+    "utf8",
+  );
+  assert.match(hook, /setInitialLoading\(true\)/);
+  assert.match(ui, /initialLoading && !hasData/);
+  assert.match(ui, /animate-pulse/);
 });
 
 test("LiquidationsPanel includes loading/error/unavailable copy", () => {
