@@ -269,6 +269,65 @@ test("query API shapes top lists and analytics", async () => {
   assert.equal(payload.recentlyDisappeared.length, 1);
   assert.equal(payload.analytics.strongestWall.wallKey, "BTCUSDT:binance:bid:100");
   assert.equal(payload.analytics.largestNotionalWall.strongestNotional, 1500);
+  assert.equal(payload.aggregatedDepthPoints.length, 2);
+  assert.equal(payload.aggregatedDepthPoints[0].side, "bid");
+});
+
+test("depth aggregation merges same price and side", async () => {
+  const { aggregateWallsForDepthChart } = await import(
+    "../lib/market-data/history/liquidity-walls/depth-chart-aggregation.js"
+  );
+  const points = aggregateWallsForDepthChart([
+    {
+      side: "bid",
+      price: 100,
+      strongestNotional: 1000,
+      persistenceScore: 40,
+      exchange: "binance",
+      lastSeen: 1000,
+    },
+    {
+      side: "bid",
+      price: 100,
+      strongestNotional: 500,
+      persistenceScore: 60,
+      exchange: "okx",
+      lastSeen: 2000,
+    },
+  ]);
+  assert.equal(points.length, 1);
+  assert.equal(points[0].notional, 1500);
+  assert.equal(points[0].exchangeCount, 2);
+  assert.equal(points[0].persistenceScore, 60);
+});
+
+test("wall time coverage stays low shortly after collection starts", async () => {
+  const { calculateWallTimeCoverage } = await import(
+    "../lib/market-data/history/liquidity-walls/liquidity-wall-query.js"
+  );
+  const now = Date.parse("2026-07-29T01:00:00.000Z");
+  const collectingSince = Date.parse("2026-07-29T00:55:00.000Z");
+  const coverage = calculateWallTimeCoverage({
+    rows: [
+      {
+        firstSeen: collectingSince,
+        lastSeen: now - 60_000,
+      },
+    ],
+    window: "4h",
+    now,
+    collectingSince,
+  });
+  assert.ok(coverage.coveragePercent < 20);
+  assert.equal(coverage.partialData, true);
+});
+
+test("1h window is accepted by liquidity walls validation", () => {
+  const result = validateHistoryLiquidityWallsQuery(
+    new URLSearchParams({ symbol: "BTCUSDT", window: "1h" }),
+  );
+  assert.equal(result.valid, true);
+  assert.equal(result.params.window, "1h");
 });
 
 test("recorder keeps one pending row per wall key", () => {

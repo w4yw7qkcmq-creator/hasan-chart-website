@@ -5,15 +5,19 @@ import Breadcrumbs from "../seo/Breadcrumbs";
 import { useMarketDepthStream } from "../../hooks/useMarketDepthStream";
 import { useOrderBookHistory } from "../../hooks/useOrderBookHistory";
 import { useOrderBookLiquidityWalls } from "../../hooks/useOrderBookLiquidityWalls";
+import { useOrderBook24hSummary } from "../../hooks/useOrderBook24hSummary";
+import { useLiquidityDepthHistory } from "../../hooks/useLiquidityDepthHistory";
 import {
   DEFAULT_LARGE_TRADE_THRESHOLD,
   DEFAULT_LARGE_TRADE_WINDOW,
+  DEFAULT_LIQUIDITY_DEPTH_WINDOW,
   DEFAULT_LIQUIDITY_RANGE_PERCENT,
   DEFAULT_LIQUIDITY_WALL_WINDOW,
   DEPTH_LEVEL_OPTIONS,
   FLOW_WINDOW_OPTIONS,
   LARGE_TRADE_THRESHOLDS,
   LARGE_TRADE_WINDOW_OPTIONS,
+  LIQUIDITY_DEPTH_WINDOW_OPTIONS,
   LIQUIDITY_RANGE_OPTIONS,
 } from "../../../lib/market-data/constants";
 import {
@@ -58,6 +62,7 @@ const breadcrumbs = [
 export default function OrderBookPageContent() {
   const { data, prefs, setPrefs, hydrated } = useMarketDepthStream();
   const [liquidityWallWindow, setLiquidityWallWindow] = useState(DEFAULT_LIQUIDITY_WALL_WINDOW);
+  const [liquidityDepthWindow, setLiquidityDepthWindow] = useState(DEFAULT_LIQUIDITY_DEPTH_WINDOW);
   const {
     flowHistory,
     dominanceHistory,
@@ -73,6 +78,18 @@ export default function OrderBookPageContent() {
     loading: liquidityWallsLoading,
     error: liquidityWallsError,
   } = useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow: liquidityWallWindow });
+  const {
+    summary: summary24h,
+    loading: summary24hLoading,
+    error: summary24hError,
+  } = useOrderBook24hSummary({ symbol: prefs.symbol, hydrated });
+  const {
+    depthHistory,
+    loading: depthHistoryLoading,
+    error: depthHistoryError,
+  } = useLiquidityDepthHistory({ prefs, hydrated, depthWindow: liquidityDepthWindow });
+
+  const isLiveDepth = liquidityDepthWindow === "live";
 
   const precisionOptions = useMemo(() => {
     const base = getDefaultPrecision(prefs.symbol);
@@ -99,6 +116,13 @@ export default function OrderBookPageContent() {
     () => formatLargeTradeEmptyMessage(largeTradeThreshold, largeTradeWindow),
     [largeTradeThreshold, largeTradeWindow],
   );
+
+  const summaryNetFlow = summary24h?.netFlow ?? summary24h?.netNotional;
+  const summaryNetTone =
+    Number(summaryNetFlow) > 0 ? "buy" : Number(summaryNetFlow) < 0 ? "sell" : undefined;
+  const summaryPartial = Boolean(summary24h?.partialData);
+  const summaryCoverage = summary24h?.coveragePercent;
+  const summaryHint = "محسوبة من حجم الصفقات المنفذة خلال آخر 24 ساعة.";
 
   const connectedCount = (data?.exchangeStatuses || []).filter((item) => item.status === "connected").length;
   const totalExchanges = data?.exchangeStatuses?.length || 3;
@@ -153,21 +177,52 @@ export default function OrderBookPageContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-7">
-          <StatTile label="السبريد" value={formatPrice(data?.spread, 4)} />
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-7">
+          <StatTile label="السبريد" sublabel="لحظي" value={formatPrice(data?.spread, 4)} />
           <StatTile
             label="نسبة الشراء"
-            value={formatPercent(dominanceFlow?.buyPercent)}
+            sublabel="آخر 24 ساعة"
+            value={
+              summary24hLoading && !summary24h
+                ? "…"
+                : summary24hError
+                  ? "—"
+                  : formatPercent(summary24h?.buyPercent)
+            }
             tone="buy"
+            hint={summaryHint}
+            partial={summaryPartial}
+            coveragePercent={summaryCoverage}
           />
           <StatTile
             label="نسبة البيع"
-            value={formatPercent(dominanceFlow?.sellPercent)}
+            sublabel="آخر 24 ساعة"
+            value={
+              summary24hLoading && !summary24h
+                ? "…"
+                : summary24hError
+                  ? "—"
+                  : formatPercent(summary24h?.sellPercent)
+            }
             tone="sell"
+            hint={summaryHint}
+            partial={summaryPartial}
+            coveragePercent={summaryCoverage}
           />
           <StatTile
             label="صافي التدفق"
-            value={formatUsd(dominanceFlow?.netNotional ?? dominanceFlow?.netFlow, { compact: true })}
+            sublabel="آخر 24 ساعة"
+            value={
+              summary24hLoading && !summary24h
+                ? "…"
+                : summary24hError
+                  ? "—"
+                  : formatUsd(summaryNetFlow, { compact: true })
+            }
+            tone={summaryNetTone}
+            hint={summaryHint}
+            partial={summaryPartial}
+            coveragePercent={summaryCoverage}
           />
         </div>
       </section>
@@ -245,18 +300,16 @@ export default function OrderBookPageContent() {
                 ? "الصفقات المنفذة من السجل التاريخي ضمن الإطار المختار."
                 : "الصفقات المنفذة فعلياً ضمن الإطار المختار."
             }
-            action={
-              <SegmentedControl
-                compact
-                ariaLabel="إطار السيطرة"
-                label="الإطار"
-                value={dominanceWindow}
-                onChange={(value) => setPrefs({ dominanceWindow: value })}
-                scrollable
-                options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-              />
-            }
           >
+            <SegmentedControl
+              compact
+              ariaLabel="إطار السيطرة"
+              label="الإطار"
+              value={dominanceWindow}
+              onChange={(value) => setPrefs({ dominanceWindow: value })}
+              scrollable
+              options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+            />
             <HistoryState
               loading={needsDominanceHistory && historyLoading}
               error={needsDominanceHistory && historyError}
@@ -295,18 +348,16 @@ export default function OrderBookPageContent() {
                 ? "الحجم المنفذ من السجل التاريخي."
                 : "الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر."
             }
-            action={
-              <SegmentedControl
-                compact
-                ariaLabel="إطار الحجم"
-                label="الإطار"
-                value={prefs.flowWindow}
-                onChange={(value) => setPrefs({ flowWindow: value })}
-                scrollable
-                options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-              />
-            }
           >
+            <SegmentedControl
+              compact
+              ariaLabel="إطار الحجم"
+              label="الإطار"
+              value={prefs.flowWindow}
+              onChange={(value) => setPrefs({ flowWindow: value })}
+              scrollable
+              options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+            />
             <HistoryState
               loading={needsFlowHistory && historyLoading}
               error={needsFlowHistory && historyError}
@@ -345,42 +396,64 @@ export default function OrderBookPageContent() {
       <section className="mb-6 grid items-start gap-6 lg:grid-cols-12">
         <Panel
           className="lg:col-span-7"
-          title="خريطة عمق السيولة"
-          description="توزيع السيولة الشرائية والبيعية حول السعر الحالي."
+          title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
+          description={
+            isLiveDepth
+              ? "توزيع أوامر الشراء والبيع الظاهرة حاليًا حول السعر."
+              : "مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
+          }
         >
-          <LiquidityDepthChart points={data?.depthMap || []} midPrice={data?.midPrice} />
+          <div className="mb-4">
+            <SegmentedControl
+              compact
+              ariaLabel="إطار خريطة السيولة"
+              label="الإطار"
+              value={liquidityDepthWindow}
+              onChange={setLiquidityDepthWindow}
+              scrollable
+              options={LIQUIDITY_DEPTH_WINDOW_OPTIONS}
+            />
+          </div>
+          <LiquidityDepthChart
+            mode={isLiveDepth ? "live" : "historical"}
+            points={isLiveDepth ? data?.depthMap || [] : depthHistory?.aggregatedDepthPoints || []}
+            midPrice={data?.midPrice}
+            loading={!isLiveDepth && depthHistoryLoading}
+            error={!isLiveDepth && depthHistoryError}
+            partial={depthHistory?.partialData}
+            coveragePercent={depthHistory?.coveragePercent}
+            collecting={depthHistory?.collecting}
+          />
         </Panel>
 
         <Panel
           className="lg:col-span-5"
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
-          action={
-            <div className="flex w-full flex-col gap-3 sm:w-auto">
-              <SegmentedControl
-                compact
-                ariaLabel="حد الصفقة الكبيرة"
-                label="الحد"
-                value={String(largeTradeThreshold)}
-                onChange={(value) => setPrefs({ largeTradeThreshold: Number(value) })}
-                scrollable
-                options={LARGE_TRADE_THRESHOLDS.map((value) => ({
-                  value: String(value),
-                  label: formatThresholdLabel(value),
-                }))}
-              />
-              <SegmentedControl
-                compact
-                ariaLabel="نافذة الصفقات الكبيرة"
-                label="الإطار"
-                value={largeTradeWindow}
-                onChange={(value) => setPrefs({ largeTradeWindow: value })}
-                scrollable
-                options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-              />
-            </div>
-          }
         >
+          <div className="mb-4 space-y-3">
+            <SegmentedControl
+              compact
+              ariaLabel="حد الصفقة الكبيرة"
+              label="الحد"
+              value={String(largeTradeThreshold)}
+              onChange={(value) => setPrefs({ largeTradeThreshold: Number(value) })}
+              scrollable
+              options={LARGE_TRADE_THRESHOLDS.map((value) => ({
+                value: String(value),
+                label: formatThresholdLabel(value),
+              }))}
+            />
+            <SegmentedControl
+              compact
+              ariaLabel="نافذة الصفقات الكبيرة"
+              label="الإطار"
+              value={largeTradeWindow}
+              onChange={(value) => setPrefs({ largeTradeWindow: value })}
+              scrollable
+              options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+            />
+          </div>
           <HistoryState
             loading={needsLargeTradeHistory && historyLoading}
             error={needsLargeTradeHistory && historyError}

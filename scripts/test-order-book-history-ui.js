@@ -189,4 +189,42 @@ test("mobile layout classes present", () => {
   assert.match(page, /overflow-x-auto/);
 });
 
+test("24h summary uses dedicated hook with fixed 1d window", () => {
+  const summaryHook = readFileSync(join(ROOT, "app/hooks/useOrderBook24hSummary.js"), "utf8");
+  const { page } = readSources();
+  assert.match(summaryHook, /window=1d|SUMMARY_WINDOW = "1d"/);
+  assert.match(summaryHook, /scope=aggregated|SUMMARY_SCOPE = "aggregated"/);
+  assert.match(page, /useOrderBook24hSummary/);
+  assert.match(page, /آخر 24 ساعة/);
+  assert.match(page, /formatPercent\(summary24h\?\.buyPercent\)/);
+  assert.match(page, /summaryNetFlow/);
+});
+
+test("liquidity depth chart supports live and historical windows", () => {
+  const { page, chart, ui } = readSources();
+  assert.match(page, /liquidityDepthWindow/);
+  assert.match(page, /LIQUIDITY_DEPTH_WINDOW_OPTIONS/);
+  assert.match(page, /useLiquidityDepthHistory/);
+  assert.match(page, /خريطة جدران السيولة التاريخية/);
+  assert.match(chart, /mode === "historical"/);
+  assert.match(page, /depthHistory\?\.aggregatedDepthPoints/);
+  assert.match(ui, /DepthHistoryState/);
+  assert.match(ui, /تعذّر تحميل بيانات السيولة التاريخية/);
+});
+
+test("segmented controls stay inside cards with width constraints", () => {
+  const { ui, page } = readSources();
+  assert.match(ui, /min-w-0 max-w-full/);
+  assert.match(ui, /overflow-x-auto scrollbar-none/);
+  assert.match(ui, /whitespace-nowrap/);
+  assert.match(page, /Panel[\s\S]*SegmentedControl/);
+  assert.doesNotMatch(page, /action=\{\s*<SegmentedControl/);
+});
+
+test("spread stays live while summary uses 24h", () => {
+  const page = readSources().page;
+  assert.match(page, /label="السبريد"[\s\S]*sublabel="لحظي"/);
+  assert.match(page, /formatPrice\(data\?\.spread/);
+});
+
 console.log(`order-book history ui tests passed: ${passed}/${passed}`);
