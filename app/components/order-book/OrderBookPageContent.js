@@ -30,6 +30,8 @@ import {
   SYMBOL_LABELS,
 } from "../../../lib/market-data/symbols";
 import FearGreedCard from "./FearGreedCard";
+import LiquidationsPanel from "./LiquidationsPanel";
+import { useOrderBookLiquidations } from "../../hooks/useOrderBookLiquidations";
 import HistoricalLiquidityWallsPanel from "./HistoricalLiquidityWallsPanel";
 import LiquidityDepthChart from "./LiquidityDepthChart";
 import OrderBookPanel, {
@@ -106,6 +108,11 @@ export default function OrderBookPageContent() {
     loading: depthHistoryLoading,
     error: depthHistoryError,
   } = useLiquidityDepthHistory({ prefs, hydrated, depthWindow: liquidityDepthWindow });
+  const {
+    data: liquidationsData,
+    loading: liquidationsLoading,
+    error: liquidationsError,
+  } = useOrderBookLiquidations({ hydrated });
 
   const isLiveDepth = liquidityDepthWindow === "live";
   const sidebarWallsBid = isSidebarWallsLive
@@ -585,6 +592,12 @@ export default function OrderBookPageContent() {
           history={liquidityWallsHistory}
         />
       </section>
+
+      <LiquidationsPanel
+        data={liquidationsData}
+        loading={liquidationsLoading}
+        error={liquidationsError}
+      />
 
       <section className="mb-5">
         <FearGreedCard variant="orderBook" />

@@ -1,0 +1,30 @@
+[
+  {
+    "exchangeName": "All",
+    "totalVolUsd": 45279103.13749436,
+    "longVolUsd": 35686126.80231931,
+    "shortVolUsd": 9592976.33517505,
+    "rate": 100
+  },
+  {
+    "exchangeName": "Binance",
+    "totalVolUsd": 25239134.69145997,
+    "longVolUsd": 19511982.05799722,
+    "shortVolUsd": 5727152.63346275,
+    "rate": 55.74
+  },
+  {
+    "exchangeName": "Bybit",
+    "totalVolUsd": 2920000,
+    "longVolUsd": 2170000,
+    "shortVolUsd": 750000,
+    "rate": 6.49
+  },
+  {
+    "exchangeName": "OKX",
+    "totalVolUsd": 5790000,
+    "longVolUsd": 4380000,
+    "shortVolUsd": 1410000,
+    "rate": 12.88
+  }
+]
