@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchWithTimeout } from "../../../lib/fetch-with-timeout";
 import { formatInteger } from "./formatters";
+import { NumericValue } from "./order-book-ui";
 
 function gaugeColor(value) {
   if (value <= 25) return "#dc2626";
@@ -12,8 +13,10 @@ function gaugeColor(value) {
   return "#059669";
 }
 
-export default function FearGreedCard() {
+export default function FearGreedCard({ variant = "default" }) {
   const [payload, setPayload] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const isOrderBook = variant === "orderBook";
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +28,9 @@ export default function FearGreedCard() {
       })
       .catch(() => {
         if (!cancelled) setPayload({ success: false });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
@@ -37,49 +43,79 @@ export default function FearGreedCard() {
   const formattedValue = formatInteger(value);
   const color = gaugeColor(Number.isFinite(numericValue) ? numericValue : 50);
 
+  const wrapperClass = isOrderBook
+    ? "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5"
+    : "site-price-card rounded-2xl border border-slate-200/80 bg-white/90 p-5 dark:border-white/10 dark:bg-slate-900/70";
+
   return (
-    <div className="site-price-card rounded-2xl border border-slate-200/80 bg-white/90 p-5 dark:border-white/10 dark:bg-slate-900/70">
+    <div className={wrapperClass}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="site-price-card__eyebrow">Sentiment</p>
-          <h3 className="site-price-card__title mb-0">مؤشر الخوف والطمع</h3>
+          {!isOrderBook ? <p className="site-price-card__eyebrow">Sentiment</p> : null}
+          <h3
+            className={
+              isOrderBook
+                ? "text-lg font-bold text-slate-900 dark:text-white"
+                : "site-price-card__title mb-0"
+            }
+          >
+            مؤشر الخوف والطمع
+          </h3>
         </div>
         {payload?.staleNotice ? (
-          <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-700 dark:text-amber-300">
+          <span className="rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-[10px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
             {payload.staleNotice}
           </span>
         ) : null}
       </div>
 
-      {!payload?.current ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">تعذر تحميل المؤشر حالياً.</p>
+      {loading ? (
+        <div className="flex min-h-[8rem] flex-col items-center justify-center gap-3">
+          <div className="h-24 w-full max-w-xs animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+          <div className="h-4 w-32 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
+        </div>
+      ) : !payload?.current ? (
+        <p className="min-h-[5rem] text-sm text-slate-500 dark:text-slate-400">
+          تعذّر تحميل المؤشر حاليًا
+        </p>
       ) : (
         <>
-          <div className="flex flex-col items-center gap-3">
-            <svg viewBox="0 0 200 110" className="h-28 w-full max-w-xs">
-              <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" strokeWidth="12" />
+          <div className="flex flex-col items-center gap-2">
+            <svg viewBox="0 0 200 110" className="h-24 w-full max-w-xs sm:h-28">
+              <path
+                d="M20 100 A80 80 0 0 1 180 100"
+                fill="none"
+                stroke="currentColor"
+                className="text-slate-200 dark:text-slate-700"
+                strokeWidth="10"
+              />
               <path
                 d="M20 100 A80 80 0 0 1 180 100"
                 fill="none"
                 stroke={color}
-                strokeWidth="12"
+                strokeWidth="10"
                 strokeDasharray={`${((Number.isFinite(numericValue) ? numericValue : 0) / 100) * 251} 251`}
               />
-              <text x="100" y="78" textAnchor="middle" className="fill-slate-900 text-3xl font-semibold dark:fill-white">
+              <text
+                x="100"
+                y="78"
+                textAnchor="middle"
+                className="fill-slate-900 text-3xl font-bold dark:fill-white"
+              >
                 {formattedValue}
               </text>
             </svg>
-            <p className="text-lg font-medium text-slate-800 dark:text-slate-100">
+            <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
               {payload.current.classificationAr}
             </p>
           </div>
 
-          {payload.history?.length ? (
+          {payload.history?.length && !isOrderBook ? (
             <div className="mt-4 flex h-16 items-end gap-1">
               {[...payload.history].reverse().slice(-14).map((entry) => (
                 <div
                   key={entry.timestamp}
-                  className="flex-1 rounded-t bg-slate-200 dark:bg-slate-700"
+                  className="flex-1 rounded-t"
                   style={{ height: `${Math.max(8, entry.value)}%`, backgroundColor: gaugeColor(entry.value) }}
                   title={`${formatInteger(entry.value)} - ${entry.classificationAr}`}
                 />
@@ -87,7 +123,9 @@ export default function FearGreedCard() {
             </div>
           ) : null}
 
-          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">{payload.attribution}</p>
+          {payload.attribution && !isOrderBook ? (
+            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">{payload.attribution}</p>
+          ) : null}
         </>
       )}
     </div>

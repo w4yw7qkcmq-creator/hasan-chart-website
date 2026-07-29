@@ -8,6 +8,7 @@ import {
   formatMinutesAgoAr,
   formatPrice,
   formatQuantity,
+  formatUsd,
 } from "./formatters";
 import {
   CoverageBadge,
@@ -56,7 +57,7 @@ function AnalyticsCard({ label, hint, row }) {
 
   return (
     <div
-      className={`rounded-xl border p-4 ${
+      className={`flex h-full min-h-[8.5rem] flex-col rounded-xl border p-3 sm:p-4 ${
         isBuy
           ? "border-emerald-200/80 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
           : "border-rose-200/80 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-950/20"
@@ -64,29 +65,32 @@ function AnalyticsCard({ label, hint, row }) {
       title={hint}
     >
       <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</p>
-      <div className="mt-3 space-y-2 text-sm">
+      <div className="mt-2 flex flex-1 flex-col justify-end gap-1.5 text-sm">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-slate-500 dark:text-slate-400">السعر</span>
-          <NumericValue className="font-semibold text-slate-900 dark:text-white">
+          <span className="text-xs text-slate-500 dark:text-slate-400">السعر</span>
+          <NumericValue className="font-bold text-slate-900 dark:text-white">
             {formatPrice(row.price)}
           </NumericValue>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-slate-500 dark:text-slate-400">الاتجاه</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">الاتجاه</span>
           <SideBadge side={row.side} />
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-slate-500 dark:text-slate-400">الثبات</span>
-          <NumericValue className={`font-semibold ${isBuy ? "text-emerald-600" : "text-rose-600"}`}>
-            {Math.round(row.persistenceScore)}%
-          </NumericValue>
-        </div>
-        {row.exchange ? (
+        {Number.isFinite(row.notional) ? (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-slate-500 dark:text-slate-400">المنصة</span>
-            <span>{EXCHANGE_LABELS[row.exchange] || row.exchange}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">القيمة</span>
+            <NumericValue className="font-semibold text-slate-900 dark:text-white">
+              {formatUsd(row.notional, { compact: true })}
+            </NumericValue>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400">الثبات</span>
+            <NumericValue className={`font-semibold ${isBuy ? "text-emerald-600" : "text-rose-600"}`}>
+              {Math.round(row.persistenceScore)}%
+            </NumericValue>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -110,6 +114,7 @@ function WallsTable({ rows, showLastSeen = false }) {
                 <th className="px-3 py-2.5 text-right">الاتجاه</th>
                 <th className="px-3 py-2.5 text-right">السعر</th>
                 <th className="px-3 py-2.5 text-right">الحجم</th>
+                <th className="px-3 py-2.5 text-right">القيمة</th>
                 <th className="px-3 py-2.5 text-right">الثبات</th>
                 <th className="px-3 py-2.5 text-right">مدة البقاء</th>
                 <th className="px-3 py-2.5 text-right">مرات الظهور</th>
@@ -131,6 +136,9 @@ function WallsTable({ rows, showLastSeen = false }) {
                   </td>
                   <td className="px-3 py-2.5">
                     <NumericValue>{formatQuantity(row.size)}</NumericValue>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <NumericValue>{formatUsd(row.notional, { compact: true })}</NumericValue>
                   </td>
                   <td className="px-3 py-2.5">
                     <NumericValue>{Math.round(row.persistenceScore)}%</NumericValue>
@@ -204,7 +212,7 @@ function WallsTable({ rows, showLastSeen = false }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+          className="mt-3 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 dark:text-slate-300 dark:hover:bg-white/5"
         >
           {expanded ? "عرض أقل" : `عرض المزيد (${Math.min(rows.length, EXPANDED_VISIBLE) - DEFAULT_VISIBLE}+)`}
         </button>

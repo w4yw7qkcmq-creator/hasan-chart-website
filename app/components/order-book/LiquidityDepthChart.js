@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { EXCHANGE_LABELS } from "../../../lib/market-data/symbols";
 import { formatMinutesAgoAr, formatPrice, formatUsd } from "./formatters";
-import { DepthHistoryState, EmptyState, NumericValue } from "./order-book-ui";
+import { ChartPlaceholder, DepthHistoryState, EmptyState, NumericValue } from "./order-book-ui";
+
+const CHART_MIN_HEIGHT = "h-48 sm:h-56";
 
 function buildTooltip(point, mode) {
   const sideLabel = point.side === "bid" ? "شراء" : "بيع";
@@ -84,13 +86,16 @@ export default function LiquidityDepthChart({
           />
         );
       }
-      return <EmptyState message="لا توجد جدران سيولة كافية ضمن هذه الفترة حتى الآن." />;
+      return (
+        <ChartPlaceholder
+          minHeight={CHART_MIN_HEIGHT}
+          message="لا توجد جدران سيولة كافية ضمن هذه الفترة حتى الآن."
+        />
+      );
     }
   } else if (!chartPoints.length || !midPrice) {
     return (
-      <div className="flex h-44 items-center justify-center rounded-xl border border-dashed border-slate-200 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400 sm:h-52">
-        بانتظار بيانات السيولة...
-      </div>
+      <ChartPlaceholder minHeight={CHART_MIN_HEIGHT} message="بانتظار بيانات السيولة..." />
     );
   }
 
@@ -108,28 +113,31 @@ export default function LiquidityDepthChart({
           collecting={collecting && partial}
         />
       ) : null}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+            <span className="h-2 w-2 rounded-sm bg-emerald-500" />
             شراء
           </span>
           <span className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-            <span className="h-2.5 w-2.5 rounded-sm bg-rose-500" />
+            <span className="h-2 w-2 rounded-sm bg-rose-500" />
             بيع
           </span>
+          <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+            <span className="h-px w-3 border-t border-dashed border-slate-400 dark:border-slate-500" />
+            السعر الحالي
+          </span>
         </div>
-        <span className="text-slate-500 dark:text-slate-400">
-          {mode === "historical" ? "Mid Price: " : "السعر الحالي: "}
+        <span className="rounded-lg bg-slate-100 px-2 py-1 text-slate-600 dark:bg-white/5 dark:text-slate-300">
           <NumericValue className="font-semibold text-slate-800 dark:text-slate-100">
             {formatPrice(midPrice)}
           </NumericValue>
         </span>
       </div>
 
-      <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-white/10 dark:bg-slate-950/40 sm:p-4">
-        <svg viewBox="0 0 600 160" className="h-40 w-full sm:h-48" role="img" aria-label={chartLabel}>
-          {[30, 60, 120, 150].map((y) => (
+      <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 px-2 py-2 dark:border-white/10 dark:bg-slate-950/40 sm:px-3">
+        <svg viewBox="0 0 600 180" className={`${CHART_MIN_HEIGHT} w-full`} role="img" aria-label={chartLabel}>
+          {[45, 90, 135].map((y) => (
             <line
               key={y}
               x1="0"
@@ -141,32 +149,29 @@ export default function LiquidityDepthChart({
               strokeDasharray="4 4"
             />
           ))}
-          <line x1="0" y1="80" x2="600" y2="80" stroke="currentColor" className="text-slate-400 dark:text-slate-500" />
+          <line x1="0" y1="90" x2="600" y2="90" stroke="currentColor" className="text-slate-300 dark:text-slate-600" />
           <line
             x1="300"
-            y1="8"
+            y1="6"
             x2="300"
-            y2="152"
+            y2="174"
             stroke="currentColor"
             className="text-slate-400 dark:text-slate-500"
             strokeDasharray="3 3"
           />
-          <text x="305" y="18" className="fill-slate-500 text-[10px]">
-            Mid
-          </text>
           {chartPoints.map((point) => {
-            const x = 300 + ((point.price - midPrice) / midPrice) * 260;
-            const height = Math.max(4, (point.notional / maxNotional) * 62);
-            const y = point.side === "bid" ? 80 - height : 80;
+            const x = 300 + ((point.price - midPrice) / midPrice) * 270;
+            const height = Math.max(6, (point.notional / maxNotional) * 78);
+            const y = point.side === "bid" ? 90 - height : 90;
             const fill = point.side === "bid" ? "#10b981" : "#f43f5e";
-            const opacity = 0.3 + (point.notional / maxNotional) * 0.7;
+            const opacity = 0.35 + (point.notional / maxNotional) * 0.65;
 
             return (
               <rect
                 key={`${point.side}-${point.price}`}
-                x={Math.max(0, Math.min(590, x - 3))}
+                x={Math.max(0, Math.min(588, x - 4))}
                 y={y}
-                width={6}
+                width={8}
                 height={height}
                 fill={fill}
                 opacity={opacity}
@@ -178,7 +183,6 @@ export default function LiquidityDepthChart({
           })}
         </svg>
       </div>
-
     </div>
   );
 }

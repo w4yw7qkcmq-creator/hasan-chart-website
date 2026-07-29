@@ -38,7 +38,6 @@ import {
   formatThresholdLabel,
   formatTime,
   formatUsd,
-  statusLabelAr,
 } from "./formatters";
 import {
   EmptyState,
@@ -80,7 +79,8 @@ export default function OrderBookPageContent() {
   } = useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow: liquidityWallWindow });
   const {
     summary: summary24h,
-    loading: summary24hLoading,
+    initialLoading: summary24hInitialLoading,
+    isRefreshing: summary24hRefreshing,
     error: summary24hError,
   } = useOrderBook24hSummary({ symbol: prefs.symbol, hydrated });
   const {
@@ -122,8 +122,6 @@ export default function OrderBookPageContent() {
     Number(summaryNetFlow) > 0 ? "buy" : Number(summaryNetFlow) < 0 ? "sell" : undefined;
   const summaryPartial = Boolean(summary24h?.partialData);
   const summaryCoverage = summary24h?.coveragePercent;
-  const summaryHint = "محسوبة من حجم الصفقات المنفذة خلال آخر 24 ساعة.";
-
   const connectedCount = (data?.exchangeStatuses || []).filter((item) => item.status === "connected").length;
   const totalExchanges = data?.exchangeStatuses?.length || 3;
 
@@ -136,99 +134,99 @@ export default function OrderBookPageContent() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8" dir="rtl">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8" dir="rtl">
       <Breadcrumbs items={breadcrumbs} />
 
-      <header className="mt-6 mb-6">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Market Depth
-        </p>
-        <h1 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
+      <header className="mt-4 mb-5">
+        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">عمق السوق</p>
+        <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white sm:text-[1.65rem]">
           دفتر الأوامر والسيولة
         </h1>
-        <p className="max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-          متابعة لحظية لطلبات البيع والشراء، سيولة السوق، جدران الأوامر، الصفقات الكبيرة، وحجم التداول
-          المنفذ.
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+          متابعة لحظية لدفتر الأوامر، السيولة، جدران الأوامر، الصفقات الكبيرة، وحجم التداول المنفذ.
         </p>
       </header>
 
       {/* Row 1 — price hero + quick stats */}
-      <section className="mb-6 grid items-start gap-4 lg:grid-cols-12">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5 lg:col-span-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">الرمز الحالي</p>
-              <h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">
+      <section className="mb-5 grid items-stretch gap-3 lg:grid-cols-12 lg:gap-4">
+        <div className="flex min-h-[7.5rem] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5 lg:col-span-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500 dark:text-slate-400">الرمز</p>
+              <h2 className="truncate text-xl font-bold text-slate-900 dark:text-white">
                 {SYMBOL_LABELS[prefs.symbol] || prefs.symbol}
               </h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                 {EXCHANGE_LABELS[prefs.mode] || prefs.mode}
               </p>
             </div>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-              {connectedCount}/{totalExchanges} منصات متصلة
+            <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+              {connectedCount}/{totalExchanges} متصل
             </span>
           </div>
-          <div className="mt-4">
-            <p className="text-xs text-slate-500 dark:text-slate-400">آخر سعر</p>
-            <NumericValue className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">
+          <div className="mt-3">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">آخر سعر</p>
+            <NumericValue className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
               {formatPrice(data?.lastPrice)}
             </NumericValue>
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-7">
+        <div className="grid min-w-0 grid-cols-2 gap-3 lg:col-span-7 lg:grid-cols-4">
           <StatTile label="السبريد" sublabel="لحظي" value={formatPrice(data?.spread, 4)} />
           <StatTile
             label="نسبة الشراء"
             sublabel="آخر 24 ساعة"
             value={
-              summary24hLoading && !summary24h
-                ? "…"
-                : summary24hError
-                  ? "—"
-                  : formatPercent(summary24h?.buyPercent)
+              summary24hError && !summary24h
+                ? "—"
+                : summary24h
+                  ? formatPercent(summary24h.buyPercent)
+                  : null
             }
             tone="buy"
-            hint={summaryHint}
             partial={summaryPartial}
             coveragePercent={summaryCoverage}
+            initialLoading={summary24hInitialLoading}
+            isRefreshing={summary24hRefreshing}
           />
           <StatTile
             label="نسبة البيع"
             sublabel="آخر 24 ساعة"
             value={
-              summary24hLoading && !summary24h
-                ? "…"
-                : summary24hError
-                  ? "—"
-                  : formatPercent(summary24h?.sellPercent)
+              summary24hError && !summary24h
+                ? "—"
+                : summary24h
+                  ? formatPercent(summary24h.sellPercent)
+                  : null
             }
             tone="sell"
-            hint={summaryHint}
             partial={summaryPartial}
             coveragePercent={summaryCoverage}
+            initialLoading={summary24hInitialLoading}
+            isRefreshing={summary24hRefreshing}
           />
           <StatTile
             label="صافي التدفق"
             sublabel="آخر 24 ساعة"
             value={
-              summary24hLoading && !summary24h
-                ? "…"
-                : summary24hError
-                  ? "—"
-                  : formatUsd(summaryNetFlow, { compact: true })
+              summary24hError && !summary24h
+                ? "—"
+                : summary24h
+                  ? formatUsd(summaryNetFlow, { compact: true })
+                  : null
             }
             tone={summaryNetTone}
-            hint={summaryHint}
             partial={summaryPartial}
             coveragePercent={summaryCoverage}
+            initialLoading={summary24hInitialLoading}
+            isRefreshing={summary24hRefreshing}
           />
         </div>
       </section>
 
       {/* Controls */}
-      <section className="mb-6 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5">
+      <section className="mb-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5">
         <div className="grid gap-4 xl:grid-cols-2">
           <SegmentedControl
             label="العملة"
@@ -253,19 +251,7 @@ export default function OrderBookPageContent() {
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StyledSelect
-            label="Precision"
-            value={String(prefs.precision ?? getDefaultPrecision(prefs.symbol))}
-            onChange={(value) => setPrefs({ precision: Number(value) })}
-            options={precisionOptions.map((value) => ({ value: String(value), label: String(value) }))}
-          />
-          <StyledSelect
-            label="المستويات"
-            value={String(prefs.levels)}
-            onChange={(value) => setPrefs({ levels: Number(value) })}
-            options={DEPTH_LEVEL_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
-          />
+        <div className="grid gap-3 sm:grid-cols-2">
           <StyledSelect
             label="نطاق السيولة"
             value={String(prefs.liquidityRange ?? DEFAULT_LIQUIDITY_RANGE_PERCENT)}
@@ -284,15 +270,30 @@ export default function OrderBookPageContent() {
             ]}
           />
         </div>
+
+        <div className="grid gap-3 border-t border-slate-100 pt-4 dark:border-white/5 sm:grid-cols-2">
+          <StyledSelect
+            label="دقة السعر"
+            value={String(prefs.precision ?? getDefaultPrecision(prefs.symbol))}
+            onChange={(value) => setPrefs({ precision: Number(value) })}
+            options={precisionOptions.map((value) => ({ value: String(value), label: String(value) }))}
+          />
+          <StyledSelect
+            label="عدد المستويات"
+            value={String(prefs.levels)}
+            onChange={(value) => setPrefs({ levels: Number(value) })}
+            options={DEPTH_LEVEL_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+          />
+        </div>
       </section>
 
       {/* Row 2 — main order book + sidebar analytics */}
-      <section className="mb-6 grid items-start gap-6 lg:grid-cols-12">
+      <section className="mb-5 grid items-start gap-5 lg:grid-cols-12">
         <div className="lg:col-span-8">
           <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
         </div>
 
-        <div className="space-y-6 lg:col-span-4">
+        <div className="space-y-5 lg:col-span-4">
           <Panel
             title="سيطرة الشراء والبيع"
             description={
@@ -383,8 +384,11 @@ export default function OrderBookPageContent() {
             </div>
           </Panel>
 
-          <Panel title="جدران السيولة اللحظية" description="أكبر مستويات سيولة ظاهرة حالياً في دفتر الأوامر.">
-            <div className="grid gap-3">
+          <Panel
+            title="جدران السيولة اللحظية"
+            description="أكبر مستويات سيولة ظاهرة حالياً في دفتر الأوامر."
+          >
+            <div className="grid gap-2.5">
               <LiveWallCard title="أكبر جدار شراء" wall={data?.walls?.largestBid} tone="buy" />
               <LiveWallCard title="أكبر جدار بيع" wall={data?.walls?.largestAsk} tone="sell" />
             </div>
@@ -393,7 +397,7 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Row 3 — depth chart + large trades */}
-      <section className="mb-6 grid items-start gap-6 lg:grid-cols-12">
+      <section className="mb-5 grid items-start gap-5 lg:grid-cols-12">
         <Panel
           className="lg:col-span-7"
           title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
@@ -461,14 +465,15 @@ export default function OrderBookPageContent() {
             coveragePercent={largeTradeHistory?.coveragePercent}
           />
           {displayedLargeTrades.length ? (
-            <div className="max-h-80 overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
-              <table className="w-full min-w-[420px] text-sm">
-                <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+            <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
+              <table className="w-full min-w-[480px] text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
-                    <th className="px-3 py-2.5 text-right">الوقت</th>
-                    <th className="px-3 py-2.5 text-right">المنصة</th>
-                    <th className="px-3 py-2.5 text-right">الاتجاه</th>
-                    <th className="px-3 py-2.5 text-left">القيمة</th>
+                    <th className="px-3 py-2 text-right">الوقت</th>
+                    <th className="px-3 py-2 text-right">المنصة</th>
+                    <th className="px-3 py-2 text-right">الاتجاه</th>
+                    <th className="px-3 py-2 text-right">السعر</th>
+                    <th className="px-3 py-2 text-left">القيمة</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -477,15 +482,20 @@ export default function OrderBookPageContent() {
                       key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
                       className="border-t border-slate-100 transition hover:bg-slate-50/80 dark:border-white/5 dark:hover:bg-white/5"
                     >
-                      <td className="px-3 py-2">
-                        <NumericValue>{formatTime(trade.ts)}</NumericValue>
+                      <td className="px-3 py-1.5">
+                        <NumericValue className="text-xs">{formatTime(trade.ts)}</NumericValue>
                       </td>
-                      <td className="px-3 py-2">{EXCHANGE_LABELS[trade.exchange] || trade.exchange}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-1.5 text-xs">
+                        {EXCHANGE_LABELS[trade.exchange] || trade.exchange}
+                      </td>
+                      <td className="px-3 py-1.5">
                         <SideBadge side={trade.side} />
                       </td>
-                      <td className="px-3 py-2 text-left">
-                        <NumericValue className="font-medium">
+                      <td className="px-3 py-1.5">
+                        <NumericValue className="text-xs">{formatPrice(trade.price)}</NumericValue>
+                      </td>
+                      <td className="px-3 py-1.5 text-left">
+                        <NumericValue className="font-semibold text-slate-900 dark:text-white">
                           {formatUsd(trade.notional, { compact: true })}
                         </NumericValue>
                       </td>
@@ -503,7 +513,7 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Row 5 — historical liquidity walls full width */}
-      <section className="mb-6">
+      <section className="mb-5">
         <HistoricalLiquidityWallsPanel
           wallWindow={liquidityWallWindow}
           onWallWindowChange={setLiquidityWallWindow}
@@ -513,41 +523,57 @@ export default function OrderBookPageContent() {
         />
       </section>
 
-      <section className="mb-6">
-        <FearGreedCard />
+      <section className="mb-5">
+        <FearGreedCard variant="orderBook" />
       </section>
 
       {/* Last — data sources */}
       <section className="mb-2">
-        <Panel
-          title="مصادر البيانات"
-          description="يتم تجميع بيانات دفتر الأوامر والتنفيذ من المنصات المتصلة."
-        >
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(data?.exchangeStatuses || []).map((item) => {
-              const connected = item.status === "connected";
-              return (
-                <div
-                  key={item.exchange}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-white/10"
-                >
-                  <div className="flex items-center gap-2">
+        <details open className="group rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80">
+          <summary className="cursor-pointer list-none p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">مصادر البيانات</h2>
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                  حالة اتصال منصات دفتر الأوامر والتنفيذ.
+                </p>
+              </div>
+              <span className="text-xs text-slate-400 group-open:rotate-180 transition-transform">▾</span>
+            </div>
+          </summary>
+          <div className="border-t border-slate-100 px-4 pb-4 pt-3 dark:border-white/5 sm:px-5 sm:pb-5">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {(data?.exchangeStatuses || []).map((item) => {
+                const connected = item.status === "connected";
+                return (
+                  <div
+                    key={item.exchange}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-sm dark:border-white/10"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`}
+                      />
+                      <span className="font-medium">{EXCHANGE_LABELS[item.exchange] || item.exchange}</span>
+                    </div>
                     <span
-                      className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`}
-                    />
-                    <span className="font-medium">{EXCHANGE_LABELS[item.exchange] || item.exchange}</span>
+                      className={
+                        connected
+                          ? "text-xs text-emerald-600 dark:text-emerald-400"
+                          : "text-xs text-amber-600 dark:text-amber-400"
+                      }
+                    >
+                      {connected ? "متصل" : "غير متصل"}
+                    </span>
                   </div>
-                  <span className={connected ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
-                    {statusLabelAr(item.status)}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            {data?.disclaimer ? (
+              <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{data.disclaimer}</p>
+            ) : null}
           </div>
-          {data?.disclaimer ? (
-            <p className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{data.disclaimer}</p>
-          ) : null}
-        </Panel>
+        </details>
       </section>
     </div>
   );

@@ -29,6 +29,8 @@ function readSources() {
     ui: readFileSync(join(ROOT, "app/components/order-book/order-book-ui.js"), "utf8"),
     panel: readFileSync(join(ROOT, "app/components/order-book/OrderBookPanel.js"), "utf8"),
     chart: readFileSync(join(ROOT, "app/components/order-book/LiquidityDepthChart.js"), "utf8"),
+    fearGreed: readFileSync(join(ROOT, "app/components/order-book/FearGreedCard.js"), "utf8"),
+    summaryHook: readFileSync(join(ROOT, "app/hooks/useOrderBook24hSummary.js"), "utf8"),
   };
 }
 
@@ -135,12 +137,12 @@ test("buy green sell red without blue on trade elements", () => {
 
 test("data sources moved to last section", () => {
   const page = readSources().page;
-  const dataSourcesIndex = page.lastIndexOf('title="مصادر البيانات"');
+  const dataSourcesIndex = page.lastIndexOf("مصادر البيانات");
   const wallsIndex = page.indexOf("HistoricalLiquidityWallsPanel");
   const orderBookIndex = page.indexOf("OrderBookPanel");
   assert.ok(dataSourcesIndex > wallsIndex);
   assert.ok(dataSourcesIndex > orderBookIndex);
-  assert.doesNotMatch(page, /title="مصادر البيانات"[\s\S]*OrderBookPanel/);
+  assert.match(page, /FearGreedCard[\s\S]*مصادر البيانات/);
 });
 
 test("historical walls full width grid", () => {
@@ -190,14 +192,54 @@ test("mobile layout classes present", () => {
 });
 
 test("24h summary uses dedicated hook with fixed 1d window", () => {
-  const summaryHook = readFileSync(join(ROOT, "app/hooks/useOrderBook24hSummary.js"), "utf8");
-  const { page } = readSources();
+  const { summaryHook, page } = readSources();
   assert.match(summaryHook, /window=1d|SUMMARY_WINDOW = "1d"/);
   assert.match(summaryHook, /scope=aggregated|SUMMARY_SCOPE = "aggregated"/);
   assert.match(page, /useOrderBook24hSummary/);
   assert.match(page, /آخر 24 ساعة/);
-  assert.match(page, /formatPercent\(summary24h\?\.buyPercent\)/);
+  assert.match(page, /formatPercent\(summary24h\.buyPercent\)/);
   assert.match(page, /summaryNetFlow/);
+});
+
+test("24h summary separates initialLoading from isRefreshing", () => {
+  const { summaryHook, page, ui } = readSources();
+  assert.match(summaryHook, /initialLoading/);
+  assert.match(summaryHook, /isRefreshing/);
+  assert.match(summaryHook, /background:\s*true/);
+  assert.match(summaryHook, /hasDataRef/);
+  assert.match(page, /initialLoading:\s*summary24hInitialLoading/);
+  assert.match(page, /isRefreshing:\s*summary24hRefreshing/);
+  assert.match(page, /initialLoading=\{summary24hInitialLoading\}/);
+  assert.match(page, /isRefreshing=\{summary24hRefreshing\}/);
+  assert.match(ui, /RefreshSpinner/);
+  assert.match(ui, /initialLoading/);
+  assert.match(ui, /isRefreshing/);
+});
+
+test("24h summary does not flash ellipsis during background refresh", () => {
+  const page = readSources().page;
+  assert.doesNotMatch(page, /summary24hLoading[\s\S]*"\.\.\."/);
+  assert.doesNotMatch(page, /"\.\.\."/);
+  assert.match(page, /summary24h\s*\?\s*formatPercent/);
+});
+
+test("control labels are fully arabic", () => {
+  const page = readSources().page;
+  assert.match(page, /label="دقة السعر"/);
+  assert.match(page, /label="عدد المستويات"/);
+  assert.match(page, /label="نطاق السيولة"/);
+  assert.match(page, /label="عرض الجوال"/);
+  assert.doesNotMatch(page, /label="Precision"/);
+  assert.match(page, /عمق السوق/);
+});
+
+test("fear and greed card has order book variant with arabic title", () => {
+  const { page, fearGreed } = readSources();
+  assert.match(page, /FearGreedCard variant="orderBook"/);
+  assert.match(fearGreed, /variant = "default"/);
+  assert.match(fearGreed, /variant === "orderBook"/);
+  assert.match(fearGreed, /مؤشر الخوف والطمع/);
+  assert.match(fearGreed, /تعذّر تحميل المؤشر حاليًا/);
 });
 
 test("liquidity depth chart supports live and historical windows", () => {

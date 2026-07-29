@@ -17,25 +17,38 @@ function buildQuery(symbol) {
 
 export function useOrderBook24hSummary({ symbol, hydrated }) {
   const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
+  const hasDataRef = useRef(false);
 
   useEffect(() => {
     if (!hydrated || !symbol) {
       setSummary(null);
-      setLoading(false);
+      setInitialLoading(false);
+      setIsRefreshing(false);
       setError(null);
+      hasDataRef.current = false;
       return undefined;
     }
 
     let cancelled = false;
     let refreshTimer;
 
-    const load = () => {
+    const load = ({ background = false } = {}) => {
       const requestId = ++requestIdRef.current;
-      setLoading(true);
-      setError(null);
+      const hasCachedData = hasDataRef.current;
+
+      if (!background || !hasCachedData) {
+        setInitialLoading(!hasCachedData);
+      }
+      if (background && hasCachedData) {
+        setIsRefreshing(true);
+      }
+      if (!background) {
+        setError(null);
+      }
 
       void fetchWithTimeout(
         `/api/market-depth/history/flow?${buildQuery(symbol)}`,
@@ -46,27 +59,33 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
         .then((payload) => {
           if (cancelled || requestId !== requestIdRef.current) return;
           if (!payload?.success) {
-            setError("SUMMARY_FETCH_FAILED");
-            setSummary(null);
+            if (!hasDataRef.current) {
+              setError("SUMMARY_FETCH_FAILED");
+              setSummary(null);
+            }
             return;
           }
           setSummary(payload);
+          hasDataRef.current = true;
           setError(null);
         })
         .catch(() => {
           if (cancelled || requestId !== requestIdRef.current) return;
-          setError("SUMMARY_FETCH_FAILED");
-          setSummary(null);
+          if (!hasDataRef.current) {
+            setError("SUMMARY_FETCH_FAILED");
+            setSummary(null);
+          }
         })
         .finally(() => {
           if (!cancelled && requestId === requestIdRef.current) {
-            setLoading(false);
+            setInitialLoading(false);
+            setIsRefreshing(false);
           }
         });
     };
 
-    load();
-    refreshTimer = setInterval(load, REFRESH_MS);
+    load({ background: false });
+    refreshTimer = setInterval(() => load({ background: true }), REFRESH_MS);
 
     return () => {
       cancelled = true;
@@ -76,7 +95,9 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
 
   return {
     summary,
-    loading,
+    initialLoading,
+    isRefreshing,
+    loading: initialLoading,
     error,
     summaryWindow: SUMMARY_WINDOW,
   };

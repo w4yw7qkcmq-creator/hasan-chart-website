@@ -10,15 +10,17 @@ export function NumericValue({ children, className = "" }) {
   );
 }
 
-export function Panel({ title, description, children, action, className = "" }) {
+export function Panel({ title, description, children, action, className = "", compact = false }) {
   return (
     <section
-      className={`min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5 ${className}`}
+      className={`min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80 ${
+        compact ? "p-3 sm:p-4" : "p-4 sm:p-5"
+      } ${className}`}
     >
-      <div className="mb-4 min-w-0">
-        <h2 className="text-base font-bold text-slate-900 dark:text-white sm:text-lg">{title}</h2>
+      <div className={`min-w-0 ${compact ? "mb-3" : "mb-4"}`}>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
         {description ? (
-          <p className="mt-1 text-xs leading-6 text-slate-500 dark:text-slate-400">{description}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
         ) : null}
         {action ? <div className="mt-3 w-full min-w-0 max-w-full">{action}</div> : null}
       </div>
@@ -37,7 +39,7 @@ export function SegmentedControl({
   scrollable = false,
 }) {
   return (
-    <div className={`flex min-w-0 max-w-full flex-col gap-1.5 ${compact ? "w-full" : "w-full"}`}>
+    <div className="flex min-w-0 max-w-full flex-col gap-1.5">
       {label ? (
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
       ) : null}
@@ -76,7 +78,7 @@ export function SegmentedControl({
 
 export function StyledSelect({ label, value, onChange, options, compact = false }) {
   return (
-    <label className={`flex flex-col gap-1.5 text-sm ${compact ? "min-w-[7rem]" : ""}`}>
+    <label className={`flex min-w-0 flex-col gap-1.5 text-sm ${compact ? "min-w-[7rem]" : ""}`}>
       {label ? (
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
       ) : null}
@@ -84,7 +86,7 @@ export function StyledSelect({ label, value, onChange, options, compact = false 
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-sm text-slate-800 outline-none transition focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:focus-visible:ring-white/20"
+          className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-800 outline-none transition focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:focus-visible:ring-white/20"
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
@@ -118,36 +120,49 @@ export function SideBadge({ side, variant = "bid" }) {
   );
 }
 
-export function CoverageBadge({ partial, coveragePercent }) {
+export function CoverageBadge({ partial, coveragePercent, compact = false }) {
   if (!partial) return null;
   const label = formatCoveragePercent(coveragePercent);
   return (
-    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-      البيانات التاريخية قيد التجميع — التغطية <NumericValue className="mr-1">{label}%</NumericValue>
+    <span
+      className={`inline-flex items-center rounded-full border border-amber-200/80 bg-amber-50/90 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 ${
+        compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs"
+      }`}
+    >
+      تغطية <NumericValue className="mx-0.5">{label}%</NumericValue>
     </span>
+  );
+}
+
+export function RefreshSpinner({ className = "" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-200 ${className}`}
+    />
   );
 }
 
 export function DepthHistoryState({ loading, error, partial, coveragePercent, collecting }) {
   if (loading) {
     return (
-      <p className="mb-3 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+      <div className="mb-3 flex h-44 items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400 sm:h-48">
         جاري تحميل جدران السيولة التاريخية...
-      </p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+      <div className="mb-3 flex h-44 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 sm:h-48">
         تعذّر تحميل بيانات السيولة التاريخية.
-      </p>
+      </div>
     );
   }
 
   if (collecting && (!Number.isFinite(coveragePercent) || coveragePercent <= 0)) {
     return (
-      <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+      <p className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
         البيانات التاريخية قيد التجميع
       </p>
     );
@@ -156,7 +171,7 @@ export function DepthHistoryState({ loading, error, partial, coveragePercent, co
   if (partial) {
     return (
       <div className="mb-3">
-        <CoverageBadge partial={partial} coveragePercent={coveragePercent} />
+        <CoverageBadge partial={partial} coveragePercent={coveragePercent} compact />
       </div>
     );
   }
@@ -167,7 +182,7 @@ export function DepthHistoryState({ loading, error, partial, coveragePercent, co
 export function HistoryState({ loading, error, partial, coveragePercent }) {
   if (loading) {
     return (
-      <p className="mb-3 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+      <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
         جاري تحميل البيانات التاريخية...
       </p>
     );
@@ -175,7 +190,7 @@ export function HistoryState({ loading, error, partial, coveragePercent }) {
 
   if (error) {
     return (
-      <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+      <p className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
         تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.
       </p>
     );
@@ -184,7 +199,7 @@ export function HistoryState({ loading, error, partial, coveragePercent }) {
   if (partial) {
     return (
       <div className="mb-3">
-        <CoverageBadge partial={partial} coveragePercent={coveragePercent} />
+        <CoverageBadge partial={partial} coveragePercent={coveragePercent} compact />
       </div>
     );
   }
@@ -201,7 +216,7 @@ export function MetricLine({ label, value, tone }) {
         : "text-slate-900 dark:text-white";
 
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm last:border-b-0 dark:border-white/5">
       <span className="text-slate-600 dark:text-slate-300">{label}</span>
       <NumericValue className={`font-semibold ${toneClass}`}>{value}</NumericValue>
     </div>
@@ -217,7 +232,7 @@ export function FlowSplitBar({ buyPercent = 0, sellPercent = 0 }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
+      <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
         <div
           className="bg-emerald-500 transition-all dark:bg-emerald-500/90"
           style={{ width: `${buyWidth}%` }}
@@ -241,7 +256,16 @@ export function FlowSplitBar({ buyPercent = 0, sellPercent = 0 }) {
   );
 }
 
-export function StatTile({ label, sublabel, value, tone, hint, coveragePercent, partial }) {
+export function StatTile({
+  label,
+  sublabel,
+  value,
+  tone,
+  coveragePercent,
+  partial,
+  isRefreshing = false,
+  initialLoading = false,
+}) {
   const toneClass =
     tone === "buy"
       ? "text-emerald-600 dark:text-emerald-400"
@@ -251,34 +275,51 @@ export function StatTile({ label, sublabel, value, tone, hint, coveragePercent, 
 
   const showCoverage =
     partial && Number.isFinite(coveragePercent) && coveragePercent > 0 && coveragePercent < 99;
+  const showSkeleton = initialLoading && (value == null || value === "");
 
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/5">
-      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-      {sublabel ? (
-        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{sublabel}</p>
-      ) : null}
-      <p className={`mt-1 text-base font-bold sm:text-lg ${toneClass}`}>
-        <NumericValue>{value || "—"}</NumericValue>
-      </p>
-      {showCoverage ? (
-        <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">
-          تغطية البيانات{" "}
-          <NumericValue>{formatCoveragePercent(coveragePercent)}%</NumericValue>
-        </p>
-      ) : null}
-      {hint ? (
-        <p className="mt-1 text-[10px] leading-5 text-slate-400 dark:text-slate-500" title={hint}>
-          {hint}
-        </p>
-      ) : null}
+    <div className="flex h-full min-h-[7.5rem] min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
+          {sublabel ? (
+            <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{sublabel}</p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {isRefreshing ? <RefreshSpinner /> : null}
+          {showCoverage ? <CoverageBadge partial coveragePercent={coveragePercent} compact /> : null}
+        </div>
+      </div>
+      <div className="mt-auto pt-2">
+        {showSkeleton ? (
+          <div className="h-7 w-20 animate-pulse rounded-md bg-slate-200/80 dark:bg-white/10" />
+        ) : (
+          <p className={`text-xl font-bold sm:text-2xl ${toneClass}`}>
+            <NumericValue>{value ?? "—"}</NumericValue>
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-export function EmptyState({ message }) {
+export function EmptyState({ message, icon = "◌" }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+    <div className="flex min-h-[8rem] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center dark:border-white/10">
+      <span className="mb-2 text-2xl text-slate-300 dark:text-slate-600" aria-hidden="true">
+        {icon}
+      </span>
+      <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">{message}</p>
+    </div>
+  );
+}
+
+export function ChartPlaceholder({ message, minHeight = "h-44 sm:h-48" }) {
+  return (
+    <div
+      className={`flex ${minHeight} items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/30 dark:text-slate-400`}
+    >
       {message}
     </div>
   );

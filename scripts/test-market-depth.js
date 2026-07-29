@@ -377,7 +377,7 @@ function testOrderBookUiSourceGuards() {
   assert.equal(/teal|blue/i.test(panelSource), false);
   assert.match(pageSource, /formatLargeTradeEmptyMessage/);
   assert.match(pageSource, /StatTile/);
-  assert.match(pageSource, /title="مصادر البيانات"/);
+  assert.match(pageSource, /مصادر البيانات/);
   assert.doesNotMatch(pageSource, /SummaryCard/);
 }
 
