@@ -19,13 +19,13 @@ function buildQuery({ symbol, window, exchange }) {
   return params.toString();
 }
 
-export function useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow }) {
+export function useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow, enabled: enabledOverride = true }) {
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
 
-  const enabled = isHistoricalLiquidityWallWindow(wallWindow);
+  const enabled = enabledOverride && isHistoricalLiquidityWallWindow(wallWindow);
   const queryKey = useMemo(
     () => [prefs.symbol, prefs.mode, wallWindow].join("|"),
     [prefs.symbol, prefs.mode, wallWindow],

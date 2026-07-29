@@ -18,6 +18,11 @@ import {
 } from "../app/hooks/useOrderBookHistory.js";
 import { buildMarketDepthQuery } from "../app/hooks/useOrderBookPreferences.js";
 import { formatDurationAr } from "../app/components/order-book/formatters.js";
+import { computeDepthBarWidthPercent } from "../app/components/order-book/depth-bar-utils.js";
+import {
+  fearGreedClassificationAr,
+  fearGreedPointerPosition,
+} from "../app/components/order-book/fear-greed-gauge.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 let passed = 0;
@@ -239,7 +244,60 @@ test("fear and greed card has order book variant with arabic title", () => {
   assert.match(fearGreed, /variant = "default"/);
   assert.match(fearGreed, /variant === "orderBook"/);
   assert.match(fearGreed, /مؤشر الخوف والطمع/);
-  assert.match(fearGreed, /تعذّر تحميل المؤشر حاليًا/);
+  assert.match(fearGreed, /تعذّر تحميل مؤشر الخوف والطمع حاليًا/);
+});
+
+test("order book depth glow uses rose and emerald gradients", () => {
+  const panel = readSources().panel;
+  assert.match(panel, /linear-gradient\(to left, rgba\(244,63,94/);
+  assert.match(panel, /linear-gradient\(to left, rgba\(16,185,129/);
+  assert.match(panel, /absolute inset-y-0 right-0/);
+  assert.match(panel, /relative z-\[1\]/);
+  assert.doesNotMatch(panel, /text-blue|bg-blue|text-cyan|text-sky|text-teal/);
+});
+
+test("depth bar width uses sqrt scaling with visual minimum", () => {
+  assert.equal(computeDepthBarWidthPercent(0, 100), 0);
+  assert.equal(computeDepthBarWidthPercent(50, 0), 0);
+  assert.equal(computeDepthBarWidthPercent(100, 100), 100);
+  assert.ok(computeDepthBarWidthPercent(25, 100) >= 8);
+  assert.ok(computeDepthBarWidthPercent(25, 100) < computeDepthBarWidthPercent(100, 100));
+});
+
+test("liquidity walls summary has independent live/historical frames", () => {
+  const { page, panel } = readSources();
+  assert.match(page, /liquidityWallsWindow/);
+  assert.match(page, /LIQUIDITY_WALLS_SUMMARY_WINDOW_OPTIONS/);
+  assert.match(page, /title="جدران السيولة"/);
+  assert.match(page, /HistoricalWallCard/);
+  assert.match(page, /LiquidityWallsState/);
+  assert.match(page, /strongestBid/);
+  assert.match(page, /strongestAsk/);
+  assert.match(page, /enabled: !isSidebarWallsLive/);
+  assert.match(panel, /تعذّر تحميل جدران السيولة/);
+});
+
+test("fear and greed semicircle gauge has five segments and arabic bands", () => {
+  const fearGreed = readSources().fearGreed;
+  const gauge = readFileSync(join(ROOT, "app/components/order-book/fear-greed-gauge.js"), "utf8");
+  assert.match(fearGreed, /fear-greed-gauge/);
+  assert.match(gauge, /FEAR_GREED_GAUGE_SEGMENTS/);
+  assert.match(gauge, /#dc2626/);
+  assert.match(gauge, /#f97316/);
+  assert.match(gauge, /#eab308/);
+  assert.match(gauge, /#84cc16/);
+  assert.match(gauge, /#059669/);
+  assert.match(fearGreed, /SemicircleGauge/);
+  assert.equal(fearGreedClassificationAr(39), "خوف");
+  assert.equal(fearGreedClassificationAr(0), "خوف شديد");
+  assert.equal(fearGreedClassificationAr(50), "محايد");
+  assert.equal(fearGreedClassificationAr(100), "طمع شديد");
+  const left = fearGreedPointerPosition(0);
+  const mid = fearGreedPointerPosition(50);
+  const right = fearGreedPointerPosition(100);
+  assert.ok(left.x < mid.x && mid.x < right.x);
+  assert.ok(mid.y < left.y);
+  assert.doesNotMatch(fearGreed, /Sentiment[\s\S]*variant === "orderBook"/);
 });
 
 test("liquidity depth chart supports live and historical windows", () => {

@@ -13,12 +13,14 @@ import {
   DEFAULT_LIQUIDITY_DEPTH_WINDOW,
   DEFAULT_LIQUIDITY_RANGE_PERCENT,
   DEFAULT_LIQUIDITY_WALL_WINDOW,
+  DEFAULT_LIQUIDITY_WALLS_SUMMARY_WINDOW,
   DEPTH_LEVEL_OPTIONS,
   FLOW_WINDOW_OPTIONS,
   LARGE_TRADE_THRESHOLDS,
   LARGE_TRADE_WINDOW_OPTIONS,
   LIQUIDITY_DEPTH_WINDOW_OPTIONS,
   LIQUIDITY_RANGE_OPTIONS,
+  LIQUIDITY_WALLS_SUMMARY_WINDOW_OPTIONS,
 } from "../../../lib/market-data/constants";
 import {
   EXCHANGE_LABELS,
@@ -30,7 +32,11 @@ import {
 import FearGreedCard from "./FearGreedCard";
 import HistoricalLiquidityWallsPanel from "./HistoricalLiquidityWallsPanel";
 import LiquidityDepthChart from "./LiquidityDepthChart";
-import OrderBookPanel, { LiveWallCard } from "./OrderBookPanel";
+import OrderBookPanel, {
+  HistoricalWallCard,
+  LiveWallCard,
+  LiquidityWallsState,
+} from "./OrderBookPanel";
 import {
   formatLargeTradeEmptyMessage,
   formatPercent,
@@ -61,6 +67,7 @@ const breadcrumbs = [
 export default function OrderBookPageContent() {
   const { data, prefs, setPrefs, hydrated } = useMarketDepthStream();
   const [liquidityWallWindow, setLiquidityWallWindow] = useState(DEFAULT_LIQUIDITY_WALL_WINDOW);
+  const [liquidityWallsWindow, setLiquidityWallsWindow] = useState(DEFAULT_LIQUIDITY_WALLS_SUMMARY_WINDOW);
   const [liquidityDepthWindow, setLiquidityDepthWindow] = useState(DEFAULT_LIQUIDITY_DEPTH_WINDOW);
   const {
     flowHistory,
@@ -77,6 +84,17 @@ export default function OrderBookPageContent() {
     loading: liquidityWallsLoading,
     error: liquidityWallsError,
   } = useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow: liquidityWallWindow });
+  const isSidebarWallsLive = liquidityWallsWindow === "live";
+  const {
+    liquidityWallsHistory: sidebarWallsHistory,
+    loading: sidebarWallsLoading,
+    error: sidebarWallsError,
+  } = useOrderBookLiquidityWalls({
+    prefs,
+    hydrated,
+    wallWindow: isSidebarWallsLive ? DEFAULT_LIQUIDITY_WALL_WINDOW : liquidityWallsWindow,
+    enabled: !isSidebarWallsLive,
+  });
   const {
     summary: summary24h,
     initialLoading: summary24hInitialLoading,
@@ -90,6 +108,18 @@ export default function OrderBookPageContent() {
   } = useLiquidityDepthHistory({ prefs, hydrated, depthWindow: liquidityDepthWindow });
 
   const isLiveDepth = liquidityDepthWindow === "live";
+  const sidebarWallsBid = isSidebarWallsLive
+    ? data?.walls?.largestBid
+    : sidebarWallsHistory?.analytics?.strongestBid;
+  const sidebarWallsAsk = isSidebarWallsLive
+    ? data?.walls?.largestAsk
+    : sidebarWallsHistory?.analytics?.strongestAsk;
+  const sidebarWallsEmpty =
+    !isSidebarWallsLive &&
+    !sidebarWallsLoading &&
+    !sidebarWallsError &&
+    !sidebarWallsBid &&
+    !sidebarWallsAsk;
 
   const precisionOptions = useMemo(() => {
     const base = getDefaultPrecision(prefs.symbol);
@@ -385,13 +415,46 @@ export default function OrderBookPageContent() {
           </Panel>
 
           <Panel
-            title="جدران السيولة اللحظية"
-            description="أكبر مستويات سيولة ظاهرة حالياً في دفتر الأوامر."
+            title="جدران السيولة"
+            description={
+              isSidebarWallsLive
+                ? "أكبر مستويات السيولة الظاهرة حاليًا في دفتر الأوامر."
+                : "أقوى مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
+            }
           >
-            <div className="grid gap-2.5">
-              <LiveWallCard title="أكبر جدار شراء" wall={data?.walls?.largestBid} tone="buy" />
-              <LiveWallCard title="أكبر جدار بيع" wall={data?.walls?.largestAsk} tone="sell" />
+            <div className="mb-3">
+              <SegmentedControl
+                compact
+                ariaLabel="إطار جدران السيولة"
+                label="الإطار"
+                value={liquidityWallsWindow}
+                onChange={setLiquidityWallsWindow}
+                scrollable
+                options={LIQUIDITY_WALLS_SUMMARY_WINDOW_OPTIONS}
+              />
             </div>
+            {!isSidebarWallsLive ? (
+              <LiquidityWallsState
+                loading={sidebarWallsLoading}
+                error={sidebarWallsError}
+                partial={sidebarWallsHistory?.partialData}
+                coveragePercent={sidebarWallsHistory?.coveragePercent}
+                collecting={sidebarWallsHistory?.collecting}
+              />
+            ) : null}
+            {isSidebarWallsLive ? (
+              <div className="grid gap-2.5">
+                <LiveWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
+                <LiveWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
+              </div>
+            ) : sidebarWallsLoading || sidebarWallsError ? null : sidebarWallsEmpty ? (
+              <EmptyState message="لا توجد جدران كافية ضمن هذه الفترة حتى الآن." />
+            ) : (
+              <div className="grid gap-2.5">
+                <HistoricalWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
+                <HistoricalWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
+              </div>
+            )}
           </Panel>
         </div>
       </section>

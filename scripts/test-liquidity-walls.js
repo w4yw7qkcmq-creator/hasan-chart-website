@@ -269,6 +269,8 @@ test("query API shapes top lists and analytics", async () => {
   assert.equal(payload.recentlyDisappeared.length, 1);
   assert.equal(payload.analytics.strongestWall.wallKey, "BTCUSDT:binance:bid:100");
   assert.equal(payload.analytics.largestNotionalWall.strongestNotional, 1500);
+  assert.equal(payload.analytics.strongestBid.wallKey, "BTCUSDT:binance:bid:100");
+  assert.equal(payload.analytics.strongestAsk.wallKey, "BTCUSDT:binance:ask:101");
   assert.equal(payload.aggregatedDepthPoints.length, 2);
   assert.equal(payload.aggregatedDepthPoints[0].side, "bid");
 });
