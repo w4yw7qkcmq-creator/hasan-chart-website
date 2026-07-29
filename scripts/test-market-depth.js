@@ -372,11 +372,13 @@ function testOrderBookUiSourceGuards() {
   assert.match(pageSource, /dominanceFlow\?\.buyNotional/);
   assert.match(formatterSource, /en-US/);
   assert.match(formatterSource, /numberingSystem: "latn"/);
-  assert.match(panelSource, /bg-green-500/);
-  assert.match(panelSource, /bg-red-500/);
+  assert.match(panelSource, /bg-emerald-500/);
+  assert.match(panelSource, /bg-rose-500/);
   assert.equal(/teal|blue/i.test(panelSource), false);
   assert.match(pageSource, /formatLargeTradeEmptyMessage/);
-  assert.equal((pageSource.match(/<SummaryCard/g) || []).length, 2);
+  assert.match(pageSource, /StatTile/);
+  assert.match(pageSource, /title="مصادر البيانات"/);
+  assert.doesNotMatch(pageSource, /SummaryCard/);
 }
 
 function testIndependentFlowDominanceWindows() {

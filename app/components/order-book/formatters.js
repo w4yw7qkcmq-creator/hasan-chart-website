@@ -86,7 +86,46 @@ export function formatFlowWindowLabelAr(window) {
 }
 
 export function formatLargeTradeEmptyMessage(threshold, window) {
-  return `لا توجد صفقات منفذة تتجاوز ${formatThresholdLabel(threshold)} خلال آخر ${formatFlowWindowLabelAr(window)}.`;
+  return `لا توجد صفقات كبيرة ضمن الحد المحدد (${formatThresholdLabel(threshold)}) في هذه الفترة (${formatFlowWindowLabelAr(window)}).`;
+}
+
+/**
+ * @param {number} seconds
+ */
+export function formatDurationAr(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (total === 0) return "حديثًا";
+  if (total < 60) {
+    return total < 10 ? "أقل من دقيقة" : `${total} ث`;
+  }
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) {
+    return `${minutes} دقيقة`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  return remMinutes ? `${hours} س ${remMinutes} د` : `${hours} س`;
+}
+
+/**
+ * @param {number} ts
+ * @param {number} [now]
+ */
+export function formatMinutesAgoAr(ts, now = Date.now()) {
+  const diffMs = now - Number(ts);
+  if (!Number.isFinite(diffMs) || diffMs < 0) return "—";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "أقل من دقيقة";
+  if (minutes < 60) return `منذ ${minutes} دقيقة`;
+  const hours = Math.floor(minutes / 60);
+  const rem = minutes % 60;
+  return rem ? `منذ ${hours} س ${rem} د` : `منذ ${hours} س`;
+}
+
+export function sideLabelAr(side) {
+  if (side === "bid" || side === "buy") return "شراء";
+  if (side === "ask" || side === "sell") return "بيع";
+  return side || "—";
 }
 
 export function statusLabelAr(status) {

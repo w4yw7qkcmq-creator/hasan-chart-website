@@ -3,9 +3,7 @@
 import { useMemo, useState } from "react";
 import Breadcrumbs from "../seo/Breadcrumbs";
 import { useMarketDepthStream } from "../../hooks/useMarketDepthStream";
-import {
-  useOrderBookHistory,
-} from "../../hooks/useOrderBookHistory";
+import { useOrderBookHistory } from "../../hooks/useOrderBookHistory";
 import { useOrderBookLiquidityWalls } from "../../hooks/useOrderBookLiquidityWalls";
 import {
   DEFAULT_LARGE_TRADE_THRESHOLD,
@@ -14,7 +12,6 @@ import {
   DEFAULT_LIQUIDITY_WALL_WINDOW,
   DEPTH_LEVEL_OPTIONS,
   FLOW_WINDOW_OPTIONS,
-  HISTORICAL_LIQUIDITY_WALL_WINDOWS,
   LARGE_TRADE_THRESHOLDS,
   LARGE_TRADE_WINDOW_OPTIONS,
   LIQUIDITY_RANGE_OPTIONS,
@@ -26,20 +23,31 @@ import {
   SITE_SYMBOLS,
   SYMBOL_LABELS,
 } from "../../../lib/market-data/symbols";
-import { formatCoveragePercent } from "../../../lib/market-data/history/window-utils.js";
 import FearGreedCard from "./FearGreedCard";
+import HistoricalLiquidityWallsPanel from "./HistoricalLiquidityWallsPanel";
 import LiquidityDepthChart from "./LiquidityDepthChart";
-import OrderBookPanel from "./OrderBookPanel";
+import OrderBookPanel, { LiveWallCard } from "./OrderBookPanel";
 import {
   formatLargeTradeEmptyMessage,
   formatPercent,
   formatPrice,
-  formatQuantity,
   formatThresholdLabel,
   formatTime,
   formatUsd,
   statusLabelAr,
 } from "./formatters";
+import {
+  EmptyState,
+  FlowSplitBar,
+  HistoryState,
+  MetricLine,
+  NumericValue,
+  Panel,
+  SegmentedControl,
+  SideBadge,
+  StatTile,
+  StyledSelect,
+} from "./order-book-ui";
 
 const breadcrumbs = [
   { label: "الرئيسية", href: "/" },
@@ -76,10 +84,7 @@ export default function OrderBookPageContent() {
   const largeTradeThreshold = prefs.largeTradeThreshold ?? DEFAULT_LARGE_TRADE_THRESHOLD;
   const largeTradeWindow = prefs.largeTradeWindow ?? DEFAULT_LARGE_TRADE_WINDOW;
   const dominanceWindow = prefs.dominanceWindow ?? prefs.flowWindow;
-  const dominanceFlow = needsDominanceHistory
-    ? dominanceHistory
-    : data?.dominanceFlow;
-
+  const dominanceFlow = needsDominanceHistory ? dominanceHistory : data?.dominanceFlow;
   const executedFlow = needsFlowHistory ? flowHistory : data?.executedFlow;
 
   const displayedLargeTrades = needsLargeTradeHistory
@@ -92,8 +97,11 @@ export default function OrderBookPageContent() {
 
   const largeTradeEmptyMessage = useMemo(
     () => formatLargeTradeEmptyMessage(largeTradeThreshold, largeTradeWindow),
-    [largeTradeThreshold, largeTradeWindow]
+    [largeTradeThreshold, largeTradeWindow],
   );
+
+  const connectedCount = (data?.exchangeStatuses || []).filter((item) => item.status === "connected").length;
+  const totalExchanges = data?.exchangeStatuses?.length || 3;
 
   if (!hydrated) {
     return (
@@ -107,167 +115,144 @@ export default function OrderBookPageContent() {
     <div className="mx-auto max-w-7xl px-4 py-8" dir="rtl">
       <Breadcrumbs items={breadcrumbs} />
 
-      <header className="mt-6 mb-8">
-        <p className="site-price-card__eyebrow">Market Depth</p>
-        <h1 className="mb-3 text-3xl font-bold text-slate-900 dark:text-white">دفتر الأوامر والسيولة</h1>
+      <header className="mt-6 mb-6">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Market Depth
+        </p>
+        <h1 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
+          دفتر الأوامر والسيولة
+        </h1>
         <p className="max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
           متابعة لحظية لطلبات البيع والشراء، سيولة السوق، جدران الأوامر، الصفقات الكبيرة، وحجم التداول
-          المنفذ — بيانات مجمعة من المنصات المدعومة: OKX، Binance، Bybit.
+          المنفذ.
         </p>
       </header>
 
-      <section className="mb-6 grid gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-4 dark:border-white/10 dark:bg-slate-900/70 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <ControlSelect
-          label="العملة"
-          value={prefs.symbol}
-          onChange={(value) =>
-            setPrefs({ symbol: value, precision: getDefaultPrecision(value) })
-          }
-          options={SITE_SYMBOLS.map((symbol) => ({ value: symbol, label: SYMBOL_LABELS[symbol] }))}
-        />
-        <ControlSelect
-          label="المنصة"
-          value={prefs.mode}
-          onChange={(value) => setPrefs({ mode: value })}
-          options={[
-            { value: "aggregated", label: EXCHANGE_LABELS.aggregated },
-            { value: "okx", label: EXCHANGE_LABELS.okx },
-            { value: "binance", label: EXCHANGE_LABELS.binance },
-            { value: "bybit", label: EXCHANGE_LABELS.bybit },
-          ]}
-        />
-        <ControlSelect
-          label="Precision"
-          value={String(prefs.precision ?? getDefaultPrecision(prefs.symbol))}
-          onChange={(value) => setPrefs({ precision: Number(value) })}
-          options={precisionOptions.map((value) => ({ value: String(value), label: String(value) }))}
-        />
-        <ControlSelect
-          label="المستويات"
-          value={String(prefs.levels)}
-          onChange={(value) => setPrefs({ levels: Number(value) })}
-          options={DEPTH_LEVEL_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
-        />
-        <ControlSelect
-          label="نطاق السيولة"
-          value={String(prefs.liquidityRange ?? DEFAULT_LIQUIDITY_RANGE_PERCENT)}
-          onChange={(value) => setPrefs({ liquidityRange: Number(value) })}
-          options={LIQUIDITY_RANGE_OPTIONS.map((value) => ({ value: String(value), label: `${value}%` }))}
-        />
-        <ControlSelect
-          label="إطار الحجم"
-          value={prefs.flowWindow}
-          onChange={(value) => setPrefs({ flowWindow: value })}
-          options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-        />
-        <ControlSelect
-          label="صفقة كبيرة"
-          value={String(largeTradeThreshold)}
-          onChange={(value) => setPrefs({ largeTradeThreshold: Number(value) })}
-          options={LARGE_TRADE_THRESHOLDS.map((value) => ({
-            value: String(value),
-            label: formatThresholdLabel(value),
-          }))}
-        />
-        <ControlSelect
-          label="نافذة الصفقات الكبيرة"
-          value={largeTradeWindow}
-          onChange={(value) => setPrefs({ largeTradeWindow: value })}
-          options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-        />
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-slate-500 dark:text-slate-400">عرض الجوال</span>
-          <div className="flex rounded-xl border border-slate-200 dark:border-white/10">
-            {[
-              { value: "all", label: "الكل" },
-              { value: "asks", label: "بيع" },
-              { value: "bids", label: "شراء" },
-            ].map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setPrefs({ mobileSide: item.value })}
-                className={`flex-1 px-2 py-2 text-xs ${
-                  prefs.mobileSide === item.value
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                    : "text-slate-600 dark:text-slate-300"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
+      {/* Row 1 — price hero + quick stats */}
+      <section className="mb-6 grid items-start gap-4 lg:grid-cols-12">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5 lg:col-span-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">الرمز الحالي</p>
+              <h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">
+                {SYMBOL_LABELS[prefs.symbol] || prefs.symbol}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {EXCHANGE_LABELS[prefs.mode] || prefs.mode}
+              </p>
+            </div>
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+              {connectedCount}/{totalExchanges} منصات متصلة
+            </span>
+          </div>
+          <div className="mt-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">آخر سعر</p>
+            <NumericValue className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">
+              {formatPrice(data?.lastPrice)}
+            </NumericValue>
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-7">
+          <StatTile label="السبريد" value={formatPrice(data?.spread, 4)} />
+          <StatTile
+            label="نسبة الشراء"
+            value={formatPercent(dominanceFlow?.buyPercent)}
+            tone="buy"
+          />
+          <StatTile
+            label="نسبة البيع"
+            value={formatPercent(dominanceFlow?.sellPercent)}
+            tone="sell"
+          />
+          <StatTile
+            label="صافي التدفق"
+            value={formatUsd(dominanceFlow?.netNotional ?? dominanceFlow?.netFlow, { compact: true })}
+          />
+        </div>
       </section>
 
-      <section className="mb-6 grid gap-4 md:grid-cols-2">
-        <SummaryCard title="آخر سعر" value={formatPrice(data?.lastPrice)} />
-        <SummaryCard
-          title="مصادر البيانات"
-          value={data?.exchanges?.length ? data.exchanges.map((e) => EXCHANGE_LABELS[e] || e).join("، ") : "—"}
-          hint={data?.disclaimer}
-        />
-      </section>
-
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
-          <OrderBookPanel data={data} mobileSide={prefs.mobileSide} />
-
-          <Panel title="خريطة عمق السيولة">
-            <LiquidityDepthChart points={data?.depthMap || []} midPrice={data?.midPrice} />
-          </Panel>
-
-          <Panel title={largeTradesTitle}>
-            <HistoryState
-              loading={needsLargeTradeHistory && historyLoading}
-              error={needsLargeTradeHistory && historyError}
-              partial={largeTradeHistory?.partialData}
-              coveragePercent={largeTradeHistory?.coveragePercent}
-            />
-            <div className="max-h-80 overflow-y-auto overflow-x-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-slate-500 dark:text-slate-400">
-                    <th className="py-2 text-right">الوقت</th>
-                    <th className="py-2 text-right">المنصة</th>
-                    <th className="py-2 text-right">الاتجاه</th>
-                    <th className="py-2 text-left">القيمة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayedLargeTrades.map((trade) => (
-                    <tr
-                      key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
-                      className="border-t border-slate-100 dark:border-white/5"
-                    >
-                      <td className="py-2">
-                        <NumericValue>{formatTime(trade.ts)}</NumericValue>
-                      </td>
-                      <td className="py-2">{EXCHANGE_LABELS[trade.exchange] || trade.exchange}</td>
-                      <td className="py-2">{trade.side === "buy" ? "شراء منفذ" : "بيع منفذ"}</td>
-                      <td className="py-2 text-left">
-                        <NumericValue>{formatUsd(trade.notional, { compact: true })}</NumericValue>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!displayedLargeTrades.length && !(needsLargeTradeHistory && historyLoading) ? (
-                <p className="py-6 text-center text-sm text-slate-500">{largeTradeEmptyMessage}</p>
-              ) : null}
-            </div>
-          </Panel>
+      {/* Controls */}
+      <section className="mb-6 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5">
+        <div className="grid gap-4 xl:grid-cols-2">
+          <SegmentedControl
+            label="العملة"
+            ariaLabel="اختيار العملة"
+            value={prefs.symbol}
+            onChange={(value) => setPrefs({ symbol: value, precision: getDefaultPrecision(value) })}
+            options={SITE_SYMBOLS.map((symbol) => ({ value: symbol, label: SYMBOL_LABELS[symbol] }))}
+            scrollable
+          />
+          <SegmentedControl
+            label="المنصة"
+            ariaLabel="اختيار المنصة"
+            value={prefs.mode}
+            onChange={(value) => setPrefs({ mode: value })}
+            options={[
+              { value: "aggregated", label: EXCHANGE_LABELS.aggregated },
+              { value: "okx", label: EXCHANGE_LABELS.okx },
+              { value: "binance", label: EXCHANGE_LABELS.binance },
+              { value: "bybit", label: EXCHANGE_LABELS.bybit },
+            ]}
+            scrollable
+          />
         </div>
 
-        <div className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StyledSelect
+            label="Precision"
+            value={String(prefs.precision ?? getDefaultPrecision(prefs.symbol))}
+            onChange={(value) => setPrefs({ precision: Number(value) })}
+            options={precisionOptions.map((value) => ({ value: String(value), label: String(value) }))}
+          />
+          <StyledSelect
+            label="المستويات"
+            value={String(prefs.levels)}
+            onChange={(value) => setPrefs({ levels: Number(value) })}
+            options={DEPTH_LEVEL_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+          />
+          <StyledSelect
+            label="نطاق السيولة"
+            value={String(prefs.liquidityRange ?? DEFAULT_LIQUIDITY_RANGE_PERCENT)}
+            onChange={(value) => setPrefs({ liquidityRange: Number(value) })}
+            options={LIQUIDITY_RANGE_OPTIONS.map((value) => ({ value: String(value), label: `${value}%` }))}
+          />
+          <SegmentedControl
+            label="عرض الجوال"
+            ariaLabel="عرض الجوال"
+            value={prefs.mobileSide}
+            onChange={(value) => setPrefs({ mobileSide: value })}
+            options={[
+              { value: "all", label: "الكل" },
+              { value: "asks", label: "بيع", tone: "sell" },
+              { value: "bids", label: "شراء", tone: "buy" },
+            ]}
+          />
+        </div>
+      </section>
+
+      {/* Row 2 — main order book + sidebar analytics */}
+      <section className="mb-6 grid items-start gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
+        </div>
+
+        <div className="space-y-6 lg:col-span-4">
           <Panel
             title="سيطرة الشراء والبيع"
+            description={
+              needsDominanceHistory
+                ? "الصفقات المنفذة من السجل التاريخي ضمن الإطار المختار."
+                : "الصفقات المنفذة فعلياً ضمن الإطار المختار."
+            }
             action={
-              <ControlSelect
+              <SegmentedControl
                 compact
-                label="إطار السيطرة"
+                ariaLabel="إطار السيطرة"
+                label="الإطار"
                 value={dominanceWindow}
                 onChange={(value) => setPrefs({ dominanceWindow: value })}
+                scrollable
                 options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
               />
             }
@@ -278,51 +263,46 @@ export default function OrderBookPageContent() {
               partial={dominanceHistory?.partialData}
               coveragePercent={dominanceHistory?.coveragePercent}
             />
-            <div className="space-y-3 text-sm">
+            <FlowSplitBar
+              buyPercent={dominanceFlow?.buyPercent}
+              sellPercent={dominanceFlow?.sellPercent}
+            />
+            <div className="mt-4 space-y-2">
               <MetricLine
                 label="شراء منفذ"
                 value={formatUsd(dominanceFlow?.buyNotional, { compact: true })}
+                tone="buy"
               />
               <MetricLine
                 label="بيع منفذ"
                 value={formatUsd(dominanceFlow?.sellNotional, { compact: true })}
+                tone="sell"
               />
               <MetricLine
                 label="صافي التدفق"
-                value={formatUsd(
-                  dominanceFlow?.netNotional ?? dominanceFlow?.netFlow,
-                  { compact: true },
-                )}
+                value={formatUsd(dominanceFlow?.netNotional ?? dominanceFlow?.netFlow, { compact: true })}
               />
-              <MetricLine label="نسبة المشترين" value={formatPercent(dominanceFlow?.buyPercent)} />
-              <MetricLine label="نسبة البائعين" value={formatPercent(dominanceFlow?.sellPercent)} />
-              <MetricLine
-                label="الطرف الغالب"
-                value={dominanceFlow?.dominantSideLabel || "متوازن"}
-              />
-              <MetricLine
-                label="قوة الغلبة"
-                value={formatPercent(dominanceFlow?.dominanceStrength)}
-              />
-              <p className="rounded-xl bg-slate-100 px-3 py-2 text-center font-medium text-slate-800 dark:bg-white/5 dark:text-slate-100">
+              <p className="rounded-xl bg-slate-50 px-3 py-2 text-center text-sm font-medium text-slate-800 dark:bg-white/5 dark:text-slate-100">
                 {dominanceFlow?.dominanceLabel || dominanceFlow?.dominanceClassification || "متوازن"}
-              </p>
-              <p className="text-xs leading-6 text-slate-500 dark:text-slate-400">
-                {needsDominanceHistory
-                  ? "هذا القسم يعرض الصفقات المنفذة من السجل التاريخي ضمن الإطار المختار."
-                  : "هذا القسم يقيس الصفقات المنفذة فعلياً ضمن الإطار المختار، وليس السيولة الموضوعة في دفتر الأوامر."}
               </p>
             </div>
           </Panel>
 
           <Panel
             title="حجم الشراء/البيع المنفذ"
+            description={
+              needsFlowHistory
+                ? "الحجم المنفذ من السجل التاريخي."
+                : "الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر."
+            }
             action={
-              <ControlSelect
+              <SegmentedControl
                 compact
-                label="إطار الحجم"
+                ariaLabel="إطار الحجم"
+                label="الإطار"
                 value={prefs.flowWindow}
                 onChange={(value) => setPrefs({ flowWindow: value })}
+                scrollable
                 options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
               />
             }
@@ -333,312 +313,169 @@ export default function OrderBookPageContent() {
               partial={flowHistory?.partialData}
               coveragePercent={flowHistory?.coveragePercent}
             />
-            <div className="space-y-3 text-sm">
+            <FlowSplitBar buyPercent={executedFlow?.buyPercent} sellPercent={executedFlow?.sellPercent} />
+            <div className="mt-4 space-y-2">
               <MetricLine
                 label="شراء منفذ"
                 value={formatUsd(executedFlow?.buyNotional, { compact: true })}
+                tone="buy"
               />
               <MetricLine
                 label="بيع منفذ"
                 value={formatUsd(executedFlow?.sellNotional, { compact: true })}
+                tone="sell"
               />
               <MetricLine
                 label="صافي التدفق"
-                value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, {
-                  compact: true,
-                })}
+                value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, { compact: true })}
               />
-              <MetricLine label="نسبة الشراء" value={formatPercent(executedFlow?.buyPercent)} />
-              <MetricLine label="نسبة البيع" value={formatPercent(executedFlow?.sellPercent)} />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {needsFlowHistory
-                  ? "هذا القسم يعرض الحجم المنفذ من السجل التاريخي."
-                  : "هذا القسم يقيس الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر."}
-              </p>
             </div>
           </Panel>
 
-          <Panel title="جدران السيولة">
-            <WallBlock title="أكبر جدار شراء" wall={data?.walls?.largestBid} />
-            <WallBlock title="أكبر جدار بيع" wall={data?.walls?.largestAsk} />
+          <Panel title="جدران السيولة اللحظية" description="أكبر مستويات سيولة ظاهرة حالياً في دفتر الأوامر.">
+            <div className="grid gap-3">
+              <LiveWallCard title="أكبر جدار شراء" wall={data?.walls?.largestBid} tone="buy" />
+              <LiveWallCard title="أكبر جدار بيع" wall={data?.walls?.largestAsk} tone="sell" />
+            </div>
           </Panel>
+        </div>
+      </section>
 
-          <Panel
-            title="Historical Liquidity Walls"
-            action={
-              <ControlSelect
+      {/* Row 3 — depth chart + large trades */}
+      <section className="mb-6 grid items-start gap-6 lg:grid-cols-12">
+        <Panel
+          className="lg:col-span-7"
+          title="خريطة عمق السيولة"
+          description="توزيع السيولة الشرائية والبيعية حول السعر الحالي."
+        >
+          <LiquidityDepthChart points={data?.depthMap || []} midPrice={data?.midPrice} />
+        </Panel>
+
+        <Panel
+          className="lg:col-span-5"
+          title={largeTradesTitle}
+          description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
+          action={
+            <div className="flex w-full flex-col gap-3 sm:w-auto">
+              <SegmentedControl
                 compact
-                label="إطار الجدران التاريخية"
-                value={liquidityWallWindow}
-                onChange={setLiquidityWallWindow}
-                options={HISTORICAL_LIQUIDITY_WALL_WINDOWS.map((value) => ({
-                  value,
-                  label: value,
+                ariaLabel="حد الصفقة الكبيرة"
+                label="الحد"
+                value={String(largeTradeThreshold)}
+                onChange={(value) => setPrefs({ largeTradeThreshold: Number(value) })}
+                scrollable
+                options={LARGE_TRADE_THRESHOLDS.map((value) => ({
+                  value: String(value),
+                  label: formatThresholdLabel(value),
                 }))}
               />
-            }
-          >
-            <HistoryState
-              loading={liquidityWallsLoading}
-              error={liquidityWallsError}
-              partial={liquidityWallsHistory?.partialData}
-              coveragePercent={liquidityWallsHistory?.coveragePercent}
-            />
-            <LiquidityWallAnalytics analytics={liquidityWallsHistory?.analytics} />
-            <HistoricalLiquidityWallsSection
-              title="Top Persistent Walls"
-              rows={liquidityWallsHistory?.topPersistent || []}
-            />
-            <HistoricalLiquidityWallsSection
-              title="Top Appeared Walls"
-              rows={liquidityWallsHistory?.topAppeared || []}
-            />
-            <HistoricalLiquidityWallsSection
-              title="Recently Disappeared"
-              rows={liquidityWallsHistory?.recentlyDisappeared || []}
-            />
-          </Panel>
+              <SegmentedControl
+                compact
+                ariaLabel="نافذة الصفقات الكبيرة"
+                label="الإطار"
+                value={largeTradeWindow}
+                onChange={(value) => setPrefs({ largeTradeWindow: value })}
+                scrollable
+                options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+              />
+            </div>
+          }
+        >
+          <HistoryState
+            loading={needsLargeTradeHistory && historyLoading}
+            error={needsLargeTradeHistory && historyError}
+            partial={largeTradeHistory?.partialData}
+            coveragePercent={largeTradeHistory?.coveragePercent}
+          />
+          {displayedLargeTrades.length ? (
+            <div className="max-h-80 overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
+              <table className="w-full min-w-[420px] text-sm">
+                <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2.5 text-right">الوقت</th>
+                    <th className="px-3 py-2.5 text-right">المنصة</th>
+                    <th className="px-3 py-2.5 text-right">الاتجاه</th>
+                    <th className="px-3 py-2.5 text-left">القيمة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedLargeTrades.map((trade) => (
+                    <tr
+                      key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
+                      className="border-t border-slate-100 transition hover:bg-slate-50/80 dark:border-white/5 dark:hover:bg-white/5"
+                    >
+                      <td className="px-3 py-2">
+                        <NumericValue>{formatTime(trade.ts)}</NumericValue>
+                      </td>
+                      <td className="px-3 py-2">{EXCHANGE_LABELS[trade.exchange] || trade.exchange}</td>
+                      <td className="px-3 py-2">
+                        <SideBadge side={trade.side} />
+                      </td>
+                      <td className="px-3 py-2 text-left">
+                        <NumericValue className="font-medium">
+                          {formatUsd(trade.notional, { compact: true })}
+                        </NumericValue>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            !(needsLargeTradeHistory && historyLoading) && (
+              <EmptyState message={largeTradeEmptyMessage} />
+            )
+          )}
+        </Panel>
+      </section>
 
-          <Panel title="حالة المنصات">
-            <div className="space-y-2">
-              {(data?.exchangeStatuses || []).map((item) => (
+      {/* Row 5 — historical liquidity walls full width */}
+      <section className="mb-6">
+        <HistoricalLiquidityWallsPanel
+          wallWindow={liquidityWallWindow}
+          onWallWindowChange={setLiquidityWallWindow}
+          loading={liquidityWallsLoading}
+          error={liquidityWallsError}
+          history={liquidityWallsHistory}
+        />
+      </section>
+
+      <section className="mb-6">
+        <FearGreedCard />
+      </section>
+
+      {/* Last — data sources */}
+      <section className="mb-2">
+        <Panel
+          title="مصادر البيانات"
+          description="يتم تجميع بيانات دفتر الأوامر والتنفيذ من المنصات المتصلة."
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(data?.exchangeStatuses || []).map((item) => {
+              const connected = item.status === "connected";
+              return (
                 <div
                   key={item.exchange}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-white/10"
+                  className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-3 text-sm dark:border-white/10"
                 >
-                  <span>{EXCHANGE_LABELS[item.exchange] || item.exchange}</span>
-                  <span className="text-slate-500 dark:text-slate-400">{statusLabelAr(item.status)}</span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`}
+                    />
+                    <span className="font-medium">{EXCHANGE_LABELS[item.exchange] || item.exchange}</span>
+                  </div>
+                  <span className={connected ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                    {statusLabelAr(item.status)}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </Panel>
-
-          <FearGreedCard />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HistoryState({ loading, error, partial, coveragePercent }) {
-  if (loading) {
-    return (
-      <p className="mb-3 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
-        جاري تحميل البيانات التاريخية...
-      </p>
-    );
-  }
-
-  if (error) {
-    return (
-      <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
-        تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.
-      </p>
-    );
-  }
-
-  if (partial) {
-    const label = formatCoveragePercent(coveragePercent);
-    return (
-      <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
-        البيانات التاريخية قيد التجميع — التغطية{" "}
-        <NumericValue>{label}%</NumericValue>
-      </p>
-    );
-  }
-
-  return null;
-}
-
-function NumericValue({ children, className = "" }) {
-  return (
-    <span dir="ltr" className={`inline-block tabular-nums ${className}`}>
-      {children}
-    </span>
-  );
-}
-
-function ControlSelect({ label, value, onChange, options, compact = false }) {
-  return (
-    <label className={`flex flex-col gap-1 text-sm ${compact ? "min-w-[7rem]" : ""}`}>
-      <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none dark:border-white/10 dark:bg-slate-950 dark:text-slate-100"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function SummaryCard({ title, value, hint }) {
-  return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 dark:border-white/10 dark:bg-slate-900/70">
-      <p className="text-xs text-slate-500 dark:text-slate-400">{title}</p>
-      <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
-        <NumericValue>{value || "—"}</NumericValue>
-      </p>
-      {hint ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
-    </div>
-  );
-}
-
-function Panel({ title, children, action }) {
-  return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-5 dark:border-white/10 dark:bg-slate-900/70">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function MetricLine({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-600 dark:text-slate-300">{label}</span>
-      <NumericValue className="font-medium text-slate-900 dark:text-white">{value}</NumericValue>
-    </div>
-  );
-}
-
-function WallBlock({ title, wall }) {
-  if (!wall) {
-    return (
-      <div className="mb-3 rounded-xl border border-dashed border-slate-200 p-3 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
-        {title}: لا يوجد جدار بارز حالياً
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-3 rounded-xl border border-slate-200 p-3 text-sm dark:border-white/10">
-      <p className="mb-2 font-medium text-slate-800 dark:text-slate-100">{title}</p>
-      <div className="space-y-1 text-slate-600 dark:text-slate-300">
-        <p>
-          السعر: <NumericValue>{formatPrice(wall.price)}</NumericValue>
-        </p>
-        <p>
-          الكمية: <NumericValue>{formatQuantity(wall.quantity)}</NumericValue>
-        </p>
-        <p>
-          القيمة: <NumericValue>{formatUsd(wall.notional, { compact: true })}</NumericValue>
-        </p>
-        <p>
-          البعد عن السعر: <NumericValue>{formatPercent(wall.distancePercent)}</NumericValue>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function LiquidityWallAnalytics({ analytics }) {
-  if (!analytics) return null;
-
-  const items = [
-    { label: "Strongest Wall", row: analytics.strongestWall },
-    { label: "Longest Living Wall", row: analytics.longestLivingWall },
-    { label: "Most Reappeared Wall", row: analytics.mostReappearedWall },
-    { label: "Largest Notional Wall", row: analytics.largestNotionalWall },
-  ].filter((item) => item.row);
-
-  if (!items.length) return null;
-
-  return (
-    <div className="mb-4 grid gap-2 sm:grid-cols-2">
-      {items.map(({ label, row }) => {
-        const isBid = row.side === "bid";
-        return (
-          <div
-            key={label}
-            className="rounded-xl border border-slate-200 p-3 text-xs dark:border-white/10"
-          >
-            <p className="mb-1 font-medium text-slate-700 dark:text-slate-200">{label}</p>
-            <p className={isBid ? "text-emerald-600" : "text-rose-600"}>
-              {isBid ? "Buy" : "Sell"} · <NumericValue>{formatPrice(row.price)}</NumericValue>
-            </p>
-            <p className="text-slate-500 dark:text-slate-400">
-              Persistence: <NumericValue>{Math.round(row.persistenceScore)}%</NumericValue>
-            </p>
+              );
+            })}
           </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function HistoricalLiquidityWallsSection({ title, rows }) {
-  return (
-    <div className="mb-4">
-      <p className="mb-2 text-sm font-medium text-slate-800 dark:text-slate-100">{title}</p>
-      <HistoricalLiquidityWallsTable rows={rows} />
-    </div>
-  );
-}
-
-function HistoricalLiquidityWallsTable({ rows }) {
-  if (!rows.length) {
-    return (
-      <p className="text-xs text-slate-500 dark:text-slate-400">
-        لا توجد جدران تاريخية مهمة ضمن الإطار المختار بعد.
-      </p>
-    );
-  }
-
-  return (
-    <div className="max-h-96 overflow-y-auto overflow-x-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-xs text-slate-500 dark:text-slate-400">
-            <th className="py-2 text-right">الاتجاه</th>
-            <th className="py-2 text-right">السعر</th>
-            <th className="py-2 text-right">الحجم</th>
-            <th className="py-2 text-right">Persistence</th>
-            <th className="py-2 text-right">المدة</th>
-            <th className="py-2 text-right">الظهور</th>
-            <th className="py-2 text-right">البورصة</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const isBid = row.side === "bid";
-            return (
-              <tr
-                key={row.wallKey}
-                className="border-t border-slate-100 dark:border-white/5"
-              >
-                <td className={`py-2 ${isBid ? "text-emerald-600" : "text-rose-600"}`}>
-                  {isBid ? "Buy" : "Sell"}
-                </td>
-                <td className="py-2">
-                  <NumericValue>{formatPrice(row.price)}</NumericValue>
-                </td>
-                <td className="py-2">
-                  <NumericValue>{formatQuantity(row.size)}</NumericValue>
-                </td>
-                <td className="py-2">
-                  <NumericValue>{Math.round(row.persistenceScore)}%</NumericValue>
-                </td>
-                <td className="py-2">
-                  <NumericValue>{row.lifetimeSeconds}s</NumericValue>
-                </td>
-                <td className="py-2">
-                  <NumericValue>{row.appearanceCount}</NumericValue>
-                </td>
-                <td className="py-2">{EXCHANGE_LABELS[row.exchange] || row.exchange}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          {data?.disclaimer ? (
+            <p className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{data.disclaimer}</p>
+          ) : null}
+        </Panel>
+      </section>
     </div>
   );
 }

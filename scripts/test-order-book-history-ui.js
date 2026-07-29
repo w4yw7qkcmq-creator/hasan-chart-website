@@ -17,9 +17,20 @@ import {
   isLiveLargeTradeWindow,
 } from "../app/hooks/useOrderBookHistory.js";
 import { buildMarketDepthQuery } from "../app/hooks/useOrderBookPreferences.js";
+import { formatDurationAr } from "../app/components/order-book/formatters.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 let passed = 0;
+
+function readSources() {
+  return {
+    page: readFileSync(join(ROOT, "app/components/order-book/OrderBookPageContent.js"), "utf8"),
+    walls: readFileSync(join(ROOT, "app/components/order-book/HistoricalLiquidityWallsPanel.js"), "utf8"),
+    ui: readFileSync(join(ROOT, "app/components/order-book/order-book-ui.js"), "utf8"),
+    panel: readFileSync(join(ROOT, "app/components/order-book/OrderBookPanel.js"), "utf8"),
+    chart: readFileSync(join(ROOT, "app/components/order-book/LiquidityDepthChart.js"), "utf8"),
+  };
+}
 
 function test(name, fn) {
   fn();
@@ -82,18 +93,13 @@ test("SSE query preserves selected live windows", () => {
 });
 
 test("UI uses history hook and partial badge", () => {
-  const source = readFileSync(
-    join(ROOT, "app/components/order-book/OrderBookPageContent.js"),
-    "utf8",
-  );
-  assert.match(source, /useOrderBookHistory/);
-  assert.match(source, /HistoryState/);
-  assert.match(source, /البيانات التاريخية قيد التجميع/);
-  assert.match(source, /coveragePercent/);
-  assert.match(source, /formatCoveragePercent/);
-  assert.doesNotMatch(source, /Math\.round\(\(Number\(completeness\)/);
-  assert.match(source, /dir="ltr"/);
-  assert.match(source, /overflow-x-hidden/);
+  const { page, ui } = readSources();
+  assert.match(page, /useOrderBookHistory/);
+  assert.match(page, /HistoryState/);
+  assert.match(ui, /البيانات التاريخية قيد التجميع/);
+  assert.match(page, /coveragePercent/);
+  assert.match(ui, /formatCoveragePercent/);
+  assert.match(ui, /dir="ltr"/);
 });
 
 test("UI window options include long frames", () => {
@@ -101,26 +107,73 @@ test("UI window options include long frames", () => {
   assert.ok(LARGE_TRADE_WINDOW_OPTIONS.includes("7d"));
 });
 
-test("historical liquidity walls panel present", () => {
-  const source = readFileSync(
-    join(ROOT, "app/components/order-book/OrderBookPageContent.js"),
-    "utf8",
-  );
-  assert.match(source, /Historical Liquidity Walls/);
-  assert.match(source, /useOrderBookLiquidityWalls/);
-  assert.match(source, /HistoricalLiquidityWallsTable/);
-  assert.match(source, /LiquidityWallAnalytics/);
-  assert.match(source, /Top Persistent Walls/);
-  assert.match(source, /Recently Disappeared/);
-  assert.match(source, /HISTORICAL_LIQUIDITY_WALL_WINDOWS/);
-  assert.match(source, /text-emerald-600/);
-  assert.match(source, /text-rose-600/);
+test("historical liquidity walls panel arabic and tabs", () => {
+  const { page, walls } = readSources();
+  assert.match(page, /HistoricalLiquidityWallsPanel/);
+  assert.match(page, /useOrderBookLiquidityWalls/);
+  assert.match(walls, /جدران السيولة التاريخية/);
+  assert.match(walls, /الأكثر ثباتًا/);
+  assert.match(walls, /الأكثر ظهورًا/);
+  assert.match(walls, /المختفية حديثًا/);
+  assert.match(walls, /أقوى جدار/);
+  assert.doesNotMatch(walls, /Top Persistent Walls/);
+  assert.doesNotMatch(walls, /Historical Liquidity Walls/);
+  assert.doesNotMatch(walls, /Persistence:/);
+});
+
+test("buy green sell red without blue on trade elements", () => {
+  const { page, walls, panel, chart, ui } = readSources();
+  const combined = page + walls + panel + chart + ui;
+  assert.match(combined, /text-emerald|bg-emerald|emerald-/);
+  assert.match(combined, /text-rose|bg-rose|rose-/);
+  assert.doesNotMatch(panel, /text-blue|bg-blue|border-blue|text-cyan|text-sky|text-teal/);
+  assert.doesNotMatch(chart, /#3b82f6|#0ea5e9|#06b6d4|blue/);
+  assert.doesNotMatch(walls, /["']Buy["']|["']Sell["']/);
+  assert.doesNotMatch(walls, />\s*Buy\s*</);
+  assert.doesNotMatch(walls, />\s*Sell\s*</);
+});
+
+test("data sources moved to last section", () => {
+  const page = readSources().page;
+  const dataSourcesIndex = page.lastIndexOf('title="مصادر البيانات"');
+  const wallsIndex = page.indexOf("HistoricalLiquidityWallsPanel");
+  const orderBookIndex = page.indexOf("OrderBookPanel");
+  assert.ok(dataSourcesIndex > wallsIndex);
+  assert.ok(dataSourcesIndex > orderBookIndex);
+  assert.doesNotMatch(page, /title="مصادر البيانات"[\s\S]*OrderBookPanel/);
+});
+
+test("historical walls full width grid", () => {
+  const { page, walls } = readSources();
+  assert.match(page, /items-start/);
+  assert.match(page, /lg:grid-cols-12/);
+  assert.match(page, /lg:col-span-8/);
+  assert.match(page, /lg:col-span-4/);
+  assert.match(walls, /col-span-full/);
+});
+
+test("segmented controls replace native timeframe selects in page", () => {
+  const page = readSources().page;
+  assert.match(page, /SegmentedControl/);
+  assert.doesNotMatch(page, /<select[\s\S]*flowWindow/);
+});
+
+test("duration formatter converts seconds to arabic minutes", () => {
+  assert.equal(formatDurationAr(540), "9 دقيقة");
+  assert.equal(formatDurationAr(35), "35 ث");
+  assert.equal(formatDurationAr(0), "حديثًا");
+  assert.equal(formatDurationAr(3900), "1 س 5 د");
+});
+
+test("walls table limits default rows and show more", () => {
+  const walls = readSources().walls;
+  assert.match(walls, /DEFAULT_VISIBLE = 8/);
+  assert.match(walls, /عرض المزيد/);
 });
 
 test("liquidity walls hook calls history API", () => {
   const source = readFileSync(join(ROOT, "app/hooks/useOrderBookLiquidityWalls.js"), "utf8");
   assert.match(source, /\/api\/market-depth\/history\/liquidity-walls/);
-  assert.match(source, /HISTORICAL_LIQUIDITY_WALL_WINDOWS/);
 });
 
 test("history API routes referenced by hook", () => {
@@ -130,12 +183,10 @@ test("history API routes referenced by hook", () => {
 });
 
 test("mobile layout classes present", () => {
-  const source = readFileSync(
-    join(ROOT, "app/components/order-book/OrderBookPageContent.js"),
-    "utf8",
-  );
-  assert.match(source, /max-w-7xl px-4/);
-  assert.match(source, /sm:grid-cols-2/);
+  const page = readSources().page;
+  assert.match(page, /max-w-7xl px-4/);
+  assert.match(page, /sm:grid-cols-2/);
+  assert.match(page, /overflow-x-auto/);
 });
 
 console.log(`order-book history ui tests passed: ${passed}/${passed}`);

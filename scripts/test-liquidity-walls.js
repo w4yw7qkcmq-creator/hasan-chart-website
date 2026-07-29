@@ -356,6 +356,15 @@ test("API route exists and uses validation", () => {
   assert.match(source, /getLiquidityWallWriterStatus/);
 });
 
+test("UI panel uses arabic labels", () => {
+  const source = readFileSync(
+    join(ROOT, "app/components/order-book/HistoricalLiquidityWallsPanel.js"),
+    "utf8",
+  );
+  assert.match(source, /جدران السيولة التاريخية/);
+  assert.match(source, /الأكثر ثباتًا/);
+});
+
 test("migration defines market_liquidity_walls table", () => {
   const source = readFileSync(
     join(ROOT, "supabase/migrations/20260729_market_liquidity_walls.sql"),
