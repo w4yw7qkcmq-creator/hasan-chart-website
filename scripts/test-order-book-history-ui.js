@@ -181,6 +181,9 @@ test("walls table limits default rows and show more", () => {
 test("liquidity walls hook calls history API", () => {
   const source = readFileSync(join(ROOT, "app/hooks/useOrderBookLiquidityWalls.js"), "utf8");
   assert.match(source, /\/api\/market-depth\/history\/liquidity-walls/);
+  assert.match(source, /initialLoading/);
+  assert.match(source, /isRefreshing/);
+  assert.match(source, /lastSuccessfulRef/);
 });
 
 test("history API routes referenced by hook", () => {
@@ -325,6 +328,34 @@ test("spread stays live while summary uses 24h", () => {
   const page = readSources().page;
   assert.match(page, /label="السبريد"[\s\S]*sublabel="لحظي"/);
   assert.match(page, /formatPrice\(data\?\.spread/);
+});
+
+test("default historical wall window is defined and used", () => {
+  const page = readSources().page;
+  assert.match(page, /DEFAULT_LIQUIDITY_WALL_WINDOW/);
+});
+
+test("live walls keep last known values during reconnect", () => {
+  const page = readSources().page;
+  assert.match(page, /lastLiveWallsRef/);
+  assert.match(page, /liveWallsBid/);
+  assert.match(page, /liveWallsAsk/);
+});
+
+test("historical walls panel falls back across tabs and keeps analytics", () => {
+  const walls = readSources().walls;
+  assert.match(walls, /resolveTabRows/);
+  assert.match(walls, /strongestBid/);
+  assert.match(walls, /strongestAsk/);
+  assert.match(walls, /usingFallback/);
+});
+
+test("order book layout uses stretch sidebar and full-width tail sections", () => {
+  const page = readSources().page;
+  assert.match(page, /items-stretch/);
+  assert.match(page, /Full-width sections/);
+  assert.match(page, /min-h-\[17rem\]/);
+  assert.match(page, /space-y-4/);
 });
 
 console.log(`order-book history ui tests passed: ${passed}/${passed}`);

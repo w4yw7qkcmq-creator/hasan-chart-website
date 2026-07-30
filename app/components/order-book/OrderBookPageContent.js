@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Breadcrumbs from "../seo/Breadcrumbs";
 import { useMarketDepthStream } from "../../hooks/useMarketDepthStream";
 import { useOrderBookHistory } from "../../hooks/useOrderBookHistory";
@@ -66,6 +66,19 @@ const breadcrumbs = [
   { label: "دفتر الأوامر والسيولة", href: "/order-book" },
 ];
 
+function pickHistoricalWallSide(history, side) {
+  const analyticsKey = side === "bid" ? "strongestBid" : "strongestAsk";
+  const fromAnalytics = history?.analytics?.[analyticsKey];
+  if (fromAnalytics) return fromAnalytics;
+
+  for (const key of ["topPersistent", "topAppeared", "recentlyDisappeared"]) {
+    const row = (history?.[key] || []).find((item) => item.side === side);
+    if (row) return row;
+  }
+
+  return null;
+}
+
 export default function OrderBookPageContent() {
   const { data, prefs, setPrefs, hydrated } = useMarketDepthStream();
   const [liquidityWallWindow, setLiquidityWallWindow] = useState(DEFAULT_LIQUIDITY_WALL_WINDOW);
@@ -83,6 +96,8 @@ export default function OrderBookPageContent() {
   } = useOrderBookHistory({ prefs, hydrated });
   const {
     liquidityWallsHistory,
+    initialLoading: liquidityWallsInitialLoading,
+    isRefreshing: liquidityWallsRefreshing,
     loading: liquidityWallsLoading,
     error: liquidityWallsError,
   } = useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow: liquidityWallWindow });
@@ -115,19 +130,46 @@ export default function OrderBookPageContent() {
     error: liquidationsError,
   } = useOrderBookLiquidations({ hydrated });
 
-  const isLiveDepth = liquidityDepthWindow === "live";
+  const lastLiveWallsRef = useRef({ bid: null, ask: null });
+
+  const liveWallsBid = useMemo(() => {
+    const wall = data?.walls?.largestBid;
+    if (wall) {
+      lastLiveWallsRef.current.bid = wall;
+      return wall;
+    }
+    if ((data?.bids?.length ?? 0) > 0 && lastLiveWallsRef.current.bid) {
+      return lastLiveWallsRef.current.bid;
+    }
+    return null;
+  }, [data?.walls?.largestBid, data?.bids]);
+
+  const liveWallsAsk = useMemo(() => {
+    const wall = data?.walls?.largestAsk;
+    if (wall) {
+      lastLiveWallsRef.current.ask = wall;
+      return wall;
+    }
+    if ((data?.asks?.length ?? 0) > 0 && lastLiveWallsRef.current.ask) {
+      return lastLiveWallsRef.current.ask;
+    }
+    return null;
+  }, [data?.walls?.largestAsk, data?.asks]);
+
   const sidebarWallsBid = isSidebarWallsLive
-    ? data?.walls?.largestBid
-    : sidebarWallsHistory?.analytics?.strongestBid;
+    ? liveWallsBid
+    : pickHistoricalWallSide(sidebarWallsHistory, "bid");
   const sidebarWallsAsk = isSidebarWallsLive
-    ? data?.walls?.largestAsk
-    : sidebarWallsHistory?.analytics?.strongestAsk;
+    ? liveWallsAsk
+    : pickHistoricalWallSide(sidebarWallsHistory, "ask");
   const sidebarWallsEmpty =
     !isSidebarWallsLive &&
     !sidebarWallsLoading &&
     !sidebarWallsError &&
     !sidebarWallsBid &&
-    !sidebarWallsAsk;
+    !sidebarWallsAsk &&
+    !(sidebarWallsHistory?.totalCount > 0);
+  const isLiveDepth = liquidityDepthWindow === "live";
 
   const precisionOptions = useMemo(() => {
     const base = getDefaultPrecision(prefs.symbol);
@@ -326,13 +368,14 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Row 2 — main order book + sidebar analytics */}
-      <section className="mb-5 grid items-start gap-5 lg:grid-cols-12">
-        <div className="lg:col-span-8">
+      <section className="mb-4 grid items-stretch gap-4 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-8">
           <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
         </div>
 
-        <div className="space-y-5 lg:col-span-4">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-4">
           <Panel
+            className="flex min-h-[17rem] flex-1 flex-col"
             title="سيطرة الشراء والبيع"
             description={
               needsDominanceHistory
@@ -381,6 +424,7 @@ export default function OrderBookPageContent() {
           </Panel>
 
           <Panel
+            className="flex min-h-[17rem] flex-1 flex-col"
             title="حجم الشراء/البيع المنفذ"
             description={
               needsFlowHistory
@@ -423,6 +467,7 @@ export default function OrderBookPageContent() {
           </Panel>
 
           <Panel
+            className="flex min-h-[17rem] flex-1 flex-col"
             title="جدران السيولة"
             description={
               isSidebarWallsLive
@@ -468,9 +513,9 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Row 3 — depth chart + large trades */}
-      <section className="mb-5 grid items-start gap-5 lg:grid-cols-12">
+      <section className="mb-4 grid items-start gap-4 lg:grid-cols-12">
         <Panel
-          className="lg:col-span-7"
+          className="flex min-h-[26rem] flex-col lg:col-span-7"
           title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
           description={
             isLiveDepth
@@ -502,7 +547,7 @@ export default function OrderBookPageContent() {
         </Panel>
 
         <Panel
-          className="lg:col-span-5"
+          className="flex min-h-[26rem] flex-col lg:col-span-5"
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
         >
@@ -583,25 +628,24 @@ export default function OrderBookPageContent() {
         </Panel>
       </section>
 
-      {/* Row 5 — historical liquidity walls full width */}
-      <section className="mb-5">
+      {/* Full-width sections */}
+      <section className="mb-4 space-y-4">
         <HistoricalLiquidityWallsPanel
           wallWindow={liquidityWallWindow}
           onWallWindowChange={setLiquidityWallWindow}
-          loading={liquidityWallsLoading}
+          loading={liquidityWallsInitialLoading}
+          isRefreshing={liquidityWallsRefreshing}
           error={liquidityWallsError}
           history={liquidityWallsHistory}
         />
-      </section>
 
-      <LiquidationsPanel
-        data={liquidationsData}
-        initialLoading={liquidationsInitialLoading}
-        isRefreshing={liquidationsRefreshing}
-        error={liquidationsError}
-      />
+        <LiquidationsPanel
+          data={liquidationsData}
+          initialLoading={liquidationsInitialLoading}
+          isRefreshing={liquidationsRefreshing}
+          error={liquidationsError}
+        />
 
-      <section className="mb-5">
         <FearGreedCard variant="orderBook" />
       </section>
 

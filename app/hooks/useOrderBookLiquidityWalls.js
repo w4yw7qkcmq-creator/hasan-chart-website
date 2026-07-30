@@ -19,10 +19,23 @@ function buildQuery({ symbol, window, exchange }) {
   return params.toString();
 }
 
+function hasHistoricalWallRows(payload) {
+  if (!payload?.success) return false;
+  return (
+    (payload.totalCount ?? 0) > 0 ||
+    (payload.topPersistent?.length ?? 0) > 0 ||
+    (payload.topAppeared?.length ?? 0) > 0 ||
+    (payload.recentlyDisappeared?.length ?? 0) > 0 ||
+    Boolean(payload.analytics?.strongestBid || payload.analytics?.strongestAsk)
+  );
+}
+
 export function useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow, enabled: enabledOverride = true }) {
   const [payload, setPayload] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const lastSuccessfulRef = useRef(null);
   const requestIdRef = useRef(0);
 
   const enabled = enabledOverride && isHistoricalLiquidityWallWindow(wallWindow);
@@ -34,15 +47,23 @@ export function useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow, enable
   useEffect(() => {
     if (!hydrated || !enabled) {
       setPayload(null);
-      setLoading(false);
+      setInitialLoading(false);
+      setIsRefreshing(false);
       setError(null);
+      lastSuccessfulRef.current = null;
       return undefined;
     }
 
     const requestId = ++requestIdRef.current;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    const hasPriorData = lastSuccessfulRef.current != null;
+
+    if (hasPriorData) {
+      setIsRefreshing(true);
+    } else {
+      setInitialLoading(true);
+      setError(null);
+    }
 
     const exchange = prefs.mode === "aggregated" ? null : prefs.mode;
 
@@ -59,21 +80,35 @@ export function useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow, enable
       .then((data) => {
         if (cancelled || requestId !== requestIdRef.current) return;
         if (!data?.success) {
+          if (lastSuccessfulRef.current) {
+            setPayload({ ...lastSuccessfulRef.current, stale: true });
+            setError("REFRESH_FAILED");
+            return;
+          }
           setError("HISTORY_FETCH_FAILED");
           setPayload(null);
           return;
+        }
+        if (hasHistoricalWallRows(data)) {
+          lastSuccessfulRef.current = data;
         }
         setPayload(data);
         setError(null);
       })
       .catch(() => {
         if (cancelled || requestId !== requestIdRef.current) return;
+        if (lastSuccessfulRef.current) {
+          setPayload({ ...lastSuccessfulRef.current, stale: true });
+          setError("REFRESH_FAILED");
+          return;
+        }
         setError("HISTORY_FETCH_FAILED");
         setPayload(null);
       })
       .finally(() => {
         if (!cancelled && requestId === requestIdRef.current) {
-          setLoading(false);
+          setInitialLoading(false);
+          setIsRefreshing(false);
         }
       });
 
@@ -84,7 +119,9 @@ export function useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow, enable
 
   return {
     liquidityWallsHistory: payload,
-    loading,
+    initialLoading,
+    isRefreshing,
+    loading: initialLoading || isRefreshing,
     error,
     enabled,
   };

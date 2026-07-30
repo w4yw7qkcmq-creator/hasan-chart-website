@@ -522,6 +522,8 @@ function testWallDetection() {
 
   assert.ok(walls.largestBid);
   assert.equal(walls.largestBid.price, 98);
+  assert.ok(walls.largestAsk);
+  assert.equal(walls.largestAsk.price, 101);
 }
 
 function testProductionFilesAvoidMockKeywords() {

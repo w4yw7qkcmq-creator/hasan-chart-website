@@ -42,6 +42,8 @@ const WALL_TABS = [
 ];
 
 const ANALYTICS_ITEMS = [
+  { key: "strongestBid", label: "أقوى جدار شراء", hint: "أقوى مستوى شراء خلال الفترة." },
+  { key: "strongestAsk", label: "أقوى جدار بيع", hint: "أقوى مستوى بيع خلال الفترة." },
   { key: "strongestWall", label: "أقوى جدار", hint: "الجدار صاحب أعلى مؤشر قوة وثبات خلال الفترة." },
   { key: "longestLivingWall", label: "الأطول بقاءً", hint: "الجدار الذي بقي ظاهرًا لأطول مدة." },
   { key: "mostReappearedWall", label: "الأكثر تكرارًا", hint: "الجدار الذي اختفى وعاد للظهور أكثر من مرة." },
@@ -96,16 +98,52 @@ function AnalyticsCard({ label, hint, row }) {
   );
 }
 
-function WallsTable({ rows, showLastSeen = false }) {
+function historyHasRows(history) {
+  return (
+    (history?.totalCount ?? 0) > 0 ||
+    (history?.topPersistent?.length ?? 0) > 0 ||
+    (history?.topAppeared?.length ?? 0) > 0 ||
+    (history?.recentlyDisappeared?.length ?? 0) > 0
+  );
+}
+
+function mergeHistoryRows(history) {
+  const merged = [];
+  const seen = new Set();
+  for (const key of ["topPersistent", "topAppeared", "recentlyDisappeared"]) {
+    for (const row of history?.[key] || []) {
+      if (seen.has(row.wallKey)) continue;
+      seen.add(row.wallKey);
+      merged.push(row);
+    }
+  }
+  return merged;
+}
+
+function resolveTabRows(history, rowsKey) {
+  const tabRows = history?.[rowsKey] || [];
+  if (tabRows.length) return tabRows;
+  if (history?.topPersistent?.length) return history.topPersistent;
+  if (history?.topAppeared?.length) return history.topAppeared;
+  if (history?.recentlyDisappeared?.length) return history.recentlyDisappeared;
+  return mergeHistoryRows(history);
+}
+
+function WallsTable({ rows, showLastSeen = false, usingFallback = false }) {
   const [expanded, setExpanded] = useState(false);
   const visibleRows = expanded ? rows.slice(0, EXPANDED_VISIBLE) : rows.slice(0, DEFAULT_VISIBLE);
 
   if (!rows.length) {
-    return <EmptyState message="لا توجد جدران تاريخية مهمة ضمن الإطار المختار بعد." />;
+    return <EmptyState message="لا توجد جدران تاريخية ضمن الإطار المختار بعد." />;
   }
 
   return (
     <div>
+      {usingFallback ? (
+        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+          لا توجد نتائج في هذا التبويب حاليًا — يُعرض أفضل ما هو متاح من بقية السجل.
+        </p>
+      ) : null}
       <div className="hidden overflow-x-auto md:block">
         <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-200 dark:border-white/10">
           <table className="w-full min-w-[640px] text-sm">
@@ -225,12 +263,15 @@ export default function HistoricalLiquidityWallsPanel({
   wallWindow,
   onWallWindowChange,
   loading,
+  isRefreshing,
   error,
   history,
 }) {
   const [activeTab, setActiveTab] = useState("persistent");
   const currentTab = WALL_TABS.find((tab) => tab.id === activeTab) || WALL_TABS[0];
-  const rows = history?.[currentTab.rowsKey] || [];
+  const tabRows = history?.[currentTab.rowsKey] || [];
+  const rows = resolveTabRows(history, currentTab.rowsKey);
+  const usingFallback = Boolean(history && tabRows.length === 0 && rows.length > 0);
 
   const analytics = useMemo(() => {
     if (!history?.analytics) return [];
@@ -240,20 +281,32 @@ export default function HistoricalLiquidityWallsPanel({
     })).filter((item) => item.row);
   }, [history?.analytics]);
 
+  const showInitialLoading = loading && !historyHasRows(history);
   return (
     <Panel
       title="جدران السيولة التاريخية"
       description="يعرض مستويات السيولة التي استمرت أو تكررت خلال الفترة المحددة، مع قياس قوة وثبات كل جدار."
       action={
-        <SegmentedControl
-          compact
-          ariaLabel="إطار الجدران التاريخية"
-          label="الإطار الزمني"
-          value={wallWindow}
-          onChange={onWallWindowChange}
-          scrollable
-          options={HISTORICAL_LIQUIDITY_WALL_WINDOWS.map((value) => ({ value, label: value }))}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {history?.stale ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+              بيانات قديمة
+            </span>
+          ) : isRefreshing ? (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
+              جاري التحديث...
+            </span>
+          ) : null}
+          <SegmentedControl
+            compact
+            ariaLabel="إطار الجدران التاريخية"
+            label="الإطار الزمني"
+            value={wallWindow}
+            onChange={onWallWindowChange}
+            scrollable
+            options={HISTORICAL_LIQUIDITY_WALL_WINDOWS.map((value) => ({ value, label: value }))}
+          />
+        </div>
       }
       className="col-span-full"
     >
@@ -267,7 +320,12 @@ export default function HistoricalLiquidityWallsPanel({
         </ul>
       </details>
 
-      <HistoryState loading={loading} error={error} partial={history?.partialData} coveragePercent={history?.coveragePercent} />
+      <HistoryState
+        loading={showInitialLoading}
+        error={error && !historyHasRows(history) ? error : null}
+        partial={history?.partialData}
+        coveragePercent={history?.coveragePercent}
+      />
 
       {analytics.length ? (
         <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -288,7 +346,7 @@ export default function HistoricalLiquidityWallsPanel({
       <p className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{currentTab.hint}</p>
 
       <div className="mt-4">
-        <WallsTable rows={rows} showLastSeen={activeTab === "disappeared"} />
+        <WallsTable rows={rows} showLastSeen={activeTab === "disappeared"} usingFallback={usingFallback} />
       </div>
     </Panel>
   );

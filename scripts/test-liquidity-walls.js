@@ -21,7 +21,7 @@ import {
   SYMBOL_WALL_MIN_NOTIONAL,
   WALL_SAMPLE_INTERVAL_MS,
 } from "../lib/market-data/history/liquidity-walls/wall-detector.js";
-import { HISTORICAL_LIQUIDITY_WALL_WINDOWS } from "../lib/market-data/constants.js";
+import { HISTORICAL_LIQUIDITY_WALL_WINDOWS, DEFAULT_LIQUIDITY_WALL_WINDOW } from "../lib/market-data/constants.js";
 import { isHistoricalLiquidityWallWindow } from "../app/hooks/useOrderBookLiquidityWalls.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,6 +54,7 @@ function makeLevels({ midPrice, side, bigNotional, noiseNotional = 1000, count =
 
 test("wall windows match constants", () => {
   assert.deepEqual(HISTORICAL_LIQUIDITY_WALL_WINDOWS, HISTORY_LIQUIDITY_WALL_WINDOWS);
+  assert.equal(DEFAULT_LIQUIDITY_WALL_WINDOW, "7d");
   for (const window of HISTORICAL_LIQUIDITY_WALL_WINDOWS) {
     assert.equal(isHistoricalLiquidityWallWindow(window), true);
   }
