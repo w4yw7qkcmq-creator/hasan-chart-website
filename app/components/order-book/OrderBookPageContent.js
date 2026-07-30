@@ -367,15 +367,16 @@ export default function OrderBookPageContent() {
         </div>
       </section>
 
+      <div className="space-y-4">
       {/* Row 2 — main order book + sidebar analytics */}
-      <section className="mb-4 grid items-stretch gap-4 lg:grid-cols-12">
+      <section className="grid items-start gap-4 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-8">
           <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
         </div>
 
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-4">
           <Panel
-            className="flex min-h-[17rem] flex-1 flex-col"
+            className="flex flex-col"
             title="سيطرة الشراء والبيع"
             description={
               needsDominanceHistory
@@ -424,7 +425,7 @@ export default function OrderBookPageContent() {
           </Panel>
 
           <Panel
-            className="flex min-h-[17rem] flex-1 flex-col"
+            className="flex flex-col"
             title="حجم الشراء/البيع المنفذ"
             description={
               needsFlowHistory
@@ -467,7 +468,7 @@ export default function OrderBookPageContent() {
           </Panel>
 
           <Panel
-            className="flex min-h-[17rem] flex-1 flex-col"
+            className="flex flex-col"
             title="جدران السيولة"
             description={
               isSidebarWallsLive
@@ -513,9 +514,9 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Row 3 — depth chart + large trades */}
-      <section className="mb-4 grid items-start gap-4 lg:grid-cols-12">
+      <section className="grid items-start gap-4 lg:grid-cols-12">
         <Panel
-          className="flex min-h-[26rem] flex-col lg:col-span-7"
+          className="flex flex-col lg:col-span-7"
           title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
           description={
             isLiveDepth
@@ -547,7 +548,7 @@ export default function OrderBookPageContent() {
         </Panel>
 
         <Panel
-          className="flex min-h-[26rem] flex-col lg:col-span-5"
+          className="flex flex-col lg:col-span-5"
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
         >
@@ -629,7 +630,7 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Full-width sections */}
-      <section className="mb-4 space-y-4">
+      <section className="space-y-4">
         <HistoricalLiquidityWallsPanel
           wallWindow={liquidityWallWindow}
           onWallWindowChange={setLiquidityWallWindow}
@@ -650,7 +651,7 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Last — data sources */}
-      <section className="mb-2">
+      <section>
         <details open className="group rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80">
           <summary className="cursor-pointer list-none p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
             <div className="flex items-center justify-between gap-3">
@@ -697,6 +698,7 @@ export default function OrderBookPageContent() {
           </div>
         </details>
       </section>
+      </div>
     </div>
   );
 }

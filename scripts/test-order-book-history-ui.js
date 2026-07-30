@@ -350,12 +350,33 @@ test("historical walls panel falls back across tabs and keeps analytics", () => 
   assert.match(walls, /usingFallback/);
 });
 
-test("order book layout uses stretch sidebar and full-width tail sections", () => {
+test("order book layout uses start-aligned sidebar and full-width tail sections", () => {
   const page = readSources().page;
-  assert.match(page, /items-stretch/);
+  assert.match(page, /items-start/);
   assert.match(page, /Full-width sections/);
-  assert.match(page, /min-h-\[17rem\]/);
   assert.match(page, /space-y-4/);
+  assert.doesNotMatch(page, /min-h-\[17rem\]/);
+  assert.doesNotMatch(page, /min-h-\[26rem\]/);
+  assert.match(page, /Last — data sources/);
+});
+
+test("fear and greed refreshes on interval and keeps last successful value", () => {
+  const { fearGreed } = readSources();
+  assert.match(fearGreed, /FEAR_GREED_REFRESH_MS/);
+  assert.match(fearGreed, /setInterval/);
+  assert.match(fearGreed, /cache: "no-store"/);
+  assert.match(fearGreed, /lastSuccessfulRef/);
+  assert.match(fearGreed, /isRefreshing/);
+  assert.match(fearGreed, /initialLoading/);
+  assert.doesNotMatch(fearGreed, /const \[loading, setLoading\]/);
+});
+
+test("liquidity wall cards grow naturally without clipping overflow", () => {
+  const { panel, ui } = readSources();
+  assert.doesNotMatch(panel, /LiveWallCard[\s\S]*min-h-\[7\.5rem\]/);
+  assert.doesNotMatch(panel, /HistoricalWallCard[\s\S]*min-h-\[8rem\]/);
+  assert.match(ui, /overflow-x-hidden/);
+  assert.doesNotMatch(ui, /Panel[\s\S]*overflow-hidden rounded-2xl/);
 });
 
 console.log(`order-book history ui tests passed: ${passed}/${passed}`);

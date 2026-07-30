@@ -13,7 +13,7 @@ export function NumericValue({ children, className = "" }) {
 export function Panel({ title, description, children, action, className = "", compact = false }) {
   return (
     <section
-      className={`min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80 ${
+      className={`min-w-0 overflow-x-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80 ${
         compact ? "p-3 sm:p-4" : "p-4 sm:p-5"
       } ${className}`}
     >

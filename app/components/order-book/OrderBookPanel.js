@@ -201,7 +201,7 @@ export function LiveWallCard({ title, wall, tone }) {
   if (!wall) {
     return (
       <div
-        className={`flex min-h-[7.5rem] flex-col justify-center rounded-xl border border-dashed p-3 text-sm text-slate-500 ${border} ${bg}`}
+        className={`flex flex-col justify-center rounded-xl border border-dashed p-3 text-sm text-slate-500 ${border} ${bg}`}
         title={WALL_TOOLTIP}
       >
         <p className="font-medium text-slate-700 dark:text-slate-200">{title}</p>
@@ -213,7 +213,7 @@ export function LiveWallCard({ title, wall, tone }) {
   const strength = Math.min(100, Math.max(12, (wall.notional / 500_000) * 100));
 
   return (
-    <div className={`flex min-h-[7.5rem] flex-col rounded-xl border p-3 ${border} ${bg}`} title={WALL_TOOLTIP}>
+    <div className={`flex flex-col rounded-xl border p-3 ${border} ${bg}`} title={WALL_TOOLTIP}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${accent}`}>
@@ -259,7 +259,7 @@ export function HistoricalWallCard({ title, wall, tone }) {
 
   if (!wall) {
     return (
-      <div className={`flex min-h-[8rem] flex-col justify-center rounded-xl border border-dashed p-3 text-sm ${border} ${bg}`}>
+      <div className={`flex flex-col justify-center rounded-xl border border-dashed p-3 text-sm ${border} ${bg}`}>
         <p className="font-medium text-slate-700 dark:text-slate-200">{title}</p>
         <p className="mt-1 text-xs text-slate-500">لا توجد جدران كافية ضمن هذه الفترة حتى الآن.</p>
       </div>
@@ -269,7 +269,7 @@ export function HistoricalWallCard({ title, wall, tone }) {
   const notional = wall.strongestNotional ?? wall.notional;
 
   return (
-    <div className={`flex min-h-[8rem] flex-col rounded-xl border p-3 ${border} ${bg}`}>
+    <div className={`flex flex-col rounded-xl border p-3 ${border} ${bg}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${accent}`}>

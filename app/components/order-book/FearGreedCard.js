@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../../lib/fetch-with-timeout";
 import { formatInteger } from "./formatters";
 import {
@@ -11,6 +11,8 @@ import {
 } from "./fear-greed-gauge";
 
 export { fearGreedClassificationAr, fearGreedPointerPosition } from "./fear-greed-gauge";
+
+export const FEAR_GREED_REFRESH_MS = 5 * 60 * 1000;
 
 function SemicircleGauge({ value }) {
   const numericValue = Number(value);
@@ -53,32 +55,79 @@ function SemicircleGauge({ value }) {
   );
 }
 
+async function fetchFearGreedPayload() {
+  const response = await fetchWithTimeout(
+    "/api/market-sentiment/fear-greed",
+    { cache: "no-store" },
+    8000,
+  );
+  return response.json();
+}
+
 export default function FearGreedCard({ variant = "default" }) {
   const [payload, setPayload] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const lastSuccessfulRef = useRef(null);
   const isOrderBook = variant === "orderBook";
 
   useEffect(() => {
     let cancelled = false;
 
-    void fetchWithTimeout("/api/market-sentiment/fear-greed", {}, 8000)
-      .then((response) => response.json())
-      .then((result) => {
-        if (!cancelled) setPayload(result);
-      })
-      .catch(() => {
-        if (!cancelled) setPayload({ success: false });
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    async function load(isRefresh = false) {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      }
+
+      try {
+        const result = await fetchFearGreedPayload();
+        if (cancelled) return;
+
+        if (result?.current?.value != null) {
+          lastSuccessfulRef.current = result;
+          setPayload(result);
+        } else if (lastSuccessfulRef.current) {
+          setPayload({
+            ...lastSuccessfulRef.current,
+            stale: true,
+            staleNotice: "قد تكون متأخرة",
+          });
+        } else {
+          setPayload(result);
+        }
+      } catch {
+        if (cancelled) return;
+
+        if (lastSuccessfulRef.current) {
+          setPayload({
+            ...lastSuccessfulRef.current,
+            stale: true,
+            staleNotice: "قد تكون متأخرة",
+          });
+        } else {
+          setPayload({ success: false });
+        }
+      } finally {
+        if (!cancelled) {
+          setInitialLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    }
+
+    void load(false);
+    const intervalId = setInterval(() => {
+      void load(true);
+    }, FEAR_GREED_REFRESH_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(intervalId);
     };
   }, []);
 
-  const value = payload?.current?.value;
+  const displayPayload = payload?.current ? payload : lastSuccessfulRef.current;
+  const value = displayPayload?.current?.value;
   const numericValue = Number(value);
 
   const wrapperClass = isOrderBook
@@ -92,17 +141,24 @@ export default function FearGreedCard({ variant = "default" }) {
       <div className={wrapperClass}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">مؤشر الخوف والطمع</h3>
-          <span className="text-slate-400" aria-hidden="true">
-            ›
-          </span>
+          {isRefreshing ? (
+            <span
+              aria-hidden="true"
+              className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-200"
+            />
+          ) : (
+            <span className="text-slate-400" aria-hidden="true">
+              ›
+            </span>
+          )}
         </div>
 
-        {loading ? (
+        {initialLoading && !displayPayload?.current ? (
           <div className={`flex ${bodyHeightClass} flex-col items-center justify-center gap-2`}>
             <div className="h-[7.5rem] w-full max-w-[280px] animate-pulse rounded-t-full bg-slate-100 dark:bg-white/5" />
             <div className="h-4 w-24 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
           </div>
-        ) : !payload?.current ? (
+        ) : !displayPayload?.current ? (
           <p className={`${bodyHeightClass} text-sm text-slate-500 dark:text-slate-400`}>
             تعذّر تحميل مؤشر الخوف والطمع حاليًا.
           </p>
@@ -110,8 +166,10 @@ export default function FearGreedCard({ variant = "default" }) {
           <SemicircleGauge value={numericValue} />
         )}
 
-        {payload?.staleNotice ? (
-          <p className="mt-2 text-center text-[10px] text-amber-700 dark:text-amber-300">{payload.staleNotice}</p>
+        {displayPayload?.staleNotice ? (
+          <p className="mt-2 text-center text-[10px] text-amber-700 dark:text-amber-300">
+            {displayPayload.staleNotice}
+          </p>
         ) : null}
       </div>
     );
@@ -124,19 +182,19 @@ export default function FearGreedCard({ variant = "default" }) {
           <p className="site-price-card__eyebrow">Sentiment</p>
           <h3 className="site-price-card__title mb-0">مؤشر الخوف والطمع</h3>
         </div>
-        {payload?.staleNotice ? (
+        {displayPayload?.staleNotice ? (
           <span className="rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-[10px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-            {payload.staleNotice}
+            {displayPayload.staleNotice}
           </span>
         ) : null}
       </div>
 
-      {loading ? (
+      {initialLoading && !displayPayload?.current ? (
         <div className="flex min-h-[8rem] flex-col items-center justify-center gap-3">
           <div className="h-24 w-full max-w-xs animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
           <div className="h-4 w-32 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
         </div>
-      ) : !payload?.current ? (
+      ) : !displayPayload?.current ? (
         <p className="min-h-[5rem] text-sm text-slate-500 dark:text-slate-400">
           تعذّر تحميل المؤشر حاليًا
         </p>
@@ -145,13 +203,13 @@ export default function FearGreedCard({ variant = "default" }) {
           <div className="flex flex-col items-center gap-2">
             <SemicircleGauge value={numericValue} />
             <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
-              {payload.current.classificationAr || fearGreedClassificationAr(numericValue)}
+              {displayPayload.current.classificationAr || fearGreedClassificationAr(numericValue)}
             </p>
           </div>
 
-          {payload.history?.length ? (
+          {displayPayload.history?.length ? (
             <div className="mt-4 flex h-16 items-end gap-1">
-              {[...payload.history].reverse().slice(-14).map((entry) => (
+              {[...displayPayload.history].reverse().slice(-14).map((entry) => (
                 <div
                   key={entry.timestamp}
                   className="flex-1 rounded-t"
@@ -167,8 +225,8 @@ export default function FearGreedCard({ variant = "default" }) {
             </div>
           ) : null}
 
-          {payload.attribution ? (
-            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">{payload.attribution}</p>
+          {displayPayload.attribution ? (
+            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">{displayPayload.attribution}</p>
           ) : null}
         </>
       )}
