@@ -183,7 +183,7 @@ test("liquidity walls hook calls history API", () => {
   assert.match(source, /\/api\/market-depth\/history\/liquidity-walls/);
   assert.match(source, /initialLoading/);
   assert.match(source, /isRefreshing/);
-  assert.match(source, /lastSuccessfulRef/);
+  assert.match(source, /cacheByKeyRef/);
 });
 
 test("history API routes referenced by hook", () => {
@@ -350,25 +350,47 @@ test("historical walls panel falls back across tabs and keeps analytics", () => 
   assert.match(walls, /usingFallback/);
 });
 
-test("order book layout uses start-aligned sidebar and full-width tail sections", () => {
+test("order book layout uses equal-height depth row and full-width tail sections", () => {
   const page = readSources().page;
-  assert.match(page, /items-start/);
+  assert.match(page, /equal-height row/);
+  assert.match(page, /items-stretch/);
   assert.match(page, /Full-width sections/);
   assert.match(page, /space-y-4/);
+  assert.match(page, /fillContainer/);
+  assert.match(page, /min-h-0 flex-1/);
   assert.doesNotMatch(page, /min-h-\[17rem\]/);
   assert.doesNotMatch(page, /min-h-\[26rem\]/);
   assert.match(page, /Last — data sources/);
 });
 
-test("fear and greed refreshes on interval and keeps last successful value", () => {
+test("fear and greed order book uses coinmarketcap source", () => {
   const { fearGreed } = readSources();
-  assert.match(fearGreed, /FEAR_GREED_REFRESH_MS/);
-  assert.match(fearGreed, /setInterval/);
-  assert.match(fearGreed, /cache: "no-store"/);
+  assert.match(fearGreed, /source=coinmarketcap/);
+  assert.match(fearGreed, /المصدر: CoinMarketCap/);
+  assert.match(fearGreed, /FEAR_GREED_REFRESH_MS = 15 \* 60 \* 1000/);
+  assert.doesNotMatch(fearGreed, /alternative\.me[\s\S]*variant === "orderBook"/);
   assert.match(fearGreed, /lastSuccessfulRef/);
-  assert.match(fearGreed, /isRefreshing/);
-  assert.match(fearGreed, /initialLoading/);
-  assert.doesNotMatch(fearGreed, /const \[loading, setLoading\]/);
+  assert.match(fearGreed, /cache: "no-store"/);
+});
+
+test("coinmarketcap fear greed adapter parses public endpoint", () => {
+  const adapter = readFileSync(
+    join(ROOT, "lib/market-data/sentiment/coinmarketcap-fear-greed.js"),
+    "utf8",
+  );
+  const constants = readFileSync(join(ROOT, "lib/market-data/constants.js"), "utf8");
+  assert.match(adapter, /coinmarketcap/);
+  assert.match(adapter, /CMC_FEAR_GREED_API_URL/);
+  assert.match(constants, /pro-api\.coinmarketcap\.com\/public-api\/v3\/fear-and-greed\/latest/);
+  assert.match(adapter, /CMC_FEAR_GREED_CACHE_MS/);
+});
+
+test("historical walls hook retries and caches per window", () => {
+  const hook = readFileSync(join(ROOT, "app/hooks/useOrderBookLiquidityWalls.js"), "utf8");
+  assert.match(hook, /fetchLiquidityWallsWithRetry/);
+  assert.match(hook, /cacheByKeyRef/);
+  assert.match(hook, /30_000/);
+  assert.match(hook, /stale: true/);
 });
 
 test("liquidity wall cards grow naturally without clipping overflow", () => {

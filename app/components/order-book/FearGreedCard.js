@@ -12,7 +12,9 @@ import {
 
 export { fearGreedClassificationAr, fearGreedPointerPosition } from "./fear-greed-gauge";
 
-export const FEAR_GREED_REFRESH_MS = 5 * 60 * 1000;
+export const FEAR_GREED_REFRESH_MS = 15 * 60 * 1000;
+const ORDER_BOOK_FEAR_GREED_URL = "/api/market-sentiment/fear-greed?source=coinmarketcap";
+const LEGACY_FEAR_GREED_URL = "/api/market-sentiment/fear-greed";
 
 function SemicircleGauge({ value }) {
   const numericValue = Number(value);
@@ -55,13 +57,41 @@ function SemicircleGauge({ value }) {
   );
 }
 
-async function fetchFearGreedPayload() {
+function normalizeFearGreedPayload(result, isOrderBook) {
+  if (!result) return null;
+
+  if (isOrderBook && result.source === "coinmarketcap" && result.value != null) {
+    return {
+      success: true,
+      current: {
+        value: result.value,
+        classification: result.classification,
+        classificationAr: result.classificationAr || fearGreedClassificationAr(result.value),
+      },
+      source: result.source,
+      updatedAt: result.updatedAt,
+      fetchedAt: result.fetchedAt,
+      stale: result.stale,
+      staleNotice: result.staleNotice,
+      attribution: "المصدر: CoinMarketCap",
+    };
+  }
+
+  if (result.current?.value != null) {
+    return result;
+  }
+
+  return null;
+}
+
+async function fetchFearGreedPayload(isOrderBook) {
   const response = await fetchWithTimeout(
-    "/api/market-sentiment/fear-greed",
+    isOrderBook ? ORDER_BOOK_FEAR_GREED_URL : LEGACY_FEAR_GREED_URL,
     { cache: "no-store" },
-    8000,
+    12_000,
   );
-  return response.json();
+  const result = await response.json();
+  return normalizeFearGreedPayload(result, isOrderBook);
 }
 
 export default function FearGreedCard({ variant = "default" }) {
@@ -80,7 +110,7 @@ export default function FearGreedCard({ variant = "default" }) {
       }
 
       try {
-        const result = await fetchFearGreedPayload();
+        const result = await fetchFearGreedPayload(isOrderBook);
         if (cancelled) return;
 
         if (result?.current?.value != null) {
@@ -90,10 +120,10 @@ export default function FearGreedCard({ variant = "default" }) {
           setPayload({
             ...lastSuccessfulRef.current,
             stale: true,
-            staleNotice: "قد تكون متأخرة",
+            staleNotice: "بيانات قديمة",
           });
         } else {
-          setPayload(result);
+          setPayload(result || { success: false });
         }
       } catch {
         if (cancelled) return;
@@ -102,7 +132,7 @@ export default function FearGreedCard({ variant = "default" }) {
           setPayload({
             ...lastSuccessfulRef.current,
             stale: true,
-            staleNotice: "قد تكون متأخرة",
+            staleNotice: "بيانات قديمة",
           });
         } else {
           setPayload({ success: false });
@@ -124,7 +154,7 @@ export default function FearGreedCard({ variant = "default" }) {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, []);
+  }, [isOrderBook]);
 
   const displayPayload = payload?.current ? payload : lastSuccessfulRef.current;
   const value = displayPayload?.current?.value;
@@ -169,6 +199,12 @@ export default function FearGreedCard({ variant = "default" }) {
         {displayPayload?.staleNotice ? (
           <p className="mt-2 text-center text-[10px] text-amber-700 dark:text-amber-300">
             {displayPayload.staleNotice}
+          </p>
+        ) : null}
+
+        {displayPayload?.current ? (
+          <p className="mt-2 text-center text-[10px] text-slate-500 dark:text-slate-400">
+            المصدر: CoinMarketCap
           </p>
         ) : null}
       </div>

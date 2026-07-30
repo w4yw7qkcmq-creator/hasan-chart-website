@@ -40,6 +40,7 @@ export default function LiquidityDepthChart({
   partial = false,
   coveragePercent,
   collecting = false,
+  fillContainer = false,
 }) {
   const { maxNotional, chartPoints } = useMemo(() => {
     const max = Math.max(...points.map((p) => p.notional || 0), 1);
@@ -101,9 +102,14 @@ export default function LiquidityDepthChart({
 
   const chartLabel =
     mode === "historical" ? "خريطة جدران السيولة التاريخية" : "خريطة عمق السيولة";
+  const shellClass = fillContainer ? "flex min-h-0 flex-1 flex-col" : "min-w-0";
+  const svgShellClass = fillContainer
+    ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 px-2 py-2 dark:border-white/10 dark:bg-slate-950/40 sm:px-3"
+    : "min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 px-2 py-2 dark:border-white/10 dark:bg-slate-950/40 sm:px-3";
+  const svgClass = fillContainer ? "h-full min-h-[12rem] w-full flex-1" : `${CHART_MIN_HEIGHT} w-full`;
 
   return (
-    <div className="min-w-0">
+    <div className={shellClass}>
       {mode === "historical" ? (
         <DepthHistoryState
           loading={false}
@@ -135,8 +141,8 @@ export default function LiquidityDepthChart({
         </span>
       </div>
 
-      <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 px-2 py-2 dark:border-white/10 dark:bg-slate-950/40 sm:px-3">
-        <svg viewBox="0 0 600 180" className={`${CHART_MIN_HEIGHT} w-full`} role="img" aria-label={chartLabel}>
+      <div className={svgShellClass}>
+        <svg viewBox="0 0 600 180" className={svgClass} preserveAspectRatio="xMidYMid meet" role="img" aria-label={chartLabel}>
           {[45, 90, 135].map((y) => (
             <line
               key={y}

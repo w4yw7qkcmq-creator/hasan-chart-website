@@ -103,7 +103,8 @@ function historyHasRows(history) {
     (history?.totalCount ?? 0) > 0 ||
     (history?.topPersistent?.length ?? 0) > 0 ||
     (history?.topAppeared?.length ?? 0) > 0 ||
-    (history?.recentlyDisappeared?.length ?? 0) > 0
+    (history?.recentlyDisappeared?.length ?? 0) > 0 ||
+    Boolean(history?.analytics?.strongestBid || history?.analytics?.strongestAsk)
   );
 }
 
@@ -346,7 +347,11 @@ export default function HistoricalLiquidityWallsPanel({
       <p className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{currentTab.hint}</p>
 
       <div className="mt-4">
-        <WallsTable rows={rows} showLastSeen={activeTab === "disappeared"} usingFallback={usingFallback} />
+        {!showInitialLoading && !(error && !historyHasRows(history)) && !rows.length && !analytics.length ? (
+          <EmptyState message="لا توجد جدران تاريخية ضمن الإطار المختار بعد." />
+        ) : (
+          <WallsTable rows={rows} showLastSeen={activeTab === "disappeared"} usingFallback={usingFallback} />
+        )}
       </div>
     </Panel>
   );

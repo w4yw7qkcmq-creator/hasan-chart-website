@@ -513,10 +513,10 @@ export default function OrderBookPageContent() {
         </div>
       </section>
 
-      {/* Row 3 — depth chart + large trades */}
-      <section className="grid items-start gap-4 lg:grid-cols-12">
+      {/* Row 3 — depth chart + large trades (equal-height row) */}
+      <section className="grid items-stretch gap-4 lg:grid-cols-12">
         <Panel
-          className="flex flex-col lg:col-span-7"
+          className="flex h-full min-h-0 flex-col lg:col-span-7"
           title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
           description={
             isLiveDepth
@@ -535,20 +535,23 @@ export default function OrderBookPageContent() {
               options={LIQUIDITY_DEPTH_WINDOW_OPTIONS}
             />
           </div>
-          <LiquidityDepthChart
-            mode={isLiveDepth ? "live" : "historical"}
-            points={isLiveDepth ? data?.depthMap || [] : depthHistory?.aggregatedDepthPoints || []}
-            midPrice={data?.midPrice}
-            loading={!isLiveDepth && depthHistoryLoading}
-            error={!isLiveDepth && depthHistoryError}
-            partial={depthHistory?.partialData}
-            coveragePercent={depthHistory?.coveragePercent}
-            collecting={depthHistory?.collecting}
-          />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <LiquidityDepthChart
+              fillContainer
+              mode={isLiveDepth ? "live" : "historical"}
+              points={isLiveDepth ? data?.depthMap || [] : depthHistory?.aggregatedDepthPoints || []}
+              midPrice={data?.midPrice}
+              loading={!isLiveDepth && depthHistoryLoading}
+              error={!isLiveDepth && depthHistoryError}
+              partial={depthHistory?.partialData}
+              coveragePercent={depthHistory?.coveragePercent}
+              collecting={depthHistory?.collecting}
+            />
+          </div>
         </Panel>
 
         <Panel
-          className="flex flex-col lg:col-span-5"
+          className="flex h-full min-h-0 flex-col lg:col-span-5"
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
         >
@@ -575,6 +578,7 @@ export default function OrderBookPageContent() {
               options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
             />
           </div>
+          <div className="flex min-h-0 flex-1 flex-col">
           <HistoryState
             loading={needsLargeTradeHistory && historyLoading}
             error={needsLargeTradeHistory && historyError}
@@ -582,7 +586,7 @@ export default function OrderBookPageContent() {
             coveragePercent={largeTradeHistory?.coveragePercent}
           />
           {displayedLargeTrades.length ? (
-            <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
               <table className="w-full min-w-[480px] text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
@@ -626,6 +630,7 @@ export default function OrderBookPageContent() {
               <EmptyState message={largeTradeEmptyMessage} />
             )
           )}
+          </div>
         </Panel>
       </section>
 
