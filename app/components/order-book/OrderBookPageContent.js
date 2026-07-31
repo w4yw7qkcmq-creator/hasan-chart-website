@@ -219,10 +219,6 @@ export default function OrderBookPageContent() {
   const summaryCoverage = summary24h?.coveragePercent;
   const connectedCount = data?.connectedExchangeCount ?? (data?.exchangeStatuses || []).filter((item) => item.status === "connected").length;
   const totalExchanges = data?.expectedExchangeCount ?? (data?.exchangeStatuses?.length || 3);
-  const probing = Boolean(data?.probing);
-  const coverageLabel = probing
-    ? "جاري التحقق من المنصات الداعمة..."
-    : `${connectedCount}/${totalExchanges} متصل`;
   const displaySymbol = data?.displaySymbol || formatMarketSymbol(prefs.symbol);
   const historyCollecting = Boolean(data?.historyCollecting);
 
@@ -313,12 +309,6 @@ export default function OrderBookPageContent() {
         </p>
       </header>
 
-      {data?.symbolLoadError ? (
-        <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-          {data.symbolLoadError}
-        </p>
-      ) : null}
-
       {symbolNotice ? (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
           {symbolNotice}
@@ -351,7 +341,7 @@ export default function OrderBookPageContent() {
               </p>
             </div>
             <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-              {coverageLabel}
+              {connectedCount}/{totalExchanges} متصل
             </span>
           </div>
           <div className="mt-3">
@@ -810,7 +800,6 @@ export default function OrderBookPageContent() {
             <div className="grid gap-2 sm:grid-cols-3">
               {(data?.exchangeStatuses || []).map((item) => {
                 const connected = item.status === "connected";
-                const label = item.probeLabel || (connected ? "متصل" : "غير متصل");
                 return (
                   <div
                     key={item.exchange}
@@ -818,7 +807,7 @@ export default function OrderBookPageContent() {
                   >
                     <div className="flex items-center gap-2">
                       <span
-                        className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : item.status === "probing" ? "bg-sky-500 animate-pulse" : "bg-amber-500"}`}
+                        className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`}
                       />
                       <span className="font-medium">{EXCHANGE_LABELS[item.exchange] || item.exchange}</span>
                     </div>
@@ -826,12 +815,10 @@ export default function OrderBookPageContent() {
                       className={
                         connected
                           ? "text-xs text-emerald-600 dark:text-emerald-400"
-                          : item.status === "probing"
-                            ? "text-xs text-sky-600 dark:text-sky-400"
-                            : "text-xs text-amber-600 dark:text-amber-400"
+                          : "text-xs text-amber-600 dark:text-amber-400"
                       }
                     >
-                      {label}
+                      {connected ? "متصل" : "غير متصل"}
                     </span>
                   </div>
                 );
