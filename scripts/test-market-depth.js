@@ -379,6 +379,16 @@ function testOrderBookUiSourceGuards() {
   assert.match(pageSource, /StatTile/);
   assert.match(pageSource, /مصادر البيانات/);
   assert.doesNotMatch(pageSource, /SummaryCard/);
+  assert.doesNotMatch(pageSource, /lg:row-span-/);
+  assert.doesNotMatch(pageSource, /lg:col-start-/);
+  assert.match(pageSource, /max-h-\[26rem\]/);
+  assert.match(pageSource, /fillContainer/);
+  assert.match(pageSource, /ORDER_BOOK_ROW_HEIGHT_LG/);
+  assert.match(pageSource, /grid grid-cols-1 gap-2 lg:grid-cols-2/);
+  assert.match(panelSource, /ORDER_BOOK_VISIBLE_ROWS = 12/);
+  assert.match(panelSource, /ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-\[36rem\]"/);
+  assert.match(panelSource, /h-full min-h-0/);
+  assert.match(panelSource, /overflow-y-auto overscroll-contain/);
 }
 
 function testIndependentFlowDominanceWindows() {

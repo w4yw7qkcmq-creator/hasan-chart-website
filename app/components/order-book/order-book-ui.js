@@ -17,7 +17,7 @@ export function Panel({ title, description, children, action, className = "", co
         compact ? "p-3 sm:p-4" : "p-4 sm:p-5"
       } ${className}`}
     >
-      <div className={`min-w-0 ${compact ? "mb-3" : "mb-4"}`}>
+      <div className={`min-w-0 shrink-0 ${compact ? "mb-3" : "mb-4"}`}>
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
         {description ? (
           <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>

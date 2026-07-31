@@ -14,6 +14,10 @@ import { CoverageBadge, NumericValue } from "./order-book-ui";
 
 import { computeDepthBarWidthPercent } from "./depth-bar-utils";
 
+export const ORDER_BOOK_VISIBLE_ROWS = 12;
+export const ORDER_BOOK_ROW_HEIGHT = "h-[36rem]";
+export const ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-[36rem]";
+
 function DepthGlowBar({ side, widthPercent }) {
   const isAsk = side === "ask";
   const width = Math.min(100, Math.max(0, widthPercent || 0));
@@ -108,8 +112,11 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
     [bids],
   );
 
+  const visibleAsks = asks.slice(0, ORDER_BOOK_VISIBLE_ROWS);
+  const visibleBids = bids.slice(0, ORDER_BOOK_VISIBLE_ROWS);
+
   return (
-    <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80">
       <div className="border-b border-slate-200 px-4 py-3 dark:border-white/10 sm:px-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -149,9 +156,10 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
         <span className="text-right">القيمة</span>
       </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {showAsks ? (
-        <div className="max-h-[300px] overflow-y-auto overscroll-contain">
-          {asks.map((level) => (
+        <div>
+          {visibleAsks.map((level) => (
             <DepthRow
               key={`ask-${level.price}`}
               level={level}
@@ -162,7 +170,7 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
         </div>
       ) : null}
 
-      <div className="relative z-[2] border-y border-slate-200 bg-slate-100/60 px-3 py-1.5 text-center text-[11px] font-medium text-slate-600 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300">
+      <div className="sticky z-[2] border-y border-slate-200 bg-slate-100/60 px-3 py-1.5 text-center text-[11px] font-medium text-slate-600 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300">
         خط السعر —{" "}
         <NumericValue className="font-semibold text-slate-900 dark:text-white">
           {formatPrice(data?.midPrice)}
@@ -170,8 +178,8 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
       </div>
 
       {showBids ? (
-        <div className="max-h-[300px] overflow-y-auto overscroll-contain">
-          {bids.map((level) => (
+        <div>
+          {visibleBids.map((level) => (
             <DepthRow
               key={`bid-${level.price}`}
               level={level}
@@ -181,13 +189,16 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
           ))}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
 
 const WALL_TOOLTIP = "أكبر مستوى سيولة ظاهر حاليًا ضمن دفتر الأوامر.";
 
-export function LiveWallCard({ title, wall, tone }) {
+export function LiveWallCard({ title, wall, tone, compact = false }) {
+  const pad = compact ? "p-2" : "p-3";
+  const priceSize = compact ? "text-base" : "text-lg";
   const isBuy = tone === "buy";
   const border = isBuy
     ? "border-emerald-200/80 dark:border-emerald-900/40"
@@ -201,7 +212,7 @@ export function LiveWallCard({ title, wall, tone }) {
   if (!wall) {
     return (
       <div
-        className={`flex flex-col justify-center rounded-xl border border-dashed p-3 text-sm text-slate-500 ${border} ${bg}`}
+        className={`flex flex-col justify-center rounded-xl border border-dashed ${pad} text-sm text-slate-500 ${border} ${bg}`}
         title={WALL_TOOLTIP}
       >
         <p className="font-medium text-slate-700 dark:text-slate-200">{title}</p>
@@ -213,26 +224,26 @@ export function LiveWallCard({ title, wall, tone }) {
   const strength = Math.min(100, Math.max(12, (wall.notional / 500_000) * 100));
 
   return (
-    <div className={`flex flex-col rounded-xl border p-3 ${border} ${bg}`} title={WALL_TOOLTIP}>
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className={`flex flex-col rounded-xl border ${pad} ${border} ${bg}`} title={WALL_TOOLTIP}>
+      <div className={`${compact ? "mb-1" : "mb-2"} flex items-center justify-between gap-2`}>
         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${accent}`}>
           {isBuy ? "شراء" : "بيع"}
         </span>
       </div>
-      <div className="mb-2 flex items-end justify-between gap-3">
+      <div className={`${compact ? "mb-1" : "mb-2"} flex items-end justify-between gap-3`}>
         <div>
           <p className="text-[10px] text-slate-500 dark:text-slate-400">السعر</p>
-          <NumericValue className={`text-lg font-bold ${accent}`}>{formatPrice(wall.price)}</NumericValue>
+          <NumericValue className={`${priceSize} font-bold ${accent}`}>{formatPrice(wall.price)}</NumericValue>
         </div>
         <div className="text-left">
           <p className="text-[10px] text-slate-500 dark:text-slate-400">القيمة</p>
-          <NumericValue className="text-lg font-bold text-slate-900 dark:text-white">
+          <NumericValue className={`${priceSize} font-bold text-slate-900 dark:text-white`}>
             {formatUsd(wall.notional, { compact: true })}
           </NumericValue>
         </div>
       </div>
-      <div className="mb-2 h-1 overflow-hidden rounded-full bg-white/60 dark:bg-black/20">
+      <div className={`${compact ? "mb-1" : "mb-2"} h-1 overflow-hidden rounded-full bg-white/60 dark:bg-black/20`}>
         <div className={`h-full rounded-full ${bar}`} style={{ width: `${strength}%` }} />
       </div>
       <div className="mt-auto flex justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
@@ -247,7 +258,9 @@ export function LiveWallCard({ title, wall, tone }) {
   );
 }
 
-export function HistoricalWallCard({ title, wall, tone }) {
+export function HistoricalWallCard({ title, wall, tone, compact = false }) {
+  const pad = compact ? "p-2" : "p-3";
+  const priceSize = compact ? "text-base" : "text-lg";
   const isBuy = tone === "buy";
   const border = isBuy
     ? "border-emerald-200/80 dark:border-emerald-900/40"
@@ -259,7 +272,7 @@ export function HistoricalWallCard({ title, wall, tone }) {
 
   if (!wall) {
     return (
-      <div className={`flex flex-col justify-center rounded-xl border border-dashed p-3 text-sm ${border} ${bg}`}>
+      <div className={`flex flex-col justify-center rounded-xl border border-dashed ${pad} text-sm ${border} ${bg}`}>
         <p className="font-medium text-slate-700 dark:text-slate-200">{title}</p>
         <p className="mt-1 text-xs text-slate-500">لا توجد جدران كافية ضمن هذه الفترة حتى الآن.</p>
       </div>
@@ -269,21 +282,21 @@ export function HistoricalWallCard({ title, wall, tone }) {
   const notional = wall.strongestNotional ?? wall.notional;
 
   return (
-    <div className={`flex flex-col rounded-xl border p-3 ${border} ${bg}`}>
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className={`flex flex-col rounded-xl border ${pad} ${border} ${bg}`}>
+      <div className={`${compact ? "mb-1" : "mb-2"} flex items-center justify-between gap-2`}>
         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${accent}`}>
           {isBuy ? "شراء" : "بيع"}
         </span>
       </div>
-      <div className="mb-2 flex items-end justify-between gap-3">
+      <div className={`${compact ? "mb-1" : "mb-2"} flex items-end justify-between gap-3`}>
         <div>
           <p className="text-[10px] text-slate-500 dark:text-slate-400">السعر</p>
-          <NumericValue className={`text-lg font-bold ${accent}`}>{formatPrice(wall.price)}</NumericValue>
+          <NumericValue className={`${priceSize} font-bold ${accent}`}>{formatPrice(wall.price)}</NumericValue>
         </div>
         <div className="text-left">
           <p className="text-[10px] text-slate-500 dark:text-slate-400">القيمة</p>
-          <NumericValue className="text-lg font-bold text-slate-900 dark:text-white">
+          <NumericValue className={`${priceSize} font-bold text-slate-900 dark:text-white`}>
             {formatUsd(notional, { compact: true })}
           </NumericValue>
         </div>
