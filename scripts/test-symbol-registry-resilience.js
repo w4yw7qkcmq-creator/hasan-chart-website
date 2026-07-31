@@ -15,7 +15,9 @@ import {
   refreshSymbolRegistry,
   resetSymbolRegistryForTests,
   searchRegistrySymbols,
-  setRegistryClockForTests,
+  __advanceSymbolRegistryClockForTests,
+  __resetSymbolRegistryClockForTests,
+  __setSymbolRegistryClockForTests,
 } from "../lib/market-data/symbol-registry.js";
 
 function dogeBinanceMap() {
@@ -61,11 +63,11 @@ const sleepCalls = [];
 const sleepImpl = async (ms) => {
   sleepCalls.push(ms);
   now += ms;
-  setRegistryClockForTests(now);
+  __setSymbolRegistryClockForTests(now);
 };
 
 resetSymbolRegistryForTests();
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 
 // 1. first fetch fails -> core fallback
 await refreshSymbolRegistry({
@@ -84,9 +86,9 @@ const beforeRetry = now;
 await refreshSymbolRegistry({ fetchImpl: makeFetchImpl(["fail"]), sleepImpl });
 assert.equal(getRegistryStateForTests().count, 4);
 now = beforeRetry + REGISTRY_FAILED_RETRY_MS - 1;
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 resetSymbolRegistryForTests();
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 await refreshSymbolRegistry({
   force: true,
   fetchImpl: makeFetchImpl(["fail"]),
@@ -99,7 +101,7 @@ assert.equal(getRegistryStateForTests().count, 4, "no fetch before nextRetryAt")
 
 // 3-5. after nextRetryAt second attempt succeeds with 2 sources
 now = retryAt + 1;
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 const fetchImplRecovery = makeFetchImpl([
   {
     binance: { symbols: [{ symbol: "DOGEUSDT", status: "TRADING", quoteAsset: "USDT", isSpotTradingAllowed: true }] },
@@ -130,7 +132,7 @@ assert.equal(fetchCalls, 9, "one shared refresh (3 attempts x 3 exchanges)");
 // 13-14. deterministic failure -> recovery mock
 resetSymbolRegistryForTests();
 now = 5_000_000;
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 sleepCalls.length = 0;
 
 await refreshSymbolRegistry({
@@ -144,7 +146,7 @@ assert.equal(getRegistryStateForTests().available, false);
 
 const blockedUntil = getRegistryStateForTests().nextRetryAt;
 now = blockedUntil - 1;
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 await refreshSymbolRegistry({
   fetchImpl: async () => {
     throw new Error("still_blocked");
@@ -154,7 +156,7 @@ await refreshSymbolRegistry({
 assert.equal(getRegistryStateForTests().available, false);
 
 now = blockedUntil + 1;
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 await refreshSymbolRegistry({
   fetchImpl: async (_url, label) => {
     if (label === "BINANCE") {
@@ -227,7 +229,7 @@ await refreshSymbolRegistry({
 const successAt = getRegistryStateForTests();
 assert.equal(successAt.available, true);
 now += REGISTRY_CACHE_TTL_MS - 1;
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 let fetchCalled = false;
 await refreshSymbolRegistry({
   fetchImpl: async () => {
@@ -240,7 +242,7 @@ assert.equal(fetchCalled, false);
 
 // 10. stale successful registry kept on refresh failure
 now += 2;
-setRegistryClockForTests(now);
+__setSymbolRegistryClockForTests(now);
 await refreshSymbolRegistry({
   force: true,
   fetchImpl: makeFetchImpl(["fail"]),
@@ -281,4 +283,95 @@ await fetchRegistryWithRetries({
 });
 assert.deepEqual(sleepCalls, [1000, 3000]);
 
-console.log("symbol-registry resilience tests passed: 15/15");
+// 16. source must not freeze module clock at load time
+const registrySource = readFileSync(join(process.cwd(), "lib/market-data/symbol-registry.js"), "utf8");
+assert.doesNotMatch(registrySource, /let clockNow = Date\.now\(\)/);
+assert.match(registrySource, /clockOverride \?\? Date\.now\(\)/);
+assert.doesNotMatch(registrySource, /function nowMs\(\)\s*\{\s*return clockNow;/);
+
+// 17. lastAttemptAt advances after nextRetryAt and recovery exposes DOGE/LTC
+resetSymbolRegistryForTests();
+now = 20_000_000;
+__setSymbolRegistryClockForTests(now);
+sleepCalls.length = 0;
+
+await refreshSymbolRegistry({
+  force: true,
+  fetchImpl: async () => {
+    throw new Error("all_down");
+  },
+  sleepImpl,
+});
+
+const firstHealth = getSymbolRegistryHealth();
+const firstAttemptAt = firstHealth.registryLastAttemptAt;
+const firstNextRetryAt = firstHealth.registryNextRetryAt;
+const firstFailureCount = getRegistryStateForTests().failureCount;
+assert.equal(getRegistryStateForTests().available, false);
+assert.ok(firstNextRetryAt);
+
+now = new Date(firstNextRetryAt).getTime() - 1;
+__setSymbolRegistryClockForTests(now);
+let recoveryFetchCalls = 0;
+await refreshSymbolRegistry({
+  fetchImpl: async () => {
+    recoveryFetchCalls += 1;
+    throw new Error("still_blocked");
+  },
+  sleepImpl,
+});
+assert.equal(recoveryFetchCalls, 0, "no refresh before nextRetryAt");
+assert.equal(getSymbolRegistryHealth().registryLastAttemptAt, firstAttemptAt);
+assert.equal(getRegistryStateForTests().failureCount, firstFailureCount);
+
+now = new Date(firstNextRetryAt).getTime() + 1;
+__setSymbolRegistryClockForTests(now);
+await refreshSymbolRegistry({
+  fetchImpl: async (_url, label) => {
+    recoveryFetchCalls += 1;
+    if (label === "BINANCE") {
+      return {
+        symbols: [
+          { symbol: "DOGEUSDT", status: "TRADING", quoteAsset: "USDT", isSpotTradingAllowed: true },
+          { symbol: "LTCUSDT", status: "TRADING", quoteAsset: "USDT", isSpotTradingAllowed: true },
+        ],
+      };
+    }
+    if (label === "BYBIT") {
+      return {
+        result: {
+          list: [
+            { symbol: "DOGEUSDT", status: "Trading", quoteCoin: "USDT" },
+            { symbol: "LTCUSDT", status: "Trading", quoteCoin: "USDT" },
+          ],
+        },
+      };
+    }
+    throw new Error("OKX_unavailable");
+  },
+  sleepImpl,
+});
+
+const secondHealth = getSymbolRegistryHealth();
+assert.notEqual(secondHealth.registryLastAttemptAt, firstAttemptAt, "lastAttemptAt must advance");
+assert.notEqual(secondHealth.registryNextRetryAt, firstNextRetryAt, "nextRetryAt must move");
+assert.equal(getRegistryStateForTests().available, true);
+assert.equal(searchRegistrySymbols("DOGE").length, 1);
+assert.equal(searchRegistrySymbols("LTC").length, 1);
+
+// 18. reset clock restores live Date.now() behavior
+__resetSymbolRegistryClockForTests();
+resetSymbolRegistryForTests();
+const liveStart = Date.now();
+await refreshSymbolRegistry({
+  force: true,
+  fetchImpl: async () => {
+    throw new Error("live_clock_fail");
+  },
+  sleepImpl: async () => {},
+});
+const liveNextRetry = getRegistryStateForTests().nextRetryAt;
+assert.ok(liveNextRetry >= liveStart + REGISTRY_FAILED_RETRY_MS - 250);
+assert.ok(liveNextRetry <= liveStart + REGISTRY_FAILED_RETRY_MS + 5000);
+
+console.log("symbol-registry resilience tests passed: 18/18");
