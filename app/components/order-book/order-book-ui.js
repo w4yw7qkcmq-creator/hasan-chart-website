@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { CLIENT_REGISTRY_RETRY_MS } from "../../../lib/market-data/dynamic-symbol-constants.js";
 import { formatMarketSymbol } from "../../../lib/market-data/symbols.js";
 import { formatCoveragePercent } from "../../../lib/market-data/history/window-utils.js";
 
@@ -121,6 +122,7 @@ export function SymbolSearchCombobox({
   const rootRef = useRef(null);
   const abortRef = useRef(null);
   const debounceRef = useRef(null);
+  const retryTimerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -164,6 +166,7 @@ export function SymbolSearchCombobox({
 
       const response = await fetch(`/api/market-symbols?${params.toString()}`, {
         signal: controller.signal,
+        cache: "no-store",
       });
       const payload = await response.json();
       if (!payload?.success) {
@@ -189,6 +192,32 @@ export function SymbolSearchCombobox({
       setFetchState("error");
     }
   }, []);
+
+  useEffect(() => {
+    void fetchSymbols("");
+  }, [fetchSymbols]);
+
+  useEffect(() => {
+    if (fetchState !== "unavailable") {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      return undefined;
+    }
+
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      void fetchSymbols(query);
+    }, CLIENT_REGISTRY_RETRY_MS);
+
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, [fetchState, fetchSymbols, query]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -220,6 +249,7 @@ export function SymbolSearchCombobox({
     () => () => {
       abortRef.current?.abort();
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     },
     [],
   );

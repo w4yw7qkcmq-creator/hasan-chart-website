@@ -21,6 +21,7 @@ assert.match(page, /historyCollecting/);
 assert.match(page, /جاري تحميل/);
 assert.match(page, /symbolRateLimitMessage/);
 assert.match(page, /router\.replace\("\/order-book\?symbol=BTCUSDT"/);
-assert.match(page, /تعذّر تحميل قائمة العملات حاليًا/);
+assert.match(ui, /CLIENT_REGISTRY_RETRY_MS/);
+assert.match(ui, /cache: "no-store"/);
 
-console.log("order-book dynamic symbol ui tests passed: 14/14");
+console.log("order-book dynamic symbol ui tests passed: 16/16");

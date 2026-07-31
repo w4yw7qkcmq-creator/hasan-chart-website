@@ -4,8 +4,10 @@ import { getClientIp, marketHistoryLimiter } from "../../../lib/rate-limit";
 import {
   MIN_SUPPORTED_EXCHANGES,
   REGISTRY_CACHE_TTL_MS,
+  REGISTRY_UNAVAILABLE_CACHE_MAX_AGE_SEC,
 } from "../../../lib/market-data/dynamic-symbol-constants.js";
 import {
+  getSymbolRegistryHealth,
   getSymbolRegistrySnapshot,
   refreshSymbolRegistry,
   searchRegistrySymbols,
@@ -16,7 +18,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MAX_QUERY_LENGTH = 32;
-const CACHE_CONTROL = `public, max-age=${Math.floor(REGISTRY_CACHE_TTL_MS / 1000)}, s-maxage=${Math.floor(REGISTRY_CACHE_TTL_MS / 1000)}, stale-while-revalidate=300`;
+const CACHE_CONTROL_SUCCESS = `public, max-age=${Math.floor(REGISTRY_CACHE_TTL_MS / 1000)}, s-maxage=${Math.floor(REGISTRY_CACHE_TTL_MS / 1000)}, stale-while-revalidate=300`;
+const CACHE_CONTROL_UNAVAILABLE = `public, max-age=${REGISTRY_UNAVAILABLE_CACHE_MAX_AGE_SEC}, s-maxage=${REGISTRY_UNAVAILABLE_CACHE_MAX_AGE_SEC}`;
 
 function parseLimit(value) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -59,6 +62,7 @@ export async function GET(request) {
 
     await refreshSymbolRegistry();
     const snapshot = getSymbolRegistrySnapshot();
+    const registryHealth = getSymbolRegistryHealth();
     const symbols = searchRegistrySymbols(query, { limit, minExchanges }).map((entry) => ({
       symbol: entry.symbol,
       base: entry.base,
@@ -72,14 +76,17 @@ export async function GET(request) {
     return jsonResponse(
       {
         success: true,
-        available: snapshot.available || symbols.length > 0,
+        available: snapshot.available,
         stale: snapshot.stale,
         fetchedAt: snapshot.fetchedAt,
+        nextRetryAt: snapshot.nextRetryAt,
+        sourceCount: snapshot.sourceCount,
         symbols,
+        registry: registryHealth,
       },
       {
         status: 200,
-        cacheControl: CACHE_CONTROL,
+        cacheControl: snapshot.available ? CACHE_CONTROL_SUCCESS : CACHE_CONTROL_UNAVAILABLE,
       },
     );
   } catch {
@@ -90,8 +97,10 @@ export async function GET(request) {
         available: false,
         stale: snapshot.stale,
         fetchedAt: snapshot.fetchedAt,
+        nextRetryAt: snapshot.nextRetryAt,
         symbols: [],
         messageSafe: "symbol_registry_unavailable",
+        registry: getSymbolRegistryHealth(),
       },
       { status: 200, cacheControl: CACHE_NO_STORE },
     );

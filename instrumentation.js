@@ -11,5 +11,8 @@ export async function register() {
 
     const { startMarketDepth } = await import("./lib/market-data/market-depth-hub.js");
     startMarketDepth("instrumentation-register");
+
+    const { warmupSymbolRegistry } = await import("./lib/market-data/symbol-registry.js");
+    warmupSymbolRegistry("instrumentation-register");
   }
 }
