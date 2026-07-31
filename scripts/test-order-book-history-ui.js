@@ -510,9 +510,10 @@ test("liquidity wall cards grow naturally without clipping overflow", () => {
 test("symbol search combobox replaces fixed symbol tabs", () => {
   const { page, ui } = readSources();
   assert.match(page, /SymbolSearchCombobox/);
-  assert.match(page, /SYMBOL_SEARCH_ENTRIES/);
-  assert.match(ui, /filterSymbolSearchEntries/);
-  assert.match(ui, /placeholder="ابحث ضمن العملات المدعومة \(BTC, ETH, SOL, XRP\)"/);
+  assert.match(page, /SymbolSearchCombobox/);
+  assert.match(page, /handleSymbolChange/);
+  assert.match(ui, /filterSymbolSearchEntries|\/api\/market-symbols/);
+  assert.match(ui, /placeholder="ابحث عن عملة USDT/);
 });
 
 console.log(`order-book history ui tests passed: ${passed}/${passed}`);

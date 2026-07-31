@@ -1,6 +1,6 @@
 import { CACHE_NO_STORE, jsonResponse } from "../../../../lib/api-response";
 import { getSharedMarketDepthSnapshot, startMarketDepth } from "../../../../lib/market-data/market-depth-hub";
-import { validateMarketDepthQuery, assertNoMockInProduction } from "../../../../lib/market-data/validation";
+import { validateMarketDepthQuery, assertNoMockInProduction, ensureMarketSymbolsRegistry } from "../../../../lib/market-data/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 export async function GET(request) {
   try {
     assertNoMockInProduction();
+    await ensureMarketSymbolsRegistry();
     startMarketDepth("api-market-depth-snapshot");
 
     const validation = validateMarketDepthQuery(new URL(request.url).searchParams);

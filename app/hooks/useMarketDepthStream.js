@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { resolveMarketDepthConnectionStatus } from "../../lib/market-data/connection-status";
+import {
+  createSymbolChangeRateLimiter,
+  SYMBOL_CHANGE_RATE_LIMIT_MESSAGE,
+} from "../../lib/market-data/symbol-change-rate-limit.js";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 import {
   buildMarketDepthQuery,
@@ -29,6 +33,10 @@ export function useMarketDepthStream(overrides = EMPTY_OVERRIDES) {
   const intentionalCloseRef = useRef(false);
   const mountedRef = useRef(false);
   const receivedMessageRef = useRef(false);
+  const [symbolSwitching, setSymbolSwitching] = useState(false);
+  const [symbolRateLimitMessage, setSymbolRateLimitMessage] = useState(null);
+  const lastDataSymbolRef = useRef(null);
+  const symbolRateLimiterRef = useRef(createSymbolChangeRateLimiter());
 
   const streamQuery = useMemo(() => buildMarketDepthQuery(prefs), [prefs]);
 
@@ -56,15 +64,35 @@ export function useMarketDepthStream(overrides = EMPTY_OVERRIDES) {
     [ssePhase, data, browserOnline]
   );
 
-  const setPrefs = useCallback((patch) => {
-    setPrefsState((current) => {
-      const next = { ...current, ...patch };
+  const setPrefs = useCallback((patch, options = {}) => {
+    const current = prefsRef.current;
+    const source = options.source || "internal";
+
+    if (patch.symbol && patch.symbol !== current.symbol && source === "user") {
+      const check = symbolRateLimiterRef.current.canChange(patch.symbol);
+      if (!check.allowed) {
+        setSymbolRateLimitMessage(check.message || SYMBOL_CHANGE_RATE_LIMIT_MESSAGE);
+        return false;
+      }
+      if (!check.duplicate) {
+        symbolRateLimiterRef.current.recordChange(patch.symbol);
+      }
+      setSymbolRateLimitMessage(null);
+    }
+
+    setPrefsState((prev) => {
+      const next = { ...prev, ...patch };
+      if (patch.symbol && patch.symbol !== prev.symbol) {
+        setSymbolSwitching(true);
+      }
       prefsRef.current = next;
       writeOrderBookPreferences(next, {
         explicitLargeTradeThreshold: patch.largeTradeThreshold != null ? true : undefined,
       });
       return next;
     });
+
+    return true;
   }, []);
 
   const flushPending = useCallback(() => {
@@ -74,6 +102,12 @@ export function useMarketDepthStream(overrides = EMPTY_OVERRIDES) {
     const payload = pendingRef.current;
     pendingRef.current = null;
     receivedMessageRef.current = true;
+    if (payload?.symbol) {
+      lastDataSymbolRef.current = payload.symbol;
+      if (payload.symbol === prefsRef.current.symbol) {
+        setSymbolSwitching(false);
+      }
+    }
     setData(payload);
     setSsePhase("open");
   }, []);
@@ -229,6 +263,12 @@ export function useMarketDepthStream(overrides = EMPTY_OVERRIDES) {
       .then((payload) => {
         if (cancelled || !mountedRef.current || !payload?.success) return;
         receivedMessageRef.current = true;
+        if (payload.symbol) {
+          lastDataSymbolRef.current = payload.symbol;
+          if (payload.symbol === prefsRef.current.symbol) {
+            setSymbolSwitching(false);
+          }
+        }
         setData(payload);
         setSsePhase("open");
       })
@@ -261,5 +301,7 @@ export function useMarketDepthStream(overrides = EMPTY_OVERRIDES) {
     ssePhase,
     browserOnline,
     hydrated,
+    symbolSwitching,
+    symbolRateLimitMessage,
   };
 }

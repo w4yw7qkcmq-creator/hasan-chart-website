@@ -59,7 +59,8 @@ test("historical large trades table exposes all core columns", () => {
 
 test("page uses symbol search instead of fixed tabs only", () => {
   assert.match(page, /SymbolSearchCombobox/);
-  assert.match(page, /SYMBOL_SEARCH_ENTRIES/);
+  assert.match(page, /SymbolSearchCombobox/);
+  assert.match(page, /handleSymbolChange/);
 });
 
 console.log(`order-book layout runtime tests passed: ${passed}/${passed}`);

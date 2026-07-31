@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { filterSymbolSearchEntries } from "../../../lib/market-data/symbols.js";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { formatMarketSymbol } from "../../../lib/market-data/symbols.js";
 import { formatCoveragePercent } from "../../../lib/market-data/history/window-utils.js";
 
 export function NumericValue({ children, className = "" }) {
@@ -113,16 +113,82 @@ export function SymbolSearchCombobox({
   onChange,
   entries = [],
   ariaLabel = "اختيار العملة",
+  loading = false,
+  unavailable = false,
 }) {
   const listId = useId();
   const inputRef = useRef(null);
   const rootRef = useRef(null);
+  const abortRef = useRef(null);
+  const debounceRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [remoteEntries, setRemoteEntries] = useState([]);
+  const [fetchState, setFetchState] = useState("idle");
+  const [lastGoodEntries, setLastGoodEntries] = useState(entries);
 
-  const selected = entries.find((entry) => entry.value === value) || entries[0];
-  const filtered = useMemo(() => filterSymbolSearchEntries(entries, query), [entries, query]);
+  const selected =
+    [...entries, ...remoteEntries, ...lastGoodEntries].find((entry) => entry.value === value) ||
+    (value
+      ? {
+          value,
+          label: formatMarketSymbol(value),
+        }
+      : null);
+
+  const filtered = useMemo(() => {
+    const pool = remoteEntries.length ? remoteEntries : lastGoodEntries.length ? lastGoodEntries : entries;
+    const raw = String(query || "").trim();
+    if (!raw) return pool.slice(0, 50);
+    const compact = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    return pool.filter((entry) => {
+      const candidates = [entry.value, entry.label, entry.base, entry.displayName, entry.displaySymbol]
+        .filter(Boolean)
+        .map((item) => String(item).toUpperCase());
+      return candidates.some((candidate) => candidate.includes(compact) || compact.includes(candidate.replace("/", "")));
+    });
+  }, [entries, lastGoodEntries, query, remoteEntries]);
+
+  const fetchSymbols = useCallback(async (searchQuery) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setFetchState("loading");
+
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("query", searchQuery);
+      params.set("limit", "50");
+      params.set("minExchanges", "2");
+
+      const response = await fetch(`/api/market-symbols?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+      if (!payload?.success) {
+        setFetchState("error");
+        return;
+      }
+
+      const mapped = (payload.symbols || []).map((entry) => ({
+        value: entry.symbol,
+        label: entry.displaySymbol,
+        base: entry.base,
+        displayName: entry.displayName,
+        displaySymbol: entry.displaySymbol,
+        supportedExchangeCount: entry.supportedExchangeCount,
+        supportedExchanges: entry.supportedExchanges,
+      }));
+
+      setRemoteEntries(mapped);
+      if (mapped.length) setLastGoodEntries(mapped);
+      setFetchState(payload.available === false ? "unavailable" : "idle");
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      setFetchState("error");
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -134,8 +200,29 @@ export function SymbolSearchCombobox({
   }, [open]);
 
   useEffect(() => {
+    if (!open) return undefined;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void fetchSymbols(query);
+    }, 250);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, open, fetchSymbols]);
+
+  useEffect(() => {
     setActiveIndex(0);
-  }, [query, open]);
+  }, [query, open, filtered.length]);
+
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
 
   const displayValue = open ? query : selected?.label || "";
 
@@ -181,6 +268,9 @@ export function SymbolSearchCombobox({
     }
   }
 
+  const listLoading = fetchState === "loading" || loading;
+  const listUnavailable = fetchState === "unavailable" || unavailable;
+
   return (
     <div ref={rootRef} className="relative min-w-0">
       <label className="flex min-w-0 flex-col gap-1.5 text-sm">
@@ -194,7 +284,7 @@ export function SymbolSearchCombobox({
             aria-controls={listId}
             aria-autocomplete="list"
             aria-label={ariaLabel}
-            placeholder="ابحث ضمن العملات المدعومة (BTC, ETH, SOL, XRP)"
+            placeholder="ابحث عن عملة USDT (مثل DOGE, LTC, BTC)"
             value={displayValue}
             onFocus={() => {
               setOpen(true);
@@ -207,6 +297,11 @@ export function SymbolSearchCombobox({
             onKeyDown={onKeyDown}
             className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm text-slate-800 outline-none transition focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:focus-visible:ring-white/20"
           />
+          {listLoading ? (
+            <span className="pointer-events-none absolute left-8 top-1/2 -translate-y-1/2">
+              <RefreshSpinner className="h-3.5 w-3.5" />
+            </span>
+          ) : null}
           <span
             aria-hidden="true"
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -222,9 +317,23 @@ export function SymbolSearchCombobox({
           role="listbox"
           className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-slate-900"
         >
+          {listLoading && !filtered.length ? (
+            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">جاري البحث...</li>
+          ) : null}
+          {listUnavailable && !filtered.length ? (
+            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
+              قائمة العملات غير متاحة مؤقتًا
+            </li>
+          ) : null}
           {filtered.length ? (
             filtered.map((entry, index) => {
               const active = index === activeIndex;
+              const exchangeLabel =
+                entry.supportedExchangeCount >= 3
+                  ? "3 منصات"
+                  : entry.supportedExchangeCount === 2
+                    ? "منصتان"
+                    : null;
               return (
                 <li key={entry.value} role="option" aria-selected={entry.value === value}>
                   <button
@@ -237,17 +346,22 @@ export function SymbolSearchCombobox({
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => selectEntry(entry)}
                   >
-                    <span>{entry.label}</span>
-                    <span dir="ltr" className="tabular-nums text-xs text-slate-500 dark:text-slate-400">
-                      {entry.value}
+                    <span className="min-w-0 text-right">
+                      <span className="block font-medium">{entry.label}</span>
+                      {entry.displayName ? (
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">{entry.displayName}</span>
+                      ) : null}
+                    </span>
+                    <span dir="ltr" className="shrink-0 text-left tabular-nums text-xs text-slate-500 dark:text-slate-400">
+                      {exchangeLabel || entry.value}
                     </span>
                   </button>
                 </li>
               );
             })
-          ) : (
+          ) : !listLoading ? (
             <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">لا توجد نتائج</li>
-          )}
+          ) : null}
         </ul>
       ) : null}
     </div>
@@ -328,7 +442,7 @@ export function DepthHistoryState({ loading, error, partial, coveragePercent, co
   return null;
 }
 
-export function HistoryState({ loading, error, partial, coveragePercent }) {
+export function HistoryState({ loading, error, partial, coveragePercent, collecting = false }) {
   if (loading) {
     return (
       <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
@@ -341,6 +455,14 @@ export function HistoryState({ loading, error, partial, coveragePercent }) {
     return (
       <p className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
         تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.
+      </p>
+    );
+  }
+
+  if (collecting) {
+    return (
+      <p className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+        جاري جمع البيانات التاريخية لهذا الرمز.
       </p>
     );
   }
