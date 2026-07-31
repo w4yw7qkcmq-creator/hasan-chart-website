@@ -71,6 +71,9 @@ export async function GET(request) {
       displayName: entry.displayName,
       supportedExchanges: entry.supportedExchanges,
       supportedExchangeCount: entry.supportedExchangeCount,
+      candidateExchanges: entry.candidateExchanges || entry.supportedExchanges || [],
+      source: entry.source || "live",
+      metadataVerified: entry.metadataVerified ?? entry.source !== "bootstrap",
     }));
 
     return jsonResponse(
