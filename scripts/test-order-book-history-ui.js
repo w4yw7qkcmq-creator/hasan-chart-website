@@ -350,27 +350,54 @@ test("historical walls panel falls back across tabs and keeps analytics", () => 
   assert.match(walls, /usingFallback/);
 });
 
-test("order book layout uses equal-height depth row and full-width tail sections", () => {
+test("order book layout uses unified grid and full-width tail sections", () => {
   const page = readSources().page;
-  assert.match(page, /equal-height row/);
-  assert.match(page, /items-stretch/);
+  assert.match(page, /marketToolsGrid/);
+  assert.match(page, /topGrid/);
+  assert.match(page, /lg:row-span-3/);
+  assert.match(page, /items-start/);
   assert.match(page, /Full-width sections/);
   assert.match(page, /space-y-4/);
-  assert.match(page, /fillContainer/);
-  assert.match(page, /min-h-0 flex-1/);
   assert.doesNotMatch(page, /min-h-\[17rem\]/);
   assert.doesNotMatch(page, /min-h-\[26rem\]/);
   assert.match(page, /Last — data sources/);
 });
 
-test("fear and greed order book uses coinmarketcap source", () => {
+test("liquidity walls moved out of sidebar into market tools row", () => {
+  const page = readSources().page;
+  const unifiedGridEnd = page.indexOf("{/* Full-width sections");
+  const unifiedGrid = page.slice(page.indexOf("{/* topGrid + marketToolsGrid"), unifiedGridEnd);
+  assert.doesNotMatch(unifiedGrid, /flex min-w-0 flex-col gap-4 lg:col-span-4/);
+  assert.match(unifiedGrid, /lg:col-start-9 lg:row-start-3/);
+  assert.match(unifiedGrid, /title="جدران السيولة"/);
+  assert.match(unifiedGrid, /lg:col-start-5 lg:row-start-3/);
+  assert.match(unifiedGrid, /lg:col-start-1 lg:row-start-3/);
+});
+
+test("market tools grid avoids artificial min-heights and equal-height stretch", () => {
+  const page = readSources().page;
+  const unifiedGrid = page.slice(
+    page.indexOf("{/* topGrid + marketToolsGrid"),
+    page.indexOf("{/* Full-width sections"),
+  );
+  assert.doesNotMatch(unifiedGrid, /items-stretch/);
+  assert.doesNotMatch(unifiedGrid, /h-full/);
+  assert.doesNotMatch(unifiedGrid, /fillContainer/);
+  assert.doesNotMatch(unifiedGrid, /min-h-\[17rem\]/);
+});
+
+test("fear and greed order book uses coinmarketcap source without visible attribution", () => {
   const { fearGreed } = readSources();
   assert.match(fearGreed, /source=coinmarketcap/);
-  assert.match(fearGreed, /المصدر: CoinMarketCap/);
+  assert.match(fearGreed, /attribution: "المصدر: CoinMarketCap"/);
   assert.match(fearGreed, /FEAR_GREED_REFRESH_MS = 15 \* 60 \* 1000/);
   assert.doesNotMatch(fearGreed, /alternative\.me[\s\S]*variant === "orderBook"/);
   assert.match(fearGreed, /lastSuccessfulRef/);
   assert.match(fearGreed, /cache: "no-store"/);
+  const orderBookRenderStart = fearGreed.indexOf("if (isOrderBook) {");
+  const orderBookRenderEnd = fearGreed.indexOf("return (\n    <div className={wrapperClass}>", orderBookRenderStart);
+  const orderBookRender = fearGreed.slice(orderBookRenderStart, orderBookRenderEnd);
+  assert.doesNotMatch(orderBookRender, /المصدر: CoinMarketCap/);
 });
 
 test("coinmarketcap fear greed adapter parses public endpoint", () => {

@@ -368,16 +368,15 @@ export default function OrderBookPageContent() {
       </section>
 
       <div className="space-y-4">
-      {/* Row 2 — main order book + sidebar analytics */}
+      {/* topGrid + marketToolsGrid — unified desktop layout */}
       <section className="grid items-start gap-4 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-8">
+        <div className="min-w-0 lg:col-span-8 lg:row-span-3 lg:row-start-1">
           <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-4">
-          <Panel
-            className="flex flex-col"
-            title="سيطرة الشراء والبيع"
+        <Panel
+          className="flex flex-col lg:col-span-4 lg:col-start-9 lg:row-start-1"
+          title="سيطرة الشراء والبيع"
             description={
               needsDominanceHistory
                 ? "الصفقات المنفذة من السجل التاريخي ضمن الإطار المختار."
@@ -424,9 +423,9 @@ export default function OrderBookPageContent() {
             </div>
           </Panel>
 
-          <Panel
-            className="flex flex-col"
-            title="حجم الشراء/البيع المنفذ"
+        <Panel
+          className="flex flex-col lg:col-span-4 lg:col-start-9 lg:row-start-2"
+          title="حجم الشراء/البيع المنفذ"
             description={
               needsFlowHistory
                 ? "الحجم المنفذ من السجل التاريخي."
@@ -467,91 +466,52 @@ export default function OrderBookPageContent() {
             </div>
           </Panel>
 
-          <Panel
-            className="flex flex-col"
-            title="جدران السيولة"
-            description={
-              isSidebarWallsLive
-                ? "أكبر مستويات السيولة الظاهرة حاليًا في دفتر الأوامر."
-                : "أقوى مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
-            }
-          >
-            <div className="mb-3">
-              <SegmentedControl
-                compact
-                ariaLabel="إطار جدران السيولة"
-                label="الإطار"
-                value={liquidityWallsWindow}
-                onChange={setLiquidityWallsWindow}
-                scrollable
-                options={LIQUIDITY_WALLS_SUMMARY_WINDOW_OPTIONS}
-              />
-            </div>
-            {!isSidebarWallsLive ? (
-              <LiquidityWallsState
-                loading={sidebarWallsLoading}
-                error={sidebarWallsError}
-                partial={sidebarWallsHistory?.partialData}
-                coveragePercent={sidebarWallsHistory?.coveragePercent}
-                collecting={sidebarWallsHistory?.collecting}
-              />
-            ) : null}
-            {isSidebarWallsLive ? (
-              <div className="grid gap-2.5">
-                <LiveWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
-                <LiveWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
-              </div>
-            ) : sidebarWallsLoading || sidebarWallsError ? null : sidebarWallsEmpty ? (
-              <EmptyState message="لا توجد جدران كافية ضمن هذه الفترة حتى الآن." />
-            ) : (
-              <div className="grid gap-2.5">
-                <HistoricalWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
-                <HistoricalWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
-              </div>
-            )}
-          </Panel>
-        </div>
-      </section>
-
-      {/* Row 3 — depth chart + large trades (equal-height row) */}
-      <section className="grid items-stretch gap-4 lg:grid-cols-12">
         <Panel
-          className="flex h-full min-h-0 flex-col lg:col-span-7"
-          title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
+          className="flex flex-col lg:col-span-4 lg:col-start-9 lg:row-start-3"
+          title="جدران السيولة"
           description={
-            isLiveDepth
-              ? "توزيع أوامر الشراء والبيع الظاهرة حاليًا حول السعر."
-              : "مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
+            isSidebarWallsLive
+              ? "أكبر مستويات السيولة الظاهرة حاليًا في دفتر الأوامر."
+              : "أقوى مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
           }
         >
-          <div className="mb-4">
+          <div className="mb-3">
             <SegmentedControl
               compact
-              ariaLabel="إطار خريطة السيولة"
+              ariaLabel="إطار جدران السيولة"
               label="الإطار"
-              value={liquidityDepthWindow}
-              onChange={setLiquidityDepthWindow}
+              value={liquidityWallsWindow}
+              onChange={setLiquidityWallsWindow}
               scrollable
-              options={LIQUIDITY_DEPTH_WINDOW_OPTIONS}
+              options={LIQUIDITY_WALLS_SUMMARY_WINDOW_OPTIONS}
             />
           </div>
-          <div className="flex min-h-0 flex-1 flex-col">
-            <LiquidityDepthChart
-              fillContainer
-              mode={isLiveDepth ? "live" : "historical"}
-              points={isLiveDepth ? data?.depthMap || [] : depthHistory?.aggregatedDepthPoints || []}
-              midPrice={data?.midPrice}
-              loading={!isLiveDepth && depthHistoryLoading}
-              error={!isLiveDepth && depthHistoryError}
-              partial={depthHistory?.partialData}
-              coveragePercent={depthHistory?.coveragePercent}
-              collecting={depthHistory?.collecting}
+          {!isSidebarWallsLive ? (
+            <LiquidityWallsState
+              loading={sidebarWallsLoading}
+              error={sidebarWallsError}
+              partial={sidebarWallsHistory?.partialData}
+              coveragePercent={sidebarWallsHistory?.coveragePercent}
+              collecting={sidebarWallsHistory?.collecting}
             />
-          </div>
+          ) : null}
+          {isSidebarWallsLive ? (
+            <div className="grid gap-2.5">
+              <LiveWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
+              <LiveWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
+            </div>
+          ) : sidebarWallsLoading || sidebarWallsError ? null : sidebarWallsEmpty ? (
+            <EmptyState message="لا توجد جدران كافية ضمن هذه الفترة حتى الآن." />
+          ) : (
+            <div className="grid gap-2.5">
+              <HistoricalWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
+              <HistoricalWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
+            </div>
+          )}
         </Panel>
 
         <Panel
-          className="flex h-full min-h-0 flex-col lg:col-span-5"
+          className="flex flex-col lg:col-span-4 lg:col-start-5 lg:row-start-3"
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
         >
@@ -578,7 +538,6 @@ export default function OrderBookPageContent() {
               options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
             />
           </div>
-          <div className="flex min-h-0 flex-1 flex-col">
           <HistoryState
             loading={needsLargeTradeHistory && historyLoading}
             error={needsLargeTradeHistory && historyError}
@@ -630,7 +589,38 @@ export default function OrderBookPageContent() {
               <EmptyState message={largeTradeEmptyMessage} />
             )
           )}
+        </Panel>
+
+        <Panel
+          className="flex flex-col lg:col-span-4 lg:col-start-1 lg:row-start-3"
+          title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
+          description={
+            isLiveDepth
+              ? "توزيع أوامر الشراء والبيع الظاهرة حاليًا حول السعر."
+              : "مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
+          }
+        >
+          <div className="mb-4">
+            <SegmentedControl
+              compact
+              ariaLabel="إطار خريطة السيولة"
+              label="الإطار"
+              value={liquidityDepthWindow}
+              onChange={setLiquidityDepthWindow}
+              scrollable
+              options={LIQUIDITY_DEPTH_WINDOW_OPTIONS}
+            />
           </div>
+          <LiquidityDepthChart
+            mode={isLiveDepth ? "live" : "historical"}
+            points={isLiveDepth ? data?.depthMap || [] : depthHistory?.aggregatedDepthPoints || []}
+            midPrice={data?.midPrice}
+            loading={!isLiveDepth && depthHistoryLoading}
+            error={!isLiveDepth && depthHistoryError}
+            partial={depthHistory?.partialData}
+            coveragePercent={depthHistory?.coveragePercent}
+            collecting={depthHistory?.collecting}
+          />
         </Panel>
       </section>
 

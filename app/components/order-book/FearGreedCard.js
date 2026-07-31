@@ -201,12 +201,6 @@ export default function FearGreedCard({ variant = "default" }) {
             {displayPayload.staleNotice}
           </p>
         ) : null}
-
-        {displayPayload?.current ? (
-          <p className="mt-2 text-center text-[10px] text-slate-500 dark:text-slate-400">
-            المصدر: CoinMarketCap
-          </p>
-        ) : null}
       </div>
     );
   }
