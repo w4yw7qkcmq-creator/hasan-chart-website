@@ -526,8 +526,8 @@ function testApiValidation() {
   assert.equal(valid.valid, true);
 
   const invalid = validateMarketDepthQuery(new URLSearchParams("symbol=FAKECOIN"));
-  assert.equal(invalid.valid, true);
-  assert.equal(invalid.params.symbol, "BTCUSDT");
+  assert.equal(invalid.valid, false);
+  assert.equal(invalid.error, "INVALID_SYMBOL");
 }
 
 function testNoMockInProductionGuard() {

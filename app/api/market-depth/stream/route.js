@@ -1,5 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { getMarketDepthHub, startMarketDepth } from "../../../../lib/market-data/market-depth-hub";
-import { validateMarketDepthQuery, assertNoMockInProduction } from "../../../../lib/market-data/validation";
+import { getDynamicSymbolManager } from "../../../../lib/market-data/dynamic-symbol-manager";
+import {
+  validateMarketDepthQuery,
+  assertNoMockInProduction,
+  ensureMarketSymbolsRegistry,
+} from "../../../../lib/market-data/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -7,6 +13,7 @@ export const runtime = "nodejs";
 export async function GET(request) {
   try {
     assertNoMockInProduction();
+    await ensureMarketSymbolsRegistry();
     startMarketDepth("api-market-depth-stream");
 
     const validation = validateMarketDepthQuery(new URL(request.url).searchParams);
@@ -19,6 +26,17 @@ export async function GET(request) {
 
     const params = validation.params;
     const hub = getMarketDepthHub();
+    const dynamicManager = getDynamicSymbolManager();
+    const clientId = randomUUID();
+    const acquireResult = dynamicManager.acquire(params.symbol, clientId);
+
+    if (!acquireResult.ok) {
+      return new Response(JSON.stringify({ success: false, error: acquireResult.error }), {
+        status: acquireResult.error === "UNSUPPORTED_SYMBOL" || acquireResult.error === "INVALID_SYMBOL" ? 400 : 429,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const encoder = new TextEncoder();
     let unsubscribe = null;
     let heartbeatTimer = null;
@@ -35,6 +53,7 @@ export async function GET(request) {
         abortHandler = null;
       }
 
+      dynamicManager.release(params.symbol, clientId);
       unsubscribe?.();
       unsubscribe = null;
 
@@ -76,6 +95,7 @@ export async function GET(request) {
           heartbeatTimer = null;
         }
 
+        dynamicManager.release(params.symbol, clientId);
         unsubscribe?.();
         unsubscribe = null;
       },

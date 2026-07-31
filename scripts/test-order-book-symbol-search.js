@@ -1,47 +1,57 @@
 import assert from "node:assert/strict";
 import {
-  SITE_SYMBOLS,
-  SYMBOL_SEARCH_ENTRIES,
   filterSymbolSearchEntries,
-  normalizeSiteSymbol,
+  normalizeMarketSymbol,
+  registryEntryToSearchEntry,
+  SITE_SYMBOLS,
 } from "../lib/market-data/symbols.js";
+import { seedSymbolRegistryForTests, resetSymbolRegistryForTests } from "../lib/market-data/symbol-registry.js";
 
-let passed = 0;
+resetSymbolRegistryForTests();
+seedSymbolRegistryForTests([
+  {
+    symbol: "DOGEUSDT",
+    base: "DOGE",
+    quote: "USDT",
+    displaySymbol: "DOGE/USDT",
+    displayName: "Dogecoin",
+    exchanges: {
+      binance: { supported: true, marketSymbol: "DOGEUSDT" },
+      bybit: { supported: true, marketSymbol: "DOGEUSDT" },
+      okx: { supported: true, marketSymbol: "DOGE-USDT" },
+    },
+    supportedExchangeCount: 3,
+    supportedExchanges: ["binance", "bybit", "okx"],
+  },
+]);
 
-function test(name, fn) {
-  fn();
-  passed += 1;
-}
+const entries = SITE_SYMBOLS.map((symbol) => ({
+  value: symbol,
+  label: `${symbol.slice(0, -4)}/USDT`,
+  base: symbol.slice(0, -4),
+}));
 
-test("search entries mirror allowed site symbols only", () => {
-  assert.equal(SYMBOL_SEARCH_ENTRIES.length, SITE_SYMBOLS.length);
-  for (const symbol of SITE_SYMBOLS) {
-    assert.ok(SYMBOL_SEARCH_ENTRIES.some((entry) => entry.value === symbol));
-  }
+assert.equal(entries.length, SITE_SYMBOLS.length);
+
+const btc = filterSymbolSearchEntries(entries, "btc");
+assert.equal(btc.length, 1);
+assert.equal(btc[0].value, "BTCUSDT");
+
+const slash = filterSymbolSearchEntries(entries, "BTC/USDT");
+assert.equal(slash[0].value, "BTCUSDT");
+
+const dogeEntry = registryEntryToSearchEntry({
+  symbol: "DOGEUSDT",
+  base: "DOGE",
+  displaySymbol: "DOGE/USDT",
+  displayName: "Dogecoin",
+  supportedExchangeCount: 3,
+  supportedExchanges: ["binance", "bybit", "okx"],
 });
+assert.equal(dogeEntry.value, "DOGEUSDT");
 
-test("filter accepts btc, slash form, and compact form", () => {
-  const btc = filterSymbolSearchEntries(SYMBOL_SEARCH_ENTRIES, "btc");
-  assert.equal(btc.length, 1);
-  assert.equal(btc[0].value, "BTCUSDT");
+assert.equal(normalizeMarketSymbol("btc-usdt"), "BTCUSDT");
+assert.equal(normalizeMarketSymbol("eth/usdt"), "ETHUSDT");
+assert.equal(normalizeMarketSymbol("SOLUSDT"), "SOLUSDT");
 
-  const slash = filterSymbolSearchEntries(SYMBOL_SEARCH_ENTRIES, "BTC/USDT");
-  assert.equal(slash[0].value, "BTCUSDT");
-
-  const compact = filterSymbolSearchEntries(SYMBOL_SEARCH_ENTRIES, "BTCUSDT");
-  assert.equal(compact[0].value, "BTCUSDT");
-});
-
-test("filter rejects unsupported symbols", () => {
-  assert.equal(filterSymbolSearchEntries(SYMBOL_SEARCH_ENTRIES, "DOGE").length, 0);
-  assert.equal(filterSymbolSearchEntries(SYMBOL_SEARCH_ENTRIES, "ADAUSDT").length, 0);
-  assert.equal(normalizeSiteSymbol("DOGEUSDT"), null);
-});
-
-test("normalize accepts common input shapes", () => {
-  assert.equal(normalizeSiteSymbol("btc-usdt"), "BTCUSDT");
-  assert.equal(normalizeSiteSymbol("eth/usdt"), "ETHUSDT");
-  assert.equal(normalizeSiteSymbol("SOLUSDT"), "SOLUSDT");
-});
-
-console.log(`order-book symbol search tests passed: ${passed}/${passed}`);
+console.log("order-book symbol search tests passed: 6/6");

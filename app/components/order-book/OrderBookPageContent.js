@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Breadcrumbs from "../seo/Breadcrumbs";
 import { useMarketDepthStream } from "../../hooks/useMarketDepthStream";
 import { useOrderBookHistory } from "../../hooks/useOrderBookHistory";
@@ -24,10 +25,10 @@ import {
 } from "../../../lib/market-data/constants";
 import {
   EXCHANGE_LABELS,
+  formatMarketSymbol,
   getDefaultPrecision,
+  normalizeMarketSymbol,
   PRECISION_OPTIONS,
-  SYMBOL_LABELS,
-  SYMBOL_SEARCH_ENTRIES,
 } from "../../../lib/market-data/symbols";
 import FearGreedCard from "./FearGreedCard";
 import LiquidationsPanel from "./LiquidationsPanel";
@@ -85,7 +86,11 @@ function pickHistoricalWallSide(history, side) {
 }
 
 export default function OrderBookPageContent() {
-  const { data, prefs, setPrefs, hydrated } = useMarketDepthStream();
+  const { data, prefs, setPrefs, hydrated, symbolSwitching, symbolRateLimitMessage } = useMarketDepthStream();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [symbolNotice, setSymbolNotice] = useState(null);
+  const urlSymbolAppliedRef = useRef(false);
   const [liquidityWallWindow, setLiquidityWallWindow] = useState(DEFAULT_LIQUIDITY_WALL_WINDOW);
   const [liquidityWallsWindow, setLiquidityWallsWindow] = useState(DEFAULT_LIQUIDITY_WALLS_SUMMARY_WINDOW);
   const [liquidityDepthWindow, setLiquidityDepthWindow] = useState(DEFAULT_LIQUIDITY_DEPTH_WINDOW);
@@ -212,8 +217,75 @@ export default function OrderBookPageContent() {
     Number(summaryNetFlow) > 0 ? "buy" : Number(summaryNetFlow) < 0 ? "sell" : undefined;
   const summaryPartial = Boolean(summary24h?.partialData);
   const summaryCoverage = summary24h?.coveragePercent;
-  const connectedCount = (data?.exchangeStatuses || []).filter((item) => item.status === "connected").length;
-  const totalExchanges = data?.exchangeStatuses?.length || 3;
+  const connectedCount = data?.connectedExchangeCount ?? (data?.exchangeStatuses || []).filter((item) => item.status === "connected").length;
+  const totalExchanges = data?.expectedExchangeCount ?? (data?.exchangeStatuses?.length || 3);
+  const displaySymbol = data?.displaySymbol || formatMarketSymbol(prefs.symbol);
+  const historyCollecting = Boolean(data?.historyCollecting);
+
+  useEffect(() => {
+    if (!hydrated || urlSymbolAppliedRef.current) return;
+    urlSymbolAppliedRef.current = true;
+
+    const raw = searchParams.get("symbol");
+    if (!raw) return;
+
+    const normalized = normalizeMarketSymbol(raw);
+    if (!normalized) {
+      setSymbolNotice("الرمز المطلوب غير متاح حاليًا، تم الرجوع إلى BTC/USDT.");
+      setPrefs(
+        { symbol: "BTCUSDT", precision: getDefaultPrecision("BTCUSDT", data?.lastPrice) },
+        { source: "fallback" },
+      );
+      router.replace("/order-book?symbol=BTCUSDT", { scroll: false });
+      return;
+    }
+
+    void fetch(`/api/market-symbols?query=${encodeURIComponent(normalized)}&limit=5&minExchanges=2`)
+      .then((response) => response.json())
+      .then((payload) => {
+        const supported = (payload?.symbols || []).some((entry) => entry.symbol === normalized);
+        if (supported) {
+          setPrefs(
+            { symbol: normalized, precision: getDefaultPrecision(normalized, data?.lastPrice) },
+            { source: "url" },
+          );
+          return;
+        }
+
+        if (!payload?.available) {
+          setSymbolNotice("تعذّر تحميل قائمة العملات حاليًا. العملات الأساسية فقط متاحة مؤقتًا.");
+        } else {
+          setSymbolNotice("الرمز المطلوب غير متاح حاليًا، تم الرجوع إلى BTC/USDT.");
+        }
+
+        setPrefs(
+          { symbol: "BTCUSDT", precision: getDefaultPrecision("BTCUSDT", data?.lastPrice) },
+          { source: "fallback" },
+        );
+        router.replace("/order-book?symbol=BTCUSDT", { scroll: false });
+      })
+      .catch(() => {
+        setSymbolNotice("تعذّر تحميل قائمة العملات حاليًا. العملات الأساسية فقط متاحة مؤقتًا.");
+        setPrefs(
+          { symbol: "BTCUSDT", precision: getDefaultPrecision("BTCUSDT", data?.lastPrice) },
+          { source: "fallback" },
+        );
+        router.replace("/order-book?symbol=BTCUSDT", { scroll: false });
+      });
+  }, [hydrated, searchParams, setPrefs, data?.lastPrice, router]);
+
+  function handleSymbolChange(value) {
+    setSymbolNotice(null);
+    const applied = setPrefs(
+      { symbol: value, precision: getDefaultPrecision(value, data?.lastPrice) },
+      { source: "user" },
+    );
+    if (!applied) return;
+
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    params.set("symbol", value);
+    router.replace(`/order-book?${params.toString()}`, { scroll: false });
+  }
 
   if (!hydrated) {
     return (
@@ -237,6 +309,24 @@ export default function OrderBookPageContent() {
         </p>
       </header>
 
+      {symbolNotice ? (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          {symbolNotice}
+        </p>
+      ) : null}
+
+      {symbolRateLimitMessage ? (
+        <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+          {symbolRateLimitMessage}
+        </p>
+      ) : null}
+
+      {symbolSwitching ? (
+        <p className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+          جاري تحميل {formatMarketSymbol(prefs.symbol)}...
+        </p>
+      ) : null}
+
       {/* Row 1 — price hero + quick stats */}
       <section className="mb-5 grid items-stretch gap-3 lg:grid-cols-12 lg:gap-4">
         <div className="flex min-h-[7.5rem] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5 lg:col-span-5">
@@ -244,7 +334,7 @@ export default function OrderBookPageContent() {
             <div className="min-w-0">
               <p className="text-xs text-slate-500 dark:text-slate-400">الرمز</p>
               <h2 className="truncate text-xl font-bold text-slate-900 dark:text-white">
-                {SYMBOL_LABELS[prefs.symbol] || prefs.symbol}
+                {displaySymbol}
               </h2>
               <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                 {EXCHANGE_LABELS[prefs.mode] || prefs.mode}
@@ -322,8 +412,8 @@ export default function OrderBookPageContent() {
             label="العملة"
             ariaLabel="اختيار العملة"
             value={prefs.symbol}
-            entries={SYMBOL_SEARCH_ENTRIES}
-            onChange={(value) => setPrefs({ symbol: value, precision: getDefaultPrecision(value) })}
+            loading={symbolSwitching}
+            onChange={handleSymbolChange}
           />
           <SegmentedControl
             label="المنصة"
@@ -409,6 +499,7 @@ export default function OrderBookPageContent() {
                 error={needsDominanceHistory && historyError}
                 partial={dominanceHistory?.partialData}
                 coveragePercent={dominanceHistory?.coveragePercent}
+                collecting={historyCollecting && needsDominanceHistory}
               />
               <FlowSplitBar
                 buyPercent={dominanceFlow?.buyPercent}
@@ -461,6 +552,7 @@ export default function OrderBookPageContent() {
                 error={needsFlowHistory && historyError}
                 partial={flowHistory?.partialData}
                 coveragePercent={flowHistory?.coveragePercent}
+                collecting={historyCollecting && needsFlowHistory}
               />
               <FlowSplitBar buyPercent={executedFlow?.buyPercent} sellPercent={executedFlow?.sellPercent} />
             </div>
@@ -604,6 +696,7 @@ export default function OrderBookPageContent() {
               error={needsLargeTradeHistory && historyError}
               partial={largeTradeHistory?.partialData}
               coveragePercent={largeTradeHistory?.coveragePercent}
+              collecting={historyCollecting && needsLargeTradeHistory}
             />
           </div>
           <div className="mt-3 min-h-0 flex-1 min-w-0">
