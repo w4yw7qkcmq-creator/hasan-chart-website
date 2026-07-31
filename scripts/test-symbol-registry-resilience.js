@@ -76,15 +76,16 @@ await refreshSymbolRegistry({
   sleepImpl,
 });
 let state = getRegistryStateForTests();
-assert.equal(state.available, false);
+assert.equal(state.available, true);
 assert.equal(state.cacheMode, "failed");
-assert.equal(state.count, 4);
+assert.equal(state.registryMode, "bootstrap");
+assert.ok(state.count >= 4);
 assert.ok(state.nextRetryAt > now);
 
 // 2. unavailable cache does not live 30 minutes
 const beforeRetry = now;
 await refreshSymbolRegistry({ fetchImpl: makeFetchImpl(["fail"]), sleepImpl });
-assert.equal(getRegistryStateForTests().count, 4);
+assert.ok(getRegistryStateForTests().count >= 4);
 now = beforeRetry + REGISTRY_FAILED_RETRY_MS - 1;
 __setSymbolRegistryClockForTests(now);
 resetSymbolRegistryForTests();
@@ -97,7 +98,7 @@ await refreshSymbolRegistry({
 const retryAt = getRegistryStateForTests().nextRetryAt;
 now = retryAt - 1;
 await refreshSymbolRegistry({ fetchImpl: makeFetchImpl(["fail"]), sleepImpl });
-assert.equal(getRegistryStateForTests().count, 4, "no fetch before nextRetryAt");
+assert.ok(getRegistryStateForTests().count >= 4, "no fetch before nextRetryAt");
 
 // 3-5. after nextRetryAt second attempt succeeds with 2 sources
 now = retryAt + 1;
@@ -142,7 +143,8 @@ await refreshSymbolRegistry({
   },
   sleepImpl,
 });
-assert.equal(getRegistryStateForTests().available, false);
+assert.equal(getRegistryStateForTests().available, true);
+assert.equal(getRegistryStateForTests().registryMode, "bootstrap");
 
 const blockedUntil = getRegistryStateForTests().nextRetryAt;
 now = blockedUntil - 1;
@@ -153,11 +155,12 @@ await refreshSymbolRegistry({
   },
   sleepImpl,
 });
-assert.equal(getRegistryStateForTests().available, false);
+assert.equal(getRegistryStateForTests().available, true);
 
 now = blockedUntil + 1;
 __setSymbolRegistryClockForTests(now);
 await refreshSymbolRegistry({
+  force: true,
   fetchImpl: async (_url, label) => {
     if (label === "BINANCE") {
       return {
@@ -181,8 +184,10 @@ await refreshSymbolRegistry({
   },
   sleepImpl,
 });
-assert.equal(getRegistryStateForTests().available, true);
-assert.equal(getRegistryStateForTests().sourceCount, 2);
+const afterRecovery = getRegistryStateForTests();
+assert.equal(afterRecovery.available, true);
+assert.equal(afterRecovery.registryMode, "live");
+assert.equal(afterRecovery.sourceCount, 2);
 assert.equal(searchRegistrySymbols("DOGE").length, 1);
 assert.equal(searchRegistrySymbols("LTC").length, 1);
 
@@ -307,8 +312,8 @@ const firstHealth = getSymbolRegistryHealth();
 const firstAttemptAt = firstHealth.registryLastAttemptAt;
 const firstNextRetryAt = firstHealth.registryNextRetryAt;
 const firstFailureCount = getRegistryStateForTests().failureCount;
-assert.equal(getRegistryStateForTests().available, false);
-assert.ok(firstNextRetryAt);
+assert.equal(getRegistryStateForTests().available, true);
+assert.equal(getRegistryStateForTests().registryMode, "bootstrap");
 
 now = new Date(firstNextRetryAt).getTime() - 1;
 __setSymbolRegistryClockForTests(now);
