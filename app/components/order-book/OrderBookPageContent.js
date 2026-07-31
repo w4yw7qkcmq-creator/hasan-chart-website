@@ -67,6 +67,8 @@ const breadcrumbs = [
   { label: "دفتر الأوامر والسيولة", href: "/order-book" },
 ];
 
+export const LARGE_TRADES_MAX_VISIBLE_ROWS = 15;
+
 function pickHistoricalWallSide(history, side) {
   const analyticsKey = side === "bid" ? "strongestBid" : "strongestAsk";
   const fromAnalytics = history?.analytics?.[analyticsKey];
@@ -185,9 +187,14 @@ export default function OrderBookPageContent() {
   const dominanceFlow = needsDominanceHistory ? dominanceHistory : data?.dominanceFlow;
   const executedFlow = needsFlowHistory ? flowHistory : data?.executedFlow;
 
-  const displayedLargeTrades = needsLargeTradeHistory
-    ? largeTradeHistory?.rows || []
-    : data?.largeTrades || [];
+  const displayedLargeTrades = useMemo(() => {
+    const rows = needsLargeTradeHistory
+      ? largeTradeHistory?.rows || []
+      : data?.largeTrades || [];
+    return [...rows]
+      .sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0))
+      .slice(0, LARGE_TRADES_MAX_VISIBLE_ROWS);
+  }, [needsLargeTradeHistory, largeTradeHistory?.rows, data?.largeTrades]);
 
   const largeTradesTitle = needsLargeTradeHistory
     ? "الصفقات الكبيرة التاريخية"
@@ -375,10 +382,10 @@ export default function OrderBookPageContent() {
           <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
         </div>
 
-        <div className={`flex min-w-0 flex-col gap-4 lg:col-span-4 lg:min-h-0 ${ORDER_BOOK_ROW_HEIGHT_LG}`}>
+        <div className={`flex min-w-0 flex-col gap-3 overflow-hidden lg:col-span-4 lg:min-h-0 ${ORDER_BOOK_ROW_HEIGHT_LG}`}>
           <Panel
             compact
-            className="flex shrink-0 flex-col overflow-x-hidden"
+            className="flex shrink-0 flex-col overflow-hidden"
             title="سيطرة الشراء والبيع"
             description={
               needsDominanceHistory
@@ -386,26 +393,28 @@ export default function OrderBookPageContent() {
                 : "الصفقات المنفذة فعلياً ضمن الإطار المختار."
             }
           >
-            <SegmentedControl
-              compact
-              ariaLabel="إطار السيطرة"
-              label="الإطار"
-              value={dominanceWindow}
-              onChange={(value) => setPrefs({ dominanceWindow: value })}
-              scrollable
-              options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-            />
-            <HistoryState
-              loading={needsDominanceHistory && historyLoading}
-              error={needsDominanceHistory && historyError}
-              partial={dominanceHistory?.partialData}
-              coveragePercent={dominanceHistory?.coveragePercent}
-            />
-            <FlowSplitBar
-              buyPercent={dominanceFlow?.buyPercent}
-              sellPercent={dominanceFlow?.sellPercent}
-            />
-            <div className="mt-2 space-y-1.5">
+            <div className="shrink-0 space-y-1.5">
+              <SegmentedControl
+                compact
+                ariaLabel="إطار السيطرة"
+                label="الإطار"
+                value={dominanceWindow}
+                onChange={(value) => setPrefs({ dominanceWindow: value })}
+                scrollable
+                options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+              />
+              <HistoryState
+                loading={needsDominanceHistory && historyLoading}
+                error={needsDominanceHistory && historyError}
+                partial={dominanceHistory?.partialData}
+                coveragePercent={dominanceHistory?.coveragePercent}
+              />
+              <FlowSplitBar
+                buyPercent={dominanceFlow?.buyPercent}
+                sellPercent={dominanceFlow?.sellPercent}
+              />
+            </div>
+            <div className="mt-1 min-h-0 space-y-1 overflow-x-hidden">
               <MetricLine
                 label="شراء منفذ"
                 value={formatUsd(dominanceFlow?.buyNotional, { compact: true })}
@@ -420,7 +429,7 @@ export default function OrderBookPageContent() {
                 label="صافي التدفق"
                 value={formatUsd(dominanceFlow?.netNotional ?? dominanceFlow?.netFlow, { compact: true })}
               />
-              <p className="rounded-xl bg-slate-50 px-3 py-1.5 text-center text-sm font-medium text-slate-800 dark:bg-white/5 dark:text-slate-100">
+              <p className="rounded-lg bg-slate-50 px-2.5 py-1 text-center text-xs font-medium text-slate-800 dark:bg-white/5 dark:text-slate-100">
                 {dominanceFlow?.dominanceLabel || dominanceFlow?.dominanceClassification || "متوازن"}
               </p>
             </div>
@@ -428,7 +437,7 @@ export default function OrderBookPageContent() {
 
           <Panel
             compact
-            className="flex shrink-0 flex-col overflow-x-hidden"
+            className="flex min-h-0 flex-col overflow-hidden"
             title="حجم الشراء/البيع المنفذ"
             description={
               needsFlowHistory
@@ -436,37 +445,41 @@ export default function OrderBookPageContent() {
                 : "الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر."
             }
           >
-            <SegmentedControl
-              compact
-              ariaLabel="إطار الحجم"
-              label="الإطار"
-              value={prefs.flowWindow}
-              onChange={(value) => setPrefs({ flowWindow: value })}
-              scrollable
-              options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-            />
-            <HistoryState
-              loading={needsFlowHistory && historyLoading}
-              error={needsFlowHistory && historyError}
-              partial={flowHistory?.partialData}
-              coveragePercent={flowHistory?.coveragePercent}
-            />
-            <FlowSplitBar buyPercent={executedFlow?.buyPercent} sellPercent={executedFlow?.sellPercent} />
-            <div className="mt-2 space-y-1.5">
-              <MetricLine
-                label="شراء منفذ"
-                value={formatUsd(executedFlow?.buyNotional, { compact: true })}
-                tone="buy"
+            <div className="shrink-0 space-y-1.5">
+              <SegmentedControl
+                compact
+                ariaLabel="إطار الحجم"
+                label="الإطار"
+                value={prefs.flowWindow}
+                onChange={(value) => setPrefs({ flowWindow: value })}
+                scrollable
+                options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
               />
-              <MetricLine
-                label="بيع منفذ"
-                value={formatUsd(executedFlow?.sellNotional, { compact: true })}
-                tone="sell"
+              <HistoryState
+                loading={needsFlowHistory && historyLoading}
+                error={needsFlowHistory && historyError}
+                partial={flowHistory?.partialData}
+                coveragePercent={flowHistory?.coveragePercent}
               />
-              <MetricLine
-                label="صافي التدفق"
-                value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, { compact: true })}
-              />
+            </div>
+            <div className="mt-1 min-h-0 overflow-x-hidden">
+              <FlowSplitBar buyPercent={executedFlow?.buyPercent} sellPercent={executedFlow?.sellPercent} />
+              <div className="mt-1 space-y-1">
+                <MetricLine
+                  label="شراء منفذ"
+                  value={formatUsd(executedFlow?.buyNotional, { compact: true })}
+                  tone="buy"
+                />
+                <MetricLine
+                  label="بيع منفذ"
+                  value={formatUsd(executedFlow?.sellNotional, { compact: true })}
+                  tone="sell"
+                />
+                <MetricLine
+                  label="صافي التدفق"
+                  value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, { compact: true })}
+                />
+              </div>
             </div>
           </Panel>
 
@@ -522,7 +535,7 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Row 2 — depth chart (right) + large trades (left) */}
-      <section className="grid items-stretch gap-4 lg:grid-cols-12">
+      <section className="relative isolate z-0 grid items-stretch gap-4 lg:grid-cols-12">
         <Panel
           className="flex h-full min-h-0 flex-col overflow-x-hidden lg:col-span-7"
           title={isLiveDepth ? "خريطة عمق السيولة" : "خريطة جدران السيولة التاريخية"}
@@ -559,11 +572,11 @@ export default function OrderBookPageContent() {
         </Panel>
 
         <Panel
-          className="flex h-full min-h-0 flex-col overflow-x-hidden lg:col-span-5"
+          className="relative z-0 flex h-full min-h-0 flex-col overflow-hidden lg:col-span-5"
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
         >
-          <div className="mb-4 space-y-3">
+          <div className="shrink-0 space-y-3">
             <SegmentedControl
               compact
               ariaLabel="حد الصفقة الكبيرة"
@@ -585,15 +598,16 @@ export default function OrderBookPageContent() {
               scrollable
               options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
             />
+            <HistoryState
+              loading={needsLargeTradeHistory && historyLoading}
+              error={needsLargeTradeHistory && historyError}
+              partial={largeTradeHistory?.partialData}
+              coveragePercent={largeTradeHistory?.coveragePercent}
+            />
           </div>
-          <HistoryState
-            loading={needsLargeTradeHistory && historyLoading}
-            error={needsLargeTradeHistory && historyError}
-            partial={largeTradeHistory?.partialData}
-            coveragePercent={largeTradeHistory?.coveragePercent}
-          />
+          <div className="mt-3 min-h-0 flex-1 overflow-hidden">
           {displayedLargeTrades.length ? (
-            <div className="max-h-[26rem] min-h-0 overflow-y-auto overflow-x-auto overscroll-contain rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
+            <div className="max-h-[26rem] overflow-y-auto overflow-x-auto overscroll-contain rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
               <table className="w-full min-w-[480px] text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
@@ -637,6 +651,7 @@ export default function OrderBookPageContent() {
               <EmptyState message={largeTradeEmptyMessage} />
             )
           )}
+          </div>
         </Panel>
       </section>
 

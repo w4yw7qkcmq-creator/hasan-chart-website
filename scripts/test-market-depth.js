@@ -352,6 +352,33 @@ function testDominanceStrengthBoundaries() {
   assert.equal(dominantSideLabelAr("balanced"), "متوازن");
 }
 
+function testLiquidityDepthChartMultiLevel() {
+  const chartSource = readFileSync(
+    fileURLToPath(new URL("../app/components/order-book/LiquidityDepthChart.js", import.meta.url)),
+    "utf8",
+  );
+  const pageSource = readFileSync(
+    fileURLToPath(new URL("../app/components/order-book/OrderBookPageContent.js", import.meta.url)),
+    "utf8",
+  );
+
+  assert.match(chartSource, /points\.filter\(\(point\) => point\.side === "bid"\)/);
+  assert.match(chartSource, /points\.filter\(\(point\) => point\.side === "ask"\)/);
+  assert.match(chartSource, /sqrtScale/);
+  assert.match(chartSource, /buildPriceTicks/);
+  assert.match(chartSource, /buildValueTicks/);
+  assert.match(chartSource, /#10b981/);
+  assert.match(chartSource, /#f43f5e/);
+  assert.match(chartSource, /buildTooltipLines/);
+  assert.match(chartSource, /mode === "historical"/);
+  assert.match(chartSource, /if \(error\)/);
+  assert.match(pageSource, /data\?\.depthMap/);
+  assert.match(pageSource, /aggregatedDepthPoints/);
+  assert.match(pageSource, /overflow-hidden lg:col-span-4/);
+  assert.match(pageSource, /LARGE_TRADES_MAX_VISIBLE_ROWS/);
+  assert.doesNotMatch(chartSource, /as="span"/);
+}
+
 function testOrderBookUiSourceGuards() {
   const pageSource = readFileSync(
     fileURLToPath(new URL("../app/components/order-book/OrderBookPageContent.js", import.meta.url)),
@@ -764,6 +791,7 @@ const tests = [
   testLargeTradeWindowsAndThresholds,
   testExecutedDominanceFlow,
   testDominanceStrengthBoundaries,
+  testLiquidityDepthChartMultiLevel,
   testOrderBookUiSourceGuards,
   testIndependentFlowDominanceWindows,
   testLargeTradeStatsBeforeLimit,

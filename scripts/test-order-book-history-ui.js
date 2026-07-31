@@ -365,7 +365,7 @@ test("order book layout uses separate rows without grid placement hacks", () => 
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
   assert.match(row1, /lg:col-span-8 lg:min-h-0 \$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
   assert.match(row1, /lg:col-span-4 lg:min-h-0 \$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
-  assert.match(row1, /OrderBookPanel[\s\S]*flex min-w-0 flex-col gap-4 lg:col-span-4/);
+  assert.match(row1, /flex min-w-0 flex-col gap-3 overflow-hidden lg:col-span-4/);
   assert.match(row1, /title="جدران السيولة"/);
   assert.match(panel, /ORDER_BOOK_VISIBLE_ROWS = 12/);
   assert.match(panel, /ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-\[36rem\]"/);
@@ -397,19 +397,66 @@ test("sidebar uses auto height below lg breakpoint", () => {
 test("depth and large trades share equal-height row with scroll cap", () => {
   const page = readSources().page;
   const row2 = page.slice(page.indexOf("{/* Row 2"), page.indexOf("{/* Full-width sections"));
+  assert.match(row2, /relative isolate z-0/);
   assert.match(row2, /lg:col-span-7/);
   assert.match(row2, /lg:col-span-5/);
   assert.match(row2, /fillContainer/);
   assert.match(row2, /max-h-\[26rem\]/);
   assert.match(row2, /overflow-y-auto overflow-x-auto overscroll-contain/);
+  assert.match(row2, /relative z-0 flex h-full min-h-0 flex-col overflow-hidden lg:col-span-5/);
+  assert.match(row2, /shrink-0 space-y-3[\s\S]*HistoryState/);
+  assert.match(row2, /mt-3 min-h-0 flex-1 overflow-hidden/);
+  assert.match(page, /LARGE_TRADES_MAX_VISIBLE_ROWS = 15/);
+  assert.match(page, /\.slice\(0, LARGE_TRADES_MAX_VISIBLE_ROWS\)/);
+  assert.match(page, /displayedLargeTrades = useMemo/);
   assert.doesNotMatch(row2, /lg:row-start-/);
   assert.doesNotMatch(row2, /lg:col-start-/);
+});
+
+test("executed flow stays inside sidebar without overlapping row 2", () => {
+  const { page } = readSources();
+  const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
+  const flowTitleIndex = row1.indexOf('title="حجم الشراء/البيع');
+  const flowStart = row1.lastIndexOf("<Panel", flowTitleIndex);
+  const flowPanel = row1.slice(flowStart, row1.indexOf('title="جدران السيولة"', flowTitleIndex));
+  assert.match(row1, /flex min-w-0 flex-col gap-3 overflow-hidden lg:col-span-4/);
+  assert.match(flowPanel, /className="flex min-h-0 flex-col overflow-hidden"/);
+  assert.match(flowPanel, /shrink-0 space-y-1\.5/);
+  assert.match(flowPanel, /mt-1 min-h-0 overflow-x-hidden/);
+  assert.doesNotMatch(flowPanel, /shrink-0 flex-col overflow-hidden"/);
+});
+
+test("liquidity depth chart renders multi-level histogram with axes and tooltip", () => {
+  const { chart, page } = readSources();
+  assert.match(chart, /sqrtScale/);
+  assert.match(chart, /buildPriceTicks/);
+  assert.match(chart, /buildValueTicks/);
+  assert.match(chart, /#10b981/);
+  assert.match(chart, /#f43f5e/);
+  assert.match(chart, /strokeDasharray="4 3"/);
+  assert.match(chart, /buildTooltipLines/);
+  assert.match(chart, /البعد عن السعر/);
+  assert.match(chart, /مستوى شراء ·/);
+  assert.match(chart, /preserveAspectRatio="none"/);
+  assert.match(chart, /min-h-\[14rem\]/);
+  assert.match(page, /depthMap \|\| \[\]/);
+  assert.match(page, /aggregatedDepthPoints/);
+  assert.doesNotMatch(chart, /as="span"/);
+});
+
+test("depth chart keeps historical errors visible without silent fallback", () => {
+  const { chart, page } = readSources();
+  assert.match(chart, /mode === "historical"/);
+  assert.match(chart, /if \(error\)/);
+  assert.match(chart, /DepthHistoryState/);
+  assert.match(page, /depthHistoryError/);
+  assert.doesNotMatch(chart, /catch[\s\S]*mode = "live"/);
 });
 
 test("liquidity walls stay in sidebar stack", () => {
   const page = readSources().page;
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
-  assert.match(row1, /flex min-w-0 flex-col gap-4 lg:col-span-4[\s\S]*title="جدران السيولة"/);
+  assert.match(row1, /flex min-w-0 flex-col gap-3[\s\S]*title="جدران السيولة"/);
   const row2 = page.slice(page.indexOf("{/* Row 2"), page.indexOf("{/* Full-width sections"));
   assert.doesNotMatch(row2, /title="جدران السيولة"/);
 });

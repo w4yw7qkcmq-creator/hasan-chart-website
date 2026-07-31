@@ -59,7 +59,7 @@ export function SegmentedControl({
               role="tab"
               aria-selected={active}
               onClick={() => onChange(option.value)}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 sm:text-sm ${
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3 ${compact ? "py-1.5" : "py-2"} text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 sm:text-sm ${
                 active
                   ? "bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white"
                   : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
@@ -143,10 +143,10 @@ export function RefreshSpinner({ className = "" }) {
   );
 }
 
-export function DepthHistoryState({ loading, error, partial, coveragePercent, collecting }) {
+export function DepthHistoryState({ loading, error, partial, coveragePercent, collecting, minHeight = "h-44 sm:h-48" }) {
   if (loading) {
     return (
-      <div className="mb-3 flex h-44 items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400 sm:h-48">
+      <div className={`mb-3 flex ${minHeight} items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400`}>
         جاري تحميل جدران السيولة التاريخية...
       </div>
     );
@@ -154,7 +154,7 @@ export function DepthHistoryState({ loading, error, partial, coveragePercent, co
 
   if (error) {
     return (
-      <div className="mb-3 flex h-44 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 sm:h-48">
+      <div className={`mb-3 flex ${minHeight} items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200`}>
         تعذّر تحميل بيانات السيولة التاريخية.
       </div>
     );
