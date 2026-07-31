@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { filterSymbolSearchEntries } from "../../../lib/market-data/symbols.js";
 import { formatCoveragePercent } from "../../../lib/market-data/history/window-utils.js";
 
 export function NumericValue({ children, className = "" }) {
@@ -102,6 +104,153 @@ export function StyledSelect({ label, value, onChange, options, compact = false 
         </span>
       </div>
     </label>
+  );
+}
+
+export function SymbolSearchCombobox({
+  label = "العملة",
+  value,
+  onChange,
+  entries = [],
+  ariaLabel = "اختيار العملة",
+}) {
+  const listId = useId();
+  const inputRef = useRef(null);
+  const rootRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const selected = entries.find((entry) => entry.value === value) || entries[0];
+  const filtered = useMemo(() => filterSymbolSearchEntries(entries, query), [entries, query]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query, open]);
+
+  const displayValue = open ? query : selected?.label || "";
+
+  function selectEntry(entry) {
+    if (!entry) return;
+    onChange(entry.value);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function onKeyDown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      setQuery("");
+      inputRef.current?.blur();
+      return;
+    }
+
+    if (!open && (event.key === "ArrowDown" || event.key === "Enter")) {
+      event.preventDefault();
+      setOpen(true);
+      return;
+    }
+
+    if (!open) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((index) => Math.min(index + 1, Math.max(filtered.length - 1, 0)));
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((index) => Math.max(index - 1, 0));
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      selectEntry(filtered[activeIndex]);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative min-w-0">
+      <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
+        <div className="relative min-w-0">
+          <input
+            ref={inputRef}
+            type="text"
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-label={ariaLabel}
+            placeholder="ابحث ضمن العملات المدعومة (BTC, ETH, SOL, XRP)"
+            value={displayValue}
+            onFocus={() => {
+              setOpen(true);
+              setQuery("");
+            }}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={onKeyDown}
+            className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm text-slate-800 outline-none transition focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:focus-visible:ring-white/20"
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          >
+            ▾
+          </span>
+        </div>
+      </label>
+
+      {open ? (
+        <ul
+          id={listId}
+          role="listbox"
+          className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-slate-900"
+        >
+          {filtered.length ? (
+            filtered.map((entry, index) => {
+              const active = index === activeIndex;
+              return (
+                <li key={entry.value} role="option" aria-selected={entry.value === value}>
+                  <button
+                    type="button"
+                    className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-right text-sm transition ${
+                      active
+                        ? "bg-slate-100 text-slate-900 dark:bg-white/10 dark:text-white"
+                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+                    }`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => selectEntry(entry)}
+                  >
+                    <span>{entry.label}</span>
+                    <span dir="ltr" className="tabular-nums text-xs text-slate-500 dark:text-slate-400">
+                      {entry.value}
+                    </span>
+                  </button>
+                </li>
+              );
+            })
+          ) : (
+            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">لا توجد نتائج</li>
+          )}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

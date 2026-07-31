@@ -374,7 +374,9 @@ function testLiquidityDepthChartMultiLevel() {
   assert.match(chartSource, /if \(error\)/);
   assert.match(pageSource, /data\?\.depthMap/);
   assert.match(pageSource, /aggregatedDepthPoints/);
-  assert.match(pageSource, /overflow-hidden lg:col-span-4/);
+  assert.match(pageSource, /flex min-w-0 flex-col gap-3 lg:col-span-4/);
+  assert.match(pageSource, /Row 2 — live \/ summary liquidity walls/);
+  assert.match(pageSource, /SymbolSearchCombobox/);
   assert.match(pageSource, /LARGE_TRADES_MAX_VISIBLE_ROWS/);
   assert.doesNotMatch(chartSource, /as="span"/);
 }
@@ -411,7 +413,7 @@ function testOrderBookUiSourceGuards() {
   assert.match(pageSource, /max-h-\[26rem\]/);
   assert.match(pageSource, /fillContainer/);
   assert.match(pageSource, /ORDER_BOOK_ROW_HEIGHT_LG/);
-  assert.match(pageSource, /grid grid-cols-1 gap-2 lg:grid-cols-2/);
+  assert.match(pageSource, /grid grid-cols-1 gap-3 md:grid-cols-2/);
   assert.match(panelSource, /ORDER_BOOK_VISIBLE_ROWS = 12/);
   assert.match(panelSource, /ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-\[36rem\]"/);
   assert.match(panelSource, /h-full min-h-0/);

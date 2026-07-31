@@ -26,8 +26,8 @@ import {
   EXCHANGE_LABELS,
   getDefaultPrecision,
   PRECISION_OPTIONS,
-  SITE_SYMBOLS,
   SYMBOL_LABELS,
+  SYMBOL_SEARCH_ENTRIES,
 } from "../../../lib/market-data/symbols";
 import FearGreedCard from "./FearGreedCard";
 import LiquidationsPanel from "./LiquidationsPanel";
@@ -44,6 +44,7 @@ import {
   formatLargeTradeEmptyMessage,
   formatPercent,
   formatPrice,
+  formatQuantity,
   formatThresholdLabel,
   formatTime,
   formatUsd,
@@ -59,6 +60,7 @@ import {
   SideBadge,
   StatTile,
   StyledSelect,
+  SymbolSearchCombobox,
 } from "./order-book-ui";
 
 const breadcrumbs = [
@@ -316,13 +318,12 @@ export default function OrderBookPageContent() {
       {/* Controls */}
       <section className="mb-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5">
         <div className="grid gap-4 xl:grid-cols-2">
-          <SegmentedControl
+          <SymbolSearchCombobox
             label="العملة"
             ariaLabel="اختيار العملة"
             value={prefs.symbol}
+            entries={SYMBOL_SEARCH_ENTRIES}
             onChange={(value) => setPrefs({ symbol: value, precision: getDefaultPrecision(value) })}
-            options={SITE_SYMBOLS.map((symbol) => ({ value: symbol, label: SYMBOL_LABELS[symbol] }))}
-            scrollable
           />
           <SegmentedControl
             label="المنصة"
@@ -376,16 +377,16 @@ export default function OrderBookPageContent() {
       </section>
 
       <div className="space-y-4">
-      {/* Row 1 — order book (right) + sidebar (left) */}
-      <section className="grid items-stretch gap-4 lg:grid-cols-12">
+      {/* Row 1 — order book (right) + dominance / executed flow (left) */}
+      <section className="grid items-start gap-4 lg:grid-cols-12">
         <div className={`min-w-0 lg:col-span-8 lg:min-h-0 ${ORDER_BOOK_ROW_HEIGHT_LG}`}>
           <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
         </div>
 
-        <div className={`flex min-w-0 flex-col gap-3 overflow-hidden lg:col-span-4 lg:min-h-0 ${ORDER_BOOK_ROW_HEIGHT_LG}`}>
+        <div className="flex min-w-0 flex-col gap-3 lg:col-span-4">
           <Panel
             compact
-            className="flex shrink-0 flex-col overflow-hidden"
+            className="min-w-0"
             title="سيطرة الشراء والبيع"
             description={
               needsDominanceHistory
@@ -393,7 +394,7 @@ export default function OrderBookPageContent() {
                 : "الصفقات المنفذة فعلياً ضمن الإطار المختار."
             }
           >
-            <div className="shrink-0 space-y-1.5">
+            <div className="space-y-2">
               <SegmentedControl
                 compact
                 ariaLabel="إطار السيطرة"
@@ -414,7 +415,7 @@ export default function OrderBookPageContent() {
                 sellPercent={dominanceFlow?.sellPercent}
               />
             </div>
-            <div className="mt-1 min-h-0 space-y-1 overflow-x-hidden">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <MetricLine
                 label="شراء منفذ"
                 value={formatUsd(dominanceFlow?.buyNotional, { compact: true })}
@@ -429,7 +430,7 @@ export default function OrderBookPageContent() {
                 label="صافي التدفق"
                 value={formatUsd(dominanceFlow?.netNotional ?? dominanceFlow?.netFlow, { compact: true })}
               />
-              <p className="rounded-lg bg-slate-50 px-2.5 py-1 text-center text-xs font-medium text-slate-800 dark:bg-white/5 dark:text-slate-100">
+              <p className="flex items-center justify-center rounded-lg bg-slate-50 px-2.5 py-2 text-center text-xs font-medium text-slate-800 sm:col-span-2 dark:bg-white/5 dark:text-slate-100">
                 {dominanceFlow?.dominanceLabel || dominanceFlow?.dominanceClassification || "متوازن"}
               </p>
             </div>
@@ -437,7 +438,7 @@ export default function OrderBookPageContent() {
 
           <Panel
             compact
-            className="flex min-h-0 flex-col overflow-hidden"
+            className="min-w-0"
             title="حجم الشراء/البيع المنفذ"
             description={
               needsFlowHistory
@@ -445,7 +446,7 @@ export default function OrderBookPageContent() {
                 : "الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر."
             }
           >
-            <div className="shrink-0 space-y-1.5">
+            <div className="space-y-2">
               <SegmentedControl
                 compact
                 ariaLabel="إطار الحجم"
@@ -461,80 +462,80 @@ export default function OrderBookPageContent() {
                 partial={flowHistory?.partialData}
                 coveragePercent={flowHistory?.coveragePercent}
               />
-            </div>
-            <div className="mt-1 min-h-0 overflow-x-hidden">
               <FlowSplitBar buyPercent={executedFlow?.buyPercent} sellPercent={executedFlow?.sellPercent} />
-              <div className="mt-1 space-y-1">
-                <MetricLine
-                  label="شراء منفذ"
-                  value={formatUsd(executedFlow?.buyNotional, { compact: true })}
-                  tone="buy"
-                />
-                <MetricLine
-                  label="بيع منفذ"
-                  value={formatUsd(executedFlow?.sellNotional, { compact: true })}
-                  tone="sell"
-                />
-                <MetricLine
-                  label="صافي التدفق"
-                  value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, { compact: true })}
-                />
-              </div>
             </div>
-          </Panel>
-
-          <Panel
-            compact
-            className="flex min-h-0 flex-1 flex-col overflow-x-hidden"
-            title="جدران السيولة"
-            description={
-              isSidebarWallsLive
-                ? "أكبر مستويات السيولة الظاهرة حاليًا في دفتر الأوامر."
-                : "أقوى مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
-            }
-          >
-            <div className="mb-2 shrink-0">
-              <SegmentedControl
-                compact
-                ariaLabel="إطار جدران السيولة"
-                label="الإطار"
-                value={liquidityWallsWindow}
-                onChange={setLiquidityWallsWindow}
-                scrollable
-                options={LIQUIDITY_WALLS_SUMMARY_WINDOW_OPTIONS}
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <MetricLine
+                label="شراء منفذ"
+                value={formatUsd(executedFlow?.buyNotional, { compact: true })}
+                tone="buy"
               />
-            </div>
-            {!isSidebarWallsLive ? (
-              <div className="shrink-0">
-                <LiquidityWallsState
-                  loading={sidebarWallsLoading}
-                  error={sidebarWallsError}
-                  partial={sidebarWallsHistory?.partialData}
-                  coveragePercent={sidebarWallsHistory?.coveragePercent}
-                  collecting={sidebarWallsHistory?.collecting}
-                />
-              </div>
-            ) : null}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              {isSidebarWallsLive ? (
-                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-                  <LiveWallCard compact title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
-                  <LiveWallCard compact title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
-                </div>
-              ) : sidebarWallsLoading || sidebarWallsError ? null : sidebarWallsEmpty ? (
-                <EmptyState message="لا توجد جدران كافية ضمن هذه الفترة حتى الآن." />
-              ) : (
-                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-                  <HistoricalWallCard compact title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
-                  <HistoricalWallCard compact title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
-                </div>
-              )}
+              <MetricLine
+                label="بيع منفذ"
+                value={formatUsd(executedFlow?.sellNotional, { compact: true })}
+                tone="sell"
+              />
+              <MetricLine
+                label="صافي التدفق"
+                value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, { compact: true })}
+              />
+              <p className="flex items-center justify-center rounded-lg bg-slate-50 px-2.5 py-2 text-center text-xs font-medium text-slate-800 sm:col-span-2 dark:bg-white/5 dark:text-slate-100">
+                {executedFlow?.dominanceLabel || executedFlow?.dominanceClassification || "متوازن"}
+              </p>
             </div>
           </Panel>
         </div>
       </section>
 
-      {/* Row 2 — depth chart (right) + large trades (left) */}
+      {/* Row 2 — live / summary liquidity walls */}
+      <section className="grid gap-4 lg:grid-cols-12">
+        <Panel
+          compact
+          className="min-w-0 lg:col-span-12"
+          title="جدران السيولة"
+          description={
+            isSidebarWallsLive
+              ? "أكبر مستويات السيولة الظاهرة حاليًا في دفتر الأوامر."
+              : "أقوى مستويات السيولة التي ظهرت أو استمرت خلال الفترة المحددة."
+          }
+        >
+          <div className="mb-3">
+            <SegmentedControl
+              compact
+              ariaLabel="إطار جدران السيولة"
+              label="الإطار"
+              value={liquidityWallsWindow}
+              onChange={setLiquidityWallsWindow}
+              scrollable
+              options={LIQUIDITY_WALLS_SUMMARY_WINDOW_OPTIONS}
+            />
+          </div>
+          {!isSidebarWallsLive ? (
+            <LiquidityWallsState
+              loading={sidebarWallsLoading}
+              error={sidebarWallsError}
+              partial={sidebarWallsHistory?.partialData}
+              coveragePercent={sidebarWallsHistory?.coveragePercent}
+              collecting={sidebarWallsHistory?.collecting}
+            />
+          ) : null}
+          {isSidebarWallsLive ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <LiveWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
+              <LiveWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
+            </div>
+          ) : sidebarWallsLoading || sidebarWallsError ? null : sidebarWallsEmpty ? (
+            <EmptyState message="لا توجد جدران كافية ضمن هذه الفترة حتى الآن." />
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <HistoricalWallCard title="أكبر جدار شراء" wall={sidebarWallsBid} tone="buy" />
+              <HistoricalWallCard title="أكبر جدار بيع" wall={sidebarWallsAsk} tone="sell" />
+            </div>
+          )}
+        </Panel>
+      </section>
+
+      {/* Row 3 — depth chart (right) + large trades (left) */}
       <section className="relative isolate z-0 grid items-stretch gap-4 lg:grid-cols-12">
         <Panel
           className="flex h-full min-h-0 flex-col overflow-x-hidden lg:col-span-7"
@@ -572,7 +573,7 @@ export default function OrderBookPageContent() {
         </Panel>
 
         <Panel
-          className="relative z-0 flex h-full min-h-0 flex-col overflow-hidden lg:col-span-5"
+          className="relative z-0 flex h-full min-h-0 min-w-0 flex-col lg:col-span-5"
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
         >
@@ -605,17 +606,26 @@ export default function OrderBookPageContent() {
               coveragePercent={largeTradeHistory?.coveragePercent}
             />
           </div>
-          <div className="mt-3 min-h-0 flex-1 overflow-hidden">
+          <div className="mt-3 min-h-0 flex-1 min-w-0">
           {displayedLargeTrades.length ? (
             <div className="max-h-[26rem] overflow-y-auto overflow-x-auto overscroll-contain rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
-              <table className="w-full min-w-[480px] text-sm">
+              <table className="w-full min-w-[42rem] table-fixed text-sm tabular-nums">
+                <colgroup>
+                  <col className="w-[4.5rem]" />
+                  <col className="w-[5rem]" />
+                  <col className="w-[4.5rem]" />
+                  <col className="w-[6.5rem]" />
+                  <col className="w-[5.5rem]" />
+                  <col className="w-[5.5rem]" />
+                </colgroup>
                 <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
-                    <th className="px-3 py-2 text-right">الوقت</th>
-                    <th className="px-3 py-2 text-right">المنصة</th>
-                    <th className="px-3 py-2 text-right">الاتجاه</th>
-                    <th className="px-3 py-2 text-right">السعر</th>
-                    <th className="px-3 py-2 text-left">القيمة</th>
+                    <th className="px-2 py-2 text-right sm:px-3">الوقت</th>
+                    <th className="px-2 py-2 text-right sm:px-3">المنصة</th>
+                    <th className="px-2 py-2 text-right sm:px-3">الاتجاه</th>
+                    <th className="px-2 py-2 text-right sm:px-3">السعر</th>
+                    <th className="px-2 py-2 text-right sm:px-3">الكمية</th>
+                    <th className="px-2 py-2 text-right sm:px-3">القيمة</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -624,19 +634,22 @@ export default function OrderBookPageContent() {
                       key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
                       className="border-t border-slate-100 transition hover:bg-slate-50/80 dark:border-white/5 dark:hover:bg-white/5"
                     >
-                      <td className="px-3 py-1.5">
+                      <td className="px-2 py-1.5 sm:px-3">
                         <NumericValue className="text-xs">{formatTime(trade.ts)}</NumericValue>
                       </td>
-                      <td className="px-3 py-1.5 text-xs">
+                      <td className="px-2 py-1.5 text-xs sm:px-3">
                         {EXCHANGE_LABELS[trade.exchange] || trade.exchange}
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-2 py-1.5 sm:px-3">
                         <SideBadge side={trade.side} />
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-2 py-1.5 sm:px-3">
                         <NumericValue className="text-xs">{formatPrice(trade.price)}</NumericValue>
                       </td>
-                      <td className="px-3 py-1.5 text-left">
+                      <td className="px-2 py-1.5 sm:px-3">
+                        <NumericValue className="text-xs">{formatQuantity(trade.quantity)}</NumericValue>
+                      </td>
+                      <td className="px-2 py-1.5 sm:px-3">
                         <NumericValue className="font-semibold text-slate-900 dark:text-white">
                           {formatUsd(trade.notional, { compact: true })}
                         </NumericValue>

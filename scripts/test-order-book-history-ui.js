@@ -352,9 +352,10 @@ test("historical walls panel falls back across tabs and keeps analytics", () => 
 
 test("order book layout uses separate rows without grid placement hacks", () => {
   const { page, panel } = readSources();
-  assert.match(page, /Row 1 — order book \(right\) \+ sidebar \(left\)/);
-  assert.match(page, /Row 2 — depth chart \(right\) \+ large trades \(left\)/);
-  assert.match(page, /items-stretch/);
+  assert.match(page, /Row 1 — order book \(right\) \+ dominance \/ executed flow \(left\)/);
+  assert.match(page, /Row 2 — live \/ summary liquidity walls/);
+  assert.match(page, /Row 3 — depth chart \(right\) \+ large trades \(left\)/);
+  assert.match(page, /items-start/);
   assert.match(page, /Full-width sections/);
   assert.match(page, /space-y-4/);
   assert.match(page, /Last — data sources/);
@@ -364,9 +365,9 @@ test("order book layout uses separate rows without grid placement hacks", () => 
   assert.doesNotMatch(page, /marketToolsGrid/);
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
   assert.match(row1, /lg:col-span-8 lg:min-h-0 \$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
-  assert.match(row1, /lg:col-span-4 lg:min-h-0 \$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
-  assert.match(row1, /flex min-w-0 flex-col gap-3 overflow-hidden lg:col-span-4/);
-  assert.match(row1, /title="جدران السيولة"/);
+  assert.match(row1, /flex min-w-0 flex-col gap-3 lg:col-span-4/);
+  assert.doesNotMatch(row1, /overflow-hidden lg:col-span-4/);
+  assert.doesNotMatch(row1, /title="جدران السيولة"/);
   assert.match(panel, /ORDER_BOOK_VISIBLE_ROWS = 12/);
   assert.match(panel, /ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-\[36rem\]"/);
   assert.match(panel, /visibleAsks = asks\.slice\(0, ORDER_BOOK_VISIBLE_ROWS\)/);
@@ -374,38 +375,38 @@ test("order book layout uses separate rows without grid placement hacks", () => 
   assert.match(panel, /overflow-y-auto overscroll-contain/);
 });
 
-test("row 1 balances order book and sidebar height on desktop", () => {
+test("row 1 sidebar has natural height without walls stack", () => {
   const page = readSources().page;
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
-  assert.match(row1, /grid items-stretch gap-4 lg:grid-cols-12/);
+  assert.match(row1, /grid items-start gap-4 lg:grid-cols-12/);
   assert.match(row1, /\$\{ORDER_BOOK_ROW_HEIGHT_LG\}[\s\S]*OrderBookPanel/);
-  assert.match(row1, /flex min-h-0 flex-1 flex-col[\s\S]*title="جدران السيولة"/);
-  assert.match(row1, /grid grid-cols-1 gap-2 lg:grid-cols-2/);
-  assert.match(row1, /LiveWallCard compact/);
-  assert.match(row1, /min-h-0 flex-1 overflow-y-auto overscroll-contain/);
-  assert.doesNotMatch(row1, /lg:h-auto/);
+  assert.match(row1, /title="سيطرة الشراء والبيع"/);
+  assert.match(row1, /title="حجم الشراء\/البيع المنفذ"/);
+  assert.doesNotMatch(row1, /title="جدران السيولة"/);
+  assert.doesNotMatch(row1, /flex-1 flex-col overflow-x-hidden/);
 });
 
-test("sidebar uses auto height below lg breakpoint", () => {
+test("sidebar column has no fixed height wrapper", () => {
   const page = readSources().page;
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
-  assert.match(row1, /\$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
-  assert.match(row1, /flex shrink-0 flex-col[\s\S]*title="سيطرة الشراء والبيع"/);
-  assert.doesNotMatch(row1, /flex-1[\s\S]*title="سيطرة الشراء والبيع"/);
+  assert.doesNotMatch(row1, /lg:col-span-4 lg:min-h-0 \$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
+  assert.match(row1, /className="min-w-0"/);
 });
 
 test("depth and large trades share equal-height row with scroll cap", () => {
   const page = readSources().page;
-  const row2 = page.slice(page.indexOf("{/* Row 2"), page.indexOf("{/* Full-width sections"));
+  const row2 = page.slice(page.indexOf("{/* Row 3"), page.indexOf("{/* Full-width sections"));
   assert.match(row2, /relative isolate z-0/);
   assert.match(row2, /lg:col-span-7/);
   assert.match(row2, /lg:col-span-5/);
   assert.match(row2, /fillContainer/);
   assert.match(row2, /max-h-\[26rem\]/);
   assert.match(row2, /overflow-y-auto overflow-x-auto overscroll-contain/);
-  assert.match(row2, /relative z-0 flex h-full min-h-0 flex-col overflow-hidden lg:col-span-5/);
+  assert.match(row2, /relative z-0 flex h-full min-h-0 min-w-0 flex-col lg:col-span-5/);
   assert.match(row2, /shrink-0 space-y-3[\s\S]*HistoryState/);
-  assert.match(row2, /mt-3 min-h-0 flex-1 overflow-hidden/);
+  assert.match(row2, /mt-3 min-h-0 flex-1 min-w-0/);
+  assert.match(row2, /min-w-\[42rem\]/);
+  assert.match(row2, /الكمية/);
   assert.match(page, /LARGE_TRADES_MAX_VISIBLE_ROWS = 15/);
   assert.match(page, /\.slice\(0, LARGE_TRADES_MAX_VISIBLE_ROWS\)/);
   assert.match(page, /displayedLargeTrades = useMemo/);
@@ -413,17 +414,17 @@ test("depth and large trades share equal-height row with scroll cap", () => {
   assert.doesNotMatch(row2, /lg:col-start-/);
 });
 
-test("executed flow stays inside sidebar without overlapping row 2", () => {
+test("executed flow panel uses natural auto height grid metrics", () => {
   const { page } = readSources();
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
   const flowTitleIndex = row1.indexOf('title="حجم الشراء/البيع');
   const flowStart = row1.lastIndexOf("<Panel", flowTitleIndex);
-  const flowPanel = row1.slice(flowStart, row1.indexOf('title="جدران السيولة"', flowTitleIndex));
-  assert.match(row1, /flex min-w-0 flex-col gap-3 overflow-hidden lg:col-span-4/);
-  assert.match(flowPanel, /className="flex min-h-0 flex-col overflow-hidden"/);
-  assert.match(flowPanel, /shrink-0 space-y-1\.5/);
-  assert.match(flowPanel, /mt-1 min-h-0 overflow-x-hidden/);
-  assert.doesNotMatch(flowPanel, /shrink-0 flex-col overflow-hidden"/);
+  const flowPanel = row1.slice(flowStart, row1.indexOf("</Panel>", flowTitleIndex) + 8);
+  assert.match(flowPanel, /className="min-w-0"/);
+  assert.match(flowPanel, /mt-3 grid gap-2 sm:grid-cols-2/);
+  assert.match(flowPanel, /dominanceLabel/);
+  assert.doesNotMatch(flowPanel, /overflow-hidden/);
+  assert.doesNotMatch(flowPanel, /min-h-0 overflow-x-hidden/);
 });
 
 test("liquidity depth chart renders multi-level histogram with axes and tooltip", () => {
@@ -453,12 +454,15 @@ test("depth chart keeps historical errors visible without silent fallback", () =
   assert.doesNotMatch(chart, /catch[\s\S]*mode = "live"/);
 });
 
-test("liquidity walls stay in sidebar stack", () => {
+test("liquidity walls moved to dedicated full-width row", () => {
   const page = readSources().page;
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
-  assert.match(row1, /flex min-w-0 flex-col gap-3[\s\S]*title="جدران السيولة"/);
-  const row2 = page.slice(page.indexOf("{/* Row 2"), page.indexOf("{/* Full-width sections"));
-  assert.doesNotMatch(row2, /title="جدران السيولة"/);
+  assert.doesNotMatch(row1, /title="جدران السيولة"/);
+  const wallsRow = page.slice(page.indexOf("{/* Row 2"), page.indexOf("{/* Row 3"));
+  assert.match(wallsRow, /title="جدران السيولة"/);
+  assert.match(wallsRow, /lg:col-span-12/);
+  assert.match(wallsRow, /LiveWallCard title="أكبر جدار شراء"/);
+  assert.doesNotMatch(wallsRow, /LiveWallCard compact/);
 });
 
 test("fear and greed order book uses coinmarketcap source without visible attribution", () => {
@@ -501,6 +505,14 @@ test("liquidity wall cards grow naturally without clipping overflow", () => {
   assert.doesNotMatch(panel, /HistoricalWallCard[\s\S]*min-h-\[8rem\]/);
   assert.match(ui, /overflow-x-hidden/);
   assert.doesNotMatch(ui, /Panel[\s\S]*overflow-hidden rounded-2xl/);
+});
+
+test("symbol search combobox replaces fixed symbol tabs", () => {
+  const { page, ui } = readSources();
+  assert.match(page, /SymbolSearchCombobox/);
+  assert.match(page, /SYMBOL_SEARCH_ENTRIES/);
+  assert.match(ui, /filterSymbolSearchEntries/);
+  assert.match(ui, /placeholder="ابحث ضمن العملات المدعومة \(BTC, ETH, SOL, XRP\)"/);
 });
 
 console.log(`order-book history ui tests passed: ${passed}/${passed}`);
