@@ -355,7 +355,7 @@ test("order book layout uses separate rows without grid placement hacks", () => 
   assert.match(page, /Row 1 — order book \(right\) \+ dominance \/ executed flow \(left\)/);
   assert.match(page, /Row 2 — live \/ summary liquidity walls/);
   assert.match(page, /Row 3 — depth chart \(right\) \+ large trades \(left\)/);
-  assert.match(page, /items-start/);
+  assert.match(page, /lg:items-stretch/);
   assert.match(page, /Full-width sections/);
   assert.match(page, /space-y-4/);
   assert.match(page, /Last — data sources/);
@@ -364,8 +364,9 @@ test("order book layout uses separate rows without grid placement hacks", () => 
   assert.doesNotMatch(page, /lg:col-start-/);
   assert.doesNotMatch(page, /marketToolsGrid/);
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
-  assert.match(row1, /lg:col-span-8 lg:min-h-0 \$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
-  assert.match(row1, /flex min-w-0 flex-col gap-3 lg:col-span-4/);
+  assert.match(row1, /flex min-h-0 min-w-0 flex-col lg:col-span-8/);
+  assert.match(row1, /flex min-h-0 min-w-0 flex-col gap-3 lg:col-span-4/);
+  assert.doesNotMatch(row1, /ORDER_BOOK_ROW_HEIGHT_LG/);
   assert.doesNotMatch(row1, /overflow-hidden lg:col-span-4/);
   assert.doesNotMatch(row1, /title="جدران السيولة"/);
   assert.match(panel, /ORDER_BOOK_VISIBLE_ROWS = 12/);
@@ -378,8 +379,8 @@ test("order book layout uses separate rows without grid placement hacks", () => 
 test("row 1 sidebar has natural height without walls stack", () => {
   const page = readSources().page;
   const row1 = page.slice(page.indexOf("{/* Row 1"), page.indexOf("{/* Row 2"));
-  assert.match(row1, /grid items-start gap-4 lg:grid-cols-12/);
-  assert.match(row1, /\$\{ORDER_BOOK_ROW_HEIGHT_LG\}[\s\S]*OrderBookPanel/);
+  assert.match(row1, /lg:items-stretch/);
+  assert.match(row1, /OrderBookPanel/);
   assert.match(row1, /title="سيطرة الشراء والبيع"/);
   assert.match(row1, /title="حجم الشراء\/البيع المنفذ"/);
   assert.doesNotMatch(row1, /title="جدران السيولة"/);
@@ -420,9 +421,9 @@ test("executed flow panel uses natural auto height grid metrics", () => {
   const flowTitleIndex = row1.indexOf('title="حجم الشراء/البيع');
   const flowStart = row1.lastIndexOf("<Panel", flowTitleIndex);
   const flowPanel = row1.slice(flowStart, row1.indexOf("</Panel>", flowTitleIndex) + 8);
-  assert.match(flowPanel, /className="min-w-0"/);
-  assert.match(flowPanel, /mt-3 grid gap-2 sm:grid-cols-2/);
-  assert.match(flowPanel, /dominanceLabel/);
+  assert.match(flowPanel, /className="min-w-0 transition-opacity duration-200"/);
+  assert.match(flowPanel, /mt-3 grid grid-cols-2 gap-2/);
+  assert.match(flowPanel, /executedFlow\?\.window/);
   assert.doesNotMatch(flowPanel, /overflow-hidden/);
   assert.doesNotMatch(flowPanel, /min-h-0 overflow-x-hidden/);
 });

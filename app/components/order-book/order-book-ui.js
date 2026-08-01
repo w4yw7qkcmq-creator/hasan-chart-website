@@ -472,10 +472,19 @@ export function DepthHistoryState({ loading, error, partial, coveragePercent, co
   return null;
 }
 
-export function HistoryState({ loading, error, partial, coveragePercent, collecting = false }) {
+export function HistoryState({
+  loading,
+  error,
+  partial,
+  coveragePercent,
+  collecting = false,
+  empty = false,
+  emptyMessage = "لا توجد بيانات كافية ضمن هذا الإطار حتى الآن.",
+  errorMessage = "تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.",
+}) {
   if (loading) {
     return (
-      <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+      <p className="mb-3 min-h-[2.5rem] rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
         جاري تحميل البيانات التاريخية...
       </p>
     );
@@ -483,16 +492,24 @@ export function HistoryState({ loading, error, partial, coveragePercent, collect
 
   if (error) {
     return (
-      <p className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
-        تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.
+      <p className="mb-3 min-h-[2.5rem] rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+        {errorMessage}
       </p>
     );
   }
 
   if (collecting) {
     return (
-      <p className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+      <p className="mb-3 min-h-[2.5rem] rounded-lg border border-amber-200/80 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
         جاري جمع البيانات التاريخية لهذا الرمز.
+      </p>
+    );
+  }
+
+  if (empty) {
+    return (
+      <p className="mb-3 min-h-[2.5rem] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+        {emptyMessage}
       </p>
     );
   }

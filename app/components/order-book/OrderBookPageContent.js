@@ -39,7 +39,6 @@ import OrderBookPanel, {
   HistoricalWallCard,
   LiveWallCard,
   LiquidityWallsState,
-  ORDER_BOOK_ROW_HEIGHT_LG,
 } from "./OrderBookPanel";
 import {
   formatLargeTradeEmptyMessage,
@@ -191,8 +190,26 @@ export default function OrderBookPageContent() {
   const largeTradeThreshold = prefs.largeTradeThreshold ?? DEFAULT_LARGE_TRADE_THRESHOLD;
   const largeTradeWindow = prefs.largeTradeWindow ?? DEFAULT_LARGE_TRADE_WINDOW;
   const dominanceWindow = prefs.dominanceWindow ?? prefs.flowWindow;
-  const dominanceFlow = needsDominanceHistory ? dominanceHistory : data?.dominanceFlow;
-  const executedFlow = needsFlowHistory ? flowHistory : data?.executedFlow;
+  const liveDominanceFlow =
+    !needsDominanceHistory && data?.dominanceFlow?.window === dominanceWindow
+      ? data.dominanceFlow
+      : null;
+  const historicalDominanceFlow =
+    needsDominanceHistory && dominanceHistory?.window === dominanceWindow
+      ? dominanceHistory
+      : null;
+  const dominanceFlow = needsDominanceHistory ? historicalDominanceFlow : liveDominanceFlow;
+
+  const liveExecutedFlow =
+    !needsFlowHistory && data?.executedFlow?.window === prefs.flowWindow
+      ? data.executedFlow
+      : null;
+  const historicalExecutedFlow =
+    needsFlowHistory && flowHistory?.window === prefs.flowWindow ? flowHistory : null;
+  const executedFlow = needsFlowHistory ? historicalExecutedFlow : liveExecutedFlow;
+  const executedFlowLoading = needsFlowHistory
+    ? historyLoading || (Boolean(prefs.flowWindow) && !historicalExecutedFlow && !historyError)
+    : !liveExecutedFlow && Boolean(data?.symbol);
 
   const displayedLargeTrades = useMemo(() => {
     const rows = needsLargeTradeHistory
@@ -478,12 +495,12 @@ export default function OrderBookPageContent() {
 
       <div className="space-y-4">
       {/* Row 1 — order book (right) + dominance / executed flow (left) */}
-      <section className="grid items-start gap-4 lg:grid-cols-12">
-        <div className={`min-w-0 lg:col-span-8 lg:min-h-0 ${ORDER_BOOK_ROW_HEIGHT_LG}`}>
+      <section className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
+        <div className="flex min-h-0 min-w-0 flex-col lg:col-span-8">
           <OrderBookPanel data={data} mobileSide={prefs.mobileSide} symbol={prefs.symbol} />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 lg:col-span-4">
+        <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:col-span-4 lg:gap-4">
           <Panel
             compact
             className="min-w-0"
@@ -505,16 +522,23 @@ export default function OrderBookPageContent() {
                 options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
               />
               <HistoryState
-                loading={needsDominanceHistory && historyLoading}
+                loading={
+                  needsDominanceHistory &&
+                  (historyLoading || (!historicalDominanceFlow && !historyError))
+                }
                 error={needsDominanceHistory && historyError}
-                partial={dominanceHistory?.partialData}
-                coveragePercent={dominanceHistory?.coveragePercent}
+                partial={historicalDominanceFlow?.partialData}
+                coveragePercent={historicalDominanceFlow?.coveragePercent}
                 collecting={historyCollecting && needsDominanceHistory}
               />
-              <FlowSplitBar
-                buyPercent={dominanceFlow?.buyPercent}
-                sellPercent={dominanceFlow?.sellPercent}
-              />
+              {dominanceFlow ? (
+                <FlowSplitBar
+                  buyPercent={dominanceFlow.buyPercent}
+                  sellPercent={dominanceFlow.sellPercent}
+                />
+              ) : (
+                <div className="h-8 rounded-lg bg-slate-100/80 dark:bg-white/5" aria-hidden="true" />
+              )}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <MetricLine
@@ -539,11 +563,11 @@ export default function OrderBookPageContent() {
 
           <Panel
             compact
-            className="min-w-0"
+            className="min-w-0 transition-opacity duration-200"
             title="حجم الشراء/البيع المنفذ"
             description={
               needsFlowHistory
-                ? "الحجم المنفذ من السجل التاريخي."
+                ? "الحجم المنفذ من السجل التاريخي ضمن الإطار المختار."
                 : "الصفقات المنفذة فعلياً، وليس السيولة الموضوعة في دفتر الأوامر."
             }
           >
@@ -558,15 +582,31 @@ export default function OrderBookPageContent() {
                 options={FLOW_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
               />
               <HistoryState
-                loading={needsFlowHistory && historyLoading}
+                loading={needsFlowHistory && (historyLoading || (!historicalExecutedFlow && !historyError))}
                 error={needsFlowHistory && historyError}
-                partial={flowHistory?.partialData}
-                coveragePercent={flowHistory?.coveragePercent}
+                partial={historicalExecutedFlow?.partialData}
+                coveragePercent={historicalExecutedFlow?.coveragePercent}
                 collecting={historyCollecting && needsFlowHistory}
+                empty={
+                  needsFlowHistory &&
+                  !historyLoading &&
+                  !historyError &&
+                  historicalExecutedFlow &&
+                  !historicalExecutedFlow.bucketCount
+                }
+                emptyMessage="لا توجد بيانات كافية ضمن هذا الإطار حتى الآن."
+                errorMessage="تعذّر تحميل بيانات التدفق التاريخية."
               />
-              <FlowSplitBar buyPercent={executedFlow?.buyPercent} sellPercent={executedFlow?.sellPercent} />
+              {executedFlow ? (
+                <FlowSplitBar
+                  buyPercent={executedFlow.buyPercent}
+                  sellPercent={executedFlow.sellPercent}
+                />
+              ) : (
+                <div className="h-8 rounded-lg bg-slate-100/80 dark:bg-white/5" aria-hidden="true" />
+              )}
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-2 gap-2 transition-opacity duration-200">
               <MetricLine
                 label="شراء منفذ"
                 value={formatUsd(executedFlow?.buyNotional, { compact: true })}
@@ -581,10 +621,34 @@ export default function OrderBookPageContent() {
                 label="صافي التدفق"
                 value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, { compact: true })}
               />
-              <p className="flex items-center justify-center rounded-lg bg-slate-50 px-2.5 py-2 text-center text-xs font-medium text-slate-800 sm:col-span-2 dark:bg-white/5 dark:text-slate-100">
+              <p className="flex min-h-[2.75rem] items-center justify-center rounded-lg bg-slate-50 px-2.5 py-2 text-center text-xs font-medium text-slate-800 sm:col-span-2 dark:bg-white/5 dark:text-slate-100">
                 {executedFlow?.dominanceLabel || executedFlow?.dominanceClassification || "متوازن"}
               </p>
             </div>
+            {executedFlow?.window ? (
+              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                الإطار الحالي:{" "}
+                <NumericValue className="font-medium text-slate-700 dark:text-slate-200">
+                  {executedFlow.window}
+                </NumericValue>
+                {Number.isFinite(executedFlow.tradeCount) ? (
+                  <>
+                    {" "}
+                    · عينات:{" "}
+                    <NumericValue className="font-medium">{executedFlow.tradeCount}</NumericValue>
+                  </>
+                ) : null}
+                {Number.isFinite(executedFlow.bucketCount) ? (
+                  <>
+                    {" "}
+                    · buckets:{" "}
+                    <NumericValue className="font-medium">{executedFlow.bucketCount}</NumericValue>
+                  </>
+                ) : null}
+              </p>
+            ) : executedFlowLoading ? (
+              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">جاري تحديث الإطار...</p>
+            ) : null}
           </Panel>
         </div>
       </section>

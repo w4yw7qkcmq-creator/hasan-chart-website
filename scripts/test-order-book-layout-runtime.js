@@ -20,10 +20,11 @@ function sliceBetween(startMarker, endMarker) {
   return page.slice(start, end);
 }
 
-test("layout removes sidebar fixed height and overflow clipping", () => {
+test("layout row 1 uses stretch grid without fixed order book height", () => {
   const row1 = sliceBetween("{/* Row 1", "{/* Row 2");
+  assert.match(row1, /lg:items-stretch/);
+  assert.doesNotMatch(row1, /ORDER_BOOK_ROW_HEIGHT_LG/);
   assert.doesNotMatch(row1, /overflow-hidden lg:col-span-4/);
-  assert.doesNotMatch(row1, /lg:col-span-4 lg:min-h-0 \$\{ORDER_BOOK_ROW_HEIGHT_LG\}/);
   assert.doesNotMatch(row1, /title="جدران السيولة"/);
 });
 
@@ -31,9 +32,10 @@ test("executed flow panel avoids internal overflow clipping classes", () => {
   const row1 = sliceBetween("{/* Row 1", "{/* Row 2");
   const flowStart = row1.indexOf('title="حجم الشراء/البيع');
   const flowPanel = row1.slice(row1.lastIndexOf("<Panel", flowStart));
-  assert.match(flowPanel, /className="min-w-0"/);
-  assert.match(flowPanel, /mt-3 grid gap-2 sm:grid-cols-2/);
+  assert.match(flowPanel, /className="min-w-0 transition-opacity duration-200"/);
+  assert.match(flowPanel, /mt-3 grid grid-cols-2 gap-2/);
   assert.match(flowPanel, /dominanceLabel/);
+  assert.match(flowPanel, /executedFlow\?\.window/);
   assert.doesNotMatch(flowPanel, /overflow-hidden/);
   assert.doesNotMatch(flowPanel, /overflow-x-hidden/);
 });
