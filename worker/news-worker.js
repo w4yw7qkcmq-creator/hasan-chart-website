@@ -12,8 +12,90 @@ global.WebSocket = WebSocket;
 const { createClient } = require("@supabase/supabase-js");
 const { createUserNotification } = require("./create-user-notification");
 const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
+const {
+  buildEconomicNewsAnalysis,
+  processDuePendingReleases,
+  runEconomicReleaseDryRun,
+  getProviderRegistry,
+  getPendingQueue,
+  mergeProviderMetricsIntoCycle,
+  isStructuredTripleReleaseTitle,
+  canPublishStructuredRelease,
+  logEconomicReleaseDroppedIncomplete,
+} = require("./lib/economic-releases");
+const { discoverTelegramNews } = require("./lib/telegram-news");
+const {
+  filterGeneralRssItems,
+  markRssItemsAsGeneralOnly,
+} = require("./lib/telegram-news/rss-filter");
+const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 
 const parser = new Parser();
+
+let telegramMergeBufferInstance = null;
+const telegramMergePublishLog = [];
+
+function getNewsWorkerTelegramMergeBuffer(dryRun) {
+  if (!telegramMergeBufferInstance) {
+    telegramMergeBufferInstance = getTelegramMergeBuffer({
+      dryRun,
+      onReady: publishTelegramMergeBufferItem,
+    });
+  }
+  return telegramMergeBufferInstance;
+}
+
+async function publishTelegramMergeBufferItem(item, ctx = {}) {
+  if (!item || item.skipPublish || !item.formattedMessage) {
+    return { skipped: true, reason: item?.reason || "skip_publish" };
+  }
+
+  const message = item.formattedMessage;
+  const imageTitle = item.facts?.title || item.post?.rawText?.slice(0, 120) || "خبر سوق";
+  const sourceLink = item.post?.sourceUrl || `telegram-merge:${ctx.mergeKey || "unknown"}`;
+  const impactLevel = item.newsType === "economic" ? "HIGH" : "MEDIUM";
+
+  if (NEWS_DRY_RUN) {
+    console.log(
+      "TELEGRAM_MERGE_BUFFER_PUBLISH_READY",
+      JSON.stringify({
+        mergeKey: ctx.mergeKey,
+        sources: item.sources,
+        messageIds: item.metadata?.sourceMessageIds,
+      })
+    );
+    telegramMergePublishLog.push({ mergeKey: ctx.mergeKey, sourceLink, telegram: 1, db: 1 });
+    return { dryRun: true };
+  }
+
+  await sendTelegramMessage(message);
+  const saveResult = await saveNewsPostToSupabase({
+    title: imageTitle,
+    content: message,
+    image_url: null,
+    impact_level: impactLevel,
+    source_link: sourceLink,
+  });
+
+  telegramMergePublishLog.push({
+    mergeKey: ctx.mergeKey,
+    sourceLink,
+    telegram: 1,
+    db: saveResult?.error ? 0 : 1,
+  });
+
+  savePublishedNewsLink(sourceLink, `${imageTitle} ${message}`);
+  await savePublishedNewsToSupabase({
+    link: sourceLink,
+    title: `${imageTitle} ${message}`,
+    normalized_title: normalizeNewsTitle(`${imageTitle} ${message}`).slice(0, 500),
+    topic_cluster: getNewsTopicCluster(imageTitle),
+    published_at: new Date().toISOString(),
+    telegramFingerprint: ctx.mergeKey,
+  });
+
+  return { published: true, sourceLink };
+}
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
@@ -77,6 +159,13 @@ function createEmptyCycleStats() {
     lastErrorSafe: null,
     sourceErrors: {},
     rejectionSamples: {},
+    economicEventsDetected: 0,
+    economicEventsComplete: 0,
+    economicEventsPending: 0,
+    economicEventsPublished: 0,
+    economicEventsDroppedIncomplete: 0,
+    economicEventsConflict: 0,
+    providerMetrics: [],
   };
 }
 
@@ -191,8 +280,6 @@ const ULTRA_PRIORITY_KEYWORDS = [
   "النفط",
 ];
 const MIN_MINUTES_BETWEEN_POSTS = 0;
-// Prefer real images from the news source. Keep local images only as an optional emergency fallback.
-const USE_LOCAL_IMAGE_FALLBACK = false;
 
 // Professional breaking-news mode: publish only market-moving items, not general articles.
 const FOREX_BREAKING_STYLE = true;
@@ -789,18 +876,15 @@ function removeImpactLineIfNotAllowed(message, title) {
     .trim();
 }
 
-// RSS news feeds disabled. Main live-news source is now ForexBreakingNews Telegram channel only.
-// Economic calendar functions remain active separately for scheduled alerts and official releases.
-const NEWS_FEEDS = [
+// RSS feeds — general market news only. Never used for previous/forecast/actual.
+const GENERAL_RSS_FEEDS = [
   "https://www.cnbc.com/id/100003114/device/rss/rss.html",
   "https://www.marketwatch.com/rss/topstories",
-  "https://www.marketwatch.com/rss/marketpulse",
   "https://www.forexlive.com/feed/",
-  "https://www.investing.com/rss/news.rss",
-  "https://www.investing.com/rss/forex.rss",
-  "https://www.investing.com/rss/commodities.rss",
-  "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml",
+  "https://www.coindesk.com/arc/outboundfeeds/rss/",
 ];
+
+const NEWS_FEEDS = process.env.DISABLE_GENERAL_RSS === "1" ? [] : GENERAL_RSS_FEEDS;
 
 const TELEGRAM_SOURCE_CHANNELS = [
   {
@@ -1885,22 +1969,6 @@ function wrapText(ctx, text, maxWidth) {
   }
 
   return lines.slice(0, 3);
-}
-
-function getExternalImageByNewsTopic(title, impactLevel = "MEDIUM") {
-  const value = String(title || "").toLowerCase();
-
-  const isMajorEconomicRelease =
-    /fomc|fed|federal reserve|powell|interest rate|rate decision|cpi|ppi|pce|nfp|nonfarm|payrolls|jobless claims|unemployment|consumer confidence|consumer sentiment|retail sales|gdp|ism|pmi|الفيدرالي|باول|قرار الفائدة|التضخم|مؤشر أسعار|الوظائف|البطالة|طلبات إعانة البطالة|ثقة المستهلك|الناتج المحلي/i.test(value);
-
-  const isStrongMarketNews =
-    /gold|xau|oil|crude|brent|wti|bitcoin|btc|crypto|nasdaq|dow|s&p|stock market|market crash|selloff|liquidations|iran|israel|hormuz|red sea|war|missile|attack|airstrike|sanctions|tariffs|الذهب|النفط|خام|برنت|البيتكوين|الكريبتو|ناسداك|داو جونز|الأسهم|الاسهم|تصفيات|إيران|ايران|إسرائيل|اسرائيل|هرمز|البحر الأحمر|حرب|هجوم|ضربة|عقوبات|تعريفات/i.test(value);
-
-  if (impactLevel !== "HIGH" && !isMajorEconomicRelease && !isStrongMarketNews) {
-    return null;
-  }
-
-  return null;
 }
 
 async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
@@ -2995,158 +3063,84 @@ if (blockedPoliticalNoise.test(value)) {
 }
 
 
-function hasEconomicReleaseNumbers(title) {
-  const value = String(title || "");
-
-  if (/\b\d+(?:\.\d+)?\s?(?:k|m|b|%|thousand|million|billion)\b/i.test(value)) {
-    return true;
-  }
-
-  if (/actual|forecast|previous|estimate|est\.|consensus|vs\.?/i.test(value)) {
-    return true;
-  }
-
-  if (/السابق|التقدير|الحالي|المتوقع|الفعلي|مقابل/i.test(value)) {
-    return true;
-  }
-
-  return false;
-}
-
-function shouldUseEconomicReleaseTemplate(title) {
-  const value = String(title || "").toLowerCase();
-
-  const directCriticalRelease = /jobless claims|initial claims|continuing claims|unemployment claims|cpi|core cpi|ppi|pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|consumer sentiment|retail sales|ism|pmi|gdp|fomc|rate decision|interest rate decision|powell/i.test(value);
-
-  return directCriticalRelease && hasEconomicReleaseNumbers(title);
-}
-
 function isEconomicReleaseTitle(title) {
   const value = String(title || "").toLowerCase();
   return /fomc|federal reserve|fed rate|interest rate decision|rate decision|rate cut|rate hike|powell|press conference|fed chair|jobless claims|initial claims|continuing claims|unemployment claims|cpi|core cpi|ppi|pce|nfp|nonfarm payrolls|unemployment rate|consumer confidence|consumer sentiment|retail sales|pmi|ism|gdp|الفيدرالي|قرار الفائدة|خفض الفائدة|رفع الفائدة|باول|مؤتمر صحفي|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة|مؤشر ثقة المستهلك|التضخم|البطالة|الوظائف/i.test(value);
 }
 
-function guessArabicEconomicEventName(title) {
-  const value = String(title || "").toLowerCase();
+async function analyzeNewsWithAI(title, link, options = {}) {
+  const dryRun = options.dryRun === true || NEWS_DRY_RUN;
+  const telegramItem = options.telegramItem || null;
 
-  if (/fomc|federal reserve|fed rate|interest rate decision|rate decision|rate cut|rate hike|قرار الفائدة|الفيدرالي|خفض الفائدة|رفع الفائدة/i.test(value)) {
-    return "قرار الفائدة الأمريكية";
-  }
-
-  if (/powell|press conference|fed chair|باول|مؤتمر صحفي/i.test(value)) {
-    return "تصريحات جيروم باول / المؤتمر الصحفي للفيدرالي";
-  }
-
-  if (/jobless claims|initial claims|continuing claims|unemployment claims|طلبات إعانة البطالة|إعانات البطالة|الشكاوى من البطالة|طلبات البطالة/i.test(value)) {
-    return "معدلات الشكاوى من البطالة";
-  }
-
-  if (/cpi|core cpi|inflation|التضخم/i.test(value)) {
-    return "مؤشر التضخم الأمريكي";
-  }
-
-  if (/ppi|producer price/i.test(value)) {
-    return "مؤشر أسعار المنتجين الأمريكي";
-  }
-
-  if (/nfp|nonfarm payrolls|payrolls|الوظائف/i.test(value)) {
-    return "تقرير الوظائف الأمريكية";
-  }
-
-  if (/consumer confidence|consumer sentiment|ثقة المستهلك/i.test(value)) {
-    return "مؤشر ثقة المستهلك الأمريكي";
-  }
-
-  if (/retail sales|مبيعات التجزئة/i.test(value)) {
-    return "مبيعات التجزئة الأمريكية";
-  }
-
-  if (/pmi|ism/i.test(value)) {
-    return "مؤشر مديري المشتريات الأمريكي";
-  }
-
-  if (/gdp|الناتج المحلي/i.test(value)) {
-    return "الناتج المحلي الإجمالي الأمريكي";
-  }
-
-  return "خبر اقتصادي أمريكي مهم";
-}
-
-async function analyzeEconomicReleaseWithAI(title, link) {
-  const eventName = guessArabicEconomicEventName(title);
-
-  if (!OPENAI_API_KEY) {
-    return {
-      message:
-        `🟥 صدر الآن :\n\n` +
-        `📊 أمريكا - 🇺🇸\n` +
-        `💵 ${eventName}\n\n` +
-        `▫️ التفاصيل : ${title}\n\n` +
-        `⬅️ النتيجة : بانتظار قراءة التأثير على الدولار الأمريكي\n\n` +
-        `📚 لمتابعة أخبار الأسهم والذهب والعملات انضم للقناة:\nhttps://t.me/EconomicNewsi ✅`,
-      imageTitle: eventName,
-    };
-  }
-
-  try {
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4.1-nano",
-        messages: [
-          {
-            role: "system",
-            content:
-              "أنت محرر أخبار اقتصادية عاجلة. حوّل عنوان الخبر إلى منشور عربي منسق مثل قنوات الفوركس الاحترافية. استخدم القالب التالي فقط بدون روابط مصادر وبدون شرح إضافي:\n\n🟥 صدر الآن :\n\n📊 أمريكا - 🇺🇸\n💵 اسم الخبر بالعربي\n\n▪️ السابق : القيمة السابقة إن وجدت\n▪️ التقدير : التوقع أو التقدير إن وجد\n▫️ الحالي : القراءة الحالية إن وجدت\n\n⬅️ النتيجة : اكتب سلبي/إيجابي للدولار الأمريكي أو الذهب أو الأسهم حسب المقارنة بين الحالي والتقدير. إذا لا توجد أرقام كافية اكتب: التأثير غير واضح حتى الآن\n\n📚 لمتابعة أخبار الأسهم والذهب والعملات انضم للقناة:\nhttps://t.me/EconomicNewsi ✅\n\nممنوع اختراع أرقام غير موجودة في العنوان. إذا رقم غير موجود اكتب: غير متوفر.",
-          },
-          {
-            role: "user",
-            content: `عنوان الخبر: ${title}\nاسم الخبر المتوقع بالعربي: ${eventName}`,
-          },
-        ],
-        temperature: 0.2,
-        max_tokens: 450,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
+  if (telegramItem?.isTelegramSource) {
+    if (telegramItem.skipPublish || !telegramItem.formattedMessage) {
+      return {
+        message: null,
+        imageTitle: telegramItem.title,
+        skipPublish: true,
+        reason: telegramItem.validation?.reason || "telegram_template_incomplete",
+        missingFields: telegramItem.missingFields || [],
+        usedTemplate: true,
+        telegramSource: {
+          sourceChannel: telegramItem.sourceChannel,
+          sourceMessageId: telegramItem.sourceMessageId,
+          sourceUrl: telegramItem.sourceUrl,
+          sourcePublishedAt: telegramItem.sourcePublishedAt,
         },
-      }
-    );
-
-    const aiText = response.data.choices?.[0]?.message?.content?.trim();
-
-    if (!aiText) {
-      throw new Error("Empty economic release AI response");
+      };
     }
 
     return {
-      message: aiText
-        .replace(/Telegram\.me\/ForexBreakingNews/gi, "https://t.me/EconomicNewsi")
-        .replace(/https?:\/\/t\.me\/ForexBreakingNews/gi, "https://t.me/EconomicNewsi")
-        .trim(),
-      imageTitle: eventName,
-    };
-  } catch (error) {
-    console.error("⚠️ Economic Release AI Error:", error.response?.data || error.message);
-    return {
-      message:
-        `🟥 صدر الآن :\n\n` +
-        `📊 أمريكا - 🇺🇸\n` +
-        `💵 ${eventName}\n\n` +
-        `▫️ التفاصيل : ${title}\n\n` +
-        `⬅️ النتيجة : التأثير غير واضح حتى الآن\n\n` +
-        `📚 لمتابعة أخبار الأسهم والذهب والعملات انضم للقناة:\nhttps://t.me/EconomicNewsi ✅`,
-      imageTitle: eventName,
+      message: telegramItem.formattedMessage,
+      imageTitle: telegramItem.title,
+      skipPublish: false,
+      usedTemplate: true,
+      reason: "telegram_template_ready",
+      telegramSource: {
+        sourceChannel: telegramItem.sourceChannel,
+        sourceMessageId: telegramItem.sourceMessageId,
+        sourceUrl: telegramItem.sourceUrl,
+        sourcePublishedAt: telegramItem.sourcePublishedAt,
+      },
     };
   }
-}
 
-async function analyzeNewsWithAI(title, link) {
-  if (isEconomicReleaseTitle(title) && shouldUseEconomicReleaseTemplate(title)) {
-    return analyzeEconomicReleaseWithAI(title, link);
+  if (isEconomicReleaseTitle(title)) {
+    const structured = await buildEconomicNewsAnalysis({
+      title,
+      link,
+      registry: getProviderRegistry({ tradingEconomicsClient: TRADING_ECONOMICS_CLIENT }),
+      queue: getPendingQueue(),
+      dryRun,
+    });
+
+    if (structured.handled) {
+      return {
+        message: structured.message,
+        imageTitle: structured.imageTitle,
+        skipPublish: structured.skipPublish === true,
+        reason: structured.reason || null,
+        missingFields: structured.missingFields || [],
+        economicAnalysis: structured,
+      };
+    }
+
+    if (isStructuredTripleReleaseTitle(title)) {
+      return {
+        message: null,
+        imageTitle: null,
+        skipPublish: true,
+        reason: "structured_release_no_ai_fallback",
+        missingFields: ["previous", "forecast", "actual"],
+        economicAnalysis: {
+          handled: true,
+          skipPublish: true,
+          reason: "structured_release_no_ai_fallback",
+        },
+      };
+    }
   }
+
   if (!OPENAI_API_KEY) {
     return {
       message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
@@ -3224,6 +3218,62 @@ async function analyzeNewsWithAI(title, link) {
   }
 }
 
+async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
+  const publishCheck = canPublishStructuredRelease(result.validation, result.message);
+  if (!publishCheck.allowed || !result?.message) {
+    return false;
+  }
+
+  const message = result.message;
+  const imageTitle = result.imageTitle || "خبر اقتصادي";
+  const sourceLink = result.sourceLink || `economic-release:${result.idempotencyKey}`;
+
+  if (dryRun) {
+    console.log("NEWS_DRY_RUN economic release publish-ready:", imageTitle);
+    stats.economicEventsPublished += 1;
+    return true;
+  }
+
+  const photoPath = await createNewsCard(imageTitle, null, "HIGH");
+  if (photoPath) {
+    await sendTelegramPhoto(message, photoPath);
+  } else {
+    await sendTelegramMessage(message);
+  }
+  stats.telegramPublished += 1;
+  stats.economicEventsPublished += 1;
+
+  const saveResult = await saveNewsPostToSupabase({
+    title: imageTitle,
+    content: message,
+    image_url: null,
+    impact_level: "HIGH",
+    source_link: sourceLink,
+  });
+  if (saveResult?.error) {
+    stats.dbFailed += 1;
+  } else {
+    stats.dbInserted += 1;
+  }
+
+  await dispatchMarketNewsNotifications({
+    title: imageTitle,
+    sourceLink,
+    impactLevel: "HIGH",
+  });
+
+  savePublishedNewsLink(sourceLink, `${imageTitle} ${message}`);
+  await savePublishedNewsToSupabase({
+    link: sourceLink,
+    title: `${imageTitle} ${message}`,
+    normalized_title: normalizeNewsTitle(`${imageTitle} ${message}`).slice(0, 500),
+    topic_cluster: getNewsTopicCluster(imageTitle),
+    published_at: new Date().toISOString(),
+  });
+
+  return true;
+}
+
 async function fetchForexNews(options = {}) {
   const dryRun = options.dryRun === true || NEWS_DRY_RUN;
   const skipScheduledAlerts = options.skipScheduledAlerts === true || dryRun;
@@ -3242,85 +3292,98 @@ async function fetchForexNews(options = {}) {
       await sendScheduledMarketAlerts();
     }
 
+    const economicRegistry = getProviderRegistry({ tradingEconomicsClient: TRADING_ECONOMICS_CLIENT });
+    mergeProviderMetricsIntoCycle(stats, economicRegistry.getAllMetrics());
+
+    const pendingResults = await processDuePendingReleases({
+      registry: economicRegistry,
+      queue: getPendingQueue(),
+      dryRun,
+    });
+
+    for (const pendingResult of pendingResults) {
+      if (pendingResult.action === "publish") {
+        stats.economicEventsDetected += 1;
+        stats.economicEventsComplete += 1;
+        await publishStructuredEconomicReleaseResult(pendingResult, stats, dryRun);
+      } else if (pendingResult.action === "drop") {
+        stats.economicEventsDroppedIncomplete += 1;
+        logEconomicReleaseDroppedIncomplete(pendingResult, pendingResult.validation);
+      } else if (pendingResult.action === "retry") {
+        stats.economicEventsPending += 1;
+      }
+    }
+
     const allItems = [];
 
-    // Telegram source channels (ForexBreakingNews + ForexNewspaper)
     try {
-      const telegramSources = TELEGRAM_SOURCE_CHANNELS.map((channel) => channel.url);
+      const parseStats = { promoOnlySkipped: 0, promoFootersRemoved: 0 };
+      const mergeBuffer = getNewsWorkerTelegramMergeBuffer(dryRun);
+      const telegramDiscovery = await discoverTelegramNews({
+        limitTotal: 100,
+        limitPerChannel: 50,
+        disableAi: dryRun,
+        dryRun,
+        parseStats,
+        useMergeBuffer: true,
+        mergeBuffer,
+        flushImmediately: dryRun,
+      });
 
-      for (const sourceUrl of telegramSources) {
-        try {
-          const response = await axios.get(sourceUrl, {
-            timeout: 15000,
-            headers: {
-              "User-Agent": "Mozilla/5.0"
-            }
+      stats.telegramFetched = telegramDiscovery.posts.length;
+      stats.telegramDeduped = telegramDiscovery.processed.length;
+      stats.telegramMerged = telegramDiscovery.processed.filter((item) => item.mergedFrom.length > 0).length;
+      stats.telegramEconomicIncomplete = telegramDiscovery.processed.filter(
+        (item) => item.newsType === "economic" && item.skipPublish
+      ).length;
+      stats.telegramPromoSkipped = parseStats.promoOnlySkipped;
+      stats.telegramPromoFootersRemoved = parseStats.promoFootersRemoved;
+      stats.telegramMergeBufferTimers = telegramDiscovery.mergeBufferTimers;
+      stats.telegramMergeBufferPeak = telegramDiscovery.mergeBufferMetrics?.peakSize || 0;
+
+      if (dryRun) {
+        allItems.push(...telegramDiscovery.items.filter((item) => !item.skipPublish));
+      }
+
+      for (const processedItem of telegramDiscovery.processed) {
+        if (processedItem.newsType !== "economic" || !processedItem.skipPublish) {
+          continue;
+        }
+
+        if (!dryRun) {
+          getPendingQueue().enqueue({
+            title: processedItem.facts.title || processedItem.post.rawText.slice(0, 120),
+            link: processedItem.post.sourceUrl,
+            canonical: processedItem.facts.canonical,
+            scheduledAt: processedItem.post.sourcePublishedAt,
+            validation: processedItem.validation,
+            idempotencyKey: `TG|${processedItem.fingerprint}`,
           });
-
-          const html = String(response.data || "");
-          const matches = [...html.matchAll(/tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/gi)];
-
-          for (const match of matches.slice(-10)) {
-            const text = cleanTelegramSourceText(
-              decodeTelegramHtml(String(match[1] || ""))
-            );
-
-            if (text.length < 40) {
-              stats.rejectedInvalid += 1;
-              recordRejection(stats, "telegram_too_short", text);
-              continue;
-            }
-
-            if (!isOfficialEconomicReleaseText(text)) {
-              stats.rejectedFilter += 1;
-              recordRejection(stats, "telegram_not_official_release", text);
-              continue;
-            }
-
-            allItems.push({
-              title: text,
-              contentSnippet: text,
-              summary: text,
-              description: text,
-              link: `${sourceUrl}#${Buffer.from(text).toString("base64").slice(0, 24)}`,
-              isoDate: new Date().toISOString(),
-              feedUrl: sourceUrl,
-              sourceName: "ForexBreakingNews",
-              isTelegramSource: true,
-              imageUrl: null,
-              enclosure: null,
-              thumbnail: null,
-              image: null,
-              media: null,
-              mediaContent: null,
-              mediaThumbnail: null,
-            });
-          }
-        } catch (error) {
-          stats.sourceErrors[sourceUrl] = error.message;
-          console.error(`⚠️ Telegram source failed: ${sourceUrl}`, error.message);
         }
       }
     } catch (error) {
       stats.lastErrorSafe = error.message;
-      console.error("⚠️ Telegram sources error:", error.message);
+      console.error("⚠️ Telegram discovery error:", error.message);
     }
 
-    const feedResults = await Promise.allSettled(
-      NEWS_FEEDS.map(async (feedUrl) => {
-        const feed = await parser.parseURL(feedUrl);
-        return feed.items.map((item) => ({ ...item, feedUrl }));
-      })
-    );
+    if (NEWS_FEEDS.length) {
+      const feedResults = await Promise.allSettled(
+        NEWS_FEEDS.map(async (feedUrl) => {
+          const feed = await parser.parseURL(feedUrl);
+          const generalOnly = filterGeneralRssItems(feed.items);
+          return markRssItemsAsGeneralOnly(generalOnly.map((item) => ({ ...item, feedUrl })));
+        })
+      );
 
-    for (let index = 0; index < feedResults.length; index += 1) {
-      const feedUrl = NEWS_FEEDS[index];
-      const result = feedResults[index];
-      if (result.status === "fulfilled") {
-        allItems.push(...result.value);
-      } else {
-        stats.sourceErrors[feedUrl] = result.reason?.message || String(result.reason);
-        console.error(`⚠️ Feed failed: ${feedUrl}`, stats.sourceErrors[feedUrl]);
+      for (let index = 0; index < feedResults.length; index += 1) {
+        const feedUrl = NEWS_FEEDS[index];
+        const result = feedResults[index];
+        if (result.status === "fulfilled") {
+          allItems.push(...result.value);
+        } else {
+          stats.sourceErrors[feedUrl] = result.reason?.message || String(result.reason);
+          console.error(`⚠️ Feed failed: ${feedUrl}`, stats.sourceErrors[feedUrl]);
+        }
       }
     }
 
@@ -3510,9 +3573,23 @@ async function fetchForexNews(options = {}) {
         continue;
       }
 
-      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
-      if (item.isTelegramSource && !isOfficialEconomicReleaseText(titleForImpact)) {
+      if (item.skipPublish) {
+        stats.rejectedFilter += 1;
+        recordRejection(stats, "telegram_incomplete_or_blocked", item.title);
         continue;
+      }
+
+      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
+
+      if (item.telegramFingerprint) {
+        const hasSameFingerprint = publishedItems.some(
+          (publishedItem) => publishedItem.telegramFingerprint === item.telegramFingerprint
+        );
+        if (hasSameFingerprint) {
+          stats.rejectedDuplicate += 1;
+          recordRejection(stats, "telegram_fingerprint_duplicate", item.title);
+          continue;
+        }
       }
 
       if (!item.isTelegramSource && isOfficialEconomicReleaseText(titleForImpact)) {
@@ -3592,10 +3669,49 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
     stats.eligible = 1;
     const latestLink = latestNews.link;
 
-    const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link);
+    const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link, {
+      dryRun,
+      telegramItem: latestNews,
+    });
     stats.aiProcessed = 1;
+
+    if (aiResult?.economicAnalysis?.handled) {
+      stats.economicEventsDetected += 1;
+      mergeProviderMetricsIntoCycle(stats, economicRegistry.getAllMetrics());
+
+      if (aiResult.skipPublish) {
+        stats.economicEventsPending += 1;
+        if (aiResult.reason === "source_conflict") {
+          stats.economicEventsConflict += 1;
+        }
+        console.log(
+          "⏭️ Economic release incomplete. Queued for enrichment:",
+          latestNews.title,
+          JSON.stringify({
+            reason: aiResult.reason,
+            missingFields: aiResult.missingFields,
+            idempotencyKey: aiResult.economicAnalysis?.idempotencyKey,
+          })
+        );
+        stats.cycleDurationMs = Date.now() - cycleStartedAt;
+        lastCycleStats = stats;
+        lastCycleCompletedAt = new Date().toISOString();
+        console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+        return stats;
+      }
+
+      if (aiResult.economicAnalysis?.validation?.complete) {
+        stats.economicEventsComplete += 1;
+      }
+    }
+
     if (!aiResult?.message) {
       stats.aiFailed = 1;
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+      return stats;
     }
 
     const message = aiResult.message;
@@ -3695,21 +3811,7 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
     if (veryImportantNews || latestNews.impactLevel === "HIGH") {
       const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
       const articleImage = latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
-      const topicExternalImage = getExternalImageByNewsTopic(imageTitle || latestNews.title, latestNews.impactLevel || "MEDIUM");
-      console.log("🖼️ Topic external image candidate:", topicExternalImage || "none", "| title:", imageTitle || latestNews.title);
-      const shouldUseLocalFallbackImage =
-        latestNews.impactLevel === "HIGH" ||
-        ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
-          `${latestNews.title || ""} ${latestNews.contentSnippet || ""}`
-            .toLowerCase()
-            .includes(keyword.toLowerCase())
-        );
-
-      const localFallbackImage =
-        USE_LOCAL_IMAGE_FALLBACK && shouldUseLocalFallbackImage
-          ? selectNewsImage(latestNews.title)
-          : null;
-      finalImage = rssImage || articleImage || topicExternalImage || localFallbackImage;
+      finalImage = rssImage || articleImage || null;
     }
 
     if (dryRun) {
@@ -3787,11 +3889,35 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
 
 async function runNewsCycleDiagnostic(options = {}) {
   logWorkerEnvStatus();
-  return fetchForexNews({
+  const cycleReport = await fetchForexNews({
     dryRun: true,
     skipScheduledAlerts: true,
     ...options,
   });
+
+  let economicDryRun = null;
+  let telegramDryRun = null;
+  try {
+    economicDryRun = await runEconomicReleaseDryRun({ limit: 50 });
+  } catch (error) {
+    economicDryRun = {
+      error: error.message,
+    };
+  }
+
+  try {
+    const { discoverTelegramNews } = require("./lib/telegram-news");
+    telegramDryRun = await discoverTelegramNews({ limitTotal: 100, limitPerChannel: 50 });
+  } catch (error) {
+    telegramDryRun = { error: error.message };
+  }
+
+  return {
+    ...cycleReport,
+    economicDryRun,
+    telegramDryRun,
+    pendingQueue: getPendingQueue().getSnapshot(),
+  };
 }
 
 function getNewsWorkerHealthSnapshot() {
@@ -3821,6 +3947,7 @@ module.exports = {
   runNewsCycleDiagnostic,
   getNewsWorkerHealthSnapshot,
   getRequiredEnvStatus,
+  runEconomicReleaseDryRun,
 };
 
 if (process.env.NEWS_WORKER_NO_BOOT === "1") {
