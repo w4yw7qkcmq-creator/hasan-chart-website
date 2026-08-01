@@ -776,48 +776,40 @@ export default function OrderBookPageContent() {
           <div className="mt-3 min-h-0 flex-1 min-w-0">
           {displayedLargeTrades.length ? (
             <div className="max-h-[26rem] overflow-y-auto overflow-x-auto overscroll-contain rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
-              <table className="w-full min-w-[42rem] table-fixed text-sm tabular-nums">
-                <colgroup>
-                  <col className="w-[4.5rem]" />
-                  <col className="w-[5rem]" />
-                  <col className="w-[4.5rem]" />
-                  <col className="w-[6.5rem]" />
-                  <col className="w-[5.5rem]" />
-                  <col className="w-[5.5rem]" />
-                </colgroup>
-                <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+              <table className="w-full min-w-[42rem] table-auto text-sm tabular-nums">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] leading-normal text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
-                    <th className="px-2 py-2 text-right sm:px-3">الوقت</th>
-                    <th className="px-2 py-2 text-right sm:px-3">المنصة</th>
-                    <th className="px-2 py-2 text-right sm:px-3">الاتجاه</th>
-                    <th className="px-2 py-2 text-right sm:px-3">السعر</th>
-                    <th className="px-2 py-2 text-right sm:px-3">الكمية</th>
-                    <th className="px-2 py-2 text-right sm:px-3">القيمة</th>
+                    <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">الوقت</th>
+                    <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">المنصة</th>
+                    <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">الاتجاه</th>
+                    <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">السعر</th>
+                    <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">الكمية</th>
+                    <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">القيمة</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                   {displayedLargeTrades.map((trade) => (
                     <tr
                       key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
-                      className="border-t border-slate-100 transition hover:bg-slate-50/80 dark:border-white/5 dark:hover:bg-white/5"
+                      className="align-middle transition hover:bg-slate-50/80 dark:hover:bg-white/5"
                     >
-                      <td className="px-2 py-1.5 sm:px-3">
-                        <NumericValue className="text-xs">{formatTime(trade.ts)}</NumericValue>
+                      <td className="whitespace-nowrap px-2 py-2.5 align-middle sm:px-3">
+                        <NumericValue className="text-xs leading-normal">{formatTime(trade.ts)}</NumericValue>
                       </td>
-                      <td className="px-2 py-1.5 text-xs sm:px-3">
+                      <td className="whitespace-nowrap px-2 py-2.5 align-middle text-xs leading-normal sm:px-3">
                         {EXCHANGE_LABELS[trade.exchange] || trade.exchange}
                       </td>
-                      <td className="px-2 py-1.5 sm:px-3">
+                      <td className="whitespace-nowrap px-2 py-2.5 align-middle sm:px-3">
                         <SideBadge side={trade.side} />
                       </td>
-                      <td className="px-2 py-1.5 sm:px-3">
-                        <NumericValue className="text-xs">{formatPrice(trade.price)}</NumericValue>
+                      <td className="whitespace-nowrap px-2 py-2.5 align-middle sm:px-3">
+                        <NumericValue className="text-xs leading-normal">{formatPrice(trade.price)}</NumericValue>
                       </td>
-                      <td className="px-2 py-1.5 sm:px-3">
-                        <NumericValue className="text-xs">{formatQuantity(trade.quantity)}</NumericValue>
+                      <td className="whitespace-nowrap px-2 py-2.5 align-middle sm:px-3">
+                        <NumericValue className="text-xs leading-normal">{formatQuantity(trade.quantity)}</NumericValue>
                       </td>
-                      <td className="px-2 py-1.5 sm:px-3">
-                        <NumericValue className="font-semibold text-slate-900 dark:text-white">
+                      <td className="whitespace-nowrap px-2 py-2.5 align-middle sm:px-3">
+                        <NumericValue className="font-semibold leading-normal text-slate-900 dark:text-white">
                           {formatUsd(trade.notional, { compact: true })}
                         </NumericValue>
                       </td>

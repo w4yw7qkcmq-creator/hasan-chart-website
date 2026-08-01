@@ -55,7 +55,9 @@ test("historical large trades table exposes all core columns", () => {
     assert.match(tradesRow, new RegExp(header));
   }
   assert.match(tradesRow, /min-w-\[42rem\]/);
-  assert.match(tradesRow, /table-fixed/);
+  assert.match(tradesRow, /table-auto/);
+  assert.match(tradesRow, /align-middle/);
+  assert.match(tradesRow, /whitespace-nowrap/);
   assert.match(tradesRow, /formatQuantity\(trade\.quantity\)/);
 });
 
