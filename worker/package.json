@@ -9,6 +9,7 @@
     "start:news": "node news-worker.js",
     "test:economic-releases": "node tests/economic-releases.test.cjs",
     "test:telegram-news": "node tests/telegram-news.test.cjs",
+    "test:news-images": "node tests/news-images.test.cjs",
     "start:subscription": "node subscription-maintenance-worker.js",
     "subscription-cron": "SUBSCRIPTION_WORKER_ONESHOT=true node subscription-maintenance-worker.js",
     "email-queue-worker": "EMAIL_QUEUE_WORKER_ONESHOT=false node email-queue-worker.js",
@@ -31,6 +32,7 @@
     "express": "^5.2.1",
     "form-data": "^4.0.5",
     "rss-parser": "^3.13.0",
+    "sharp": "^0.34.5",
     "web-push": "^3.6.7",
     "ws": "^8.20.1"
   }

@@ -23,6 +23,8 @@ const {
   canPublishStructuredRelease,
   logEconomicReleaseDroppedIncomplete,
 } = require("./lib/economic-releases");
+const { buildPremiumImageContextFromRelease } = require("./lib/news-images/important-events");
+const { deliverTelegramNewsWithOptionalPhoto } = require("./lib/news-images/telegram-delivery");
 const { discoverTelegramNews } = require("./lib/telegram-news");
 const {
   filterGeneralRssItems,
@@ -72,6 +74,15 @@ async function buildTelegramPublishDedupContext() {
   };
 }
 
+async function deliverTelegramNews({ message, candidate }) {
+  return deliverTelegramNewsWithOptionalPhoto({
+    message,
+    candidate,
+    sendTelegramPhoto,
+    sendTelegramMessage,
+  });
+}
+
 async function publishTelegramMergeBufferItem(item, ctx = {}) {
   syncPublishingTransition();
 
@@ -88,7 +99,9 @@ async function publishTelegramMergeBufferItem(item, ctx = {}) {
       dryRun: NEWS_DRY_RUN,
       memoryOnly: true,
       ...dedupContext,
+      deliverTelegramNews,
       sendTelegramMessage,
+      sendTelegramPhoto,
       saveNewsPostToSupabase,
       savePublishedNewsToSupabase,
       savePublishedNewsLink,
@@ -2057,25 +2070,36 @@ function wrapText(ctx, text, maxWidth) {
   return lines.slice(0, 3);
 }
 
-async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
+async function createNewsCard(title, imageUrl, impactLevel = "HIGH", premiumImageContext = null) {
   void title;
   void impactLevel;
 
-  if (!imageUrl) {
+  let resolvedImageUrl = imageUrl;
+
+  if (!resolvedImageUrl && premiumImageContext) {
+    try {
+      const { resolvePremiumNewsImagePath } = require("./lib/news-images");
+      resolvedImageUrl = await resolvePremiumNewsImagePath(premiumImageContext);
+    } catch (error) {
+      console.error("⚠️ Premium news image generation failed:", error.message);
+    }
+  }
+
+  if (!resolvedImageUrl) {
     return null;
   }
 
   try {
     let buffer = null;
 
-    if (/^https?:\/\//i.test(imageUrl)) {
-      const response = await axios.get(imageUrl, {
+    if (/^https?:\/\//i.test(resolvedImageUrl)) {
+      const response = await axios.get(resolvedImageUrl, {
         responseType: "arraybuffer",
         timeout: 15000,
       });
       buffer = Buffer.from(response.data);
-    } else if (fs.existsSync(imageUrl)) {
-      buffer = fs.readFileSync(imageUrl);
+    } else if (fs.existsSync(resolvedImageUrl)) {
+      buffer = fs.readFileSync(resolvedImageUrl);
     }
 
     if (!buffer || buffer.length === 0) {
@@ -3028,7 +3052,7 @@ async function sendScheduledMarketAlerts() {
   }
 }
 
-async function sendTelegramPhoto(message, photoPath) {
+async function sendTelegramPhoto(message, photoPath, options = {}) {
   if (NEWS_DRY_RUN) {
     console.log("NEWS_DRY_RUN skip sendTelegramPhoto:", photoPath);
     return { skipped: true, reason: "dry_run" };
@@ -3049,7 +3073,11 @@ async function sendTelegramPhoto(message, photoPath) {
     console.log("✅ Designed photo news sent to Telegram");
   } catch (error) {
     console.error("❌ Telegram Photo Error:", error.response?.data || error.message);
-    await sendTelegramMessage(message);
+    if (!options.skipTextFallback) {
+      await sendTelegramMessage(message);
+    } else {
+      throw error;
+    }
   }
 }
 
@@ -3328,7 +3356,8 @@ async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
     return true;
   }
 
-  const photoPath = await createNewsCard(imageTitle, null, "HIGH");
+  const premiumImageContext = buildPremiumImageContextFromRelease(result);
+  const photoPath = await createNewsCard(imageTitle, null, "HIGH", premiumImageContext);
   if (photoPath) {
     await sendTelegramPhoto(message, photoPath);
   } else {

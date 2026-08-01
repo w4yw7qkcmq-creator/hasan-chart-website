@@ -4,6 +4,7 @@ const { isGenericTitle, normalizeTitleText } = require("./editorial-title");
 const { sanitizeChannelArtifacts, assertNoChannelArtifacts } = require("./channel-sanitizer");
 const { buildPublishFingerprintBundle } = require("./semantic-fingerprints");
 const { isSourcePublishable, updateBaselineAfterPublish } = require("./publish-state");
+const { buildPremiumImageContextFromCandidate } = require("../news-images/important-events");
 
 /** @type {Set<string>} */
 const memoryReservations = new Set();
@@ -163,14 +164,29 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
       fingerprint,
       message,
       resolvedTitle: validation.resolvedTitle,
+      premiumImage: Boolean(buildPremiumImageContextFromCandidate(candidate)),
     };
   }
 
   try {
-    await deps.sendTelegramMessage(message);
-    state.telegramSent = true;
-    state.state = "telegram_sent";
-    publishStates.set(fingerprint, state);
+    if (deps.deliverTelegramNews) {
+      const delivery = await deps.deliverTelegramNews({ message, candidate, dryRun: deps.dryRun });
+      if (delivery?.delivery === "dry_run") {
+        state.telegramSent = true;
+        state.state = "telegram_sent";
+        publishStates.set(fingerprint, state);
+      } else {
+        state.telegramSent = true;
+        state.state = "telegram_sent";
+        state.premiumImage = delivery?.premiumImage === true;
+        publishStates.set(fingerprint, state);
+      }
+    } else {
+      await deps.sendTelegramMessage(message);
+      state.telegramSent = true;
+      state.state = "telegram_sent";
+      publishStates.set(fingerprint, state);
+    }
   } catch (error) {
     state.state = "failed";
     publishStates.set(fingerprint, state);
