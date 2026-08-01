@@ -29,6 +29,8 @@ const {
   markRssItemsAsGeneralOnly,
 } = require("./lib/telegram-news/rss-filter");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
+const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
+const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
 
 const parser = new Parser();
 
@@ -36,6 +38,7 @@ let telegramMergeBufferInstance = null;
 const telegramMergePublishLog = [];
 
 function getNewsWorkerTelegramMergeBuffer(dryRun) {
+  syncPublishingTransition();
   if (!telegramMergeBufferInstance) {
     telegramMergeBufferInstance = getTelegramMergeBuffer({
       dryRun,
@@ -45,67 +48,65 @@ function getNewsWorkerTelegramMergeBuffer(dryRun) {
   return telegramMergeBufferInstance;
 }
 
+setOnPublishingEnabledHook(() => {
+  if (telegramMergeBufferInstance) {
+    telegramMergeBufferInstance.destroy();
+  }
+});
+
+async function buildTelegramPublishDedupContext() {
+  const publishedItems = [
+    ...(await loadPublishedNewsFromSupabase()),
+    ...(await loadNewsPostsFromSupabase()),
+    ...readPublishedNewsRecords(),
+  ];
+
+  return {
+    existingLinks: publishedItems.map((item) => item.link).filter(Boolean),
+    existingFingerprints: new Set(
+      publishedItems
+        .flatMap((item) => [item.topicCluster, item.normalizedTitle, item.duplicateKey])
+        .filter(Boolean)
+    ),
+    existingNormalizedTitles: publishedItems.map((item) => item.normalizedTitle || "").filter(Boolean),
+  };
+}
+
 async function publishTelegramMergeBufferItem(item, ctx = {}) {
+  syncPublishingTransition();
+
   if (!item || item.skipPublish || !item.formattedMessage) {
     return { skipped: true, reason: item?.reason || "skip_publish" };
   }
 
-  if (!TELEGRAM_NEWS_PUBLISH_ENABLED) {
-    console.log(
-      "TELEGRAM_NEWS_PUBLISH_DISABLED",
-      JSON.stringify({
-        mergeKey: ctx.mergeKey,
-        reason: "kill_switch",
-      })
-    );
-    return { skipped: true, reason: "TELEGRAM_NEWS_PUBLISH_DISABLED" };
+  const dedupContext = NEWS_DRY_RUN ? {} : await buildTelegramPublishDedupContext();
+
+  const result = await publishValidatedTelegramNewsCandidate(
+    item,
+    { mergeKey: ctx.mergeKey, metrics: ctx.metrics },
+    {
+      dryRun: NEWS_DRY_RUN,
+      memoryOnly: true,
+      ...dedupContext,
+      sendTelegramMessage,
+      saveNewsPostToSupabase,
+      savePublishedNewsToSupabase,
+      savePublishedNewsLink,
+    }
+  );
+
+  if (result.published || result.dryRun) {
+    telegramMergePublishLog.push({
+      mergeKey: ctx.mergeKey,
+      sourceLink: item.post?.sourceUrl,
+      telegram: 1,
+      db: result.dbInserted === false ? 0 : 1,
+      fingerprint: result.fingerprint,
+      resolvedTitle: result.resolvedTitle,
+    });
   }
 
-  const message = item.formattedMessage;
-  const imageTitle = item.facts?.title || item.post?.rawText?.slice(0, 120) || "خبر سوق";
-  const sourceLink = item.post?.sourceUrl || `telegram-merge:${ctx.mergeKey || "unknown"}`;
-  const impactLevel = item.newsType === "economic" ? "HIGH" : "MEDIUM";
-
-  if (NEWS_DRY_RUN) {
-    console.log(
-      "TELEGRAM_MERGE_BUFFER_PUBLISH_READY",
-      JSON.stringify({
-        mergeKey: ctx.mergeKey,
-        sources: item.sources,
-        messageIds: item.metadata?.sourceMessageIds,
-      })
-    );
-    telegramMergePublishLog.push({ mergeKey: ctx.mergeKey, sourceLink, telegram: 1, db: 1 });
-    return { dryRun: true };
-  }
-
-  await sendTelegramMessage(message);
-  const saveResult = await saveNewsPostToSupabase({
-    title: imageTitle,
-    content: message,
-    image_url: null,
-    impact_level: impactLevel,
-    source_link: sourceLink,
-  });
-
-  telegramMergePublishLog.push({
-    mergeKey: ctx.mergeKey,
-    sourceLink,
-    telegram: 1,
-    db: saveResult?.error ? 0 : 1,
-  });
-
-  savePublishedNewsLink(sourceLink, `${imageTitle} ${message}`);
-  await savePublishedNewsToSupabase({
-    link: sourceLink,
-    title: `${imageTitle} ${message}`,
-    normalized_title: normalizeNewsTitle(`${imageTitle} ${message}`).slice(0, 500),
-    topic_cluster: getNewsTopicCluster(imageTitle),
-    published_at: new Date().toISOString(),
-    telegramFingerprint: ctx.mergeKey,
-  });
-
-  return { published: true, sourceLink };
+  return result;
 }
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -2181,9 +2182,13 @@ async function savePublishedNewsToSupabase(item) {
 
     if (error) {
       console.error("❌ Supabase Save Error:", error.message);
+      return { error: error.message };
     }
+
+    return { ok: true };
   } catch (error) {
     console.error("❌ Supabase Save Exception:", error.message);
+    return { error: error.message };
   }
 }
 
@@ -2320,9 +2325,13 @@ async function saveNewsPostToSupabase(post) {
 
     if (error) {
       console.error("❌ News Post Save Error:", error.message);
+      return { error: error.message };
     }
+
+    return { ok: true };
   } catch (error) {
     console.error("❌ News Post Save Exception:", error.message);
+    return { error: error.message };
   }
 }
 function readPublishedNewsRecords() {

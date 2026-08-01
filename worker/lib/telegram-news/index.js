@@ -3,6 +3,13 @@ const { TELEGRAM_SOURCE_CHANNELS } = require("./sources");
 const { parseTelegramChannelHtml } = require("./fetcher");
 const { processTelegramPosts } = require("./dedupe");
 const { getTelegramMergeBuffer } = require("./merge-buffer");
+const {
+  beginFetchCycle,
+  initializeBaselinesFromPosts,
+  completeBaselineFetch,
+  isBaselineReadyForPublish,
+  isSourcePublishable,
+} = require("./publish-state");
 
 const DEFAULT_USER_AGENT = "HasanChartWorld-TelegramDiscovery/1.0 (+https://hasanchart.world)";
 
@@ -79,6 +86,8 @@ function mapProcessedToNewsItems(processed) {
 }
 
 async function discoverTelegramNews(options = {}) {
+  beginFetchCycle();
+
   const parseStats = options.parseStats || {
     promoOnlySkipped: 0,
     promoFootersRemoved: 0,
@@ -91,15 +100,30 @@ async function discoverTelegramNews(options = {}) {
 
   let buffer = null;
   let bufferFlushed = [];
+  let bufferSubmitted = 0;
+  let bufferBacklogSkipped = 0;
 
   if (options.useMergeBuffer) {
     buffer = options.mergeBuffer || getTelegramMergeBuffer({
       dryRun: options.dryRun === true,
       onReady: options.onMergeReady || null,
     });
+  }
 
+  if (!isBaselineReadyForPublish()) {
+    initializeBaselinesFromPosts(posts);
+    completeBaselineFetch();
+  } else if (buffer) {
     for (const post of posts) {
-      buffer.submit(post);
+      const publishable = isSourcePublishable(post);
+      if (!publishable.ok) {
+        bufferBacklogSkipped += 1;
+        continue;
+      }
+      const result = buffer.submit(post);
+      if (!result?.skip) {
+        bufferSubmitted += 1;
+      }
     }
 
     if (options.dryRun || options.flushImmediately) {
@@ -111,6 +135,8 @@ async function discoverTelegramNews(options = {}) {
     posts,
     processed,
     bufferFlushed,
+    bufferSubmitted,
+    bufferBacklogSkipped,
     items: mapProcessedToNewsItems(processed),
     parseStats,
     mergeBuffer: buffer,

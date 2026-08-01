@@ -6,6 +6,8 @@ const { detectPostPublishAction, snapshotFacts } = require("./post-publish");
 const { formatTelegramPost } = require("./format");
 const { validateFinalMessageAgainstFacts } = require("./invariants");
 const { prepareTelegramPost } = require("./pipeline");
+const { isSourcePublishable, isPublishingEnabled } = require("./publish-state");
+const { extractResolvedTitle } = require("./atomic-publish");
 
 const DEFAULT_MAX_PENDING = Number(process.env.TELEGRAM_MERGE_BUFFER_MAX || 100);
 
@@ -110,6 +112,9 @@ function createTelegramMergeBuffer(options = {}) {
       aiImpactUsed: formatted.aiImpactUsed === true,
       aiResult: formatted.aiResult || "fallback",
       fingerprint: merged.fingerprints?.mergeKey || merged.mergeKey,
+      resolvedTitle: formatted.resolvedTitle || extractResolvedTitle(formatted.formatted),
+      qualityCheck: formatted.qualityCheck,
+      editorialCheck: formatted.editorialCheck,
     };
   }
 
@@ -157,6 +162,16 @@ function createTelegramMergeBuffer(options = {}) {
 
   function submit(post, factsInput = null, meta = {}) {
     metrics.submitted += 1;
+
+    const publishable = isSourcePublishable(post);
+    if (!publishable.ok) {
+      return {
+        action: publishable.reason,
+        skip: true,
+        reason: publishable.reason,
+        observationOnly: publishable.reason === "TELEGRAM_NEWS_PUBLISH_DISABLED",
+      };
+    }
 
     const exactKey = `${post.sourceChannel}:${post.sourceMessageId}`;
     if (seenExact.has(exactKey)) {
@@ -231,7 +246,9 @@ function createTelegramMergeBuffer(options = {}) {
         candidates: [],
       };
       pending.set(mergeKey, entry);
-      scheduleFlush(mergeKey, windowMs);
+      if (isPublishingEnabled()) {
+        scheduleFlush(mergeKey, windowMs);
+      }
     }
 
     entry.candidates.push(candidate);

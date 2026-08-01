@@ -15,6 +15,7 @@ const {
   buildMinimalStructuredFallback,
 } = require("./concise-editorial");
 const { formatTelegramNewsMessage } = require("./telegram-formatter");
+const { sanitizeChannelArtifacts } = require("./channel-sanitizer");
 const { validateFinalEditorialQuality } = require("./editorial-quality");
 
 function buildDraftPayload(editorialDraft, facts, impactText) {
@@ -145,6 +146,8 @@ async function finalizeFormattedMessage({ facts, post, classification, options, 
     storyCount: post._storyCount || 1,
   });
 
+  const sanitizedFormatted = sanitizeChannelArtifacts(resolved.formatted);
+
   if (!qualityCheck.ok) {
     console.log(
       "FINAL_EDITORIAL_QUALITY_REJECTED",
@@ -165,7 +168,7 @@ async function finalizeFormattedMessage({ facts, post, classification, options, 
     };
   }
 
-  const factCheck = validateFinalMessageAgainstFacts(resolved.formatted, facts);
+  const factCheck = validateFinalMessageAgainstFacts(sanitizedFormatted, facts);
   if (!factCheck.ok) {
     return {
       formatted: null,
@@ -178,12 +181,12 @@ async function finalizeFormattedMessage({ facts, post, classification, options, 
       resolvedTitle: resolved.resolvedTitle,
       originalTitle: facts.title,
       originalLength: String(post.rawText || "").length,
-      finalLength: resolved.formatted.length,
+      finalLength: sanitizedFormatted.length,
     };
   }
 
   return {
-    formatted: resolved.formatted,
+    formatted: sanitizedFormatted,
     skipPublish: false,
     editorialCheck: resolved.editorialCheck,
     qualityCheck,
@@ -192,7 +195,7 @@ async function finalizeFormattedMessage({ facts, post, classification, options, 
     originalTitle: facts.title,
     titleResult: resolved.titleResult,
     originalLength: String(post.rawText || "").length,
-    finalLength: resolved.formatted.length,
+    finalLength: sanitizedFormatted.length,
     aiResult: resolved.attempt === 0 ? "rule_based" : resolved.attempt === 1 ? "structured_retry" : "structured_minimal",
     usedFixedTemplate: true,
   };

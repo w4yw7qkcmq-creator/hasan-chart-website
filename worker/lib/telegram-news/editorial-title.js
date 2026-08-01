@@ -18,10 +18,15 @@ const GENERIC_TITLE_EXACT = new Set([
   "just in",
   "خبر سوق",
   "تحديث سوق",
+  "نشرة أخبار الفوركس",
+  "أخبار الفوركس العاجلة",
 ]);
 
+const GENERIC_TITLE_PREFIX =
+  /^(?:🚨|🟥|🔴|📰)?\s*(?:عاجل|صدر\s*الآن|صدر\s*الان|تحديث|موجز(?:\s*مساء|\s*أخبار(?:\s*المساء)?)?|بيان|هام|خبر\s*مهم|تنبيه|الآن|breaking|update|just\s*in|نشرة\s*أخبار\s*الفوركس|أخبار\s*الفوركس\s*العاجلة)\s*:?\s*$/i;
+
 const GENERIC_TITLE_PATTERN =
-  /^(?:🚨|🟥|🔴)?\s*(?:عاجل|صدر\s*الآن|صدر\s*الان|تحديث|موجز(?:\s*مساء|\s*أخبار)?|بيان|هام|خبر\s*مهم|تنبيه|الآن|breaking|update|just\s*in)\s*:?\s*$/i;
+  /^(?:🚨|🟥|🔴|📰)?\s*(?:عاجل|صدر\s*الآن|صدر\s*الان|تحديث|موجز(?:\s*مساء|\s*أخبار)?|بيان|هام|خبر\s*مهم|تنبيه|الآن|breaking|update|just\s*in|نشرة\s*أخبار\s*الفوركس)\s*:?\s*$/i;
 
 const ECONOMIC_HEADLINE_TEMPLATES = {
   US_CONSUMER_CONFIDENCE: {
@@ -72,7 +77,16 @@ function isGenericTitle(title) {
   if (GENERIC_TITLE_EXACT.has(cleaned)) {
     return true;
   }
-  return GENERIC_TITLE_PATTERN.test(normalizeTitleText(title));
+  if (GENERIC_TITLE_PATTERN.test(normalizeTitleText(title))) {
+    return true;
+  }
+  if (GENERIC_TITLE_PREFIX.test(normalizeTitleText(title))) {
+    return true;
+  }
+  if (/^موجز\s*أخبار\s*المساء/i.test(cleaned) && cleaned.length < 80) {
+    return true;
+  }
+  return false;
 }
 
 function compareActualToForecast(actual, forecast) {

@@ -50,6 +50,27 @@ const {
 } = require(path.join(root, "lib/telegram-news/merge-buffer"));
 const { detectPostPublishAction, snapshotFacts } = require(path.join(root, "lib/telegram-news/post-publish"));
 const {
+  resetPublishStateForTests,
+  initializeBaselinesFromPosts,
+  completeBaselineFetch,
+  isSourcePublishable,
+  clearObservationBufferBeforeEnable,
+  markObservationOnly,
+  configurePublishWindowForTests,
+} = require(path.join(root, "lib/telegram-news/publish-state"));
+const {
+  validateCandidateForAtomicPublish,
+  publishValidatedTelegramNewsCandidate,
+  reserveNewsPublishFingerprint,
+  resetAtomicPublishForTests,
+} = require(path.join(root, "lib/telegram-news/atomic-publish"));
+const { sanitizeChannelArtifacts, assertNoChannelArtifacts } = require(path.join(root, "lib/telegram-news/channel-sanitizer"));
+const {
+  buildTrumpIranFingerprint,
+  buildFedOfficialStatementFingerprint,
+  buildPublishFingerprintBundle,
+} = require(path.join(root, "lib/telegram-news/semantic-fingerprints"));
+const {
   buildAiImpactParagraph,
   resolveImpactWithAi,
 } = require(path.join(root, "lib/telegram-news/ai-impact"));
@@ -90,6 +111,30 @@ function post(overrides = {}) {
   };
 }
 
+function enablePublishStateForTests(baselineMessageId = "0") {
+  resetPublishStateForTests();
+  resetAtomicPublishForTests();
+  process.env.TELEGRAM_NEWS_PUBLISH_ENABLED = "1";
+  const baselineTime = "2026-08-01T12:00:00+00:00";
+  configurePublishWindowForTests({
+    publishingEnabledAt: baselineTime,
+    minimumPublishableSourceTime: baselineTime,
+  });
+  initializeBaselinesFromPosts([
+    post({
+      sourceChannel: "ForexBreakingNews",
+      sourceMessageId: String(baselineMessageId),
+      sourcePublishedAt: "2026-08-01T13:00:00+00:00",
+    }),
+    post({
+      sourceChannel: "ForexNewspaper",
+      sourceMessageId: String(baselineMessageId),
+      sourcePublishedAt: "2026-08-01T13:00:00+00:00",
+    }),
+  ]);
+  completeBaselineFetch();
+}
+
 function testCrossChannelEconomicDedupDifferentTitles() {
   const textA = "صدر الآن\nConsumer Confidence\nالسابق: 49.5\nالمتوقع: 54.4\nالحالي: 55.2";
   const textB = "PMI Flash Release\nالسابق: 49.5\nالمتوقع: 54.4\nالحالي: 55.2";
@@ -107,6 +152,7 @@ function testCrossChannelEconomicDedupDifferentTitles() {
 
 async function testCrossChannelSinglePublishViaMergeBuffer() {
   resetTelegramMergeBufferForTests();
+  enablePublishStateForTests("0");
   const publishLog = [];
   let now = 1_000;
 
@@ -137,6 +183,7 @@ async function testCrossChannelSinglePublishViaMergeBuffer() {
 
 async function testMergeBufferTimerMergeAtEightSeconds() {
   resetTelegramMergeBufferForTests();
+  enablePublishStateForTests("9");
   const publishLog = [];
   let now = 0;
   const timers = new Map();
@@ -170,6 +217,7 @@ async function testMergeBufferTimerMergeAtEightSeconds() {
 
 async function testMergeBufferLateDuplicateSkipped() {
   resetTelegramMergeBufferForTests();
+  enablePublishStateForTests("19");
   const publishLog = [];
   let now = 0;
   const timers = new Map();
@@ -852,11 +900,221 @@ function testQualityGateImpactDoesNotRepeatFact() {
 }
 
 async function testFinalMessagePassesQualityGate() {
+  enablePublishStateForTests("0");
   const rawText = "🚨 Trump says Iran talks could resume if Tehran agrees to nuclear limits\nOil prices eased after the remarks";
-  const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
+  const processed = await processTelegramPosts([post({ rawText, sourceMessageId: "5" })], { disableAi: true });
   assert.strictEqual(processed[0].skipPublish, false);
   assert.ok(processed[0].qualityCheck?.ok !== false);
   assert.ok(processed[0].formattedMessage.length <= 600);
+}
+
+function testBacklogSkippedBeforeBaselineReady() {
+  resetPublishStateForTests();
+  process.env.TELEGRAM_NEWS_PUBLISH_ENABLED = "1";
+  const oldPost = post({ sourceMessageId: "100", sourcePublishedAt: "2026-08-01T10:00:00+00:00" });
+  const result = isSourcePublishable(oldPost);
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.reason, "TELEGRAM_BASELINE_FETCH");
+}
+
+function testBacklogSkippedAfterBaseline() {
+  enablePublishStateForTests("200");
+  const oldPost = post({ sourceMessageId: "100", sourcePublishedAt: "2026-08-01T10:00:00+00:00" });
+  const result = isSourcePublishable(oldPost);
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.reason, "TELEGRAM_NEWS_BACKLOG_SKIPPED");
+}
+
+function testKillSwitchObservationDiscarded() {
+  resetPublishStateForTests();
+  process.env.TELEGRAM_NEWS_PUBLISH_ENABLED = "0";
+  const observed = post({ sourceMessageId: "50" });
+  markObservationOnly(observed);
+  process.env.TELEGRAM_NEWS_PUBLISH_ENABLED = "1";
+  clearObservationBufferBeforeEnable();
+  initializeBaselinesFromPosts([post({ sourceMessageId: "49" })]);
+  completeBaselineFetch();
+  const result = isSourcePublishable(observed);
+  assert.strictEqual(result.ok, false);
+}
+
+function testGenericTitleFinalRejectUrgent() {
+  enablePublishStateForTests("0");
+  const candidate = {
+    post: post({ sourceMessageId: "10" }),
+    facts: { title: "عاجل", numbers: [] },
+    formattedMessage: "🚨 عاجل :\n\nمحتوى.\n\n📊 التأثير المحتمل:\nتأثير.",
+    skipPublish: false,
+    newsType: "general",
+  };
+  const check = validateCandidateForAtomicPublish(candidate);
+  assert.ok(check.issues.includes("GENERIC_TITLE_FINAL_REJECTED"));
+}
+
+function testChannelArtifactSanitizerRemovesNewsletterBullet() {
+  const raw = "🚨 عنوان\n\n📌 أبرز التفاصيل:\n• fact one\n• نشرة أخبار الفوركس 📰\n\n📊 التأثير المحتمل:\nimpact";
+  const cleaned = sanitizeChannelArtifacts(raw);
+  assert.ok(!/نشرة\s*أخبار\s*الفوركس/i.test(cleaned));
+  assert.ok(cleaned.includes("fact one"));
+}
+
+function testTrumpFingerprintDedupInReservation() {
+  resetAtomicPublishForTests();
+  const facts = {
+    title: "Trump Iran",
+    detailLines: ["Trump says Iran talks could resume"],
+    entities: ["Trump", "Iran"],
+  };
+  const fp1 = buildTrumpIranFingerprint(facts, post({ sourceMessageId: "1" }));
+  const fp2 = buildTrumpIranFingerprint(facts, post({ sourceMessageId: "2" }));
+  assert.strictEqual(fp1.key, fp2.key);
+}
+
+async function testAtomicPublishDuplicateReservation() {
+  resetAtomicPublishForTests();
+  enablePublishStateForTests("0");
+  const candidate = {
+    post: post({ sourceMessageId: "11", sourcePublishedAt: "2026-08-01T15:00:00+00:00" }),
+    facts: {
+      title: "Gold",
+      detailLines: ["Gold rises 1.8% after Powell comments"],
+      numbers: ["1.8%"],
+      entities: ["Powell"],
+    },
+    formattedMessage:
+      "🚨 الذهب يسجل تحركًا ملحوظًا في الجلسة\n\nسجل الذهب ارتفاعًا بنسبة 1.8%.\n\n📊 التأثير المحتمل:\nقد ينعكس ذلك على الدولار والذهب.",
+    skipPublish: false,
+    newsType: "general",
+    resolvedTitle: "الذهب يسجل تحركًا ملحوظًا في الجلسة",
+  };
+  const first = await reserveNewsPublishFingerprint(candidate, { memoryOnly: true });
+  const second = await reserveNewsPublishFingerprint(candidate, { memoryOnly: true });
+  assert.strictEqual(first.reserved, true);
+  assert.strictEqual(second.reserved, false);
+}
+
+async function testTelegramFailReleasesReservationAndSkipsDb() {
+  resetAtomicPublishForTests();
+  enablePublishStateForTests("0");
+  const candidate = {
+    post: post({ sourceMessageId: "31", sourcePublishedAt: "2026-08-01T15:00:00+00:00" }),
+    facts: {
+      title: "Gold",
+      detailLines: ["Gold rises 1.8% after Powell comments"],
+      numbers: ["1.8%"],
+    },
+    formattedMessage:
+      "🚨 الذهب يسجل تحركًا ملحوظًا في الجلسة\n\nسجل الذهب ارتفاعًا بنسبة 1.8%.\n\n📊 التأثير المحتمل:\nقد ينعكس ذلك على الدولار والذهب.",
+    skipPublish: false,
+    newsType: "general",
+    resolvedTitle: "الذهب يسجل تحركًا ملحوظًا في الجلسة",
+  };
+
+  let dbCalled = false;
+  const result = await publishValidatedTelegramNewsCandidate(candidate, {}, {
+    memoryOnly: true,
+    sendTelegramMessage: async () => {
+      throw new Error("telegram_failed");
+    },
+    saveNewsPostToSupabase: async () => {
+      dbCalled = true;
+      return { ok: true };
+    },
+  });
+
+  assert.strictEqual(result.failed, true);
+  assert.strictEqual(dbCalled, false);
+  const retry = await reserveNewsPublishFingerprint(candidate, { memoryOnly: true });
+  assert.strictEqual(retry.reserved, true);
+}
+
+async function testTelegramSuccessDbFailDoesNotRetelegram() {
+  resetAtomicPublishForTests();
+  enablePublishStateForTests("0");
+  const candidate = {
+    post: post({ sourceMessageId: "32", sourcePublishedAt: "2026-08-01T15:00:00+00:00" }),
+    facts: {
+      title: "Gold",
+      detailLines: ["Gold rises 1.8% after Powell comments"],
+      numbers: ["1.8%"],
+    },
+    formattedMessage:
+      "🚨 الذهب يسجل تحركًا ملحوظًا في الجلسة\n\nسجل الذهب ارتفاعًا بنسبة 1.8%.\n\n📊 التأثير المحتمل:\nقد ينعكس ذلك على الدولار والذهب.",
+    skipPublish: false,
+    newsType: "general",
+    resolvedTitle: "الذهب يسجل تحركًا ملحوظًا في الجلسة",
+  };
+
+  let telegramCalls = 0;
+  const first = await publishValidatedTelegramNewsCandidate(candidate, {}, {
+    memoryOnly: true,
+    sendTelegramMessage: async () => {
+      telegramCalls += 1;
+    },
+    savePublishedNewsToSupabase: async () => ({ ok: true }),
+    saveNewsPostToSupabase: async () => ({ error: "db_failed" }),
+  });
+
+  assert.strictEqual(first.partial, true);
+  assert.strictEqual(first.telegramSent, true);
+  assert.strictEqual(telegramCalls, 1);
+
+  const second = await publishValidatedTelegramNewsCandidate(candidate, {}, {
+    memoryOnly: true,
+    existingLinks: [candidate.post.sourceUrl],
+    sendTelegramMessage: async () => {
+      telegramCalls += 1;
+    },
+    savePublishedNewsToSupabase: async () => ({ ok: true }),
+    saveNewsPostToSupabase: async () => ({ ok: true }),
+  });
+
+  assert.strictEqual(second.skipped, true);
+  assert.strictEqual(telegramCalls, 1);
+}
+
+async function runIncidentFixtureDryRun() {
+  enablePublishStateForTests("41400");
+  resetTelegramMergeBufferForTests();
+  resetAtomicPublishForTests();
+
+  const trumpText =
+    "🚨 Trump says Iran talks could resume if Tehran agrees to nuclear limits\nOil prices eased after the remarks";
+  const candidates = [
+    post({ sourceChannel: "ForexNewspaper", sourceMessageId: "13469", rawText: trumpText, sourcePublishedAt: "2026-08-01T22:00:00+00:00" }),
+    post({ sourceChannel: "ForexNewspaper", sourceMessageId: "13477", rawText: trumpText, sourcePublishedAt: "2026-08-01T22:01:00+00:00" }),
+    post({ sourceChannel: "ForexBreakingNews", sourceMessageId: "41463", rawText: trumpText, sourcePublishedAt: "2026-08-01T22:02:00+00:00" }),
+    post({ sourceChannel: "ForexNewspaper", sourceMessageId: "13463", rawText: trumpText, sourcePublishedAt: "2026-08-01T22:03:00+00:00" }),
+    post({ sourceChannel: "ForexBreakingNews", sourceMessageId: "41467", rawText: "Logan: inflation progress is uneven", sourcePublishedAt: "2026-08-01T22:04:00+00:00" }),
+    post({ sourceChannel: "ForexNewspaper", sourceMessageId: "13461", rawText: "عاجل :\nLogan Fed vote 9-3", sourcePublishedAt: "2026-08-01T22:05:00+00:00" }),
+    post({ sourceChannel: "ForexNewspaper", sourceMessageId: "13464", rawText: "FedWatch 67% hike July", sourcePublishedAt: "2026-08-01T22:06:00+00:00" }),
+    post({ sourceChannel: "ForexNewspaper", sourceMessageId: "13474", rawText: "FedWatch 67% hike July hold", sourcePublishedAt: "2026-08-01T22:07:00+00:00" }),
+    post({ sourceChannel: "ForexBreakingNews", sourceMessageId: "41462", rawText: "Gold falls 1.8% to 4024", sourcePublishedAt: "2026-08-01T22:08:00+00:00" }),
+    post({ sourceChannel: "ForexNewspaper", sourceMessageId: "13472", rawText: "موجز أخبار المساء\n• story A\n• story B\n• story C", sourcePublishedAt: "2026-08-01T22:09:00+00:00" }),
+    ...Array.from({ length: 10 }, (_, i) =>
+      post({
+        sourceChannel: "ForexBreakingNews",
+        sourceMessageId: String(41300 + i),
+        rawText: `backlog ${i}`,
+        sourcePublishedAt: "2026-08-01T20:00:00+00:00",
+      })
+    ),
+  ];
+
+  const processed = await processTelegramPosts(candidates.filter((p) => Number(p.sourceMessageId) > 41400), {
+    disableAi: true,
+  });
+  const publishable = processed.filter((item) => !item.skipPublish);
+  const published = [];
+  for (const item of publishable) {
+    const result = await publishValidatedTelegramNewsCandidate(item, {}, { dryRun: true, memoryOnly: true });
+    if (result.published || result.dryRun) {
+      published.push(result);
+    }
+  }
+
+  assert.strictEqual(published.length <= 4, true, `expected limited publish count got ${published.length}`);
+  assert.ok(published.every((entry) => !isGenericTitle(entry.resolvedTitle || "")));
 }
 
 async function run() {
@@ -926,6 +1184,16 @@ async function run() {
     testQualityGateMaxThreeBullets,
     testQualityGateImpactDoesNotRepeatFact,
     testFinalMessagePassesQualityGate,
+    testBacklogSkippedBeforeBaselineReady,
+    testBacklogSkippedAfterBaseline,
+    testKillSwitchObservationDiscarded,
+    testGenericTitleFinalRejectUrgent,
+    testChannelArtifactSanitizerRemovesNewsletterBullet,
+    testTrumpFingerprintDedupInReservation,
+    testAtomicPublishDuplicateReservation,
+    testTelegramFailReleasesReservationAndSkipsDb,
+    testTelegramSuccessDbFailDoesNotRetelegram,
+    runIncidentFixtureDryRun,
   ];
 
   for (const testCase of tests) {
