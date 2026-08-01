@@ -5,6 +5,7 @@ import { HISTORICAL_LIQUIDITY_WALL_WINDOWS } from "../../../lib/market-data/cons
 import { EXCHANGE_LABELS } from "../../../lib/market-data/symbols";
 import {
   formatDurationAr,
+  formatFlowWindowLabelAr,
   formatMinutesAgoAr,
   formatPrice,
   formatQuantity,
@@ -13,7 +14,6 @@ import {
 import {
   CoverageBadge,
   EmptyState,
-  HistoryState,
   NumericValue,
   Panel,
   SegmentedControl,
@@ -265,35 +265,47 @@ export default function HistoricalLiquidityWallsPanel({
   onWallWindowChange,
   loading,
   isRefreshing,
+  isPendingWindow = false,
   error,
+  refreshError,
   history,
 }) {
   const [activeTab, setActiveTab] = useState("persistent");
+  const selectedWindow = wallWindow;
+  const displayHistory = history;
+  const displayedWindow = displayHistory?.window ?? null;
+  const isShowingPreviousWindow = Boolean(
+    isPendingWindow && displayedWindow && displayedWindow !== selectedWindow,
+  );
+  const selectedFrameLabel = formatFlowWindowLabelAr(selectedWindow);
+  const displayedFrameLabel = formatFlowWindowLabelAr(displayedWindow);
+
   const currentTab = WALL_TABS.find((tab) => tab.id === activeTab) || WALL_TABS[0];
-  const tabRows = history?.[currentTab.rowsKey] || [];
-  const rows = resolveTabRows(history, currentTab.rowsKey);
-  const usingFallback = Boolean(history && tabRows.length === 0 && rows.length > 0);
+  const tabRows = displayHistory?.[currentTab.rowsKey] || [];
+  const rows = resolveTabRows(displayHistory, currentTab.rowsKey);
+  const usingFallback = Boolean(displayHistory && tabRows.length === 0 && rows.length > 0);
 
   const analytics = useMemo(() => {
-    if (!history?.analytics) return [];
+    if (!displayHistory?.analytics) return [];
     return ANALYTICS_ITEMS.map((item) => ({
       ...item,
-      row: history.analytics[item.key],
+      row: displayHistory.analytics[item.key],
     })).filter((item) => item.row);
-  }, [history?.analytics]);
+  }, [displayHistory]);
 
-  const showInitialLoading = loading && !historyHasRows(history);
+  const showInitialLoading = loading && !displayHistory;
+  const showRefreshOverlay = isShowingPreviousWindow && analytics.length > 0;
   return (
     <Panel
       title="جدران السيولة التاريخية"
       description="يعرض مستويات السيولة التي استمرت أو تكررت خلال الفترة المحددة، مع قياس قوة وثبات كل جدار."
       action={
         <div className="flex flex-wrap items-center gap-2">
-          {history?.stale ? (
+          {displayHistory?.stale && !isShowingPreviousWindow ? (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
               بيانات قديمة
             </span>
-          ) : isRefreshing ? (
+          ) : isRefreshing && !isShowingPreviousWindow ? (
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
               جاري التحديث...
             </span>
@@ -304,7 +316,7 @@ export default function HistoricalLiquidityWallsPanel({
             label="الإطار الزمني"
             value={wallWindow}
             onChange={onWallWindowChange}
-            scrollable
+            mobileScrollable
             options={HISTORICAL_LIQUIDITY_WALL_WINDOWS.map((value) => ({ value, label: value }))}
           />
         </div>
@@ -321,18 +333,86 @@ export default function HistoricalLiquidityWallsPanel({
         </ul>
       </details>
 
-      <HistoryState
-        loading={showInitialLoading}
-        error={error && !historyHasRows(history) ? error : null}
-        partial={history?.partialData}
-        coveragePercent={history?.coveragePercent}
-      />
+      {showInitialLoading ? (
+        <p className="mb-4 min-h-[2.5rem] rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+          جاري تحميل بيانات إطار {selectedWindow}...
+        </p>
+      ) : null}
+
+      {!showInitialLoading && error && !displayHistory ? (
+        <p className="mb-4 min-h-[2.5rem] rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+          تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.
+        </p>
+      ) : null}
+
+      {refreshError && displayHistory ? (
+        <p className="mb-4 min-h-[2.5rem] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          تعذّر تحديث بيانات هذا الإطار. يتم عرض آخر بيانات ناجحة.
+        </p>
+      ) : null}
+
+      {displayHistory ? (
+        <div className="mb-4 space-y-2">
+          {isShowingPreviousWindow ? (
+            <>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                الإطار المطلوب:{" "}
+                <NumericValue className="font-medium text-slate-700 dark:text-slate-200">
+                  {selectedFrameLabel}
+                </NumericValue>
+              </p>
+              <span className="inline-flex items-center rounded-full border border-sky-200/80 bg-sky-50/90 px-2.5 py-1 text-[11px] text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-100">
+                يعرض مؤقتًا بيانات {displayedFrameLabel}
+              </span>
+              <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                البيانات المعروضة من الإطار السابق حتى اكتمال التحديث.
+              </p>
+            </>
+          ) : (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              الإطار الحالي:{" "}
+              <NumericValue className="font-medium text-slate-700 dark:text-slate-200">
+                {displayedFrameLabel}
+              </NumericValue>
+              {Number.isFinite(displayHistory.totalCount) ? (
+                <>
+                  {" "}
+                  · جدران:{" "}
+                  <NumericValue className="font-medium">{displayHistory.totalCount}</NumericValue>
+                </>
+              ) : null}
+            </p>
+          )}
+          <CoverageBadge
+            forceShow
+            partial={displayHistory.partialData}
+            coveragePercent={displayHistory.coveragePercent}
+          />
+          {!isShowingPreviousWindow ? (
+            <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+              قد تبقى أسعار الجدران متطابقة بين الإطارات إذا كان نفس الجدار هو الأقوى خلالها.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {analytics.length ? (
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {analytics.map((item) => (
-            <AnalyticsCard key={item.key} label={item.label} hint={item.hint} row={item.row} />
-          ))}
+        <div className="relative mb-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {analytics.map((item) => (
+              <AnalyticsCard key={item.key} label={item.label} hint={item.hint} row={item.row} />
+            ))}
+          </div>
+          {showRefreshOverlay ? (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-white/55 backdrop-blur-[1px] dark:bg-slate-950/45"
+            >
+              <p className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-200">
+                جاري تحميل بيانات إطار {selectedFrameLabel}...
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -346,12 +426,18 @@ export default function HistoricalLiquidityWallsPanel({
 
       <p className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{currentTab.hint}</p>
 
-      <div className="mt-4">
-        {!showInitialLoading && !(error && !historyHasRows(history)) && !rows.length && !analytics.length ? (
+      <div className="relative mt-4">
+        {showRefreshOverlay ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/40 backdrop-blur-[1px] dark:bg-slate-950/35"
+          />
+        ) : null}
+        {!showInitialLoading && !(error && !displayHistory) && !rows.length && !analytics.length ? (
           <EmptyState message="لا توجد جدران تاريخية ضمن الإطار المختار بعد." />
-        ) : (
+        ) : displayHistory && (rows.length || analytics.length) ? (
           <WallsTable rows={rows} showLastSeen={activeTab === "disappeared"} usingFallback={usingFallback} />
-        )}
+        ) : null}
       </div>
     </Panel>
   );

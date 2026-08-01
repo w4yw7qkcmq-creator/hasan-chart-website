@@ -404,7 +404,8 @@ test("depth and large trades share equal-height row with scroll cap", () => {
   assert.match(row2, /max-h-\[26rem\]/);
   assert.match(row2, /overflow-y-auto overflow-x-auto overscroll-contain/);
   assert.match(row2, /relative z-0 flex h-full min-h-0 min-w-0 flex-col lg:col-span-5/);
-  assert.match(row2, /shrink-0 space-y-3[\s\S]*HistoryState/);
+  assert.match(row2, /shrink-0 space-y-4[\s\S]*lg:flex-row lg:flex-wrap[\s\S]*HistoryState/);
+  assert.match(row2, /mobileScrollable/);
   assert.match(row2, /mt-3 min-h-0 flex-1 min-w-0/);
   assert.match(row2, /min-w-\[42rem\]/);
   assert.match(row2, /الكمية/);
@@ -496,8 +497,14 @@ test("historical walls hook retries and caches per window", () => {
   const hook = readFileSync(join(ROOT, "app/hooks/useOrderBookLiquidityWalls.js"), "utf8");
   assert.match(hook, /fetchLiquidityWallsWithRetry/);
   assert.match(hook, /cacheByKeyRef/);
+  assert.match(hook, /buildLiquidityWallsCacheKey/);
+  assert.match(hook, /displayHistoryRef/);
+  assert.match(hook, /isPendingWindow/);
+  assert.match(hook, /refreshError/);
+  assert.match(hook, /data\.window !== wallWindow/);
   assert.match(hook, /30_000/);
   assert.match(hook, /stale: true/);
+  assert.match(hook, /WALLS_REFRESH_FAILED/);
 });
 
 test("liquidity wall cards grow naturally without clipping overflow", () => {

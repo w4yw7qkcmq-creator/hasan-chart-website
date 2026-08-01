@@ -109,6 +109,8 @@ export default function OrderBookPageContent() {
     isRefreshing: liquidityWallsRefreshing,
     loading: liquidityWallsLoading,
     error: liquidityWallsError,
+    isPendingWindow: liquidityWallsPendingWindow,
+    refreshError: liquidityWallsRefreshError,
   } = useOrderBookLiquidityWalls({ prefs, hydrated, wallWindow: liquidityWallWindow });
   const isSidebarWallsLive = liquidityWallsWindow === "live";
   const {
@@ -743,28 +745,32 @@ export default function OrderBookPageContent() {
           title={largeTradesTitle}
           description="صفقات منفذة تجاوزت الحد المحدد ضمن النافذة الزمنية."
         >
-          <div className="shrink-0 space-y-3">
-            <SegmentedControl
-              compact
-              ariaLabel="حد الصفقة الكبيرة"
-              label="الحد"
-              value={String(largeTradeThreshold)}
-              onChange={(value) => setPrefs({ largeTradeThreshold: Number(value) })}
-              scrollable
-              options={LARGE_TRADE_THRESHOLDS.map((value) => ({
-                value: String(value),
-                label: formatThresholdLabel(value),
-              }))}
-            />
-            <SegmentedControl
-              compact
-              ariaLabel="نافذة الصفقات الكبيرة"
-              label="الإطار"
-              value={largeTradeWindow}
-              onChange={(value) => setPrefs({ largeTradeWindow: value })}
-              scrollable
-              options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
-            />
+          <div className="shrink-0 space-y-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-start lg:gap-x-8 lg:gap-y-3">
+              <SegmentedControl
+                compact
+                className="min-w-0 lg:min-w-[18rem]"
+                ariaLabel="حد الصفقة الكبيرة"
+                label="الحد"
+                value={String(largeTradeThreshold)}
+                onChange={(value) => setPrefs({ largeTradeThreshold: Number(value) })}
+                mobileScrollable
+                options={LARGE_TRADE_THRESHOLDS.map((value) => ({
+                  value: String(value),
+                  label: formatThresholdLabel(value),
+                }))}
+              />
+              <SegmentedControl
+                compact
+                className="min-w-0 lg:min-w-[20rem]"
+                ariaLabel="نافذة الصفقات الكبيرة"
+                label="الإطار"
+                value={largeTradeWindow}
+                onChange={(value) => setPrefs({ largeTradeWindow: value })}
+                mobileScrollable
+                options={LARGE_TRADE_WINDOW_OPTIONS.map((value) => ({ value, label: value }))}
+              />
+            </div>
             <HistoryState
               loading={needsLargeTradeHistory && historyLoading}
               error={needsLargeTradeHistory && historyError}
@@ -834,7 +840,9 @@ export default function OrderBookPageContent() {
           onWallWindowChange={setLiquidityWallWindow}
           loading={liquidityWallsInitialLoading}
           isRefreshing={liquidityWallsRefreshing}
+          isPendingWindow={liquidityWallsPendingWindow}
           error={liquidityWallsError}
+          refreshError={liquidityWallsRefreshError}
           history={liquidityWallsHistory}
         />
 

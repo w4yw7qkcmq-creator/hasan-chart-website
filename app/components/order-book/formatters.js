@@ -72,14 +72,24 @@ export function formatThresholdLabel(value) {
 
 export function formatFlowWindowLabelAr(window) {
   switch (window) {
+    case "1m":
+      return "دقيقة واحدة";
     case "5m":
       return "5 دقائق";
     case "15m":
       return "15 دقيقة";
     case "1h":
       return "ساعة واحدة";
-    case "1m":
-      return "دقيقة واحدة";
+    case "4h":
+      return "4 ساعات";
+    case "12h":
+      return "12 ساعة";
+    case "1d":
+      return "يوم واحد";
+    case "3d":
+      return "3 أيام";
+    case "7d":
+      return "7 أيام";
     default:
       return window || "—";
   }

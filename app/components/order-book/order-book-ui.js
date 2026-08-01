@@ -40,16 +40,22 @@ export function SegmentedControl({
   compact = false,
   ariaLabel,
   scrollable = false,
+  mobileScrollable = false,
+  className = "",
 }) {
+  const trackClass = scrollable
+    ? "overflow-x-auto scrollbar-none"
+    : mobileScrollable
+      ? "flex-wrap overflow-visible max-lg:overflow-x-auto max-lg:scrollbar-none"
+      : "flex-wrap";
+
   return (
-    <div className="flex min-w-0 max-w-full flex-col gap-1.5">
+    <div className={`flex min-w-0 max-w-full flex-col gap-1.5 ${className}`}>
       {label ? (
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
       ) : null}
       <div
-        className={`flex min-w-0 max-w-full rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/60 ${
-          scrollable ? "overflow-x-auto scrollbar-none" : "flex-wrap"
-        }`}
+        className={`flex min-w-0 max-w-full rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/60 ${trackClass}`}
         role="tablist"
         aria-label={ariaLabel || label}
       >
@@ -413,16 +419,18 @@ export function SideBadge({ side, variant = "bid" }) {
   );
 }
 
-export function CoverageBadge({ partial, coveragePercent, compact = false }) {
-  if (!partial) return null;
+export function CoverageBadge({ partial, coveragePercent, compact = false, forceShow = false }) {
+  if (!forceShow && !partial) return null;
   const label = formatCoveragePercent(coveragePercent);
+  if (!forceShow && !Number.isFinite(Number(coveragePercent))) return null;
   return (
     <span
+      title="تمثل نسبة البيانات التاريخية المتوفرة لهذا الإطار الزمني."
       className={`inline-flex items-center rounded-full border border-amber-200/80 bg-amber-50/90 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 ${
         compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs"
       }`}
     >
-      تغطية <NumericValue className="mx-0.5">{label}%</NumericValue>
+      التغطية <NumericValue className="mx-0.5">{label}%</NumericValue>
     </span>
   );
 }

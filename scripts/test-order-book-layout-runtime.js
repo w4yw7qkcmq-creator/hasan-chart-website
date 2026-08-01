@@ -59,6 +59,8 @@ test("historical large trades table exposes all core columns", () => {
   assert.match(tradesRow, /align-middle/);
   assert.match(tradesRow, /whitespace-nowrap/);
   assert.match(tradesRow, /formatQuantity\(trade\.quantity\)/);
+  assert.match(tradesRow, /lg:flex-row lg:flex-wrap/);
+  assert.match(tradesRow, /mobileScrollable/);
 });
 
 test("page uses symbol search instead of fixed tabs only", () => {

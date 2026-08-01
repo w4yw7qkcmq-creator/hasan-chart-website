@@ -83,4 +83,42 @@ test("mobile keeps stacked auto layout without forced equal heights", () => {
   assert.doesNotMatch(row1, /max-h-\[/);
 });
 
+const wallsHook = readFileSync(join(ROOT, "app/hooks/useOrderBookLiquidityWalls.js"), "utf8");
+const wallsPanel = readFileSync(join(ROOT, "app/components/order-book/HistoricalLiquidityWallsPanel.js"), "utf8");
+const ui = readFileSync(join(ROOT, "app/components/order-book/order-book-ui.js"), "utf8");
+
+test("liquidity walls hook clears stale payload when switching uncached window", () => {
+  assert.match(wallsHook, /buildLiquidityWallsCacheKey/);
+  assert.match(wallsHook, /displayHistoryRef/);
+  assert.match(wallsHook, /isPendingWindow/);
+  assert.match(wallsHook, /data\.window !== wallWindow/);
+  assert.doesNotMatch(wallsHook, /else \{\s*setPayload\(null\)/);
+});
+
+test("historical walls panel binds analytics to selected window", () => {
+  assert.match(wallsPanel, /selectedWindow = wallWindow/);
+  assert.match(wallsPanel, /displayHistory = history/);
+  assert.match(wallsPanel, /isShowingPreviousWindow/);
+  assert.match(wallsPanel, /displayHistory\?\.analytics/);
+  assert.match(wallsPanel, /الإطار المطلوب/);
+  assert.match(wallsPanel, /يعرض مؤقتًا بيانات/);
+  assert.match(wallsPanel, /pointer-events-none absolute inset-0/);
+  assert.match(wallsPanel, /refreshError && displayHistory/);
+});
+
+test("coverage badge shows labeled percent with tooltip", () => {
+  assert.match(ui, /التغطية/);
+  assert.match(ui, /تمثل نسبة البيانات التاريخية المتوفرة لهذا الإطار الزمني/);
+  assert.match(ui, /forceShow/);
+});
+
+test("large trades controls use desktop wrap without threshold scrollbar", () => {
+  const tradesRow = sliceBetween("{/* Row 3", "{/* Full-width sections");
+  assert.match(tradesRow, /lg:flex-row lg:flex-wrap/);
+  assert.match(tradesRow, /mobileScrollable/);
+  assert.doesNotMatch(tradesRow, /label="الحد"[\s\S]*scrollable/);
+  assert.match(ui, /mobileScrollable/);
+  assert.match(ui, /max-lg:overflow-x-auto max-lg:scrollbar-none/);
+});
+
 console.log(`order-book final polish runtime tests passed: ${passed}/${passed}`);
