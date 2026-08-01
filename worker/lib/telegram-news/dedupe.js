@@ -5,6 +5,8 @@ const { formatTelegramPost } = require("./format");
 const { validateFinalMessageAgainstFacts } = require("./invariants");
 const { getMergeWindowMs } = require("./merge-window");
 const { prepareTelegramPost } = require("./pipeline");
+const { expandPostsWithMultiStory } = require("./multi-story");
+const { applyFedWatchDedup } = require("./fedwatch-dedup");
 
 function scorePostCompleteness(facts) {
   let score = 0;
@@ -200,7 +202,24 @@ async function processTelegramPosts(posts, options = {}) {
   const preparedByKey = new Map();
   const skippedEntries = [];
 
-  for (const post of posts) {
+  const expandedPosts = expandPostsWithMultiStory(posts, pipelineStats);
+
+  for (const post of expandedPosts) {
+    if (post._multiStoryUnclear) {
+      skippedEntries.push({
+        post,
+        prep: {
+          skip: true,
+          reason: "MULTI_STORY_UNCLEAR",
+          classification: null,
+          promoFooterRemoved: false,
+          newsValue: { score: 0, publishable: false },
+        },
+      });
+      pipelineStats.multiStoryUnclear = (pipelineStats.multiStoryUnclear || 0) + 1;
+      continue;
+    }
+
     const prep = prepareTelegramPost(post, pipelineStats);
     const exactKey = `${post.sourceChannel}:${post.sourceMessageId}`;
     if (prep.skip) {
@@ -294,6 +313,13 @@ async function processTelegramPosts(posts, options = {}) {
       newsValue: prep?.newsValue,
       promoFooterRemoved: prep?.promoFooterRemoved === true,
       editorialCheck: formatted.editorialCheck,
+      qualityCheck: formatted.qualityCheck,
+      editorialMetrics: formatted.editorialMetrics,
+      resolvedTitle: formatted.resolvedTitle,
+      originalTitle: formatted.originalTitle,
+      originalLength: formatted.originalLength,
+      finalLength: formatted.finalLength,
+      storyCount: item.post?._storyCount || 1,
       finalFactCheck: finalFactCheck.ok === false ? finalFactCheck : { ok: true },
       aiImpactUsed: formatted.aiImpactUsed === true,
       aiResult: formatted.aiResult || "fallback",
@@ -301,7 +327,7 @@ async function processTelegramPosts(posts, options = {}) {
     });
   }
 
-  return processed;
+  return applyFedWatchDedup(processed);
 }
 
 module.exports = {

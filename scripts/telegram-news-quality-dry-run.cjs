@@ -1,38 +1,103 @@
 const { discoverTelegramNews } = require("../worker/lib/telegram-news");
-const { prepareTelegramPost } = require("../worker/lib/telegram-news/pipeline");
-const { processTelegramPosts } = require("../worker/lib/telegram-news/dedupe");
-const { formatTelegramNewsMessage, stripTimestampFooter } = require("../worker/lib/telegram-news/telegram-formatter");
+const { isGenericTitle } = require("../worker/lib/telegram-news/editorial-title");
+
+function aggregateEditorialMetrics(processed) {
+  const totals = {
+    aiEditorialAccepted: 0,
+    aiEditorialRetryAccepted: 0,
+    aiEditorialTooSimilar: 0,
+    structuredFallbackUsed: 0,
+    structuredFallbackRejected: 0,
+    qualityGateRejected: 0,
+    multiStorySplit: 0,
+    multiStoryUnclear: 0,
+    fedwatchDuplicateSkip: 0,
+    fedwatchUpdatePending: 0,
+  };
+
+  for (const item of processed) {
+    const metrics = item.editorialMetrics || {};
+    totals.aiEditorialAccepted += metrics.aiEditorialAccepted || 0;
+    totals.aiEditorialRetryAccepted += metrics.aiEditorialRetryAccepted || 0;
+    totals.aiEditorialTooSimilar += metrics.aiEditorialTooSimilar || 0;
+    totals.structuredFallbackUsed += metrics.structuredFallbackUsed || 0;
+    totals.structuredFallbackRejected += metrics.structuredFallbackRejected || 0;
+    if (item.reason === "FINAL_EDITORIAL_QUALITY_REJECTED") {
+      totals.qualityGateRejected += 1;
+    }
+    if (item.reason === "MULTI_STORY_UNCLEAR") {
+      totals.multiStoryUnclear += 1;
+    }
+    if ((item.storyCount || 1) > 1) {
+      totals.multiStorySplit += 1;
+    }
+    if (item.reason === "fedwatch_duplicate_skip") {
+      totals.fedwatchDuplicateSkip += 1;
+    }
+    if (item.reason === "TELEGRAM_NEWS_UPDATE_PENDING") {
+      totals.fedwatchUpdatePending += 1;
+    }
+  }
+
+  return totals;
+}
 
 function buildQualityDryRunTable(discovery) {
   const rows = [];
 
   for (const item of discovery.processed) {
     rows.push({
-      Source: item.post?.sourceChannel || "",
-      "Message ID": item.post?.sourceMessageId || "",
-      Classification: item.classification?.classification || item.reason || "",
-      "Promotion Detected": item.classification?.detectedPromotionSignals?.length ? "yes" : "no",
-      "Promotion Removed": item.promoFooterRemoved ? "yes" : "no",
-      "News Value Score": item.newsValue?.score ?? "",
-      "Selected / Skipped": item.skipPublish ? "Skipped" : "Selected",
-      "AI Used": item.aiImpactUsed ? "yes" : "no",
-      "AI Accepted / Fallback": item.aiResult || "none",
-      "Similarity Result": item.editorialCheck?.reason || (item.editorialCheck?.ok === false ? item.editorialCheck?.issues?.join("|") : "ok"),
-      "Final Character Count": item.formattedMessage ? item.formattedMessage.length : 0,
-      "Final Action": item.reason || "",
+      source: item.post?.sourceChannel || "",
+      messageId: item.post?.sourceMessageId || "",
+      classification: item.classification?.classification || item.reason || "",
+      originalGenericTitle: item.originalTitle || item.facts?.title || "",
+      resolvedTitle: item.resolvedTitle || "",
+      originalLength: item.originalLength || String(item.post?.rawText || "").length,
+      finalLength: item.finalLength || (item.formattedMessage ? item.formattedMessage.length : 0),
+      storyCount: item.storyCount || 1,
+      aiFirstAttempt: item.editorialMetrics?.aiEditorialAccepted ? "accepted" : item.aiResult || "none",
+      aiRetry: item.editorialMetrics?.aiEditorialRetryAccepted ? "accepted" : "none",
+      fallbackUsed: item.editorialMetrics?.structuredFallbackUsed ? "yes" : "no",
+      similarity: item.editorialCheck?.overlap ?? "",
+      qualityGateResult: item.qualityCheck?.ok === false ? item.qualityCheck?.issues?.join("|") : "ok",
+      finalAction: item.skipPublish ? `skip:${item.reason}` : item.reason || "publish-ready",
     });
   }
 
   return rows;
 }
 
-function pickExamples(processed) {
-  const economic = processed.filter((i) => i.newsType === "economic" && !i.skipPublish).slice(0, 3);
-  const general = processed.filter((i) => i.newsType === "general" && !i.skipPublish).slice(0, 3);
-  const preEvent = processed.filter((i) => i.newsType === "pre_event" && !i.skipPublish).slice(0, 2);
-  const promos = processed.filter((i) => i.skipPublish && /PROMOTION|SUBSCRIPTION|BROKER|CHANNEL|LOW_VALUE|UNCLEAR/i.test(i.reason || "")).slice(0, 2);
+function pickTopCandidates(processed, limit = 15) {
+  const scored = processed
+    .filter((item) => item.formattedMessage || item.resolvedTitle)
+    .map((item) => {
+      let score = 0;
+      if (!item.skipPublish) score += 5;
+      if (item.resolvedTitle && !isGenericTitle(item.resolvedTitle)) score += 3;
+      if (item.finalLength && item.finalLength <= 600) score += 2;
+      if (item.qualityCheck?.ok !== false) score += 2;
+      return { item, score };
+    })
+    .sort((a, b) => b.score - a.score || (b.item.finalLength || 0) - (a.item.finalLength || 0));
 
-  return { economic, general, preEvent, promos };
+  return scored.slice(0, limit).map((entry) => entry.item);
+}
+
+function computeLengthStats(processed) {
+  const lengths = processed
+    .filter((item) => item.formattedMessage)
+    .map((item) => item.formattedMessage.length);
+
+  if (!lengths.length) {
+    return { average: 0, max: 0, count: 0 };
+  }
+
+  const total = lengths.reduce((sum, value) => sum + value, 0);
+  return {
+    average: Math.round(total / lengths.length),
+    max: Math.max(...lengths),
+    count: lengths.length,
+  };
 }
 
 async function runTelegramNewsQualityDryRun(options = {}) {
@@ -42,6 +107,8 @@ async function runTelegramNewsQualityDryRun(options = {}) {
     unclearSkipped: 0,
     lowValueSkipped: 0,
     preEventMissingName: 0,
+    multiStorySplit: 0,
+    multiStoryUnclear: 0,
   };
 
   const discovery = await discoverTelegramNews({
@@ -55,7 +122,17 @@ async function runTelegramNewsQualityDryRun(options = {}) {
   });
 
   const table = buildQualityDryRunTable(discovery);
-  const examples = pickExamples(discovery.processed);
+  const previewTop15 = pickTopCandidates(discovery.processed, 15);
+  const editorialTotals = aggregateEditorialMetrics(discovery.processed);
+  const lengthStats = computeLengthStats(discovery.processed);
+
+  const genericTitlesRemaining = discovery.processed.filter(
+    (item) => item.resolvedTitle && isGenericTitle(item.resolvedTitle)
+  ).length;
+  const overLimit = discovery.processed.filter(
+    (item) => item.formattedMessage && item.formattedMessage.length > 600
+  ).length;
+  const multiStoryBundled = discovery.processed.filter((item) => (item.storyCount || 1) > 1 && !item.skipPublish).length;
 
   return {
     metrics: {
@@ -67,15 +144,39 @@ async function runTelegramNewsQualityDryRun(options = {}) {
       unclearSkipped: parseStats.unclearSkipped,
       lowValueSkipped: parseStats.lowValueSkipped,
       preEventMissingName: parseStats.preEventMissingName,
+      multiStorySplit: parseStats.multiStorySplit || editorialTotals.multiStorySplit,
+      multiStoryUnclear: parseStats.multiStoryUnclear || editorialTotals.multiStoryUnclear,
+      genericTitlesRemaining,
+      overLimitMessages: overLimit,
+      multiStoryBundled,
+      lengthStats,
+      editorialTotals,
     },
     table,
-    examples,
+    previewTop15: previewTop15.map((item) => ({
+      source: item.post?.sourceChannel,
+      messageId: item.post?.sourceMessageId,
+      classification: item.classification?.classification,
+      originalGenericTitle: item.originalTitle,
+      resolvedTitle: item.resolvedTitle,
+      originalLength: item.originalLength,
+      finalLength: item.finalLength,
+      storyCount: item.storyCount || 1,
+      aiFirstAttempt: item.editorialMetrics?.aiEditorialAccepted ? "accepted" : item.aiResult,
+      aiRetry: item.editorialMetrics?.aiEditorialRetryAccepted ? "accepted" : "none",
+      fallbackUsed: item.editorialMetrics?.structuredFallbackUsed ? "yes" : "no",
+      similarity: item.editorialCheck?.overlap,
+      qualityGateResult: item.qualityCheck?.ok === false ? item.qualityCheck?.issues : "ok",
+      finalAction: item.skipPublish ? `skip:${item.reason}` : item.reason,
+      preview: item.formattedMessage ? item.formattedMessage.slice(0, 220) : null,
+    })),
   };
 }
 
 module.exports = {
   runTelegramNewsQualityDryRun,
   buildQualityDryRunTable,
+  pickTopCandidates,
 };
 
 if (require.main === module) {
@@ -83,17 +184,12 @@ if (require.main === module) {
     .then((report) => {
       console.log("TELEGRAM_NEWS_QUALITY_DRY_RUN");
       console.log(JSON.stringify(report.metrics, null, 2));
+
+      console.log("\nPREVIEW_TOP_15");
+      console.table(report.previewTop15);
+
       console.log("\nDRY_RUN_TABLE");
       console.table(report.table.slice(0, 40));
-
-      console.log("\n=== EXAMPLES ===");
-      for (const [label, items] of Object.entries(report.examples)) {
-        console.log(`\n--- ${label.toUpperCase()} ---`);
-        for (const item of items) {
-          console.log(`\n[${item.post?.sourceChannel}/${item.post?.sourceMessageId}]`);
-          console.log(item.formattedMessage || `(skipped: ${item.reason})`);
-        }
-      }
     })
     .catch((error) => {
       console.error("TELEGRAM_NEWS_QUALITY_DRY_RUN_FAILED", error.message);

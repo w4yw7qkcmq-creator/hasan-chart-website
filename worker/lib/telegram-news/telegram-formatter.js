@@ -85,7 +85,7 @@ function formatTelegramNewsMessage({ template, headline, country, previous, fore
     cleaned.impact || null,
   ].filter((line) => line !== null);
 
-  return stripTimestampFooter(trimToLimit(collapseBlankLines(body.join("\n")), 1000));
+  return stripTimestampFooter(trimToLimit(collapseBlankLines(body.join("\n")), 600));
 }
 
 module.exports = {

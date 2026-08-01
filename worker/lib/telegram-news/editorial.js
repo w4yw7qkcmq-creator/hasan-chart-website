@@ -1,7 +1,22 @@
 const { normalizeSentence, uniqueNonEmpty } = require("./repetition");
+const { resolveEditorialTitle, buildEconomicEditorialTitle } = require("./editorial-title");
+const {
+  buildConciseStructuredFallback,
+  buildMinimalStructuredFallback,
+} = require("./concise-editorial");
 
 const CHANNEL_NAME_PATTERN = /forexbreakingnews|forexnewspaper|ForexBreakingNews|ForexNewspaper/i;
 const PROMO_URL_PATTERN = /https?:\/\/(?:one\.)?exness|t\.me\/(?:Forex|joinchat|\+)/i;
+
+function createEditorialMetrics() {
+  return {
+    aiEditorialAccepted: 0,
+    aiEditorialRetryAccepted: 0,
+    aiEditorialTooSimilar: 0,
+    structuredFallbackUsed: 0,
+    structuredFallbackRejected: 0,
+  };
+}
 
 function buildStructuredFactsForEditorial(facts, post, classification = {}) {
   const preEvent = classification.preEvent || null;
@@ -30,7 +45,7 @@ function buildStructuredFactsForEditorial(facts, post, classification = {}) {
   };
 }
 
-function buildRuleBasedEditorialDraft(structuredFacts) {
+function buildRuleBasedEditorialDraft(structuredFacts, facts = {}) {
   if (structuredFacts.isPreEventAlert) {
     const minutes = structuredFacts.preEventMinutes || 5;
     const eventName = structuredFacts.preEventEventName || structuredFacts.titleFact;
@@ -48,10 +63,11 @@ function buildRuleBasedEditorialDraft(structuredFacts) {
   }
 
   if (structuredFacts.isStructuredTriple) {
+    const titleResult = resolveEditorialTitle(facts, structuredFacts.eventType, structuredFacts.titleFact);
     const headline =
-      String(structuredFacts.titleFact || "")
-        .replace(/^صدر\s*الآن\s*:?\s*/i, "")
-        .trim() || "إصدار اقتصادي أمريكي";
+      titleResult.title ||
+      buildEconomicEditorialTitle(facts, structuredFacts.eventType) ||
+      "إصدار اقتصادي أمريكي";
     const impact =
       structuredFacts.actual && structuredFacts.forecast
         ? `القراءة الفعلية ${structuredFacts.actual} مقابل توقع ${structuredFacts.forecast} قد تؤثر على توقعات الفائدة وحركة الدولار والذهب خلال الجلسة.`
@@ -65,25 +81,11 @@ function buildRuleBasedEditorialDraft(structuredFacts) {
       forecast: structuredFacts.forecast,
       actual: structuredFacts.actual,
       impact,
+      titleResult,
     };
   }
 
-  const headline = structuredFacts.titleFact || structuredFacts.factualPoints[0] || "تحديث سوق";
-  const points = uniqueNonEmpty(structuredFacts.factualPoints).filter(
-    (line) => normalizeSentence(line) !== normalizeSentence(headline)
-  );
-  const summary = points.slice(0, 2).join(" ") || headline;
-  const bullets = points.slice(2, 5);
-  const impact = "قد تنعكس هذه التطورات على الدولار والذهب ومؤشرات الأسهم والعملات الرقمية وفق حساسية السوق الحالية.";
-
-  return {
-    ok: true,
-    template: "general",
-    headline,
-    summary,
-    bullets,
-    impact,
-  };
+  return buildConciseStructuredFallback(structuredFacts, facts);
 }
 
 function sentenceOverlapRatio(sourceText, draftText) {
@@ -156,18 +158,54 @@ function validateEditorialDraft(finalDraft, sourceText, facts, structuredFacts =
   };
 }
 
+function resolveDraftWithSimilarityRetry(structuredFacts, facts, sourceText, metrics = createEditorialMetrics()) {
+  const attempts = [
+    () => buildRuleBasedEditorialDraft(structuredFacts, facts),
+    () => buildConciseStructuredFallback(structuredFacts, facts, { reorder: true }),
+    () => buildMinimalStructuredFallback(structuredFacts, facts),
+  ];
+
+  let lastCheck = null;
+  for (let index = 0; index < attempts.length; index += 1) {
+    const draft = attempts[index]();
+    if (!draft.ok) {
+      if (index === attempts.length - 1) {
+        metrics.structuredFallbackRejected += 1;
+        return { draft: null, metrics, reason: draft.reason };
+      }
+      continue;
+    }
+
+    lastCheck = { draft, index };
+    if (index === 0) {
+      metrics.aiEditorialAccepted += 1;
+    } else if (index === 1) {
+      metrics.aiEditorialRetryAccepted += 1;
+      metrics.structuredFallbackUsed += 1;
+    } else {
+      metrics.structuredFallbackUsed += 1;
+    }
+
+    return { draft, metrics, attempt: index };
+  }
+
+  return { draft: null, metrics, reason: lastCheck?.draft?.reason || "GENERIC_TITLE_REJECTED" };
+}
+
 async function buildEditorialDraft(structuredFacts, options = {}) {
-  const ruleDraft = buildRuleBasedEditorialDraft(structuredFacts);
-  if (!ruleDraft.ok) {
-    return { draft: null, aiUsed: false, aiResult: "skipped", reason: ruleDraft.reason };
+  const metrics = options.metrics || createEditorialMetrics();
+  const facts = options.facts || {};
+  const resolved = resolveDraftWithSimilarityRetry(structuredFacts, facts, options.sourceText || "", metrics);
+  if (!resolved.draft) {
+    return { draft: null, aiUsed: false, aiResult: "rejected", reason: resolved.reason, metrics };
   }
 
-  if (options.disableAi === true) {
-    return { draft: ruleDraft, aiUsed: false, aiResult: "rule_based" };
-  }
-
-  // AI path reserved — rule-based editorial is default; similarity retry uses stronger rule template
-  return { draft: ruleDraft, aiUsed: false, aiResult: "rule_based" };
+  return {
+    draft: resolved.draft,
+    aiUsed: false,
+    aiResult: resolved.attempt === 0 ? "structured_fallback" : "structured_retry",
+    metrics,
+  };
 }
 
 module.exports = {
@@ -176,4 +214,6 @@ module.exports = {
   buildEditorialDraft,
   validateEditorialDraft,
   sentenceOverlapRatio,
+  createEditorialMetrics,
+  resolveDraftWithSimilarityRetry,
 };

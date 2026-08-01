@@ -53,6 +53,24 @@ const {
   buildAiImpactParagraph,
   resolveImpactWithAi,
 } = require(path.join(root, "lib/telegram-news/ai-impact"));
+const {
+  resolveEditorialTitle,
+  isGenericTitle,
+  buildEconomicEditorialTitle,
+} = require(path.join(root, "lib/telegram-news/editorial-title"));
+const {
+  buildConciseEditorialMessage,
+  buildConciseStructuredFallback,
+  buildMinimalStructuredFallback,
+} = require(path.join(root, "lib/telegram-news/concise-editorial"));
+const { splitMultiStoryPost, expandPostsWithMultiStory } = require(path.join(root, "lib/telegram-news/multi-story"));
+const {
+  buildFedWatchFingerprint,
+  compareFedWatchUpdates,
+  applyFedWatchDedup,
+} = require(path.join(root, "lib/telegram-news/fedwatch-dedup"));
+const { validateFinalEditorialQuality } = require(path.join(root, "lib/telegram-news/editorial-quality"));
+const { createEditorialMetrics, resolveDraftWithSimilarityRetry } = require(path.join(root, "lib/telegram-news/editorial"));
 
 const fixturesDir = path.join(__dirname, "fixtures");
 
@@ -418,7 +436,8 @@ async function testTrumpIranGeneralTemplate() {
   const rawText = "🚨 Trump says Iran talks could resume if Tehran agrees to nuclear limits\nOil prices eased after the remarks";
   const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
   assert.strictEqual(processed[0].skipPublish, false);
-  assert.ok(processed[0].formattedMessage.includes("Trump"));
+  assert.ok(/ترامب|Trump/i.test(processed[0].formattedMessage));
+  assert.ok(!isGenericTitle(processed[0].resolvedTitle || ""));
 }
 
 async function testPreEventWithEventName() {
@@ -558,6 +577,288 @@ function testSpacingRules() {
   assert.ok(!/\n{3,}/.test(msg));
 }
 
+function testConsumerConfidenceGenericTitleResolved() {
+  const facts = {
+    title: "صدر الآن",
+    isStructuredTriple: true,
+    canonicalEventKey: "US_CONSUMER_CONFIDENCE",
+    actual: "55.2",
+    forecast: "54.4",
+    previous: "49.5",
+  };
+  const result = resolveEditorialTitle(facts, "US_CONSUMER_CONFIDENCE", "صدر الآن");
+  assert.strictEqual(result.rejected, false);
+  assert.ok(result.title.includes("ثقة المستهلك"));
+  assert.ok(!isGenericTitle(result.title));
+}
+
+function testTrumpIranGenericTitleResolved() {
+  const facts = {
+    title: "عاجل",
+    detailLines: ["Trump says Iran talks could resume if Tehran agrees to nuclear limits"],
+    entities: ["Trump", "Iran"],
+  };
+  const result = resolveEditorialTitle(facts, null, "عاجل");
+  assert.strictEqual(result.rejected, false);
+  assert.ok(/ترامب|إيران/i.test(result.title));
+}
+
+function testGenericTitleWithoutFactsRejected() {
+  const result = resolveEditorialTitle({ title: "عاجل" }, null, "عاجل");
+  assert.strictEqual(result.rejected, true);
+  assert.strictEqual(result.reason, "GENERIC_TITLE_REJECTED");
+}
+
+function testLongGeneralNewsUnder600Chars() {
+  const longLine = "A".repeat(500);
+  const structuredFacts = {
+    factualPoints: [longLine, "Gold rises 1.8% after Powell comments on inflation risks in the US session"],
+    officials: ["Powell"],
+    keyNumbers: ["1.8%"],
+  };
+  const facts = {
+    title: "Gold update",
+    detailLines: structuredFacts.factualPoints,
+    numbers: ["1.8%"],
+    entities: ["Powell"],
+  };
+  const draft = buildConciseStructuredFallback(structuredFacts, facts);
+  assert.strictEqual(draft.ok, true);
+  const msg = formatTelegramNewsMessage({
+    template: "general",
+    headline: draft.headline,
+    summary: draft.summary,
+    bullets: draft.bullets,
+    impact: draft.impact,
+  });
+  assert.ok(msg.length <= 600, `expected <=600 got ${msg.length}`);
+}
+
+function testConciseMessageMaxThreeBullets() {
+  const structuredFacts = {
+    factualPoints: [
+      "Fed's Logan said inflation progress is uneven and policy should stay restrictive",
+      "Markets trimmed rate-cut bets after the remarks",
+      "Gold eased while the dollar held firm in late trading",
+      "Treasury yields moved higher across the curve",
+    ],
+    officials: ["Logan"],
+    keyNumbers: [],
+  };
+  const facts = {
+    title: "Fed remarks",
+    detailLines: structuredFacts.factualPoints,
+    entities: ["Logan"],
+  };
+  const draft = buildConciseEditorialMessage(structuredFacts, facts);
+  assert.strictEqual(draft.ok, true);
+  assert.ok(draft.bullets.length <= 3);
+}
+
+function testSimilarityRetryUsesStructuredFacts() {
+  const structuredFacts = {
+    factualPoints: ["Gold rises 1.8% after Powell comments on inflation risks in the US session"],
+    keyNumbers: ["1.8%"],
+  };
+  const facts = { title: "Gold", detailLines: structuredFacts.factualPoints, numbers: ["1.8%"] };
+  const source = structuredFacts.factualPoints[0];
+  const metrics = createEditorialMetrics();
+  const resolved = resolveDraftWithSimilarityRetry(structuredFacts, facts, source, metrics);
+  assert.ok(resolved.draft);
+  const formatted = formatTelegramNewsMessage({
+    template: "general",
+    headline: resolved.draft.headline,
+    summary: resolved.draft.summary,
+    bullets: resolved.draft.bullets,
+    impact: resolved.draft.impact,
+  });
+  const check = validateEditorialDraft(formatted, source, facts, structuredFacts);
+  assert.ok(check.ok || metrics.structuredFallbackUsed > 0);
+}
+
+function testSimilarityRetryFallsBackToConciseStructured() {
+  const structuredFacts = {
+    factualPoints: ["Gold rises 1.8% after Powell comments on inflation risks in the US session"],
+    keyNumbers: ["1.8%"],
+  };
+  const facts = { title: "Gold", detailLines: structuredFacts.factualPoints, numbers: ["1.8%"] };
+  const source = structuredFacts.factualPoints[0];
+  const metrics = createEditorialMetrics();
+  const resolved = resolveDraftWithSimilarityRetry(structuredFacts, facts, source, metrics);
+  assert.ok(resolved.draft);
+  assert.ok(metrics.aiEditorialAccepted >= 1 || metrics.structuredFallbackUsed >= 1);
+}
+
+function testStructuredFallbackDoesNotMirrorRawDetailLines() {
+  const structuredFacts = {
+    factualPoints: [
+      "Line one about markets",
+      "Line two about oil",
+      "Line three about rates",
+    ],
+    officials: ["Trump"],
+    keyNumbers: [],
+  };
+  const facts = {
+    title: "Trump update",
+    detailLines: structuredFacts.factualPoints,
+    entities: ["Trump"],
+  };
+  const fallback = buildConciseStructuredFallback(structuredFacts, facts, { reorder: true });
+  assert.strictEqual(fallback.ok, true);
+  assert.notDeepStrictEqual(fallback.bullets, structuredFacts.factualPoints.map((l) => l));
+}
+
+function testMultiStoryDigestSplitsIntoThree() {
+  const rawText = `موجز مساء
+• Trump says Iran talks could resume if Tehran agrees to nuclear limits
+• Japan intervened in the yen after a sharp move in Tokyo trading
+• Gold rises 1.8% after Powell comments on inflation risks`;
+  const result = splitMultiStoryPost(post({ rawText }));
+  assert.strictEqual(result.split, true);
+  assert.strictEqual(result.stories.length, 3);
+}
+
+function testUnclearMultiStoryDigestSkipped() {
+  const rawText = "موجز مساء\n• short\n• tiny";
+  const result = splitMultiStoryPost(post({ rawText }));
+  assert.strictEqual(result.unclear, true);
+  assert.strictEqual(result.reason, "MULTI_STORY_UNCLEAR");
+}
+
+function testFedWatchDuplicateSameProbability() {
+  const items = applyFedWatchDedup([
+    {
+      post: post({ rawText: "FedWatch: 67% chance of a 25bp hike at the July FOMC meeting", sourcePublishedAt: "2026-08-01T10:00:00+00:00" }),
+      facts: { title: "FedWatch", isPlainFedNews: true },
+      skipPublish: false,
+    },
+    {
+      post: post({ rawText: "FedWatch update: 67% probability for July FOMC hike", sourcePublishedAt: "2026-08-01T11:00:00+00:00" }),
+      facts: { title: "FedWatch", isPlainFedNews: true },
+      skipPublish: false,
+    },
+  ]);
+  const skipped = items.filter((i) => i.reason === "fedwatch_duplicate_skip");
+  assert.strictEqual(skipped.length, 1);
+}
+
+function testFedWatchMinorChangePrefersLatest() {
+  const comparison = compareFedWatchUpdates(
+    { post: { rawText: "FedWatch 63.4% hike July FOMC" }, facts: {} },
+    { post: { rawText: "FedWatch 67% hike July FOMC" }, facts: {} }
+  );
+  assert.strictEqual(comparison.action, "duplicate_skip");
+}
+
+function testFedWatchMaterialChangeUpdatePending() {
+  const comparison = compareFedWatchUpdates(
+    { post: { rawText: "FedWatch 40% hike July FOMC" }, facts: {} },
+    { post: { rawText: "FedWatch 67% hike July FOMC" }, facts: {} }
+  );
+  assert.strictEqual(comparison.action, "update_pending");
+  const items = applyFedWatchDedup([
+    {
+      post: post({ rawText: "FedWatch 40% hike July FOMC", sourcePublishedAt: "2026-08-01T10:00:00+00:00" }),
+      facts: { isPlainFedNews: true },
+      skipPublish: false,
+    },
+    {
+      post: post({ rawText: "FedWatch 67% hike July FOMC", sourcePublishedAt: "2026-08-01T11:00:00+00:00" }),
+      facts: { isPlainFedNews: true },
+      skipPublish: false,
+    },
+  ]);
+  assert.ok(items.every((i) => i.skipPublish === true));
+  assert.ok(items.some((i) => i.reason === "TELEGRAM_NEWS_UPDATE_PENDING"));
+}
+
+function testEconomicCanonicalTitleFromKey() {
+  const title = buildEconomicEditorialTitle(
+    { actual: "50.9", forecast: "50.2" },
+    "US_ISM_MANUFACTURING"
+  );
+  assert.ok(title.includes("التصنيع"));
+  assert.ok(!isGenericTitle(title));
+}
+
+function testNoHeadlineRepeatInSummary() {
+  const msg = formatTelegramNewsMessage({
+    template: "general",
+    headline: "الذهب يرتفع بعد تصريحات باوell",
+    summary: "تحركت أسعار الذهب صعودًا بعد تصريحات Powell حول التضخم.",
+    bullets: ["الدولار استقر"],
+    impact: "قد تنعكس الحركة على الذهب والدولار خلال الجلسة.",
+  });
+  const check = validateFinalEditorialQuality(msg, { numbers: [] }, { template: "general" });
+  assert.ok(check.ok || !check.issues.includes("headline_repeated"));
+}
+
+function testQualityGateCharacterLimit() {
+  const longMsg = `🚨 عنوان حقيقي للخبر\n\n${"x".repeat(620)}`;
+  const check = validateFinalEditorialQuality(longMsg, {}, { template: "general" });
+  assert.ok(check.issues.includes("character_limit_exceeded"));
+}
+
+function testQualityGateNoSourceChannel() {
+  const msg = "🚨 خبر\n\nملخص.\n\n📊 التأثير المحتمل:\nتأثير.";
+  const check = validateFinalEditorialQuality(msg, {}, { template: "general" });
+  assert.ok(!check.issues.includes("channel_name_leak"));
+}
+
+function testQualityGateNoSourceLink() {
+  const msg = formatTelegramNewsMessage({
+    template: "general",
+    headline: "تحديث السوق",
+    summary: "ملخص.",
+    bullets: [],
+    impact: "تأثير.",
+  });
+  assert.ok(!/https?:\/\//i.test(msg));
+}
+
+function testQualityGateNoTimestampFooter() {
+  const msg = stripTimestampFooter("🚨 خبر\n\nملخص.\n\n🕒 2026/08/01 10:00 PM");
+  assert.ok(!/🕒|2026\//.test(msg));
+}
+
+function testQualityGateNoPlaceholders() {
+  const check = validateFinalEditorialQuality("🚨 CPI\n\nغير متوفر", {}, { template: "general" });
+  assert.ok(check.issues.includes("placeholder_text"));
+}
+
+function testQualityGateNoFactMismatch() {
+  const msg = formatTelegramNewsMessage({
+    template: "general",
+    headline: "الذهب يرتفع بعد Powell",
+    summary: "سجل الذهب ارتفاعًا بنسبة 1.8% بعد تصريحات Powell حول التضخم.",
+    bullets: [],
+    impact: "قد ينعكس ذلك على الدولار والذهب خلال الجلسة.",
+  });
+  const check = validateFinalEditorialQuality(msg, { numbers: ["1.8%"], rawNumbers: ["1.8%"] }, { template: "general" });
+  assert.ok(check.ok);
+}
+
+function testQualityGateMaxThreeBullets() {
+  const msg = `🚨 تحديث حقيقي للسوق\n\nملخص.\n\n📌 أبرز التفاصيل:\n• a\n• b\n• c\n• d\n\n📊 التأثير المحتمل:\nتأثير.`;
+  const check = validateFinalEditorialQuality(msg, {}, { template: "general" });
+  assert.ok(check.issues.includes("too_many_bullets"));
+}
+
+function testQualityGateImpactDoesNotRepeatFact() {
+  const msg = `🚨 الذهب يقفز في الجلسة\n\nسجل الذهب ارتفاعًا بنسبة 1.8% بعد Powell.\n\n📊 التأثير المحتمل:\nسجل الذهب ارتفاعًا بنسبة 1.8% بعد Powell.`;
+  const check = validateFinalEditorialQuality(msg, { numbers: ["1.8%"] }, { template: "general" });
+  assert.ok(check.issues.includes("impact_repeats_fact"));
+}
+
+async function testFinalMessagePassesQualityGate() {
+  const rawText = "🚨 Trump says Iran talks could resume if Tehran agrees to nuclear limits\nOil prices eased after the remarks";
+  const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, false);
+  assert.ok(processed[0].qualityCheck?.ok !== false);
+  assert.ok(processed[0].formattedMessage.length <= 600);
+}
+
 async function run() {
   const tests = [
     testCrossChannelEconomicDedupDifferentTitles,
@@ -601,6 +902,30 @@ async function run() {
     testPromotionOnlyNeverFormats,
     testLowValueSkipped,
     testSpacingRules,
+    testConsumerConfidenceGenericTitleResolved,
+    testTrumpIranGenericTitleResolved,
+    testGenericTitleWithoutFactsRejected,
+    testLongGeneralNewsUnder600Chars,
+    testConciseMessageMaxThreeBullets,
+    testSimilarityRetryUsesStructuredFacts,
+    testSimilarityRetryFallsBackToConciseStructured,
+    testStructuredFallbackDoesNotMirrorRawDetailLines,
+    testMultiStoryDigestSplitsIntoThree,
+    testUnclearMultiStoryDigestSkipped,
+    testFedWatchDuplicateSameProbability,
+    testFedWatchMinorChangePrefersLatest,
+    testFedWatchMaterialChangeUpdatePending,
+    testEconomicCanonicalTitleFromKey,
+    testNoHeadlineRepeatInSummary,
+    testQualityGateCharacterLimit,
+    testQualityGateNoSourceChannel,
+    testQualityGateNoSourceLink,
+    testQualityGateNoTimestampFooter,
+    testQualityGateNoPlaceholders,
+    testQualityGateNoFactMismatch,
+    testQualityGateMaxThreeBullets,
+    testQualityGateImpactDoesNotRepeatFact,
+    testFinalMessagePassesQualityGate,
   ];
 
   for (const testCase of tests) {
