@@ -18,8 +18,22 @@ const parser = new Parser();
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL;
+function resolveSupabaseUrl() {
+  const candidates = [process.env.SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_URL];
+
+  for (const candidate of candidates) {
+    const trimmed = String(candidate || "").trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+const SUPABASE_URL = resolveSupabaseUrl();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const NEWS_DRY_RUN = process.env.NEWS_DRY_RUN === "1" || process.env.NEWS_DRY_RUN === "true";
 const TRADING_ECONOMICS_CLIENT =
   process.env.TRADING_ECONOMICS_CLIENT ||
   process.env.TRADING_ECONOMICS_API_KEY ||
@@ -28,10 +42,92 @@ const TRADING_ECONOMICS_CLIENT =
 const INVESTING_CALENDAR_URL = "https://www.investing.com/economic-calendar/Service/getCalendarFilteredData";
 const INVESTING_US_COUNTRY_ID = "5";
 
-const supabase = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY
-);
+let supabase = null;
+
+function getSupabaseClient() {
+  if (supabase) {
+    return supabase;
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  return supabase;
+}
+
+function createEmptyCycleStats() {
+  return {
+    fetched: 0,
+    normalized: 0,
+    rejectedInvalid: 0,
+    rejectedLowImpact: 0,
+    rejectedDuplicate: 0,
+    rejectedStale: 0,
+    rejectedFilter: 0,
+    aiProcessed: 0,
+    aiFailed: 0,
+    dbInserted: 0,
+    dbFailed: 0,
+    telegramPublished: 0,
+    telegramFailed: 0,
+    eligible: 0,
+    cycleDurationMs: 0,
+    lastErrorSafe: null,
+    sourceErrors: {},
+    rejectionSamples: {},
+  };
+}
+
+let lastCycleStats = createEmptyCycleStats();
+let lastCycleCompletedAt = null;
+let lastSuccessfulFetchAt = null;
+let consecutiveFailures = 0;
+
+function recordRejection(stats, reason, sample) {
+  stats.rejectionSamples[reason] = stats.rejectionSamples[reason] || 0;
+  stats.rejectionSamples[reason] += 1;
+
+  if (sample && stats.rejectionSamples[`${reason}:sample`] == null) {
+    stats.rejectionSamples[`${reason}:sample`] = String(sample).slice(0, 160);
+  }
+}
+
+function getRequiredEnvStatus() {
+  const keys = [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_CHANNEL_ID",
+    "OPENAI_API_KEY",
+    "TRADING_ECONOMICS_API_KEY",
+    "TRADING_ECONOMICS_CLIENT",
+  ];
+
+  return keys.map((name) => {
+    const value = process.env[name];
+    return {
+      name,
+      present: value != null && String(value).trim() !== "",
+    };
+  });
+}
+
+function logWorkerEnvStatus() {
+  const status = getRequiredEnvStatus();
+  console.log(
+    "NEWS_WORKER_ENV",
+    JSON.stringify({
+      dryRun: NEWS_DRY_RUN,
+      variables: status.map(({ name, present }) => ({
+        name,
+        present,
+        empty: !present,
+      })),
+    })
+  );
+}
 
 const LAST_NEWS_FILE = path.join(__dirname, "last-news.json");
 const NEWS_CARD_FILE = path.join(__dirname, "news-card.png");
@@ -703,7 +799,7 @@ const NEWS_FEEDS = [
   "https://www.investing.com/rss/news.rss",
   "https://www.investing.com/rss/forex.rss",
   "https://www.investing.com/rss/commodities.rss",
-  "https://www.coindesk.com/arc/outboundfeeds/rss/",
+  "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml",
 ];
 
 const TELEGRAM_SOURCE_CHANNELS = [
@@ -1375,7 +1471,12 @@ async function buildUniqueNewsSlug(title, sourceLink) {
   const fallbackSlug = `${baseSlug}-${hash}`;
 
   try {
-    const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (!client) {
+      return fallbackSlug;
+    }
+
+    const { data, error } = await client
       .from("news_posts")
       .select("id,source_link,slug")
       .in("slug", [preferredSlug, fallbackSlug])
@@ -1837,7 +1938,12 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH") {
 
 async function loadPublishedNewsFromSupabase() {
   try {
-    const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (!client) {
+      return [];
+    }
+
+    const { data, error } = await client
       .from("published_news")
       .select("*")
       .order("published_at", { ascending: false })
@@ -1863,7 +1969,12 @@ async function loadPublishedNewsFromSupabase() {
 
 async function loadNewsPostsFromSupabase() {
   try {
-    const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (!client) {
+      return [];
+    }
+
+    const { data, error } = await client
       .from("news_posts")
       .select("title, content, source_link, created_at")
       .order("created_at", { ascending: false })
@@ -1889,8 +2000,18 @@ async function loadNewsPostsFromSupabase() {
 }
 
 async function savePublishedNewsToSupabase(item) {
+  if (NEWS_DRY_RUN) {
+    return { skipped: true, reason: "dry_run" };
+  }
+
   try {
-    const { error } = await supabase
+    const client = getSupabaseClient();
+    if (!client) {
+      console.error("❌ Supabase Save Error: client unavailable");
+      return { error: "client_unavailable" };
+    }
+
+    const { error } = await client
       .from("published_news")
       .upsert(
         [
@@ -1914,12 +2035,17 @@ async function savePublishedNewsToSupabase(item) {
 }
 
 async function dispatchMarketNewsNotifications({ title, sourceLink, impactLevel }) {
-  if (impactLevel !== "HIGH") {
+  if (impactLevel !== "HIGH" || NEWS_DRY_RUN) {
     return;
   }
 
   try {
-    const { data: subscriptions, error } = await supabase
+    const client = getSupabaseClient();
+    if (!client) {
+      return;
+    }
+
+    const { data: subscriptions, error } = await client
       .from("push_subscriptions")
       .select("email")
       .not("email", "is", null);
@@ -1954,7 +2080,7 @@ async function dispatchMarketNewsNotifications({ title, sourceLink, impactLevel 
     let dispatched = 0;
 
     for (const email of emails) {
-      const delivery = await evaluateDeliveryForRecipient(supabase, {
+      const delivery = await evaluateDeliveryForRecipient(client, {
         userEmail: email,
         notificationKey,
       });
@@ -1963,7 +2089,7 @@ async function dispatchMarketNewsNotifications({ title, sourceLink, impactLevel 
         continue;
       }
 
-      const { error: insertError } = await createUserNotification(supabase, {
+      const { error: insertError } = await createUserNotification(client, {
         userEmail: email,
         title: notificationTitle,
         message: notificationMessage,
@@ -1997,7 +2123,18 @@ async function dispatchMarketNewsNotifications({ title, sourceLink, impactLevel 
 }
 
 async function saveNewsPostToSupabase(post) {
+  if (NEWS_DRY_RUN) {
+    console.log("NEWS_DRY_RUN skip saveNewsPostToSupabase:", post.title || post.source_link);
+    return { skipped: true, reason: "dry_run" };
+  }
+
   try {
+    const client = getSupabaseClient();
+    if (!client) {
+      console.error("❌ News Post Save Error: client unavailable");
+      return { error: "client_unavailable" };
+    }
+
     if (!post.image_url && post.source_link) {
       post.image_url = await getImageFromArticleUrl(post.source_link);
     }
@@ -2011,7 +2148,7 @@ async function saveNewsPostToSupabase(post) {
     const slug = post.slug || (await buildUniqueNewsSlug(post.title || post.content, post.source_link));
     console.log("🔗 News slug:", slug);
 
-    const { error } = await supabase
+    const { error } = await client
       .from("news_posts")
       .upsert(
         [
@@ -2100,6 +2237,11 @@ function savePublishedNewsLink(link, title = "") {
 }
 
 async function sendTelegramMessage(message) {
+  if (NEWS_DRY_RUN) {
+    console.log("NEWS_DRY_RUN skip sendTelegramMessage:", String(message || "").slice(0, 120));
+    return { skipped: true, reason: "dry_run" };
+  }
+
   try {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
@@ -2725,6 +2867,11 @@ async function sendScheduledMarketAlerts() {
 }
 
 async function sendTelegramPhoto(message, photoPath) {
+  if (NEWS_DRY_RUN) {
+    console.log("NEWS_DRY_RUN skip sendTelegramPhoto:", photoPath);
+    return { skipped: true, reason: "dry_run" };
+  }
+
   try {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
     const form = new FormData();
@@ -3077,19 +3224,23 @@ async function analyzeNewsWithAI(title, link) {
   }
 }
 
-async function fetchForexNews() {
+async function fetchForexNews(options = {}) {
+  const dryRun = options.dryRun === true || NEWS_DRY_RUN;
+  const skipScheduledAlerts = options.skipScheduledAlerts === true || dryRun;
+  const cycleStartedAt = Date.now();
+  const stats = createEmptyCycleStats();
+
   if (isFetchingNews) {
     console.log("⏭️ Previous news fetch still running. Skipping overlap.");
-    return;
+    return { skipped: true, reason: "overlap", stats };
   }
 
   isFetchingNews = true;
   try {
-    console.log("🚀 Fetching forex news...");
-    await sendScheduledMarketAlerts();
-    // sendWeeklyEconomicCalendarPost();
-    // sendImportantEconomicEventAlerts();
-    // publishEconomicReleaseNow();
+    console.log("🚀 Fetching forex news...", JSON.stringify({ dryRun }));
+    if (!skipScheduledAlerts) {
+      await sendScheduledMarketAlerts();
+    }
 
     const allItems = [];
 
@@ -3111,15 +3262,20 @@ async function fetchForexNews() {
 
           for (const match of matches.slice(-10)) {
             const text = cleanTelegramSourceText(
-  decodeTelegramHtml(String(match[1] || ""))
-);
+              decodeTelegramHtml(String(match[1] || ""))
+            );
 
-            if (text.length < 40) continue;
+            if (text.length < 40) {
+              stats.rejectedInvalid += 1;
+              recordRejection(stats, "telegram_too_short", text);
+              continue;
+            }
 
             if (!isOfficialEconomicReleaseText(text)) {
-  console.log("⏭️ Skipped non-official Telegram item:", text.slice(0, 120));
-  continue;
-}
+              stats.rejectedFilter += 1;
+              recordRejection(stats, "telegram_not_official_release", text);
+              continue;
+            }
 
             allItems.push({
               title: text,
@@ -3130,38 +3286,55 @@ async function fetchForexNews() {
               isoDate: new Date().toISOString(),
               feedUrl: sourceUrl,
               sourceName: "ForexBreakingNews",
-isTelegramSource: true,
-imageUrl: null,
-enclosure: null,
-thumbnail: null,
-image: null,
-media: null,
-mediaContent: null,
-mediaThumbnail: null,
+              isTelegramSource: true,
+              imageUrl: null,
+              enclosure: null,
+              thumbnail: null,
+              image: null,
+              media: null,
+              mediaContent: null,
+              mediaThumbnail: null,
             });
           }
         } catch (error) {
+          stats.sourceErrors[sourceUrl] = error.message;
           console.error(`⚠️ Telegram source failed: ${sourceUrl}`, error.message);
         }
       }
     } catch (error) {
+      stats.lastErrorSafe = error.message;
       console.error("⚠️ Telegram sources error:", error.message);
     }
 
-
-
-    for (const feedUrl of NEWS_FEEDS) {
-      try {
+    const feedResults = await Promise.allSettled(
+      NEWS_FEEDS.map(async (feedUrl) => {
         const feed = await parser.parseURL(feedUrl);
-        allItems.push(...feed.items.map((item) => ({ ...item, feedUrl })));
-      } catch (error) {
-        console.error(`⚠️ Feed failed: ${feedUrl}`, error.message);
+        return feed.items.map((item) => ({ ...item, feedUrl }));
+      })
+    );
+
+    for (let index = 0; index < feedResults.length; index += 1) {
+      const feedUrl = NEWS_FEEDS[index];
+      const result = feedResults[index];
+      if (result.status === "fulfilled") {
+        allItems.push(...result.value);
+      } else {
+        stats.sourceErrors[feedUrl] = result.reason?.message || String(result.reason);
+        console.error(`⚠️ Feed failed: ${feedUrl}`, stats.sourceErrors[feedUrl]);
       }
     }
 
+    stats.fetched = allItems.length;
+    stats.normalized = allItems.length;
+
     if (!allItems.length) {
       console.log("⚠️ No news found from all feeds");
-      return;
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      consecutiveFailures += 1;
+      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+      return stats;
     }
 
     allItems.sort((a, b) => {
@@ -3327,6 +3500,13 @@ mediaThumbnail: null,
       }
 
       if (!isFresh || !isNew) {
+        if (!isFresh) {
+          stats.rejectedStale += 1;
+          recordRejection(stats, "stale_or_old", item.title);
+        } else {
+          stats.rejectedDuplicate += 1;
+          recordRejection(stats, "already_published_link", item.title);
+        }
         continue;
       }
 
@@ -3361,9 +3541,10 @@ mediaThumbnail: null,
       );
 
       if (!isImportant && !isEconomicNews && !isUltraPriority) {
-  console.log("⏭️ Skipped non-market-moving story:", item.title);
-  continue;
-}
+        stats.rejectedLowImpact += 1;
+        recordRejection(stats, "non_market_moving", item.title);
+        continue;
+      }
 const isStrongRssMarketStory = !item.isTelegramSource && isStrongExternalMarketNews(titleForImpact);
 
 if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isStrongRssMarketStory) {
@@ -3400,12 +3581,22 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
 
     if (!latestNews) {
       console.log("⏭️ No new AI-approved important news found.");
-      return;
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      consecutiveFailures += 1;
+      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+      return stats;
     }
 
+    stats.eligible = 1;
     const latestLink = latestNews.link;
 
     const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link);
+    stats.aiProcessed = 1;
+    if (!aiResult?.message) {
+      stats.aiFailed = 1;
+    }
 
     const message = aiResult.message;
     const combinedNewsIdentity = `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
@@ -3421,16 +3612,23 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
       });
 
       if (alreadyPublishedSameCluster) {
-        console.log("⏭️ Skipped duplicate after AI analysis:", combinedTopicCluster, latestNews.title);
-        savePublishedNewsLink(latestLink, combinedNewsIdentity);
-        await savePublishedNewsToSupabase({
-          link: latestLink,
-          title: combinedNewsIdentity,
-          normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
-          topic_cluster: combinedTopicCluster,
-          published_at: new Date().toISOString(),
-        });
-        return;
+        stats.rejectedDuplicate += 1;
+        recordRejection(stats, "duplicate_after_ai_cluster", latestNews.title);
+        if (!dryRun) {
+          savePublishedNewsLink(latestLink, combinedNewsIdentity);
+          await savePublishedNewsToSupabase({
+            link: latestLink,
+            title: combinedNewsIdentity,
+            normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
+            topic_cluster: combinedTopicCluster,
+            published_at: new Date().toISOString(),
+          });
+        }
+        stats.cycleDurationMs = Date.now() - cycleStartedAt;
+        lastCycleStats = stats;
+        lastCycleCompletedAt = new Date().toISOString();
+        console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+        return stats;
       }
     }
 
@@ -3512,57 +3710,153 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
           ? selectNewsImage(latestNews.title)
           : null;
       finalImage = rssImage || articleImage || topicExternalImage || localFallbackImage;
+    }
 
-      if (finalImage) {
-        const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
+    if (dryRun) {
+      console.log("NEWS_DRY_RUN eligible publish-ready item:", latestNews.title);
+    } else {
+      if (veryImportantNews || latestNews.impactLevel === "HIGH") {
+        if (finalImage) {
+          const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
 
-        if (photoPath) {
-          await sendTelegramPhoto(message, photoPath);
+          if (photoPath) {
+            await sendTelegramPhoto(message, photoPath);
+            stats.telegramPublished += 1;
+          } else {
+            console.log("⏭️ Image rejected or unavailable. Sending text only.");
+            await sendTelegramMessage(message);
+            stats.telegramPublished += 1;
+          }
         } else {
-          console.log("⏭️ Image rejected or unavailable. Sending text only.");
           await sendTelegramMessage(message);
+          stats.telegramPublished += 1;
         }
       } else {
         await sendTelegramMessage(message);
+        stats.telegramPublished += 1;
       }
-    } else {
-      await sendTelegramMessage(message);
+
+      const saveResult = await saveNewsPostToSupabase({
+        title: latestNews.title || imageTitle,
+        content: message,
+        image_url: finalImage || null,
+        impact_level: latestNews.impactLevel || "MEDIUM",
+        source_link: latestLink,
+      });
+      if (saveResult?.error) {
+        stats.dbFailed += 1;
+      } else {
+        stats.dbInserted += 1;
+      }
+
+      await dispatchMarketNewsNotifications({
+        title: latestNews.title || imageTitle,
+        sourceLink: latestLink,
+        impactLevel: latestNews.impactLevel || "MEDIUM",
+      });
+      savePublishedNewsLink(latestLink, combinedNewsIdentity);
+      await savePublishedNewsToSupabase({
+        link: latestLink,
+        title: combinedNewsIdentity,
+        normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
+        topic_cluster: combinedTopicCluster,
+        published_at: new Date().toISOString(),
+      });
     }
 
-    await saveNewsPostToSupabase({
-      title: latestNews.title || imageTitle,
-      content: message,
-      image_url: finalImage || null,
-      impact_level: latestNews.impactLevel || "MEDIUM",
-      source_link: latestLink,
-    });
-
-    await dispatchMarketNewsNotifications({
-      title: latestNews.title || imageTitle,
-      sourceLink: latestLink,
-      impactLevel: latestNews.impactLevel || "MEDIUM",
-    });
-    savePublishedNewsLink(latestLink, combinedNewsIdentity);
-    await savePublishedNewsToSupabase({
-      link: latestLink,
-      title: combinedNewsIdentity,
-      normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
-      topic_cluster: combinedTopicCluster,
-      published_at: new Date().toISOString(),
-    });
+    lastSuccessfulFetchAt = new Date().toISOString();
+    consecutiveFailures = 0;
+    stats.cycleDurationMs = Date.now() - cycleStartedAt;
+    lastCycleStats = stats;
+    lastCycleCompletedAt = lastSuccessfulFetchAt;
+    console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+    return stats;
   } catch (error) {
+    stats.lastErrorSafe = error.message;
+    consecutiveFailures += 1;
     console.error("❌ RSS Error:", error.message);
+    stats.cycleDurationMs = Date.now() - cycleStartedAt;
+    lastCycleStats = stats;
+    lastCycleCompletedAt = new Date().toISOString();
+    console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+    return stats;
   } finally {
     isFetchingNews = false;
   }
 }
 
-console.log("WORKER_BOOT {\"worker\":\"worker/news-worker.js\",\"service\":\"hasan-chart-news-worker\",\"priceAlertsEnabled\":false,\"note\":\"This service does NOT send price alert emails. Use worker/index.js for price_alerts.\"}");
+async function runNewsCycleDiagnostic(options = {}) {
+  logWorkerEnvStatus();
+  return fetchForexNews({
+    dryRun: true,
+    skipScheduledAlerts: true,
+    ...options,
+  });
+}
 
-console.log("🚀 News Worker Started...");
+function getNewsWorkerHealthSnapshot() {
+  return {
+    enabled: true,
+    running: !isFetchingNews,
+    dryRun: NEWS_DRY_RUN,
+    lastCycleCompletedAt,
+    lastSuccessfulFetchAt,
+    consecutiveFailures,
+    nextRunAt: null,
+    lastErrorSafe: lastCycleStats.lastErrorSafe || null,
+    ...lastCycleStats,
+  };
+}
 
-fetchForexNews();
+process.on("unhandledRejection", (reason) => {
+  console.error("NEWS_WORKER_UNHANDLED_REJECTION", reason?.message || String(reason));
+});
 
-setInterval(() => {
-  fetchForexNews();
-}, 60 * 1000);
+process.on("uncaughtException", (error) => {
+  console.error("NEWS_WORKER_UNCAUGHT_EXCEPTION", error.message);
+});
+
+module.exports = {
+  fetchForexNews,
+  runNewsCycleDiagnostic,
+  getNewsWorkerHealthSnapshot,
+  getRequiredEnvStatus,
+};
+
+if (process.env.NEWS_WORKER_NO_BOOT === "1") {
+  // Diagnostic import mode.
+} else {
+  logWorkerEnvStatus();
+
+  const missingCritical = ["SUPABASE_SERVICE_ROLE_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHANNEL_ID"]
+    .filter((name) => !process.env[name] || !String(process.env[name]).trim());
+
+  if (!SUPABASE_URL) {
+    missingCritical.unshift("SUPABASE_URL");
+  }
+
+  if (missingCritical.length) {
+    console.error(
+      "NEWS_WORKER_BOOT_BLOCKED",
+      JSON.stringify({
+        missingCritical,
+        note: "News worker will stay alive but cycles cannot publish until Railway variables are restored.",
+      })
+    );
+  } else {
+    console.log(
+      "WORKER_BOOT",
+      JSON.stringify({
+        worker: "worker/news-worker.js",
+        service: "hasan-chart-news-worker",
+        priceAlertsEnabled: false,
+        note: "This service does NOT send price alert emails. Use worker/index.js for price_alerts.",
+      })
+    );
+    console.log("🚀 News Worker Started...");
+    fetchForexNews();
+    setInterval(() => {
+      fetchForexNews();
+    }, 60 * 1000);
+  }
+}
