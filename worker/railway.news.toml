@@ -1,0 +1,12 @@
+# HasaN CharT World — news worker service
+# Railway service setting: Root Directory = worker
+# Railway Config File (service setting): worker/railway.news.toml
+
+[build]
+builder = "NIXPACKS"
+nixpacksConfigPath = "nixpacks.news.toml"
+
+[deploy]
+startCommand = "npm run start:news"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

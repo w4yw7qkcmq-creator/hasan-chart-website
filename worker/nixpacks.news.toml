@@ -1,0 +1,17 @@
+# Railway News Worker — Root Directory MUST be `worker` for this service.
+# Installs only worker/package.json dependencies for news-worker.js.
+
+[variables]
+NODE_VERSION = "22"
+
+[phases.setup]
+aptPkgs = ["fontconfig", "fonts-noto-core", "fonts-noto-ui-core", "fonts-noto-color-emoji"]
+
+[phases.install]
+cmds = ["npm ci --omit=dev"]
+
+[phases.build]
+cmds = ["node -e \"require('express'); require('ws'); console.log('news worker deps ok')\""]
+
+[start]
+cmd = "npm run start:news"
