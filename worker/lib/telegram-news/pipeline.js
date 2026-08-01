@@ -1,5 +1,6 @@
 const { classifyTelegramPost } = require("./classifier");
 const { scoreNewsValue } = require("./quality-gate");
+const { isOfficialHighImpactTelegramPost } = require("./source-policy");
 const {
   stripPromotionalContent,
   stripPromotionalFooter,
@@ -32,6 +33,18 @@ function prepareTelegramPost(post, stats = {}) {
   cleanedText = stripPromotionalContent(cleanedText);
   const classification = classifyTelegramPost({ ...post, rawText: cleanedText });
   const newsValue = scoreNewsValue({ ...post, rawText: cleanedText }, classification);
+
+  if (!isOfficialHighImpactTelegramPost(classification)) {
+    stats.nonEconomicSkipped = (stats.nonEconomicSkipped || 0) + 1;
+    return {
+      skip: true,
+      reason: "TELEGRAM_NON_ECONOMIC_SKIPPED",
+      logReason: classification.classification,
+      classification,
+      promoFooterRemoved,
+      newsValue,
+    };
+  }
 
   if (!classification.isPublishable) {
     if (classification.classification === "unclear") {

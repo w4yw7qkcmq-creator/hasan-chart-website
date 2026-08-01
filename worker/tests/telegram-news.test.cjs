@@ -444,9 +444,8 @@ async function testRealNewsExnessFooterRemoved() {
       rawText: "🟥 الذهب يرتفع 1.2% بعد تصريحات الفيدرالي\nتفاصيل: Powell highlighted inflation risks\nExness - open account",
     }),
   ], { disableAi: true });
-  assert.strictEqual(processed[0].skipPublish, false);
-  assert.ok(processed[0].promoFooterRemoved);
-  assert.ok(!processed[0].formattedMessage.includes("Exness"));
+  assert.strictEqual(processed[0].skipPublish, true);
+  assert.strictEqual(processed[0].reason, "TELEGRAM_NON_ECONOMIC_SKIPPED");
 }
 
 async function testMichiganEconomicTemplate() {
@@ -474,18 +473,15 @@ async function testLoganGeneralTemplate() {
   const rawText =
     "🚨 Fed's Logan: inflation progress is uneven\nShe said policy should remain restrictive until confidence improves";
   const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
-  const msg = processed[0].formattedMessage;
-  assert.ok(msg);
-  assert.ok(!msg.includes("ما الذي حدث"));
-  assert.ok(!msg.includes("ForexBreakingNews"));
+  assert.strictEqual(processed[0].skipPublish, true);
+  assert.strictEqual(processed[0].reason, "TELEGRAM_NON_ECONOMIC_SKIPPED");
 }
 
 async function testTrumpIranGeneralTemplate() {
   const rawText = "🚨 Trump says Iran talks could resume if Tehran agrees to nuclear limits\nOil prices eased after the remarks";
   const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
-  assert.strictEqual(processed[0].skipPublish, false);
-  assert.ok(/ترامب|Trump/i.test(processed[0].formattedMessage));
-  assert.ok(!isGenericTitle(processed[0].resolvedTitle || ""));
+  assert.strictEqual(processed[0].skipPublish, true);
+  assert.strictEqual(processed[0].reason, "TELEGRAM_NON_ECONOMIC_SKIPPED");
 }
 
 async function testPreEventWithEventName() {
@@ -503,7 +499,7 @@ async function testPreEventVagueSkipped() {
     post({ rawText: "⏰ باقي 5 دقائق على أخبار الدولار المهمة" }),
   ], { disableAi: true });
   assert.strictEqual(processed[0].skipPublish, true);
-  assert.strictEqual(processed[0].reason, "PRE_EVENT_ALERT_MISSING_EVENT_NAME");
+  assert.strictEqual(processed[0].reason, "TELEGRAM_NON_ECONOMIC_SKIPPED");
 }
 
 function testTimestampFooterRemoved() {
@@ -901,7 +897,7 @@ function testQualityGateImpactDoesNotRepeatFact() {
 
 async function testFinalMessagePassesQualityGate() {
   enablePublishStateForTests("0");
-  const rawText = "🚨 Trump says Iran talks could resume if Tehran agrees to nuclear limits\nOil prices eased after the remarks";
+  const rawText = "صدر الآن\nUniversity of Michigan Sentiment\nالسابق: 67.8\nالمتوقع: 68.5\nالحالي: 69.1";
   const processed = await processTelegramPosts([post({ rawText, sourceMessageId: "5" })], { disableAi: true });
   assert.strictEqual(processed[0].skipPublish, false);
   assert.ok(processed[0].qualityCheck?.ok !== false);
@@ -1113,8 +1109,7 @@ async function runIncidentFixtureDryRun() {
     }
   }
 
-  assert.strictEqual(published.length <= 4, true, `expected limited publish count got ${published.length}`);
-  assert.ok(published.every((entry) => !isGenericTitle(entry.resolvedTitle || "")));
+  assert.strictEqual(published.length, 0, `expected zero publish from non-economic incident fixture got ${published.length}`);
 }
 
 async function run() {
