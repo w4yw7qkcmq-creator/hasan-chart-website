@@ -79,9 +79,15 @@ function mapProcessedToNewsItems(processed) {
 }
 
 async function discoverTelegramNews(options = {}) {
-  const parseStats = options.parseStats || { promoOnlySkipped: 0, promoFootersRemoved: 0 };
+  const parseStats = options.parseStats || {
+    promoOnlySkipped: 0,
+    promoFootersRemoved: 0,
+    unclearSkipped: 0,
+    lowValueSkipped: 0,
+    preEventMissingName: 0,
+  };
   const posts = await fetchTelegramSourcePosts({ ...options, parseStats });
-  const processed = await processTelegramPosts(posts, options);
+  const processed = await processTelegramPosts(posts, { ...options, pipelineStats: parseStats, parseStats });
 
   let buffer = null;
   let bufferFlushed = [];

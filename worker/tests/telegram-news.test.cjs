@@ -27,8 +27,23 @@ const {
 const { fetchTelegramSourcePosts } = require(path.join(root, "lib/telegram-news/index"));
 const {
   stripPromotionalFooter,
+  stripPromotionalContent,
   isPromotionOnly,
+  hasRealNewsContent,
 } = require(path.join(root, "lib/telegram-news/promo-filter"));
+const { classifyTelegramPost } = require(path.join(root, "lib/telegram-news/classifier"));
+const { prepareTelegramPost } = require(path.join(root, "lib/telegram-news/pipeline"));
+const { scoreNewsValue } = require(path.join(root, "lib/telegram-news/quality-gate"));
+const {
+  buildEditorialDraft,
+  validateEditorialDraft,
+  buildStructuredFactsForEditorial,
+} = require(path.join(root, "lib/telegram-news/editorial"));
+const {
+  formatTelegramNewsMessage,
+  stripTimestampFooter,
+} = require(path.join(root, "lib/telegram-news/telegram-formatter"));
+const { removeSemanticRepetition } = require(path.join(root, "lib/telegram-news/repetition"));
 const {
   createTelegramMergeBuffer,
   resetTelegramMergeBufferForTests,
@@ -325,6 +340,224 @@ function testParserFromFixtureHtml() {
   assert.ok(parsed.length >= 1);
 }
 
+async function testExnessFullAdSkipped() {
+  const processed = await processTelegramPosts([
+    post({
+      rawText: "Exness - افتح حسابك الآن\none.exness.link/a\nبونص 50%\nسبريد منخفض",
+    }),
+  ], { disableAi: true });
+  assert.strictEqual(processed.length, 1);
+  assert.strictEqual(processed[0].skipPublish, true);
+  assert.match(processed[0].reason, /PROMOTION|BROKER/);
+}
+
+async function testAccountLinkSkipped() {
+  const processed = await processTelegramPosts([
+    post({ rawText: "https://t.me/joinchat/abc123" }),
+  ], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, true);
+}
+
+async function testSubscriptionOfferSkipped() {
+  const processed = await processTelegramPosts([
+    post({ rawText: "عرض خاص: اشتراك شهري 100$ → 75$\nVIP توصيات مدفوعة" }),
+  ], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, true);
+}
+
+async function testChannelPrivateAdSkipped() {
+  const processed = await processTelegramPosts([
+    post({ rawText: "قناة المضاربات الخاصة\nانضم الآن\nحصاد أسبوع توصياتنا" }),
+  ], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, true);
+}
+
+async function testRealNewsExnessFooterRemoved() {
+  const processed = await processTelegramPosts([
+    post({
+      rawText: "🟥 الذهب يرتفع 1.2% بعد تصريحات الفيدرالي\nتفاصيل: Powell highlighted inflation risks\nExness - open account",
+    }),
+  ], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, false);
+  assert.ok(processed[0].promoFooterRemoved);
+  assert.ok(!processed[0].formattedMessage.includes("Exness"));
+}
+
+async function testMichiganEconomicTemplate() {
+  const rawText = "صدر الآن\nUniversity of Michigan Sentiment\nالسابق: 67.8\nالمتوقع: 68.5\nالحالي: 69.1";
+  const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
+  const msg = processed[0].formattedMessage;
+  assert.ok(msg.includes("🚨"));
+  assert.ok(msg.includes("السابق: 67.8"));
+  assert.ok(msg.includes("المتوقع: 68.5"));
+  assert.ok(msg.includes("الحالي: 69.1"));
+  assert.ok(!msg.includes("ما الذي حدث"));
+  assert.ok(!msg.includes("أهم التفاصيل"));
+}
+
+async function testIsmEconomicTemplate() {
+  const rawText = "صدر الآن\nISM Manufacturing PMI\nالسابق: 49.5\nالمتوقع: 50.2\nالحالي: 50.9";
+  const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
+  const msg = processed[0].formattedMessage;
+  assert.ok(msg.includes("49.5"));
+  assert.ok(msg.includes("50.9"));
+  assert.ok(msg.includes("📊 التأثير المحتمل"));
+}
+
+async function testLoganGeneralTemplate() {
+  const rawText =
+    "🚨 Fed's Logan: inflation progress is uneven\nShe said policy should remain restrictive until confidence improves";
+  const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
+  const msg = processed[0].formattedMessage;
+  assert.ok(msg);
+  assert.ok(!msg.includes("ما الذي حدث"));
+  assert.ok(!msg.includes("ForexBreakingNews"));
+}
+
+async function testTrumpIranGeneralTemplate() {
+  const rawText = "🚨 Trump says Iran talks could resume if Tehran agrees to nuclear limits\nOil prices eased after the remarks";
+  const processed = await processTelegramPosts([post({ rawText })], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, false);
+  assert.ok(processed[0].formattedMessage.includes("Trump"));
+}
+
+async function testPreEventWithEventName() {
+  const processed = await processTelegramPosts([
+    post({ rawText: "⏰ باقي 5 دقائق على خبر NFP الأمريكي" }),
+  ], { disableAi: true });
+  const msg = processed[0].formattedMessage;
+  assert.strictEqual(processed[0].skipPublish, false);
+  assert.ok(msg.startsWith("⏳"));
+  assert.ok(msg.includes("NFP"));
+}
+
+async function testPreEventVagueSkipped() {
+  const processed = await processTelegramPosts([
+    post({ rawText: "⏰ باقي 5 دقائق على أخبار الدولار المهمة" }),
+  ], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, true);
+  assert.strictEqual(processed[0].reason, "PRE_EVENT_ALERT_MISSING_EVENT_NAME");
+}
+
+function testTimestampFooterRemoved() {
+  const msg = formatTelegramNewsMessage({
+    template: "general",
+    headline: "اختبار",
+    summary: "ملخص خبر.",
+    bullets: [],
+    impact: "تأثير محتمل.",
+  });
+  const withFooter = `${msg}\n\n🕒 2026/07/31 5:00 م`;
+  const cleaned = stripTimestampFooter(withFooter);
+  assert.ok(!cleaned.includes("2026/07/31"));
+  assert.ok(!cleaned.includes("🕒"));
+}
+
+function testEventTimeInsideBodyKept() {
+  const body = "🚨 قرار الفائدة\n\nيصدر الساعة 9:00 مساءً بتوقيت سوريا.";
+  assert.ok(body.includes("9:00"));
+}
+
+async function testAiChangedNumberRejectedInDraft() {
+  const facts = extractFactsFromTelegramPost(post({ rawText: "CPI\nالسابق: 0.2%\nالمتوقع: 0.3%\nالحالي: 0.4%" }));
+  const structured = buildStructuredFactsForEditorial(facts, post());
+  const draft = "🚨 CPI\n\nالحالي: 0.5%";
+  const check = validateEditorialDraft(draft, post().rawText, facts, structured);
+  assert.strictEqual(check.ok, false);
+}
+
+function testSimilarityTriggersFallbackPath() {
+  const source = "Gold rises 1.8% after Powell comments on inflation risks in the US session";
+  const draft = "Gold rises 1.8% after Powell comments on inflation risks in the US session";
+  const check = validateEditorialDraft(draft, source, { numbers: ["1.8%"] }, { keyNumbers: ["1.8%"] });
+  assert.ok(check.issues.includes("AI_EDITORIAL_DRAFT_TOO_SIMILAR"));
+}
+
+function testNoChannelNamesInOutput() {
+  const msg = formatTelegramNewsMessage({
+    template: "general",
+    headline: "تحديث",
+    summary: "ملخص.",
+    bullets: [],
+    impact: "تأثير.",
+  });
+  assert.ok(!/ForexBreakingNews|ForexNewspaper/i.test(msg));
+}
+
+function testNoSourceLinksInOutput() {
+  const msg = formatTelegramNewsMessage({
+    template: "general",
+    headline: "تحديث",
+    summary: "ملخص.",
+    bullets: [],
+    impact: "تأثير.",
+  });
+  assert.ok(!/https?:\/\//i.test(msg));
+}
+
+function testNoPlaceholdersInOutput() {
+  const msg = formatTelegramNewsMessage({
+    template: "economic",
+    headline: "CPI",
+    country: "الولايات المتحدة",
+    previous: "0.2%",
+    forecast: "0.3%",
+    actual: "0.4%",
+    impact: "تأثير.",
+  });
+  assert.ok(!/غير\s*متوفر/i.test(msg));
+}
+
+function testNoSemanticRepetitionInSections() {
+  const cleaned = removeSemanticRepetition({
+    headline: "الذهب يرتفع",
+    summary: "الذهب يرتفع",
+    bullets: ["الذهب يرتفع"],
+    impact: "قد يؤثر على الدولار.",
+  });
+  assert.notStrictEqual(cleaned.summary, cleaned.headline);
+  assert.strictEqual(cleaned.bullets.length, 0);
+}
+
+async function testAiFailureDoesNotStopNews() {
+  const rawText = "CPI\nالسابق: 0.2%\nالمتوقع: 0.3%\nالحالي: 0.4%";
+  const processed = await processTelegramPosts([post({ rawText })], {
+    disableAi: false,
+    aiBuilder: async () => ({ rejected: true, fallback: true, aiResult: "fallback", impactParagraph: null }),
+  });
+  assert.strictEqual(processed[0].skipPublish, false);
+  assert.ok(processed[0].formattedMessage);
+}
+
+async function testPromotionOnlyNeverFormats() {
+  const processed = await processTelegramPosts([
+    post({ rawText: "Exness broker promo code VIP" }),
+  ], { disableAi: false });
+  assert.strictEqual(processed[0].formattedMessage, null);
+  assert.strictEqual(processed[0].aiResult, "none");
+}
+
+async function testLowValueSkipped() {
+  const processed = await processTelegramPosts([
+    post({ rawText: "تابعونا لأخبار عاجلة قريبًا 📊" }),
+  ], { disableAi: true });
+  assert.strictEqual(processed[0].skipPublish, true);
+}
+
+function testSpacingRules() {
+  const msg = formatTelegramNewsMessage({
+    template: "economic",
+    headline: "CPI",
+    country: "US",
+    previous: "0.2%",
+    forecast: "0.3%",
+    actual: "0.4%",
+    impact: "تأثير.",
+  });
+  assert.ok(msg.includes("🚨 CPI\n\n🌍"));
+  assert.ok(!/\n{3,}/.test(msg));
+}
+
 async function run() {
   const tests = [
     testCrossChannelEconomicDedupDifferentTitles,
@@ -345,6 +578,29 @@ async function run() {
     testZeroActualIsValid,
     testAiChangedNumberRejected,
     testParserFromFixtureHtml,
+    testExnessFullAdSkipped,
+    testAccountLinkSkipped,
+    testSubscriptionOfferSkipped,
+    testChannelPrivateAdSkipped,
+    testRealNewsExnessFooterRemoved,
+    testMichiganEconomicTemplate,
+    testIsmEconomicTemplate,
+    testLoganGeneralTemplate,
+    testTrumpIranGeneralTemplate,
+    testPreEventWithEventName,
+    testPreEventVagueSkipped,
+    testTimestampFooterRemoved,
+    testEventTimeInsideBodyKept,
+    testAiChangedNumberRejectedInDraft,
+    testSimilarityTriggersFallbackPath,
+    testNoChannelNamesInOutput,
+    testNoSourceLinksInOutput,
+    testNoPlaceholdersInOutput,
+    testNoSemanticRepetitionInSections,
+    testAiFailureDoesNotStopNews,
+    testPromotionOnlyNeverFormats,
+    testLowValueSkipped,
+    testSpacingRules,
   ];
 
   for (const testCase of tests) {

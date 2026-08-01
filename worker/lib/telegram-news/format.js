@@ -3,91 +3,14 @@ const { validateEconomicReleaseCompleteness } = require("../economic-releases/co
 const { mergeProviderEvents } = require("../economic-releases/normalize");
 const { validateFinalMessageAgainstFacts } = require("./invariants");
 const { resolveImpactWithAi } = require("./ai-impact");
+const {
+  buildStructuredFactsForEditorial,
+  buildEditorialDraft,
+  validateEditorialDraft,
+} = require("./editorial");
+const { formatTelegramNewsMessage } = require("./telegram-formatter");
 
-const SYRIA_TZ = "Asia/Damascus";
-
-function formatSyriaTime(isoDate) {
-  if (!isoDate) {
-    return null;
-  }
-
-  try {
-    return new Intl.DateTimeFormat("ar-SY", {
-      timeZone: SYRIA_TZ,
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(isoDate));
-  } catch (_error) {
-    return isoDate;
-  }
-}
-
-function inferGeneralMarketImpact(text) {
-  const value = String(text || "").toLowerCase();
-  const impacts = {
-    dollar: "محايد",
-    gold: "محايد",
-    stocks: "محايد",
-    crypto: "محايد",
-  };
-
-  if (/dollar|usd|الدولار|فائدة|fed|cpi|nfp|jobless|unemployment|inflation|التضخم|البطالة/i.test(value)) {
-    impacts.dollar = /surge|jump|rally|positive|إيجاب|يرتفع|قوة/i.test(value)
-      ? "إيجابي"
-      : /fall|drop|decline|negative|سلبي|يهبط|ضعف/i.test(value)
-        ? "سلبي"
-        : "متباين";
-    impacts.gold = impacts.dollar === "إيجابي" ? "سلبي" : impacts.dollar === "سلبي" ? "إيجابي" : "متباين";
-  }
-
-  if (/gold|الذهب|xau/i.test(value)) {
-    impacts.gold = /surge|jump|rally|يرتفع|صعود/i.test(value)
-      ? "إيجابي"
-      : /fall|drop|decline|يهبط|تراجع/i.test(value)
-        ? "سلبي"
-        : "متباين";
-  }
-
-  if (/nasdaq|dow|s&p|stocks|أسهم|indices|مؤشر/i.test(value)) {
-    impacts.stocks = /surge|jump|rally|يرتفع|صعود|green/i.test(value)
-      ? "إيجابي"
-      : /fall|drop|decline|plunge|sink|tumble|هبوط|تراجع/i.test(value)
-        ? "سلبي"
-        : "متباين";
-  }
-
-  if (/bitcoin|btc|crypto|ethereum|eth|كريبتو|بيتكوين/i.test(value)) {
-    impacts.crypto = /surge|jump|rally|يرتفع|صعود/i.test(value)
-      ? "إيجابي"
-      : /fall|drop|decline|plunge|هبوط|تراجع|liquidation|تصفيات/i.test(value)
-        ? "سلبي"
-        : "متباين";
-  }
-
-  return impacts;
-}
-
-function buildFixedEconomicTemplate({ facts, post, impactText }) {
-  const syriaTime = formatSyriaTime(post.sourcePublishedAt);
-  return [
-    `🚨 ${facts.title}`,
-    "",
-    `🌍 ${facts.country || "الولايات المتحدة"}`,
-    "",
-    `السابق: ${facts.previous || facts.revisedPrevious}`,
-    `المتوقع: ${facts.forecast}`,
-    `الحالي: ${facts.actual}`,
-    "",
-    "📊 التأثير المحتمل على الأسواق:",
-    impactText,
-    "",
-    syriaTime ? `🕒 توقيت الإصدار بتوقيت سوريا: ${syriaTime}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-async function formatHasanChartEconomicNews({ facts, post }, options = {}) {
+async function formatHasanChartEconomicNews({ facts, post, classification }, options = {}) {
   const merged = mergeProviderEvents([
     {
       eventKey: facts.canonicalEventKey,
@@ -116,19 +39,43 @@ async function formatHasanChartEconomicNews({ facts, post }, options = {}) {
     };
   }
 
-  const impactResolved = await resolveImpactWithAi(facts, options);
-  const formatted = buildFixedEconomicTemplate({
-    facts: { ...facts, title: impactResolved.title || facts.title },
-    post,
-    impactText: impactResolved.impactParagraph,
-  });
+  const structuredFacts = buildStructuredFactsForEditorial(facts, post, classification);
+  const editorial = await buildEditorialDraft(structuredFacts, options);
+  let impactText = editorial.draft?.impact || "";
+
+  if (options.disableAi !== true) {
+    const impactResolved = await resolveImpactWithAi(facts, options);
+    impactText = impactResolved.impactParagraph || impactText;
+  } else {
+    impactText = impactText || getEconomicReleaseImpactText(facts.title, facts.actual, facts.forecast);
+  }
+
+  const draftPayload = {
+    template: "economic",
+    headline: editorial.draft?.headline || facts.title,
+    country: editorial.draft?.country || facts.country || "الولايات المتحدة",
+    previous: facts.previous || facts.revisedPrevious,
+    forecast: facts.forecast,
+    actual: facts.actual,
+    impact: impactText,
+  };
+
+  let formatted = formatTelegramNewsMessage(draftPayload);
+  let editorialCheck = validateEditorialDraft(formatted, post.rawText, facts, structuredFacts);
+
+  if (!editorialCheck.ok && editorialCheck.reason === "AI_EDITORIAL_DRAFT_TOO_SIMILAR") {
+    formatted = formatTelegramNewsMessage({
+      ...draftPayload,
+      impact: getEconomicReleaseImpactText(facts.title, facts.actual, facts.forecast),
+    });
+    editorialCheck = validateEditorialDraft(formatted, post.rawText, facts, structuredFacts);
+  }
 
   const factCheck = validateFinalMessageAgainstFacts(formatted, facts);
   if (!factCheck.ok) {
-    const fixedTemplate = buildFixedEconomicTemplate({
-      facts,
-      post,
-      impactText: impactResolved.impactParagraph,
+    const fixedTemplate = formatTelegramNewsMessage({
+      ...draftPayload,
+      impact: getEconomicReleaseImpactText(facts.title, facts.actual, facts.forecast),
     });
     return {
       formatted: fixedTemplate,
@@ -140,6 +87,7 @@ async function formatHasanChartEconomicNews({ facts, post }, options = {}) {
       aiImpactUsed: false,
       aiResult: "fallback",
       usedFixedTemplate: true,
+      editorialCheck,
     };
   }
 
@@ -149,58 +97,54 @@ async function formatHasanChartEconomicNews({ facts, post }, options = {}) {
     skipPublish: false,
     reason: "complete",
     missingFields: [],
-    aiImpactUsed: impactResolved.aiImpactUsed,
-    aiResult: impactResolved.aiResult,
-    usedFixedTemplate: impactResolved.usedFixedTemplate,
+    aiImpactUsed: editorial.aiUsed === true,
+    aiResult: editorial.aiResult || "rule_based",
+    usedFixedTemplate: editorial.aiResult === "fallback",
+    editorialCheck,
   };
 }
 
-async function formatHasanChartGeneralNews({ facts, post }, options = {}) {
-  const headline = facts.title || facts.detailLines[0] || "خبر سوق";
-  const whatHappened =
-    facts.detailLines.find((line) => line.length > 20 && !/^🚨|^🟥|^🔴/.test(line)) ||
-    facts.detailLines.slice(0, 2).join("\n") ||
-    headline;
-  const details = facts.detailLines
-    .filter((line) => line !== headline && line !== whatHappened && !facts.exclusiveAnalysisDetected)
-    .slice(0, 4)
-    .join("\n");
+async function formatHasanChartGeneralNews({ facts, post, classification }, options = {}) {
+  const structuredFacts = buildStructuredFactsForEditorial(facts, post, classification);
+  const editorial = await buildEditorialDraft(structuredFacts, options);
 
-  let impactsBlock;
-  let aiImpactUsed = false;
-  let aiResult = "fallback";
-
-  if (options.disableAi !== true) {
-    const impactResolved = await resolveImpactWithAi(facts, options);
-    impactsBlock = impactResolved.impactParagraph;
-    aiImpactUsed = impactResolved.aiImpactUsed;
-    aiResult = impactResolved.aiResult;
-  } else {
-    const impacts = inferGeneralMarketImpact(`${headline}\n${facts.detailLines.join("\n")}`);
-    impactsBlock = [
-      `• الدولار: ${impacts.dollar}`,
-      `• الذهب: ${impacts.gold}`,
-      `• الأسهم: ${impacts.stocks}`,
-      `• العملات الرقمية: ${impacts.crypto}`,
-    ].join("\n");
+  if (!editorial.draft?.ok && editorial.reason) {
+    return {
+      formatted: null,
+      validation: { complete: false, reason: editorial.reason },
+      skipPublish: true,
+      reason: editorial.reason,
+      missingFields: [],
+      aiImpactUsed: false,
+      aiResult: "none",
+    };
   }
 
-  const formatted = [
-    `🚨 ${headline}`,
-    "",
-    "ما الذي حدث؟",
-    whatHappened,
-    "",
-    details ? "أهم التفاصيل" : null,
-    details || null,
-    "",
-    "📊 التأثير المحتمل على الأسواق:",
-    impactsBlock,
-    "",
-    post.sourcePublishedAt ? `🕒 ${formatSyriaTime(post.sourcePublishedAt)}` : null,
-  ]
-    .filter((line) => line !== null && line !== "")
-    .join("\n");
+  let impactText = editorial.draft?.impact || "";
+  if (options.disableAi !== true) {
+    const impactResolved = await resolveImpactWithAi(facts, options);
+    impactText = impactResolved.impactParagraph || impactText;
+  }
+
+  const draftPayload = {
+    template: editorial.draft?.template || "general",
+    headline: editorial.draft?.headline || facts.title,
+    summary: editorial.draft?.summary,
+    bullets: editorial.draft?.bullets || [],
+    impact: impactText,
+  };
+
+  let formatted = formatTelegramNewsMessage(draftPayload);
+  let editorialCheck = validateEditorialDraft(formatted, post.rawText, facts, structuredFacts);
+
+  if (!editorialCheck.ok && editorialCheck.reason === "AI_EDITORIAL_DRAFT_TOO_SIMILAR") {
+    formatted = formatTelegramNewsMessage({
+      ...draftPayload,
+      summary: structuredFacts.factualPoints.slice(0, 2).join(" "),
+      bullets: structuredFacts.factualPoints.slice(2, 4),
+    });
+    editorialCheck = validateEditorialDraft(formatted, post.rawText, facts, structuredFacts);
+  }
 
   return {
     formatted,
@@ -208,29 +152,70 @@ async function formatHasanChartGeneralNews({ facts, post }, options = {}) {
     skipPublish: false,
     reason: "plain_news",
     missingFields: [],
-    aiImpactUsed,
-    aiResult,
-    usedFixedTemplate: aiResult !== "accepted",
+    aiImpactUsed: editorial.aiUsed === true,
+    aiResult: editorial.aiResult || "rule_based",
+    usedFixedTemplate: editorial.aiResult === "fallback",
+    editorialCheck,
+  };
+}
+
+async function formatPreEventAlert({ facts, post, classification }, options = {}) {
+  const structuredFacts = buildStructuredFactsForEditorial(facts, post, classification);
+  const editorial = await buildEditorialDraft(structuredFacts, options);
+
+  if (!editorial.draft?.ok) {
+    return {
+      formatted: null,
+      validation: { complete: false, reason: editorial.reason },
+      skipPublish: true,
+      reason: editorial.reason,
+      missingFields: [],
+      aiImpactUsed: false,
+      aiResult: "none",
+    };
+  }
+
+  const formatted = formatTelegramNewsMessage({
+    template: "pre_event",
+    headline: editorial.draft.headline,
+    summary: editorial.draft.summary,
+    bullets: editorial.draft.bullets,
+  });
+
+  return {
+    formatted,
+    validation: { complete: true, reason: "pre_event_alert" },
+    skipPublish: false,
+    reason: "pre_event_alert",
+    missingFields: [],
+    aiImpactUsed: false,
+    aiResult: "rule_based",
+    usedFixedTemplate: false,
+    editorialCheck: { ok: true, issues: [], overlap: 0 },
   };
 }
 
 async function formatTelegramPost(post, facts, options = {}) {
+  const classification = options.classification || {};
+
+  if (classification.classification === "pre_event_alert") {
+    return formatPreEventAlert({ facts, post, classification }, options);
+  }
+
   if (facts.isPlainFedNews) {
-    return formatHasanChartGeneralNews({ facts, post }, options);
+    return formatHasanChartGeneralNews({ facts, post, classification }, options);
   }
 
   if (facts.isStructuredTriple) {
-    return formatHasanChartEconomicNews({ facts, post }, options);
+    return formatHasanChartEconomicNews({ facts, post, classification }, options);
   }
 
-  return formatHasanChartGeneralNews({ facts, post }, options);
+  return formatHasanChartGeneralNews({ facts, post, classification }, options);
 }
 
 module.exports = {
-  formatSyriaTime,
   formatHasanChartEconomicNews,
   formatHasanChartGeneralNews,
+  formatPreEventAlert,
   formatTelegramPost,
-  inferGeneralMarketImpact,
-  buildFixedEconomicTemplate,
 };

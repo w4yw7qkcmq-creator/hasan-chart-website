@@ -5,6 +5,7 @@ const { dedupeGroupEntries } = require("./dedupe");
 const { detectPostPublishAction, snapshotFacts } = require("./post-publish");
 const { formatTelegramPost } = require("./format");
 const { validateFinalMessageAgainstFacts } = require("./invariants");
+const { prepareTelegramPost } = require("./pipeline");
 
 const DEFAULT_MAX_PENDING = Number(process.env.TELEGRAM_MERGE_BUFFER_MAX || 100);
 
@@ -21,6 +22,9 @@ function createEmptyMetrics() {
     aiRejectedFactMismatch: 0,
     promoOnlySkipped: 0,
     promoFootersRemoved: 0,
+    unclearSkipped: 0,
+    lowValueSkipped: 0,
+    preEventMissingName: 0,
   };
 }
 
@@ -80,7 +84,8 @@ function createTelegramMergeBuffer(options = {}) {
       };
     }
 
-    const formatted = await formatTelegramPost(merged.post, merged.facts, formatOptions);
+    const classification = merged.post._pipeline?.classification || {};
+    const formatted = await formatTelegramPost(merged.post, merged.facts, { ...formatOptions, classification });
     const finalFactCheck =
       formatted.formatted && !formatted.skipPublish
         ? validateFinalMessageAgainstFacts(formatted.formatted, merged.facts)
@@ -160,7 +165,31 @@ function createTelegramMergeBuffer(options = {}) {
     }
     seenExact.add(exactKey);
 
-    const facts = factsInput || extractFactsFromTelegramPost(post);
+    const prep = prepareTelegramPost(post, metrics);
+    if (prep.skip) {
+      if (prep.reason === "TELEGRAM_PROMOTION_SKIPPED") {
+        metrics.promoOnlySkipped += 1;
+      }
+      return {
+        action: prep.reason,
+        skip: true,
+        reason: prep.reason,
+        classification: prep.classification,
+        newsValue: prep.newsValue,
+      };
+    }
+
+    post = {
+      ...prep.post,
+      promoFooterRemoved: prep.promoFooterRemoved === true,
+      _pipeline: {
+        classification: prep.classification,
+        newsValue: prep.newsValue,
+        promoFooterRemoved: prep.promoFooterRemoved === true,
+      },
+    };
+
+    const facts = factsInput || prep.classification?.facts || extractFactsFromTelegramPost(post);
     const candidate = buildCandidate(post, facts);
     const mergeKey = candidate.fingerprints.mergeKey;
 

@@ -50,6 +50,17 @@ async function publishTelegramMergeBufferItem(item, ctx = {}) {
     return { skipped: true, reason: item?.reason || "skip_publish" };
   }
 
+  if (!TELEGRAM_NEWS_PUBLISH_ENABLED) {
+    console.log(
+      "TELEGRAM_NEWS_PUBLISH_DISABLED",
+      JSON.stringify({
+        mergeKey: ctx.mergeKey,
+        reason: "kill_switch",
+      })
+    );
+    return { skipped: true, reason: "TELEGRAM_NEWS_PUBLISH_DISABLED" };
+  }
+
   const message = item.formattedMessage;
   const imageTitle = item.facts?.title || item.post?.rawText?.slice(0, 120) || "خبر سوق";
   const sourceLink = item.post?.sourceUrl || `telegram-merge:${ctx.mergeKey || "unknown"}`;
@@ -116,6 +127,8 @@ function resolveSupabaseUrl() {
 const SUPABASE_URL = resolveSupabaseUrl();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const NEWS_DRY_RUN = process.env.NEWS_DRY_RUN === "1" || process.env.NEWS_DRY_RUN === "true";
+const TELEGRAM_NEWS_PUBLISH_ENABLED =
+  process.env.TELEGRAM_NEWS_PUBLISH_ENABLED !== "0" && process.env.TELEGRAM_NEWS_PUBLISH_ENABLED !== "false";
 const TRADING_ECONOMICS_CLIENT =
   process.env.TRADING_ECONOMICS_CLIENT ||
   process.env.TRADING_ECONOMICS_API_KEY ||
@@ -181,6 +194,78 @@ function recordRejection(stats, reason, sample) {
   if (sample && stats.rejectionSamples[`${reason}:sample`] == null) {
     stats.rejectionSamples[`${reason}:sample`] = String(sample).slice(0, 160);
   }
+}
+
+function buildTelegramCandidatePreview(item, options = {}) {
+  const message = String(item.formattedMessage || "");
+  return {
+    classification: item.classification?.classification || item.newsType || null,
+    sourceChannel: item.post?.sourceChannel || null,
+    sourceMessageId: item.post?.sourceMessageId || null,
+    titlePreview: String(item.facts?.title || item.post?.rawText || "").slice(0, 120),
+    finalMessagePreview: message.slice(0, 280),
+    characterCount: message.length,
+    promoRemoved: item.promoFooterRemoved === true,
+    qualityScore: item.newsValue?.score ?? null,
+    aiResult: item.aiResult || "none",
+    finalFactCheck: item.finalFactCheck?.ok === false ? item.finalFactCheck.reason || "failed" : "ok",
+    publishBlockedByKillSwitch: options.publishBlockedByKillSwitch === true,
+  };
+}
+
+function summarizeTelegramPipelineStats(processed, parseStats = {}) {
+  const classificationCounts = {};
+  for (const item of processed) {
+    const key = item.classification?.classification || item.reason || "unknown";
+    classificationCounts[key] = (classificationCounts[key] || 0) + 1;
+  }
+
+  return {
+    publishable: processed.filter((item) => !item.skipPublish && item.formattedMessage).length,
+    promotionSkipped: processed.filter((item) => item.reason === "TELEGRAM_PROMOTION_SKIPPED").length,
+    subscriptionOfferSkipped: processed.filter((item) => item.reason === "TELEGRAM_POST_CLASSIFICATION_SUBSCRIPTION_OFFER").length,
+    brokerAdSkipped: processed.filter((item) => item.reason === "TELEGRAM_POST_CLASSIFICATION_BROKER_AD").length,
+    channelAnnouncementSkipped: processed.filter(
+      (item) => item.reason === "TELEGRAM_POST_CLASSIFICATION_CHANNEL_ANNOUNCEMENT"
+    ).length,
+    unclearSkipped: parseStats.unclearSkipped || 0,
+    lowValueSkipped: parseStats.lowValueSkipped || 0,
+    promoFootersRemoved: parseStats.promoFootersRemoved || 0,
+    preEventMissingName: parseStats.preEventMissingName || 0,
+    economicAccepted: processed.filter((item) => item.newsType === "economic" && !item.skipPublish).length,
+    economicIncompletePending: processed.filter((item) => item.newsType === "economic" && item.skipPublish).length,
+    aiAccepted: processed.filter((item) => item.aiResult === "accepted").length,
+    aiTooSimilar: processed.filter((item) =>
+      item.editorialCheck?.issues?.includes("AI_EDITORIAL_DRAFT_TOO_SIMILAR")
+    ).length,
+    aiFactMismatch: processed.filter((item) => item.aiResult === "rejected_fact_mismatch").length,
+    fallbackUsed: processed.filter(
+      (item) => item.aiResult === "fallback" || item.usedFixedTemplate === true || item.aiResult === "rule_based"
+    ).length,
+    finalFactCheckFailures: processed.filter((item) => item.finalFactCheck?.ok === false).length,
+    classificationCounts,
+  };
+}
+
+function logTelegramPublishCandidatesPreview(processed, options = {}) {
+  const candidates = processed
+    .filter((item) => !item.skipPublish && item.formattedMessage)
+    .sort((a, b) => (b.newsValue?.score || 0) - (a.newsValue?.score || 0))
+    .slice(0, 10)
+    .map((item) => buildTelegramCandidatePreview(item, options));
+
+  if (!candidates.length) {
+    return;
+  }
+
+  console.log(
+    "TELEGRAM_NEWS_CANDIDATES_PREVIEW",
+    JSON.stringify({
+      count: candidates.length,
+      publishBlockedByKillSwitch: options.publishBlockedByKillSwitch === true,
+      candidates,
+    })
+  );
 }
 
 function getRequiredEnvStatus() {
@@ -3317,7 +3402,13 @@ async function fetchForexNews(options = {}) {
     const allItems = [];
 
     try {
-      const parseStats = { promoOnlySkipped: 0, promoFootersRemoved: 0 };
+      const parseStats = {
+        promoOnlySkipped: 0,
+        promoFootersRemoved: 0,
+        unclearSkipped: 0,
+        lowValueSkipped: 0,
+        preEventMissingName: 0,
+      };
       const mergeBuffer = getNewsWorkerTelegramMergeBuffer(dryRun);
       const telegramDiscovery = await discoverTelegramNews({
         limitTotal: 100,
@@ -3325,6 +3416,7 @@ async function fetchForexNews(options = {}) {
         disableAi: dryRun,
         dryRun,
         parseStats,
+        pipelineStats: parseStats,
         useMergeBuffer: true,
         mergeBuffer,
         flushImmediately: dryRun,
@@ -3332,7 +3424,7 @@ async function fetchForexNews(options = {}) {
 
       stats.telegramFetched = telegramDiscovery.posts.length;
       stats.telegramDeduped = telegramDiscovery.processed.length;
-      stats.telegramMerged = telegramDiscovery.processed.filter((item) => item.mergedFrom.length > 0).length;
+      stats.telegramMerged = telegramDiscovery.processed.filter((item) => item.mergedFrom?.length > 0).length;
       stats.telegramEconomicIncomplete = telegramDiscovery.processed.filter(
         (item) => item.newsType === "economic" && item.skipPublish
       ).length;
@@ -3340,6 +3432,11 @@ async function fetchForexNews(options = {}) {
       stats.telegramPromoFootersRemoved = parseStats.promoFootersRemoved;
       stats.telegramMergeBufferTimers = telegramDiscovery.mergeBufferTimers;
       stats.telegramMergeBufferPeak = telegramDiscovery.mergeBufferMetrics?.peakSize || 0;
+      stats.telegramPipeline = summarizeTelegramPipelineStats(telegramDiscovery.processed, parseStats);
+      stats.publishBlockedByKillSwitch = !TELEGRAM_NEWS_PUBLISH_ENABLED;
+      logTelegramPublishCandidatesPreview(telegramDiscovery.processed, {
+        publishBlockedByKillSwitch: !TELEGRAM_NEWS_PUBLISH_ENABLED,
+      });
 
       if (dryRun) {
         allItems.push(...telegramDiscovery.items.filter((item) => !item.skipPublish));
@@ -3707,6 +3804,15 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
 
     if (!aiResult?.message) {
       stats.aiFailed = 1;
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+      return stats;
+    }
+
+    if (latestNews.isTelegramSource && !TELEGRAM_NEWS_PUBLISH_ENABLED) {
+      console.log("TELEGRAM_NEWS_PUBLISH_DISABLED skip cycle publish:", latestNews.title);
       stats.cycleDurationMs = Date.now() - cycleStartedAt;
       lastCycleStats = stats;
       lastCycleCompletedAt = new Date().toISOString();

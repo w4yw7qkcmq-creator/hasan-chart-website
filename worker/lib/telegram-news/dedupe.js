@@ -4,6 +4,7 @@ const { detectFactConflict } = require("./conflict");
 const { formatTelegramPost } = require("./format");
 const { validateFinalMessageAgainstFacts } = require("./invariants");
 const { getMergeWindowMs } = require("./merge-window");
+const { prepareTelegramPost } = require("./pipeline");
 
 function scorePostCompleteness(facts) {
   let score = 0;
@@ -195,10 +196,49 @@ function dedupeTelegramPosts(posts) {
 }
 
 async function processTelegramPosts(posts, options = {}) {
-  const deduped = dedupeTelegramPosts(posts);
+  const pipelineStats = options.pipelineStats || options.parseStats || {};
+  const preparedByKey = new Map();
+  const skippedEntries = [];
+
+  for (const post of posts) {
+    const prep = prepareTelegramPost(post, pipelineStats);
+    const exactKey = `${post.sourceChannel}:${post.sourceMessageId}`;
+    if (prep.skip) {
+      skippedEntries.push({ post, prep });
+      continue;
+    }
+    preparedByKey.set(exactKey, prep);
+  }
+
+  const deduped = dedupeTelegramPosts([...preparedByKey.values()].map((entry) => entry.post));
   const processed = [];
 
+  for (const { post, prep } of skippedEntries) {
+    processed.push({
+      post: { ...post, promoFooterRemoved: prep.promoFooterRemoved === true },
+      facts: prep.classification?.facts || extractFactsFromTelegramPost(post),
+      fingerprints: buildFingerprintBundle(post, prep.classification?.facts || extractFactsFromTelegramPost(post)),
+      formattedMessage: null,
+      skipPublish: true,
+      validation: { complete: false, reason: prep.reason },
+      reason: prep.reason,
+      classification: prep.classification,
+      newsValue: prep.newsValue,
+      promoFooterRemoved: prep.promoFooterRemoved === true,
+      missingFields: [],
+      newsType: prep.classification?.classification === "pre_event_alert" ? "pre_event" : prep.classification?.facts?.isStructuredTriple ? "economic" : "general",
+      finalFactCheck: { ok: false, reason: prep.reason },
+      aiImpactUsed: false,
+      aiResult: "none",
+      action: "skipped_pipeline",
+    });
+  }
+
   for (const item of deduped) {
+    const winnerKey = `${item.post.sourceChannel}:${item.post.sourceMessageId}`;
+    const prep = preparedByKey.get(winnerKey);
+    const classification = prep?.classification || {};
+
     if (item.conflict?.hasConflict) {
       processed.push({
         ...item,
@@ -206,8 +246,11 @@ async function processTelegramPosts(posts, options = {}) {
         skipPublish: true,
         validation: { complete: false, reason: "source_conflict" },
         reason: "source_conflict",
+        classification,
+        newsValue: prep?.newsValue,
+        promoFooterRemoved: prep?.promoFooterRemoved === true,
         missingFields: item.conflict.conflicts.map((entry) => entry.field),
-        newsType: item.facts.isStructuredTriple ? "economic" : "general",
+        newsType: item.facts.isStructuredTriple ? "economic" : classification.classification === "pre_event_alert" ? "pre_event" : "general",
         finalFactCheck: { ok: false, reason: "source_conflict" },
         aiImpactUsed: false,
         aiResult: "none",
@@ -215,7 +258,7 @@ async function processTelegramPosts(posts, options = {}) {
       continue;
     }
 
-    const formatted = await formatTelegramPost(item.post, item.facts, options);
+    const formatted = await formatTelegramPost(item.post, item.facts, { ...options, classification });
     const finalFactCheck =
       formatted.formatted && !formatted.skipPublish
         ? validateFinalMessageAgainstFacts(formatted.formatted, item.facts)
@@ -246,7 +289,11 @@ async function processTelegramPosts(posts, options = {}) {
       validation: formatted.validation,
       reason: formatted.skipPublish ? formatted.reason : item.action === "merged" ? "publish-ready-merged" : "publish-ready",
       missingFields: formatted.missingFields || [],
-      newsType: item.facts.isStructuredTriple ? "economic" : "general",
+      newsType: item.facts.isStructuredTriple ? "economic" : classification.classification === "pre_event_alert" ? "pre_event" : "general",
+      classification,
+      newsValue: prep?.newsValue,
+      promoFooterRemoved: prep?.promoFooterRemoved === true,
+      editorialCheck: formatted.editorialCheck,
       finalFactCheck: finalFactCheck.ok === false ? finalFactCheck : { ok: true },
       aiImpactUsed: formatted.aiImpactUsed === true,
       aiResult: formatted.aiResult || "fallback",
