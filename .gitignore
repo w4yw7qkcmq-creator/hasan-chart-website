@@ -13,5 +13,15 @@ worker/.env
 .tmp-*.sql
 /tmp/staging-api-keys.json
 tmp/
+worker/.cache/
+worker/scripts/.tmp-premium-news-previews/
+worker/scripts/.tmp-openai-premium-preview/
+worker/scripts/.tmp-final-editorial-visual-tests/
+worker/scripts/.tmp-text-guard-preview/
+worker/scripts/.tmp-adaptive-layout-preview/
+worker/scripts/.tmp-final-headline-preview/
+worker/tests/.tmp-news-images-cache/
+worker/tests/.tmp-news-images-output/
+worker/tests/.tmp-news-images-restart/
 security-reports/
 supabase/.temp/

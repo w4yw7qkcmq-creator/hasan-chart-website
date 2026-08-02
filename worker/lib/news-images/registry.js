@@ -2,6 +2,7 @@ const { createFallbackImageProvider } = require("./fallback-image-provider");
 const { createOpenAIImageProvider } = require("./openai-image-provider");
 const { createGeminiImageProvider } = require("./gemini-image-provider");
 const { assertImageProvider } = require("./image-provider-interface");
+const { resolveProductionImageProviderTarget } = require("./openai-prompt-builder");
 
 function resolveImageProviderName(options = {}) {
   return String(options.provider || process.env.NEWS_IMAGE_PROVIDER || "fallback").trim().toLowerCase();
@@ -31,4 +32,5 @@ function createNewsImageProviderRegistry(options = {}) {
 module.exports = {
   createNewsImageProviderRegistry,
   resolveImageProviderName,
+  resolveProductionImageProviderTarget,
 };

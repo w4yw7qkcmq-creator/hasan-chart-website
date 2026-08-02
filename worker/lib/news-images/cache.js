@@ -4,26 +4,53 @@ const crypto = require("crypto");
 
 const DEFAULT_CACHE_DIR = path.join(__dirname, "..", "..", ".cache", "news-images");
 
-function buildCacheKey({ eventName, country, releaseTime }) {
+function buildCacheKey({ eventKey, eventName, country, releaseTime }) {
   const bucket = releaseTime ? new Date(releaseTime).toISOString().slice(0, 13) : "unknown";
+  const label = String(eventKey || eventName || "EVENT").trim().toUpperCase();
   return crypto
     .createHash("sha1")
-    .update(`${String(country || "US").toUpperCase()}|${String(eventName || "").trim()}|${bucket}`)
+    .update(`${String(country || "US").toUpperCase()}|${label}|${bucket}`)
     .digest("hex");
 }
 
-function getCachePaths(cacheKey, cacheDir = DEFAULT_CACHE_DIR) {
-  const fileName = `${cacheKey}.png`;
+function getCachePaths(cacheKey, cacheDir = DEFAULT_CACHE_DIR, suffix = "") {
+  const fileName = `${cacheKey}${suffix}.png`;
   return {
     cacheDir,
     filePath: path.join(cacheDir, fileName),
-    metaPath: path.join(cacheDir, `${cacheKey}.json`),
+    metaPath: path.join(cacheDir, `${cacheKey}${suffix}.json`),
   };
 }
 
 function readCachedImage(context, options = {}) {
   const cacheKey = buildCacheKey(context);
   const { filePath, metaPath } = getCachePaths(cacheKey, options.cacheDir);
+
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  let meta = null;
+  if (fs.existsSync(metaPath)) {
+    try {
+      meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+    } catch (_error) {
+      meta = null;
+    }
+  }
+
+  return {
+    cacheKey,
+    filePath,
+    buffer: fs.readFileSync(filePath),
+    meta,
+    cached: true,
+  };
+}
+
+function readRawBackground(context, options = {}) {
+  const cacheKey = buildCacheKey(context);
+  const { filePath, metaPath } = getCachePaths(cacheKey, options.rawCacheDir || options.cacheDir, "-raw");
 
   if (!fs.existsSync(filePath)) {
     return null;
@@ -72,6 +99,32 @@ function writeCachedImage(context, buffer, meta = {}, options = {}) {
   return { cacheKey, filePath };
 }
 
+function writeRawBackground(context, buffer, meta = {}, options = {}) {
+  const cacheKey = buildCacheKey(context);
+  const rawCacheDir = options.rawCacheDir || options.cacheDir || DEFAULT_CACHE_DIR;
+  const { cacheDir, filePath, metaPath } = getCachePaths(cacheKey, rawCacheDir, "-raw");
+
+  fs.mkdirSync(cacheDir, { recursive: true });
+  fs.writeFileSync(filePath, buffer);
+  fs.writeFileSync(
+    metaPath,
+    JSON.stringify(
+      {
+        ...meta,
+        cacheKey,
+        eventName: context.eventName,
+        country: context.country,
+        releaseTime: context.releaseTime,
+        savedAt: new Date().toISOString(),
+      },
+      null,
+      2
+    )
+  );
+
+  return { cacheKey, filePath, metaPath };
+}
+
 function resetCacheForTests(cacheDir = DEFAULT_CACHE_DIR) {
   if (!fs.existsSync(cacheDir)) {
     return;
@@ -86,6 +139,8 @@ module.exports = {
   buildCacheKey,
   getCachePaths,
   readCachedImage,
+  readRawBackground,
   writeCachedImage,
+  writeRawBackground,
   resetCacheForTests,
 };

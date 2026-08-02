@@ -1,44 +1,51 @@
 const axios = require("axios");
 const { createImageProviderResult } = require("./image-provider-interface");
-const { buildBackgroundPrompt } = require("./fallback-image-provider");
+const { buildOpenAIImagePrompt } = require("./openai-prompt-builder");
+const { resolveOpenAIImageSettings } = require("./openai-image-settings");
 
 function createOpenAIImageProvider(options = {}) {
   const apiKey = options.apiKey || process.env.OPENAI_API_KEY;
-  const model = options.model || process.env.NEWS_IMAGE_OPENAI_MODEL || "gpt-image-1";
   const httpClient = options.httpClient || axios;
+  const settings = resolveOpenAIImageSettings(options);
 
   return {
     name: "openai",
+    settings,
 
     async generateBackground(context = {}) {
       if (!apiKey) {
         throw new Error("OPENAI_API_KEY is required for OpenAIImageProvider");
       }
 
-      const prompt = [
-        buildBackgroundPrompt(context),
-        "ultra professional global news agency backdrop",
-        "high contrast",
-        "editorial macro finance mood",
-        "leave clean negative space for headline overlay",
-      ].join(". ");
+      const promptBundle = buildOpenAIImagePrompt(context);
+      const prompt = promptBundle.prompt;
 
-      const response = await httpClient.post(
-        "https://api.openai.com/v1/images/generations",
-        {
-          model,
-          prompt,
-          size: "1536x1024",
-          quality: "medium",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
+      let response;
+      try {
+        response = await httpClient.post(
+          "https://api.openai.com/v1/images/generations",
+          {
+            model: settings.model,
+            prompt,
+            size: settings.size,
+            quality: settings.quality,
           },
-          timeout: options.timeoutMs || 60000,
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            timeout: settings.timeoutMs,
+          }
+        );
+      } catch (error) {
+        const apiMessage =
+          error.response?.data?.error?.message ||
+          error.response?.data?.message ||
+          error.message ||
+          "OpenAI image generation failed";
+        throw new Error(`OpenAIImageProvider failed: ${apiMessage}`);
+      }
 
       const item = response.data?.data?.[0];
       let backgroundBuffer = null;
@@ -48,12 +55,12 @@ function createOpenAIImageProvider(options = {}) {
       } else if (item?.url) {
         const imageResponse = await httpClient.get(item.url, {
           responseType: "arraybuffer",
-          timeout: options.timeoutMs || 30000,
+          timeout: Math.min(settings.timeoutMs, 45000),
         });
         backgroundBuffer = Buffer.from(imageResponse.data);
       }
 
-      if (!backgroundBuffer) {
+      if (!backgroundBuffer || backgroundBuffer.length === 0) {
         throw new Error("OpenAI image generation returned no image data");
       }
 
@@ -62,6 +69,15 @@ function createOpenAIImageProvider(options = {}) {
         provider: "openai",
         cached: false,
         prompt,
+        visualCategory: promptBundle.visualCategory,
+        seed: promptBundle.seed,
+        seedSource: promptBundle.releaseSeed,
+        displayTitle: promptBundle.displayTitle,
+        overlayPlacement: promptBundle.overlayPlacement,
+        titlePlacement: promptBundle.titlePlacement,
+        model: settings.model,
+        size: settings.size,
+        quality: settings.quality,
       });
     },
   };
@@ -69,4 +85,5 @@ function createOpenAIImageProvider(options = {}) {
 
 module.exports = {
   createOpenAIImageProvider,
+  resolveOpenAIImageSettings,
 };

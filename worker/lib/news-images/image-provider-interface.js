@@ -1,4 +1,4 @@
-function createImageProviderResult({ backgroundBuffer, provider, cached = false, prompt = null }) {
+function createImageProviderResult({ backgroundBuffer, provider, cached = false, prompt = null, ...meta }) {
   if (!backgroundBuffer || !Buffer.isBuffer(backgroundBuffer)) {
     throw new Error("ImageProvider must return a background Buffer");
   }
@@ -8,6 +8,7 @@ function createImageProviderResult({ backgroundBuffer, provider, cached = false,
     provider: provider || "unknown",
     cached,
     prompt: prompt || null,
+    ...meta,
   };
 }
 
