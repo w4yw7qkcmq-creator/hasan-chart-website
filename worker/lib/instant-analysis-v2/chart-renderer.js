@@ -11,11 +11,11 @@ function buildChartAnnotationsFromResult(result) {
   const plan = result.tradePlan || {};
 
   if (result.structure?.bos?.detected && Number.isFinite(result.structure.bos.level)) {
-    annotations.push({ type: "BOS", price: result.structure.bos.level, label: "BOS" });
+    annotations.push({ type: "BOS", price: result.structure.bos.level, label: "كسر الهيكل" });
   }
 
   if (result.structure?.choch?.detected && Number.isFinite(result.structure.choch.level)) {
-    annotations.push({ type: "CHOCH", price: result.structure.choch.level, label: "CHOCH" });
+    annotations.push({ type: "CHOCH", price: result.structure.choch.level, label: "تغير السلوك" });
   }
 
   for (const ob of result.zones?.orderBlocks || []) {
@@ -27,46 +27,46 @@ function buildChartAnnotationsFromResult(result) {
   for (const fvg of result.zones?.fairValueGaps || []) {
     if (fvg.status === "filled") continue;
     if (Number.isFinite(fvg.from) && Number.isFinite(fvg.to)) {
-      annotations.push({ type: "FVG", from: fvg.from, to: fvg.to, label: `FVG ${fvg.status}` });
+      annotations.push({ type: "FVG", from: fvg.from, to: fvg.to, label: fvg.status === "partially_filled" ? "فجوة جزئية" : "فجوة قيمة" });
     }
   }
 
   for (const zone of (result.zones?.demand || []).slice(-2)) {
-    annotations.push({ type: "DEMAND", from: zone.from, to: zone.to, label: zone.label || "Demand" });
+    annotations.push({ type: "DEMAND", from: zone.from, to: zone.to, label: zone.label || "منطقة طلب" });
   }
 
   for (const zone of (result.zones?.supply || []).slice(-2)) {
-    annotations.push({ type: "SUPPLY", from: zone.from, to: zone.to, label: zone.label || "Supply" });
+    annotations.push({ type: "SUPPLY", from: zone.from, to: zone.to, label: zone.label || "منطقة عرض" });
   }
 
   for (const pool of [...(result.liquidity?.buySideLiquidity || []), ...(result.liquidity?.sellSideLiquidity || [])].slice(0, 2)) {
     if (Number.isFinite(pool.price)) {
-      annotations.push({ type: "LIQUIDITY", price: pool.price, label: pool.label || "Liquidity" });
+      annotations.push({ type: "LIQUIDITY", price: pool.price, label: pool.label || "سيولة" });
     }
   }
 
   if (plan.isActionable && result.decision?.state === "actionable") {
     if (plan.entryZone) {
-      annotations.push({ type: "ENTRY", from: plan.entryZone.from, to: plan.entryZone.to, label: "Entry" });
+      annotations.push({ type: "ENTRY", from: plan.entryZone.from, to: plan.entryZone.to, label: "دخول" });
     }
     if (Number.isFinite(plan.stopLoss)) {
-      annotations.push({ type: "STOP", price: plan.stopLoss, label: "SL" });
+      annotations.push({ type: "STOP", price: plan.stopLoss, label: "وقف" });
     }
     (plan.targets || []).forEach((tp) => {
       if (Number.isFinite(tp.price)) {
-        annotations.push({ type: "TARGET", price: tp.price, label: tp.label || "TP" });
+        annotations.push({ type: "TARGET", price: tp.price, label: tp.label?.replace("TP", "هدف") || "هدف" });
       }
     });
   }
 
   if (Number.isFinite(result.market?.currentPrice)) {
-    annotations.push({ type: "CURRENT", price: result.market.currentPrice, label: "Current" });
+    annotations.push({ type: "CURRENT", price: result.market.currentPrice, label: "السعر" });
   }
 
   return annotations;
 }
 
-function buildAnnotatedChartSvg(result, executionCandles) {
+function buildAnnotatedChartSvg(result, executionCandles, executionTimeframe = "15m") {
   const candles = Array.isArray(executionCandles) ? executionCandles.slice(-CHART_CANDLE_LIMIT) : [];
   if (candles.length < 8) return null;
 
@@ -100,7 +100,7 @@ function buildAnnotatedChartSvg(result, executionCandles) {
     .map((c, i) => {
       const x = pad.left + i * step;
       const up = c.close >= c.open;
-      const color = up ? "#34d399" : "#fb7185";
+      const color = up ? "#16A34A" : "#DC2626";
       const bodyY = toY(Math.max(c.open, c.close));
       const bodyH = Math.max(2, Math.abs(toY(c.open) - toY(c.close)));
       return `<line x1="${x}" y1="${toY(c.high)}" x2="${x}" y2="${toY(c.low)}" stroke="${color}" stroke-width="3"/>
@@ -139,43 +139,47 @@ function buildAnnotatedChartSvg(result, executionCandles) {
   }
 
   const decision = result.decision || {};
-  const biasColor = decision.direction === "long" ? "#34d399" : decision.direction === "short" ? "#fb7185" : "#22d3ee";
+  const biasColor = decision.direction === "long" ? "#16A34A" : decision.direction === "short" ? "#DC2626" : "#2563EB";
+  const tfLabel = String(executionTimeframe || "15m").toUpperCase();
+  const stateAr = decision.state === "actionable" ? "جاهز" : decision.state === "avoid" ? "تجنب" : "انتظار";
+  const dirAr = decision.direction === "long" ? "صاعد" : decision.direction === "short" ? "هابط" : "محايد";
   const firstClose = candles[0]?.close;
   const lastClose = candles[candles.length - 1]?.close;
 
   const svg = `<!-- ia-v2-chart candles=${candles.length} firstClose=${firstClose} lastClose=${lastClose} current=${result.market?.currentPrice} -->
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="${width}" height="${height}" fill="#020617"/>
-  <text x="${pad.left}" y="48" fill="#fff" font-size="28" font-weight="900">HasaN CharT World · ${escapeHtml(result.symbol)} · 15m</text>
-  <text x="${pad.left}" y="78" fill="#67e8f9" font-size="16">${escapeHtml(result.generatedAt || "")} · ${escapeHtml(decision.opportunityGrade || "")} · Confidence ${decision.confidence || 0}%</text>
-  <text x="${width - pad.right - 180}" y="48" fill="#94a3b8" font-size="15">Current</text>
-  <text x="${width - pad.right - 180}" y="78" fill="#fff" font-size="24" font-weight="900">${formatPrice(result.market?.currentPrice)}</text>
+  <rect width="${width}" height="${height}" fill="#0F172A"/>
+  <text x="${pad.left}" y="48" fill="#F8FAFC" font-size="26" font-weight="800" font-family="Segoe UI, Arial, sans-serif">HasaN CharT World · ${escapeHtml(result.symbol)} · ${escapeHtml(tfLabel)}</text>
+  <text x="${pad.left}" y="78" fill="#94A3B8" font-size="14" font-family="Segoe UI, Arial, sans-serif">${escapeHtml(decision.opportunityGrade || "")} · ثقة ${decision.confidence || 0}%</text>
+  <text x="${width - pad.right - 180}" y="48" fill="#94A3B8" font-size="14" font-family="Segoe UI, Arial, sans-serif">السعر الحالي</text>
+  <text x="${width - pad.right - 180}" y="78" fill="#FFFFFF" font-size="22" font-weight="800" font-family="Segoe UI, Arial, sans-serif">${formatPrice(result.market?.currentPrice)}</text>
   ${Array.from({ length: 6 }, (_, i) => {
     const y = pad.top + (chartH / 5) * i;
     const price = max - (range / 5) * i;
-    return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="#334155" stroke-opacity="0.35"/>
-      <text x="${width - pad.right + 8}" y="${y + 4}" fill="#64748b" font-size="11">${formatPrice(price)}</text>`;
+    return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="#1E293B" stroke-opacity="0.9"/>
+      <text x="${width - pad.right + 8}" y="${y + 4}" fill="#64748B" font-size="11" font-family="Segoe UI, Arial, sans-serif">${formatPrice(price)}</text>`;
   }).join("")}
   ${overlaySvg}
   ${candleSvg}
-  <rect x="${pad.left}" y="${height - 72}" width="420" height="48" rx="14" fill="#0f172a" stroke="${biasColor}" stroke-opacity="0.6"/>
-  <text x="${pad.left + 16}" y="${height - 42}" fill="${biasColor}" font-size="18" font-weight="800">${escapeHtml(decision.state || "wait")} · ${escapeHtml(decision.direction || "neutral")}</text>
-  <text x="${pad.left}" y="${height - 16}" fill="#94a3b8" font-size="13">Real OKX OHLC · Educational only</text>
+  <rect x="${pad.left}" y="${height - 72}" width="420" height="48" rx="12" fill="#1E293B" stroke="${biasColor}" stroke-opacity="0.5"/>
+  <text x="${pad.left + 16}" y="${height - 42}" fill="${biasColor}" font-size="16" font-weight="700" font-family="Segoe UI, Arial, sans-serif">${escapeHtml(stateAr)} · ${escapeHtml(dirAr)}</text>
+  <text x="${pad.left}" y="${height - 16}" fill="#64748B" font-size="12" font-family="Segoe UI, Arial, sans-serif">بيانات OKX حقيقية · للتعليم فقط</text>
 </svg>`;
 
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
-function buildChartPayload(result, executionCandles) {
+function buildChartPayload(result, executionCandles, executionTimeframe = "15m") {
   const candles = executionCandles.slice(-CHART_CANDLE_LIMIT);
   const annotations = buildChartAnnotationsFromResult(result);
 
   return {
-    image: buildAnnotatedChartSvg(result, candles),
+    image: buildAnnotatedChartSvg(result, candles, executionTimeframe),
     candles,
     candleCount: candles.length,
     annotations,
-    alt: `Instant Analysis v2 chart for ${result.symbol}`,
+    timeframe: executionTimeframe,
+    alt: `رسم التحليل اللحظي ${result.symbol}`,
   };
 }
 

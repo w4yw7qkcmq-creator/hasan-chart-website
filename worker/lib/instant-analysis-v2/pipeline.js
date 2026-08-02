@@ -1,4 +1,9 @@
-const { INSTANT_ANALYSIS_V2_VERSION, TIMEFRAMES } = require("./constants");
+const {
+  INSTANT_ANALYSIS_V2_VERSION,
+  INSTANT_ANALYSIS_UI_VERSION,
+  resolveExecutionTimeframeInput,
+  buildPipelineTimeframes,
+} = require("./constants");
 const { fetchMultiTimeframeCandles, buildMarketDataSnapshot } = require("./market-data");
 const { detectSwingPoints } = require("./swing-points");
 const { computeAtr, computeEma, classifyVolatility, computeTrendFromStructure, computeTrendStrength, computeMomentum } = require("./indicators");
@@ -14,7 +19,29 @@ const { assessNewsRisk } = require("./news-risk");
 const { enrichWithOpenAiExplanation } = require("./explanation");
 const { buildChartPayload } = require("./chart-renderer");
 const { validateInstantAnalysisV2, applyValidationFallback } = require("./validator");
+const { computeSetupQuality } = require("./setup-quality");
 const { logInstantAnalysisV2 } = require("./logger");
+
+function buildTrendOutlook({ executionTrend, structureTrend, htfTrend }) {
+  return {
+    short: executionTrend,
+    medium: structureTrend || executionTrend,
+    long: htfTrend || structureTrend || executionTrend,
+  };
+}
+
+function buildTimeframeTrendMap(timeframeResults) {
+  const trends = {};
+  for (const [key, payload] of Object.entries(timeframeResults)) {
+    if (!payload?.candles?.length || payload.candles.length < 20) {
+      trends[key] = "neutral";
+      continue;
+    }
+    const analysis = analyzeSingleTimeframe(payload.candles);
+    trends[key] = analysis.trend;
+  }
+  return trends;
+}
 
 function classifyMarketState(volatility, alignment) {
   if (volatility === "extreme") return "volatile";
@@ -53,16 +80,25 @@ async function runInstantAnalysisV2({
   fetchPrice,
   openaiApiKey,
   fetchUpcomingEvents = null,
+  executionTimeframe,
 }) {
   const startedAt = Date.now();
   const timings = { marketDataMs: 0, technicalEngineMs: 0, openAiMs: 0, chartRenderMs: 0, totalMs: 0 };
+  const timeframeResolution = resolveExecutionTimeframeInput(executionTimeframe);
+  if (!timeframeResolution.ok) {
+    const error = new Error(timeframeResolution.message);
+    error.code = timeframeResolution.code;
+    throw error;
+  }
+  const resolvedExecutionTf = timeframeResolution.key;
+  const pipelineTimeframes = buildPipelineTimeframes(resolvedExecutionTf);
 
-  logInstantAnalysisV2("INSTANT_ANALYSIS_V2_STARTED", { analysisId, symbol });
+  logInstantAnalysisV2("INSTANT_ANALYSIS_V2_STARTED", { analysisId, symbol, executionTimeframe: resolvedExecutionTf });
 
   const marketDataStarted = Date.now();
   const timeframeResults = await fetchMultiTimeframeCandles({
     symbol,
-    timeframes: TIMEFRAMES,
+    timeframes: pipelineTimeframes,
     fetchCandles,
   });
   timings.marketDataMs = Date.now() - marketDataStarted;
@@ -75,12 +111,12 @@ async function runInstantAnalysisV2({
   });
 
   const technicalStarted = Date.now();
-  const execution = timeframeResults["15m"];
+  const execution = timeframeResults[resolvedExecutionTf];
   const structureTf = timeframeResults["1h"];
   const htf = timeframeResults["4h"];
 
   if (!execution?.candles?.length || execution.quality === "insufficient") {
-    logInstantAnalysisV2("MARKET_DATA_INVALID", { analysisId, symbol, reason: "INSUFFICIENT_15M" });
+    logInstantAnalysisV2("MARKET_DATA_INVALID", { analysisId, symbol, reason: `INSUFFICIENT_${resolvedExecutionTf.toUpperCase()}` });
     throw new Error("INSUFFICIENT_MARKET_DATA");
   }
 
@@ -229,6 +265,22 @@ async function runInstantAnalysisV2({
     isActionable: tradePlan.isActionable,
   });
 
+  const setupQuality = computeSetupQuality({
+    structure,
+    liquidity,
+    zones: { orderBlocks, fairValueGaps },
+    market,
+    tradePlan,
+    decision,
+  });
+
+  const timeframeTrends = buildTimeframeTrendMap(timeframeResults);
+  const trendOutlook = buildTrendOutlook({
+    executionTrend,
+    structureTrend: structAnalysis?.trend,
+    htfTrend: htfAnalysis?.trend,
+  });
+
   let result = {
     version: INSTANT_ANALYSIS_V2_VERSION,
     analysisId: analysisId || `ia_${Date.now()}`,
@@ -250,10 +302,15 @@ async function runInstantAnalysisV2({
     evidence: evidenceBase,
     newsRisk,
     riskManagement,
+    setupQuality,
+    timeframeTrends,
+    trendOutlook,
     explanation: null,
     chart: null,
     validation: null,
     meta: {
+      uiVersion: INSTANT_ANALYSIS_UI_VERSION,
+      executionTimeframe: resolvedExecutionTf,
       openaiModel: process.env.INSTANT_ANALYSIS_OPENAI_MODEL || "gpt-4o-mini",
       timings,
     },
@@ -295,7 +352,7 @@ async function runInstantAnalysisV2({
   result.decision = { ...result.decision, ...decisionReasons };
 
   const chartStarted = Date.now();
-  result.chart = buildChartPayload(result, execution.candles);
+  result.chart = buildChartPayload(result, execution.candles, resolvedExecutionTf);
   timings.chartRenderMs = Date.now() - chartStarted;
 
   timings.totalMs = Date.now() - startedAt;

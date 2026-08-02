@@ -4,6 +4,11 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatNotificationTime } from "../../../lib/notifications-shared";
+import {
+  buildAnalysisRequestBody,
+  buildLoadingMessage,
+  validateAnalysisRequest,
+} from "../../../lib/instant-analysis-request";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 
 const RealCandlestickChart = dynamic(() => import("./RealCandlestickChart"), {
@@ -11,10 +16,15 @@ const RealCandlestickChart = dynamic(() => import("./RealCandlestickChart"), {
   loading: () => null,
 });
 
-const InstantAnalysisV2Panel = dynamic(() => import("./InstantAnalysisV2Panel"), {
+const InstantAnalysisV3Panel = dynamic(() => import("./InstantAnalysisV3Panel"), {
   ssr: false,
   loading: () => null,
 });
+
+const InstantAnalysisV3Skeleton = dynamic(
+  () => import("./InstantAnalysisV3Panel").then((mod) => ({ default: mod.InstantAnalysisV3Skeleton })),
+  { ssr: false, loading: () => null }
+);
 
 const AI_LOADING_STAGES = [
   "جلب بيانات السوق...",
@@ -171,7 +181,9 @@ export default function MyDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [aiSymbol, setAiSymbol] = useState("BTCUSDT");
+  const [aiTimeframe, setAiTimeframe] = useState("15m");
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiRequestSnapshot, setAiRequestSnapshot] = useState(null);
   const [aiLoadingText, setAiLoadingText] = useState("");
   const [aiError, setAiError] = useState("");
   const [aiResult, setAiResult] = useState(null);
@@ -356,19 +368,28 @@ export default function MyDashboard() {
       return;
     }
 
-    const symbol = aiSymbol.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const validation = validateAnalysisRequest({
+      symbol: aiSymbol,
+      timeframe: aiTimeframe,
+    });
 
-    if (!symbol) {
-      setAiError("اكتب رمز العملة أولاً مثل BTCUSDT");
+    if (!validation.ok) {
+      setAiError(validation.message);
       return;
     }
+
+    const requestSnapshot = {
+      symbol: validation.symbol,
+      timeframe: validation.timeframe,
+    };
 
     aiAbortRef.current?.abort();
     const analysisController = new AbortController();
     aiAbortRef.current = analysisController;
 
+    setAiRequestSnapshot(requestSnapshot);
     setAiLoading(true);
-    setAiLoadingText(AI_LOADING_STAGES[0]);
+    setAiLoadingText(buildLoadingMessage(requestSnapshot));
     setAiError("");
     setAiResult(null);
     setShowAiAnalysis(true);
@@ -376,7 +397,11 @@ export default function MyDashboard() {
     let loadingStageIndex = 0;
     const loadingStageTimer = setInterval(() => {
       loadingStageIndex = Math.min(loadingStageIndex + 1, AI_LOADING_STAGES.length - 1);
-      setAiLoadingText(AI_LOADING_STAGES[loadingStageIndex]);
+      if (loadingStageIndex === 0) {
+        setAiLoadingText(buildLoadingMessage(requestSnapshot));
+      } else {
+        setAiLoadingText(AI_LOADING_STAGES[loadingStageIndex]);
+      }
     }, 2200);
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -428,7 +453,7 @@ export default function MyDashboard() {
 
       return {
         ...data,
-        symbol: data.symbol || symbol,
+        symbol: data.symbol || requestSnapshot.symbol,
         marketBias: trend,
         bos: data.bos || (String(trend).toLowerCase().includes("bull") ? "Bullish BOS" : String(trend).toLowerCase().includes("bear") ? "Bearish BOS" : "بانتظار تأكيد"),
         choch: data.choch || "راقب تغير السلوك السعري",
@@ -455,6 +480,11 @@ export default function MyDashboard() {
     };
 
     try {
+      const requestBody = buildAnalysisRequestBody({
+        symbol: requestSnapshot.symbol,
+        timeframe: requestSnapshot.timeframe,
+      });
+
       const response = await fetchWithTimeout(
         "/api/instant-analysis",
         {
@@ -463,13 +493,7 @@ export default function MyDashboard() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            symbol,
-            source: "my-dashboard",
-            mode: "professional-smc-ict-classic",
-            requestChart: true,
-            schools: ["SMC", "ICT", "CLASSIC"],
-          }),
+          body: JSON.stringify(requestBody),
         },
         20000
       );
@@ -563,6 +587,7 @@ export default function MyDashboard() {
       clearInterval(loadingStageTimer);
       if (!analysisController.signal.aborted) {
         setAiLoading(false);
+        setAiRequestSnapshot(null);
         setAiLoadingText("");
       }
     }
@@ -837,10 +862,10 @@ export default function MyDashboard() {
         <section id="instant-analysis" className="user-dashboard-ai">
           <div className="user-dashboard-ai__header">
             <div>
-              <span className="user-dashboard-ai__eyebrow">SMC / ICT LIVE ANALYSIS</span>
+              <span className="user-dashboard-ai__eyebrow">التحليل اللحظي المؤسسي</span>
               <h2 className="user-dashboard-ai__title">تحليل العملات لحظياً</h2>
               <p className="user-dashboard-ai__text">
-                تحليل لحظي احترافي يجمع بين SMC و ICT والمدرسة الكلاسيكية مع قراءة السيولة و BOS و CHOCH.
+                تحليل احترافي متعدد الأطر يجمع بين SMC و ICT والمدرسة الكلاسيكية مع قراءة السيولة وهيكل السوق.
               </p>
             </div>
 
@@ -866,24 +891,46 @@ export default function MyDashboard() {
                 }}
                 placeholder="مثال: BTCUSDT"
                 className="user-dashboard-ai__input"
+                disabled={aiLoading}
+                aria-label="رمز العملة"
               />
+              <select
+                value={aiTimeframe}
+                onChange={(e) => setAiTimeframe(e.target.value)}
+                className="user-dashboard-ai__input user-dashboard-ai__timeframe"
+                aria-label="الإطار الزمني"
+                disabled={aiLoading}
+              >
+                <option value="">اختر الفريم</option>
+                <option value="1m">1 دقيقة</option>
+                <option value="3m">3 دقائق</option>
+                <option value="5m">5 دقائق</option>
+                <option value="15m">15 دقيقة</option>
+                <option value="30m">30 دقيقة</option>
+                <option value="1h">1 ساعة</option>
+                <option value="4h">4 ساعات</option>
+                <option value="1d">1 يوم</option>
+                <option value="1w">1 أسبوع</option>
+              </select>
               <button
                 type="button"
                 onClick={analyzeCoinWithAI}
                 disabled={aiLoading || !aiAvailability.allowed}
                 className="user-dashboard-ai__submit"
               >
-                {aiLoading ? "جاري التحليل..." : "📈 تحليل لحظي"}
+                {aiLoading ? "جارٍ التحليل..." : "طلب التحليل اللحظي"}
               </button>
             </div>
           </div>
 
-          {aiLoadingText ? (
+          {aiLoading ? (
             <div className="user-dashboard-ai__loading">
               <div className="user-dashboard-ai__spinner" aria-hidden="true" />
-              <span>{aiLoadingText}</span>
+              <span>{aiLoadingText || (aiRequestSnapshot ? buildLoadingMessage(aiRequestSnapshot) : "جارٍ التحليل...")}</span>
             </div>
           ) : null}
+
+          {aiLoading ? <InstantAnalysisV3Skeleton /> : null}
 
           {aiError ? (
             <div className="user-dashboard-ai__error">
@@ -917,7 +964,7 @@ export default function MyDashboard() {
 
               {showAiAnalysis ? (
                 aiResult?.version === "2.0" && aiResult?.v2 ? (
-                  <InstantAnalysisV2Panel result={aiResult} />
+                  <InstantAnalysisV3Panel result={aiResult} />
                 ) : (
                 <>
                   <div className="user-dashboard-ai__result-head">

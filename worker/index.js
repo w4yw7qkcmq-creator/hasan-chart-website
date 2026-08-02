@@ -1040,6 +1040,20 @@ app.post(
       });
     }
 
+    const { resolveExecutionTimeframeInput } = require("./lib/instant-analysis-v2/constants");
+    const timeframeResolution = resolveExecutionTimeframeInput(
+      req.body?.executionTimeframe || req.body?.timeframe
+    );
+
+    if (!timeframeResolution.ok) {
+      return res.status(400).json({
+        success: false,
+        code: timeframeResolution.code,
+        error: timeframeResolution.message,
+      });
+    }
+
+    const resolvedExecutionTimeframe = timeframeResolution.key;
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     analysisJobs.set(jobId, {
@@ -1060,6 +1074,7 @@ app.post(
           fetchCandles: getMarketCandles,
           fetchPrice: getMarketPrice,
           openaiApiKey,
+          executionTimeframe: resolvedExecutionTimeframe,
         });
 
         const analysis = normalizeV2ToV1Legacy(v2Result);

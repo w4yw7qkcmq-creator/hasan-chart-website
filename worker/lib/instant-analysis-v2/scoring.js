@@ -8,7 +8,7 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
   evidence.push({
     type: "BOS",
     status: structure.bos.detected ? "confirmed" : "absent",
-    label: "Break of Structure",
+    label: "كسر الهيكل",
     description: structure.bos.detected
       ? `BOS ${structure.bos.direction} عند ${structure.bos.level}`
       : "لا يوجد BOS مؤكد بالإغلاق",
@@ -18,7 +18,7 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
   evidence.push({
     type: "CHOCH",
     status: structure.choch.detected ? "confirmed" : "absent",
-    label: "Change of Character",
+    label: "تغير السلوك",
     description: structure.choch.detected
       ? `CHOCH ${structure.choch.direction}`
       : "لا يوجد CHOCH مؤكد",
@@ -28,7 +28,7 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
   evidence.push({
     type: "LIQUIDITY_SWEEP",
     status: liquidity.sweeps.length ? "confirmed" : "absent",
-    label: "Liquidity Sweep",
+    label: "سحب السيولة",
     description: liquidity.sweeps.length
       ? liquidity.sweeps[0].label
       : "لا يوجد sweep مؤكد",
@@ -44,7 +44,7 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
         : zones.orderBlocks.length
           ? "partial"
           : "absent",
-    label: "Order Block",
+    label: "منطقة Order Block",
     description: zones.orderBlocks[0]?.label || "لا يوجد Order Block محتمل",
     weight: zones.orderBlocks.some((ob) => ob.confirmed) ? 0.55 : zones.orderBlocks[0]?.score || 0,
   });
@@ -53,7 +53,7 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
   evidence.push({
     type: "FVG",
     status: activeFvgs.length ? "confirmed" : (zones.fairValueGaps || []).length ? "partial" : "absent",
-    label: "Fair Value Gap",
+    label: "فجوة القيمة العادلة",
     description: activeFvgs.length ? `${activeFvgs.length} FVG نشط` : "لا يوجد FVG نشط",
     weight: activeFvgs.length ? 0.55 : 0,
   });
@@ -66,7 +66,7 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
         : market.alignment === "conflicting"
           ? "conflicting"
           : "partial",
-    label: "HTF Alignment",
+    label: "توافق الأطر",
     description: `HTF: ${market.higherTimeframeTrend}, Execution: ${market.trend}, Alignment: ${market.alignment}`,
     weight: market.alignment === "aligned" ? 0.85 : market.alignment === "conflicting" ? -0.5 : 0.35,
   });
@@ -74,15 +74,15 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
   evidence.push({
     type: "VOLATILITY",
     status: market.volatility === "extreme" ? "conflicting" : "confirmed",
-    label: "Volatility",
-    description: `Volatility ${market.volatility}`,
+    label: "التقلب",
+    description: `التقلب: ${market.volatility}`,
     weight: market.volatility === "extreme" ? -0.4 : 0.2,
   });
 
   evidence.push({
     type: "ZONE",
     status: structure.premiumDiscount !== "equilibrium" ? "partial" : "absent",
-    label: "Premium / Discount",
+    label: "بريميوم / ديسكونت",
     description: structure.premiumDiscount,
     weight: structure.premiumDiscount === "discount" || structure.premiumDiscount === "premium" ? 0.45 : 0.1,
   });
@@ -91,7 +91,7 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
     evidence.push({
       type: "NEWS",
       status: "conflicting",
-      label: "News Risk",
+      label: "مخاطر الأخبار",
       description: newsRisk.message || "حدث اقتصادي عالي التأثير قريب",
       weight: -0.9,
     });
@@ -101,8 +101,8 @@ function buildEvidence({ structure, liquidity, zones, market, dataQuality, newsR
     evidence.push({
       type: "DATA",
       status: "partial",
-      label: "Data Quality",
-      description: `Data quality ${dataQuality}`,
+      label: "جودة البيانات",
+      description: `جودة البيانات: ${dataQuality}`,
       weight: -0.35,
     });
   }
