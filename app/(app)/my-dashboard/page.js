@@ -11,6 +11,20 @@ const RealCandlestickChart = dynamic(() => import("./RealCandlestickChart"), {
   loading: () => null,
 });
 
+const InstantAnalysisV2Panel = dynamic(() => import("./InstantAnalysisV2Panel"), {
+  ssr: false,
+  loading: () => null,
+});
+
+const AI_LOADING_STAGES = [
+  "جلب بيانات السوق...",
+  "تحليل الاتجاه متعدد الأطر...",
+  "قراءة الهيكل والسيولة...",
+  "بناء السيناريوهات...",
+  "مراجعة المخاطر...",
+  "إعداد التقرير المؤسسي...",
+];
+
 let dashboardBootstrapInflight = null;
 
 async function fetchDashboardBootstrap(signal) {
@@ -354,10 +368,16 @@ export default function MyDashboard() {
     aiAbortRef.current = analysisController;
 
     setAiLoading(true);
-    setAiLoadingText("جاري التحليل اللحظي...");
+    setAiLoadingText(AI_LOADING_STAGES[0]);
     setAiError("");
     setAiResult(null);
     setShowAiAnalysis(true);
+
+    let loadingStageIndex = 0;
+    const loadingStageTimer = setInterval(() => {
+      loadingStageIndex = Math.min(loadingStageIndex + 1, AI_LOADING_STAGES.length - 1);
+      setAiLoadingText(AI_LOADING_STAGES[loadingStageIndex]);
+    }, 2200);
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -381,6 +401,20 @@ export default function MyDashboard() {
 
     const normalizeResult = (raw) => {
       const data = raw?.result || raw || {};
+      const v2Payload = data.v2 && data.v2.version === "2.0" ? data.v2 : data.version === "2.0" ? data : null;
+
+      if (v2Payload) {
+        return {
+          version: "2.0",
+          v2: v2Payload,
+          symbol: v2Payload.symbol,
+          currentPrice: v2Payload.market?.currentPrice,
+          marketBias: v2Payload.market?.trend,
+          chartImage: v2Payload.chart?.image,
+          chartData: v2Payload.chart?.candles || [],
+        };
+      }
+
       const trend = data.marketBias || data.trend || data.direction || "neutral";
       const confidence = data.confidence ? `\n\nنسبة الثقة: ${data.confidence}%` : "";
       const levels = [
@@ -526,6 +560,7 @@ export default function MyDashboard() {
         setAiError(err?.message || UNAVAILABLE_MESSAGE);
       }
     } finally {
+      clearInterval(loadingStageTimer);
       if (!analysisController.signal.aborted) {
         setAiLoading(false);
         setAiLoadingText("");
@@ -881,6 +916,9 @@ export default function MyDashboard() {
               </div>
 
               {showAiAnalysis ? (
+                aiResult?.version === "2.0" && aiResult?.v2 ? (
+                  <InstantAnalysisV2Panel result={aiResult} />
+                ) : (
                 <>
                   <div className="user-dashboard-ai__result-head">
                     <h3 className="user-dashboard-ai__symbol">{aiResult.symbol}</h3>
@@ -916,6 +954,7 @@ export default function MyDashboard() {
                     {aiResult.analysis}
                   </div>
                 </>
+                )
               ) : null}
             </div>
           ) : null}
