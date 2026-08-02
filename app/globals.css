@@ -3390,6 +3390,38 @@ html[data-theme="light"] .user-dashboard-ai__error {
   color: #b91c1c;
 }
 
+.user-dashboard-ai__retry {
+  margin-top: 0.75rem;
+}
+
+.user-dashboard-ai__availability {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.user-dashboard-ai__availability--ready {
+  color: #86efac;
+  font-weight: 700;
+}
+
+.user-dashboard-ai__availability--wait {
+  color: #fde68a;
+  font-weight: 700;
+}
+
+.user-dashboard-ai__availability--wait p {
+  margin: 0.15rem 0;
+}
+
+html[data-theme="light"] .user-dashboard-ai__availability--ready {
+  color: #15803d;
+}
+
+html[data-theme="light"] .user-dashboard-ai__availability--wait {
+  color: #b45309;
+}
+
 .user-dashboard-ai__result {
   margin-top: 1.25rem;
   padding: 1.25rem;

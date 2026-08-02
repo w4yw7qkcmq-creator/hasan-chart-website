@@ -162,8 +162,50 @@ export default function MyDashboard() {
   const [aiError, setAiError] = useState("");
   const [aiResult, setAiResult] = useState(null);
   const [showAiAnalysis, setShowAiAnalysis] = useState(true);
+  const [aiAvailability, setAiAvailability] = useState({
+    allowed: true,
+    retryAfterSeconds: 0,
+    nextAllowedAt: null,
+    fetchedAt: 0,
+  });
+  const [aiCountdownSeconds, setAiCountdownSeconds] = useState(0);
   const aiAbortRef = useRef(null);
-  const railwayAiWorkerUrl = String(process.env.NEXT_PUBLIC_RAILWAY_AI_WORKER_URL || "").replace(/\/$/, "");
+
+  const UNAVAILABLE_MESSAGE = "خدمة التحليل اللحظي غير متاحة مؤقتاً. يرجى المحاولة بعد قليل.";
+
+  const applyAvailabilityPayload = (payload) => {
+    if (!payload || payload.success !== true) {
+      return;
+    }
+
+    const allowed = payload.allowed !== false;
+    const retryAfterSeconds = Math.max(0, Number(payload.retryAfterSeconds) || 0);
+
+    setAiAvailability({
+      allowed,
+      retryAfterSeconds: allowed ? 0 : retryAfterSeconds,
+      nextAllowedAt: allowed ? null : payload.nextAllowedAt || null,
+      fetchedAt: Date.now(),
+    });
+
+    if (!allowed) {
+      setAiCountdownSeconds(retryAfterSeconds);
+    } else {
+      setAiCountdownSeconds(0);
+    }
+  };
+
+  const formatInstantAnalysisCountdown = (totalSeconds) => {
+    const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const minutes = Math.floor(safe / 60);
+    const seconds = safe % 60;
+
+    if (minutes > 0) {
+      return `${minutes} دقيقة و${seconds} ثانية`;
+    }
+
+    return `${seconds} ثانية`;
+  };
 
   useEffect(() => {
     return () => {
@@ -224,6 +266,58 @@ export default function MyDashboard() {
     };
   }, [sessionPending, shouldShowLogin, user?.email]);
 
+  useEffect(() => {
+    if (sessionPending || shouldShowLogin || !user?.email) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    void fetch("/api/instant-analysis/availability", {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then((response) => response.json().catch(() => null))
+      .then((data) => {
+        if (cancelled) return;
+        applyAvailabilityPayload(data);
+      })
+      .catch(() => {
+        if (cancelled) return;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionPending, shouldShowLogin, user?.email]);
+
+  useEffect(() => {
+    if (aiAvailability.allowed) {
+      setAiCountdownSeconds(0);
+      return undefined;
+    }
+
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - (aiAvailability.fetchedAt || Date.now())) / 1000);
+      const remaining = Math.max(0, (aiAvailability.retryAfterSeconds || 0) - elapsed);
+      setAiCountdownSeconds(remaining);
+
+      if (remaining <= 0) {
+        setAiAvailability((prev) => ({
+          ...prev,
+          allowed: true,
+          retryAfterSeconds: 0,
+          nextAllowedAt: null,
+        }));
+      }
+    };
+
+    tick();
+    const timerId = setInterval(tick, 1000);
+
+    return () => clearInterval(timerId);
+  }, [aiAvailability.allowed, aiAvailability.retryAfterSeconds, aiAvailability.fetchedAt]);
+
   const stats = useMemo(() => {
     const activeAlerts = alertCounts.active;
     const triggeredAlerts = alertCounts.triggered;
@@ -244,15 +338,14 @@ export default function MyDashboard() {
   const subscriptionStatus = user?.subscription_status || "غير مفعل";
 
   const analyzeCoinWithAI = async () => {
+    if (aiLoading || !aiAvailability.allowed) {
+      return;
+    }
+
     const symbol = aiSymbol.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 
     if (!symbol) {
       setAiError("اكتب رمز العملة أولاً مثل BTCUSDT");
-      return;
-    }
-
-    if (!railwayAiWorkerUrl) {
-      setAiError("رابط سيرفر Railway غير مضاف داخل Vercel: NEXT_PUBLIC_RAILWAY_AI_WORKER_URL");
       return;
     }
 
@@ -329,9 +422,10 @@ export default function MyDashboard() {
 
     try {
       const response = await fetchWithTimeout(
-        `${railwayAiWorkerUrl}/api/instant-analysis`,
+        "/api/instant-analysis",
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -349,7 +443,20 @@ export default function MyDashboard() {
       const data = await response.json().catch(() => null);
 
       if (!response.ok || !data?.success) {
-        throw new Error(data?.error || `فشل إرسال طلب التحليل إلى Railway. كود الخطأ: ${response.status}`);
+        if (response.status === 429) {
+          applyAvailabilityPayload({
+            success: true,
+            allowed: false,
+            retryAfterSeconds: data?.retryAfterSeconds,
+            nextAllowedAt: data?.nextAllowedAt,
+          });
+        }
+
+        throw new Error(data?.message || UNAVAILABLE_MESSAGE);
+      }
+
+      if (data?.availability) {
+        applyAvailabilityPayload(data.availability);
       }
 
       if (!data.jobId && data.result) {
@@ -379,9 +486,10 @@ export default function MyDashboard() {
         setAiLoadingText("جاري التحليل اللحظي...");
 
         const statusResponse = await fetchWithTimeout(
-          `${railwayAiWorkerUrl}/api/instant-analysis/${encodeURIComponent(data.jobId)}`,
+          `/api/instant-analysis/${encodeURIComponent(data.jobId)}`,
           {
             method: "GET",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
             },
@@ -392,7 +500,7 @@ export default function MyDashboard() {
         const statusData = await statusResponse.json().catch(() => null);
 
         if (!statusResponse.ok || !statusData?.success) {
-          throw new Error(statusData?.error || "تعذر قراءة نتيجة التحليل من Railway");
+          throw new Error(statusData?.message || "تعذر قراءة نتيجة التحليل.");
         }
 
         if (statusData.status === "completed" || statusData.result) {
@@ -413,9 +521,9 @@ export default function MyDashboard() {
       }
 
       if (err?.name === "AbortError") {
-        setAiError("السيرفر تأخر بالرد، لكن الصفحة لم تعلق. جرّب مرة ثانية بعد لحظات.");
+        setAiError("انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى بعد لحظات.");
       } else {
-        setAiError(err?.message || "حدث خطأ أثناء الاتصال بسيرفر Railway");
+        setAiError(err?.message || UNAVAILABLE_MESSAGE);
       }
     } finally {
       if (!analysisController.signal.aborted) {
@@ -701,6 +809,19 @@ export default function MyDashboard() {
               </p>
             </div>
 
+            {aiAvailability.allowed ? (
+              <p className="user-dashboard-ai__availability user-dashboard-ai__availability--ready">
+                متاح الآن — يمكنك إنشاء تحليل لحظي جديد.
+              </p>
+            ) : (
+              <div className="user-dashboard-ai__availability user-dashboard-ai__availability--wait">
+                <p>يمكنك طلب تحليل لحظي واحد كل ساعة.</p>
+                <p>
+                  الطلب التالي متاح بعد: {formatInstantAnalysisCountdown(aiCountdownSeconds)}.
+                </p>
+              </div>
+            )}
+
             <div className="user-dashboard-ai__form">
               <input
                 value={aiSymbol}
@@ -714,7 +835,7 @@ export default function MyDashboard() {
               <button
                 type="button"
                 onClick={analyzeCoinWithAI}
-                disabled={aiLoading}
+                disabled={aiLoading || !aiAvailability.allowed}
                 className="user-dashboard-ai__submit"
               >
                 {aiLoading ? "جاري التحليل..." : "📈 تحليل لحظي"}
@@ -730,7 +851,17 @@ export default function MyDashboard() {
           ) : null}
 
           {aiError ? (
-            <div className="user-dashboard-ai__error">{aiError}</div>
+            <div className="user-dashboard-ai__error">
+              <p>{aiError}</p>
+              <button
+                type="button"
+                onClick={analyzeCoinWithAI}
+                disabled={aiLoading}
+                className="user-dashboard-btn user-dashboard-btn--ghost user-dashboard-ai__retry"
+              >
+                إعادة المحاولة
+              </button>
+            </div>
           ) : null}
 
           {aiResult ? (
