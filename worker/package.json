@@ -9,6 +9,7 @@
     "start:news": "node news-worker.js",
     "test:economic-releases": "node tests/economic-releases.test.cjs",
     "test:telegram-news": "node tests/telegram-news.test.cjs",
+    "test:general-rss": "node tests/general-rss.test.cjs",
     "test:news-images": "node tests/news-images.test.cjs",
     "start:subscription": "node subscription-maintenance-worker.js",
     "subscription-cron": "SUBSCRIPTION_WORKER_ONESHOT=true node subscription-maintenance-worker.js",

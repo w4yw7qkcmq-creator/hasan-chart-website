@@ -30,6 +30,11 @@ const {
   filterGeneralRssItems,
   markRssItemsAsGeneralOnly,
 } = require("./lib/telegram-news/rss-filter");
+const {
+  fetchGeneralRssFeeds,
+  processGeneralRssItems,
+  GENERAL_RSS_FEEDS,
+} = require("./lib/general-rss");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
 const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
@@ -976,13 +981,6 @@ function removeImpactLineIfNotAllowed(message, title) {
 }
 
 // RSS feeds — general market news only. Never used for previous/forecast/actual.
-const GENERAL_RSS_FEEDS = [
-  "https://www.cnbc.com/id/100003114/device/rss/rss.html",
-  "https://www.marketwatch.com/rss/topstories",
-  "https://www.forexlive.com/feed/",
-  "https://www.coindesk.com/arc/outboundfeeds/rss/",
-];
-
 const NEWS_FEEDS = process.env.DISABLE_GENERAL_RSS === "1" ? [] : GENERAL_RSS_FEEDS;
 
 const TELEGRAM_SOURCE_CHANNELS = [
@@ -3501,31 +3499,22 @@ async function fetchForexNews(options = {}) {
       console.error("⚠️ Telegram discovery error:", error.message);
     }
 
+    let rssFetchResult = { items: [], feedReports: [], fetched: 0 };
     if (NEWS_FEEDS.length) {
-      const feedResults = await Promise.allSettled(
-        NEWS_FEEDS.map(async (feedUrl) => {
-          const feed = await parser.parseURL(feedUrl);
-          const generalOnly = filterGeneralRssItems(feed.items);
-          return markRssItemsAsGeneralOnly(generalOnly.map((item) => ({ ...item, feedUrl })));
-        })
-      );
-
-      for (let index = 0; index < feedResults.length; index += 1) {
-        const feedUrl = NEWS_FEEDS[index];
-        const result = feedResults[index];
-        if (result.status === "fulfilled") {
-          allItems.push(...result.value);
-        } else {
-          stats.sourceErrors[feedUrl] = result.reason?.message || String(result.reason);
-          console.error(`⚠️ Feed failed: ${feedUrl}`, stats.sourceErrors[feedUrl]);
+      rssFetchResult = await fetchGeneralRssFeeds({ feeds: NEWS_FEEDS });
+      for (const feedReport of rssFetchResult.feedReports) {
+        if (!feedReport.ok) {
+          stats.sourceErrors[feedReport.feedUrl] = feedReport.error || `HTTP ${feedReport.httpStatus}`;
+          console.error(`⚠️ Feed failed: ${feedReport.name}`, stats.sourceErrors[feedReport.feedUrl]);
         }
       }
     }
 
-    stats.fetched = allItems.length;
-    stats.normalized = allItems.length;
+    stats.fetched = allItems.length + rssFetchResult.fetched;
+    stats.normalized = allItems.length + rssFetchResult.fetched;
+    stats.rssFeedReports = rssFetchResult.feedReports;
 
-    if (!allItems.length) {
+    if (!allItems.length && !rssFetchResult.items.length) {
       console.log("⚠️ No news found from all feeds");
       stats.cycleDurationMs = Date.now() - cycleStartedAt;
       lastCycleStats = stats;
@@ -3565,231 +3554,40 @@ async function fetchForexNews(options = {}) {
 
     if (MIN_MINUTES_BETWEEN_POSTS > 0 && !publishStats.hasEnoughGap) {
       console.log(`⏭️ Waiting for minimum ${MIN_MINUTES_BETWEEN_POSTS} minute gap between posts.`);
-      return;
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+      return stats;
     }
-    const publishedLinks = publishedItems.map((item) => item.link).filter(Boolean);
-    const recentPublishedItems = publishedItems.filter(isRecentPublishedItem);
-    const recentTitles = recentPublishedItems
-      .map((item) => item.title || item.normalizedTitle || "")
-      .filter(Boolean);
-    const recentAiMessages = recentPublishedItems
-      .map((item) => item.normalizedTitle || item.title || "")
-      .filter(Boolean);
 
-    let latestNews = null;
+    const rssPipeline = processGeneralRssItems(rssFetchResult.items, {
+      publishedItems,
+      publishStats,
+      feedReports: rssFetchResult.feedReports,
+      dryRun,
+      limits: {
+        maxPostsPerHour: MAX_POSTS_PER_HOUR,
+        maxHighImpactPostsPerHour: MAX_HIGH_IMPACT_POSTS_PER_HOUR,
+      },
+    });
 
-   for (const item of allItems.slice(0, 90)) {
-      const newsDate = new Date(item.isoDate || item.pubDate || Date.now()).getTime();
-      const maxAge = MAX_NEWS_AGE_HOURS * 60 * 60 * 1000;
-
-      const isFresh = Date.now() - newsDate <= maxAge;
-      const isNew = item.link && !publishedLinks.includes(item.link);
-
-      if (TEMP_ALLOW_ALL_NEWS && isFresh && isNew) {
-        console.log("🧪 TEMP_ALLOW_ALL_NEWS selected latest item:", item.title);
-        latestNews = item;
-        break;
-      }
-
-      const isDuplicateTopic = recentTitles.some((recentTitle) =>
-        areSimilarNewsTitles(item.title || "", recentTitle)
-      );
-      const normalizedCurrentTitle = normalizeNewsTitle(item.title || "");
-      const currentTopicCluster = getNewsTopicCluster(`${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`);
-      const currentDuplicateKey = getStrongDuplicateKey(`${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`);
-      const hasRecentSameDuplicateKey = currentDuplicateKey
-        ? publishedItems.some((publishedItem) => {
-            const publishedDuplicateKey =
-              publishedItem.duplicateKey ||
-              getStrongDuplicateKey(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
-
-            if (publishedDuplicateKey !== currentDuplicateKey) {
-              return false;
-            }
-
-            const publishedAt = new Date(
-              publishedItem.publishedAt ||
-                publishedItem.published_at ||
-                publishedItem.created_at ||
-                0
-            ).getTime();
-
-            if (Number.isNaN(publishedAt) || !publishedAt) {
-              return true;
-            }
-
-            return Date.now() - publishedAt <= 6 * 60 * 60 * 1000;
-          })
-        : false;
-
-      if (hasRecentSameDuplicateKey) {
-        console.log("⏭️ Skipped repeated strong duplicate key:", currentDuplicateKey, item.title);
-        continue;
-      }
-      const hasRecentSameTopicCluster = currentTopicCluster
-        ? publishedItems.some((publishedItem) => {
-            const publishedCluster = publishedItem.topicCluster || getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
-            return (
-              publishedCluster === currentTopicCluster &&
-              isRecentForTopicCluster(publishedItem, currentTopicCluster)
-            );
-          })
-        : false;
-
-      if (hasRecentSameTopicCluster) {
-        console.log("⏭️ Skipped repeated topic cluster:", currentTopicCluster, item.title);
-        continue;
-      }
-
-      const sameKeywordCluster = recentTitles.some((recentTitle) => {
-        const normalizedRecent = normalizeNewsTitle(recentTitle);
-
-        return (
-          normalizedCurrentTitle.includes("powell") && normalizedRecent.includes("powell") ||
-          normalizedCurrentTitle.includes("fed") && normalizedRecent.includes("fed") ||
-          normalizedCurrentTitle.includes("bitcoin") && normalizedRecent.includes("bitcoin") ||
-          normalizedCurrentTitle.includes("crypto") && normalizedRecent.includes("crypto") ||
-          normalizedCurrentTitle.includes("gold") && normalizedRecent.includes("gold") ||
-          normalizedCurrentTitle.includes("oil") && normalizedRecent.includes("oil") ||
-          normalizedCurrentTitle.includes("iran") && normalizedRecent.includes("iran") ||
-          normalizedCurrentTitle.includes("tehran") && normalizedRecent.includes("tehran") ||
-          normalizedCurrentTitle.includes("israel") && normalizedRecent.includes("israel") ||
-          normalizedCurrentTitle.includes("gaza") && normalizedRecent.includes("gaza") ||
-          normalizedCurrentTitle.includes("middle east") && normalizedRecent.includes("middle east") ||
-          normalizedCurrentTitle.includes("russia") && normalizedRecent.includes("russia") ||
-          normalizedCurrentTitle.includes("ukraine") && normalizedRecent.includes("ukraine") ||
-          normalizedCurrentTitle.includes("war") && normalizedRecent.includes("war") ||
-          normalizedCurrentTitle.includes("attack") && normalizedRecent.includes("attack") ||
-          normalizedCurrentTitle.includes("missile") && normalizedRecent.includes("missile") ||
-          normalizedCurrentTitle.includes("airstrike") && normalizedRecent.includes("airstrike") ||
-          normalizedCurrentTitle.includes("military") && normalizedRecent.includes("military") ||
-          normalizedCurrentTitle.includes("ceasefire") && normalizedRecent.includes("ceasefire") ||
-          normalizedCurrentTitle.includes("sanctions") && normalizedRecent.includes("sanctions") ||
-          normalizedCurrentTitle.includes("nfp") && normalizedRecent.includes("nfp") ||
-          normalizedCurrentTitle.includes("inflation") && normalizedRecent.includes("inflation") ||
-          normalizedCurrentTitle.includes("cpi") && normalizedRecent.includes("cpi")
-          || normalizedCurrentTitle.includes("ppi") && normalizedRecent.includes("ppi")
-|| normalizedCurrentTitle.includes("pce") && normalizedRecent.includes("pce")
-|| normalizedCurrentTitle.includes("consumer confidence") && normalizedRecent.includes("consumer confidence")
-|| normalizedCurrentTitle.includes("consumer sentiment") && normalizedRecent.includes("consumer sentiment")
-|| normalizedCurrentTitle.includes("retail sales") && normalizedRecent.includes("retail sales")
-|| normalizedCurrentTitle.includes("jobless claims") && normalizedRecent.includes("jobless claims")
-|| normalizedCurrentTitle.includes("pmi") && normalizedRecent.includes("pmi")
-|| normalizedCurrentTitle.includes("ism") && normalizedRecent.includes("ism")
-|| normalizedCurrentTitle.includes("earnings") && normalizedRecent.includes("earnings")
-|| normalizedCurrentTitle.includes("tesla") && normalizedRecent.includes("tesla")
-|| normalizedCurrentTitle.includes("nvidia") && normalizedRecent.includes("nvidia")
-|| normalizedCurrentTitle.includes("apple") && normalizedRecent.includes("apple")
-|| normalizedCurrentTitle.includes("microsoft") && normalizedRecent.includes("microsoft")
-        );
-      });
-
-
-      const aiSimilarityDuplicate = recentAiMessages.some((recentMessage) =>
-        areSimilarNewsTitles(
-          `${item.title || ""} ${item.contentSnippet || ""}`,
-          recentMessage
-        )
-      );
-
-      if (isDuplicateTopic || sameKeywordCluster || aiSimilarityDuplicate) {
-        console.log("⏭️ Skipped duplicate/similar news:", item.title);
-        continue;
-      }
-
-      if (!isFresh || !isNew) {
-        if (!isFresh) {
-          stats.rejectedStale += 1;
-          recordRejection(stats, "stale_or_old", item.title);
-        } else {
-          stats.rejectedDuplicate += 1;
-          recordRejection(stats, "already_published_link", item.title);
-        }
-        continue;
-      }
-
-      if (item.skipPublish) {
-        stats.rejectedFilter += 1;
-        recordRejection(stats, "telegram_incomplete_or_blocked", item.title);
-        continue;
-      }
-
-      const titleForImpact = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""} ${item.description || ""}`;
-
-      if (item.telegramFingerprint) {
-        const hasSameFingerprint = publishedItems.some(
-          (publishedItem) => publishedItem.telegramFingerprint === item.telegramFingerprint
-        );
-        if (hasSameFingerprint) {
-          stats.rejectedDuplicate += 1;
-          recordRejection(stats, "telegram_fingerprint_duplicate", item.title);
-          continue;
-        }
-      }
-
-      if (!item.isTelegramSource && isOfficialEconomicReleaseText(titleForImpact)) {
-        continue;
-      }
-
-      if (/wall st futures|wall street futures|spacex|space x|debut in focus|peace hopes|earnings|quarterly results|eps|revenue|guidance|ipo/i.test(titleForImpact)) {
-        continue;
-      }
-
-      if (isBlockedGeneralNews(titleForImpact)) {
-        console.log("⏭️ Skipped blocked general story:", item.title);
-        continue;
-      }
-
-      if (!item.isTelegramSource && !isStrongExternalMarketNews(titleForImpact)) {
-        console.log("⏭️ Skipped external story without strong market impact:", item.title);
-        continue;
-      }
-      const isEconomicNews = isEconomicCalendarNews(titleForImpact);
-      const isImportant = await isMarketMovingNews(titleForImpact);
-
-      const impactLevel = isEconomicNews ? "HIGH" : getMarketImpactLevel(titleForImpact);
-      const isUltraPriority = ULTRA_PRIORITY_KEYWORDS.some((keyword) =>
-        titleForImpact.toLowerCase().includes(keyword.toLowerCase())
-      );
-
-      if (!isImportant && !isEconomicNews && !isUltraPriority) {
-        stats.rejectedLowImpact += 1;
-        recordRejection(stats, "non_market_moving", item.title);
-        continue;
-      }
-const isStrongRssMarketStory = !item.isTelegramSource && isStrongExternalMarketNews(titleForImpact);
-
-if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isStrongRssMarketStory) {
-  console.log("⏭️ Skipped medium/low RSS story. Only strong market stories are allowed:", item.title);
-  continue;
-}
-      if (impactLevel === "LOW") {
-        console.log("⏭️ Skipped weak/low-impact market story:", item.title);
-        continue;
-      }
-      if (
-        normalHourlyLimitReached &&
-        impactLevel !== "HIGH" &&
-        !isUltraPriority
-      ) {
-        console.log("⏭️ Hourly limit reached. Skipped non-HIGH impact story:", item.title);
-        continue;
-      }
-
-      if (
-        hardHourlyLimitReached &&
-        !isUltraPriority &&
-        !isEconomicNews
-      ) {
-        console.log("⏭️ Hard hourly limit reached. Skipped non-ULTRA priority story:", item.title);
-        continue;
-      }
-
-
-      item.impactLevel = impactLevel;
-      latestNews = item;
-      break;
+    stats.rss = rssPipeline.diagnostics;
+    for (const feedReport of rssFetchResult.feedReports) {
+      const feedEligible = rssPipeline.diagnostics.items.filter(
+        (entry) =>
+          entry.source === feedReport.name &&
+          (entry.action === "RSS_ELIGIBLE" || entry.action === "RSS_WOULD_PUBLISH_RATE_LIMITED")
+      ).length;
+      const feedRejected = rssPipeline.diagnostics.items.filter(
+        (entry) => entry.source === feedReport.name && entry.action !== "RSS_ELIGIBLE" && entry.action !== "RSS_WOULD_PUBLISH_RATE_LIMITED"
+      ).length;
+      feedReport.accepted = feedEligible;
+      feedReport.rejected = feedRejected;
     }
+    stats.rssFeedReports = rssFetchResult.feedReports;
+
+    let latestNews = rssPipeline.selectedItem || null;
 
     if (!latestNews) {
       console.log("⏭️ No new AI-approved important news found.");
@@ -3993,6 +3791,9 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
         stats.dbFailed += 1;
       } else {
         stats.dbInserted += 1;
+        if (stats.rss) {
+          stats.rss.published = 1;
+        }
       }
 
       await dispatchMarketNewsNotifications({
@@ -4029,6 +3830,52 @@ if (!item.isTelegramSource && impactLevel !== "HIGH" && !isUltraPriority && !isS
   } finally {
     isFetchingNews = false;
   }
+}
+
+async function runRssGeneralDryRun(options = {}) {
+  const { fetchGeneralRssFeeds, processGeneralRssItems, resetRssObservationStateForTests } = require("./lib/general-rss");
+
+  if (options.resetObservation !== false) {
+    resetRssObservationStateForTests();
+  }
+
+  const fetchResult = await fetchGeneralRssFeeds();
+  const pipeline = processGeneralRssItems(fetchResult.items, {
+    publishedItems: options.publishedItems || [],
+    publishStats: options.publishStats || { postsLastHour: 0 },
+    feedReports: fetchResult.feedReports,
+    dryRun: true,
+    skipObservationInit: true,
+    skipBacklogCheck: true,
+    limits: {
+      maxPostsPerHour: MAX_POSTS_PER_HOUR,
+      maxHighImpactPostsPerHour: MAX_HIGH_IMPACT_POSTS_PER_HOUR,
+    },
+  });
+
+  const table = pipeline.diagnostics.items.slice(0, 50);
+  const topEligible = pipeline.eligibleItems.slice(0, 10);
+
+  return {
+    feedReports: fetchResult.feedReports,
+    summary: {
+      fetched: pipeline.diagnostics.fetched,
+      normalized: pipeline.diagnostics.normalized,
+      eligible: pipeline.diagnostics.eligible,
+      duplicate: pipeline.diagnostics.duplicateSkipped,
+      stale: pipeline.diagnostics.staleSkipped,
+      lowValue: pipeline.diagnostics.lowValueSkipped,
+      noMarketAngle: pipeline.diagnostics.noMarketAngleSkipped,
+      qualityRejected: pipeline.diagnostics.qualityRejected,
+      rateLimited: pipeline.diagnostics.rateLimited,
+      wouldPublish: pipeline.diagnostics.wouldPublish,
+      structuredEconomicSkipped: pipeline.diagnostics.structuredEconomicSkipped,
+      backlogSkipped: pipeline.diagnostics.backlogSkipped,
+    },
+    table,
+    topEligible,
+    diagnostics: pipeline.diagnostics,
+  };
 }
 
 async function runNewsCycleDiagnostic(options = {}) {
@@ -4089,6 +3936,7 @@ process.on("uncaughtException", (error) => {
 module.exports = {
   fetchForexNews,
   runNewsCycleDiagnostic,
+  runRssGeneralDryRun,
   getNewsWorkerHealthSnapshot,
   getRequiredEnvStatus,
   runEconomicReleaseDryRun,
