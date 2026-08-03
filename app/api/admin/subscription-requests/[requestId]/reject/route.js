@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
 import {
   assertAdminSubscriptionRejectAuthorized,
   validateSubscriptionRejectPayload,
@@ -34,7 +35,7 @@ export async function POST(request, context) {
 
   try {
     stage = "auth";
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.SUBSCRIPTIONS_MANAGE, { request });
     assertAdminSubscriptionRejectAuthorized(adminCheck);
 
     const rateLimited = await enforceRateLimit(

@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../lib/api-response";
 import { dispatchAnalysisReplyAlerts, resolveAnalysisReplyRecipientEmail } from "../../../../lib/analysis-reply-dispatch";
 import { dispatchUnifiedSiteAlerts } from "../../../../lib/site-notification-dispatch.js";
@@ -32,7 +33,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.DASHBOARD_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(
@@ -220,7 +221,7 @@ async function resolveAccountManagementEmail(supabase, row) {
 
 export async function POST(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.DASHBOARD_MUTATIONS, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

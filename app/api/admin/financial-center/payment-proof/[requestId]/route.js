@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../../../lib/admin-auth.js";
+import { requireAdminPermission } from "../../../../../../lib/admin-auth.js";
+import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants.js";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response.js";
 import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit.js";
 import { adminReadLimiter } from "../../../../../../lib/rate-limit.js";
@@ -29,7 +30,7 @@ function trimIdForLog(value) {
   return String(value).trim().slice(0, 80);
 }
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   const startedAt = Date.now();
   const resolvedParams = await params;
   let requestId = "";
@@ -55,7 +56,7 @@ export async function GET(_request, { params }) {
 
   try {
     stage = "auth";
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.FINANCE_PROOFS_READ, { request });
     if (!adminCheck.ok) {
       logPaymentProofEvent("PAYMENT_PROOF_FETCH_FAILED", {
         requestId,

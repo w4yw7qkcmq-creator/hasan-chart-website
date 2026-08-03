@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.ANALYSIS_READ, { request });
 
     return NextResponse.json({
       success: true,

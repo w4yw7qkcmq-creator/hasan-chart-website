@@ -1,5 +1,6 @@
 import crypto from "crypto";
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { requireValidUuid } from "../../../../lib/partner-security";
 import { getSupabaseAdmin } from "../../../../lib/supabase-admin";
 
@@ -42,7 +43,7 @@ function decryptValue(value) {
 
 export async function POST(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.ACCOUNTS_SECRETS_MANAGE, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

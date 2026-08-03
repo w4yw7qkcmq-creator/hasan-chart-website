@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { isAdminUser, normalizeEmail } from "../../../../lib/admin-emails";
+import { resolveIamContext } from "../../../../lib/iam/resolve-permissions.js";
 import { CACHE_PRIVATE_SHORT } from "../../../../lib/api-response";
 import { getSupabaseAdmin } from "../../../../lib/auth-session";
 import { withReadCache } from "../../../../lib/server-read-cache";
@@ -95,18 +96,29 @@ async function buildSessionResponse(resolved) {
     .or(`id.eq.${resolved.user.id},email.eq.${normalizedEmail}`)
     .maybeSingle();
 
-  const role = adminProfile?.role || resolved.user.user_metadata?.role || "user";
+  const role = adminProfile?.role || "user";
   const user = {
     id: resolved.user.id,
     email: resolved.user.email,
     role,
   };
 
+  const iam = await resolveIamContext(supabase, resolved.user);
+  const isAdmin = iam.isAdmin || isAdminUser(user);
+
   const response = NextResponse.json({
     ok: true,
     authenticated: true,
     user,
-    isAdmin: isAdminUser(user),
+    isAdmin,
+    iam: iam.isAdmin
+      ? {
+          roleIds: iam.roleIds,
+          primaryRoleId: iam.primaryRoleId,
+          permissions: [...iam.permissions],
+          source: iam.source,
+        }
+      : null,
     session: buildSessionPayload(resolved.session),
   });
 

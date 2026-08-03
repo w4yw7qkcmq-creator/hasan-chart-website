@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
 import { writeAdminAuditLog } from "../../../../../../lib/admin-audit-log";
 import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request, context) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.USERS_READ, { request });
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
@@ -54,7 +55,7 @@ export async function GET(request, context) {
 
 export async function POST(request, context) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.USERS_NOTES_MANAGE, { request });
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
@@ -109,7 +110,7 @@ export async function POST(request, context) {
 
 export async function PATCH(request, context) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.USERS_NOTES_MANAGE, { request });
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
@@ -184,7 +185,7 @@ export async function PATCH(request, context) {
 
 export async function DELETE(request, context) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.USERS_NOTES_MANAGE, { request });
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }

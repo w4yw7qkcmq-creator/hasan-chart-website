@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
 import { assertAdminSubscriptionRemoveAuthorized } from "../../../../../../lib/admin-subscription-request-remove-shared.js";
 import { requireValidSubscriptionRequestId } from "../../../../../../lib/id-validation.js";
 import { removeSubscriptionRequest } from "../../../../../../lib/admin-subscription-request-remove.js";
@@ -32,7 +33,7 @@ export async function POST(request, context) {
 
   try {
     stage = "auth";
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.SUBSCRIPTIONS_MANAGE, { request });
     assertAdminSubscriptionRemoveAuthorized(adminCheck);
 
     const rateLimited = await enforceRateLimit(

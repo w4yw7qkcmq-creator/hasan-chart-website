@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import {
   ADMIN_NOTIFICATION_TEST_TYPES,
   runAdminNotificationTest,
@@ -11,8 +12,8 @@ export const maxDuration = 30;
 
 const ALLOWED_TYPES = new Set(ADMIN_NOTIFICATION_TEST_TYPES.map((item) => item.id));
 
-export async function GET() {
-  const adminCheck = await verifyAdminSession();
+export async function GET(request) {
+  const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.SYSTEM_NOTIFICATIONS_TEST, { request });
 
   if (!adminCheck.ok) {
     return Response.json(
@@ -30,7 +31,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.SYSTEM_NOTIFICATIONS_TEST, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

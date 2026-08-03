@@ -2,7 +2,8 @@ import {
   ADMIN_USER_SECTIONS,
   loadAdminUserSection,
 } from "../../../../../lib/admin-user-management";
-import { verifyAdminSession } from "../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../../lib/api-response";
 import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
 import { adminReadLimiter } from "../../../../../lib/rate-limit";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request, context) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.USERS_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

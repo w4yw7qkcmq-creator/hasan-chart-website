@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../lib/iam/constants";
 import { dispatchAnalysisReplyAlerts } from "../../../lib/analysis-reply-dispatch";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { requireValidUuid } from "../../../lib/partner-security";
@@ -11,7 +12,7 @@ export const maxDuration = 10;
 
 export async function POST(req) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.ANALYSIS_MANAGE, { request: req });
 
     if (!adminCheck.ok) {
       return Response.json(

@@ -15,6 +15,7 @@ import {
 } from "./lib/partner-shared";
 
 const ADMIN_API_PREFIX = "/api/admin";
+const IAM_API_PREFIX = "/api/iam";
 const ADMIN_REPLY_API = "/api/admin-reply";
 const PUBLIC_API_ROUTES = new Set([
   "/api/market-pulse",
@@ -29,7 +30,11 @@ function hasAccessToken(request) {
 }
 
 function isProtectedAdminApi(pathname) {
-  return pathname.startsWith(ADMIN_API_PREFIX) || pathname === ADMIN_REPLY_API;
+  return (
+    pathname.startsWith(ADMIN_API_PREFIX) ||
+    pathname.startsWith(IAM_API_PREFIX) ||
+    pathname === ADMIN_REPLY_API
+  );
 }
 
 function applyCaptureResultCookies(response, capturePayload) {
@@ -90,6 +95,24 @@ export async function middleware(request) {
         )
       );
     }
+  }
+
+  if (pathname.startsWith("/admin")) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", pathname);
+    requestHeaders.set("x-admin-pathname", pathname);
+
+    if (!hasAccessToken(request)) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("returnUrl", pathname);
+      return applySecurityHeaders(NextResponse.redirect(loginUrl));
+    }
+
+    return applySecurityHeaders(
+      NextResponse.next({
+        request: { headers: requestHeaders },
+      })
+    );
   }
 
   if (pathname.startsWith("/api/")) {

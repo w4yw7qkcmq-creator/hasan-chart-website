@@ -1,4 +1,4 @@
-import { verifyAdminSession } from "../../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../../lib/admin-auth";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
 import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
 import {
@@ -6,14 +6,15 @@ import {
   isSelfTargetAction,
   validateDangerousActionConfirmation,
 } from "../../../../../../lib/admin-user-management-action-handler";
-import { getAdminRole } from "../../../../../../lib/admin-permissions";
+import { permissionForLifecycleAction } from "../../../../../../lib/iam/action-permissions";
+import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
 import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request, context) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.USERS_MANAGE, { request });
 
     if (!adminCheck.ok) {
       return Response.json(
@@ -36,26 +37,27 @@ export async function POST(request, context) {
       return Response.json({ success: false, error: "معرّف المستخدم مطلوب" }, { status: 400 });
     }
 
-    const { data: adminProfile } = await adminCheck.supabase
-      .from("profiles")
-      .select("id,email,role,admin_role")
-      .eq("id", adminCheck.user.id)
-      .maybeSingle();
-
-    const effectiveAdminProfile =
-      adminProfile || { id: adminCheck.user.id, email: adminCheck.user.email, role: "admin" };
-
-    if (!getAdminRole(effectiveAdminProfile)) {
-      return Response.json({ success: false, error: "غير مصرح لك بالدخول" }, { status: 403 });
+    const action = String(body?.action || "").trim();
+    const actionPerm = permissionForLifecycleAction(action);
+    const actionAuth = await requireAdminPermission(actionPerm, { request });
+    if (!actionAuth.ok) {
+      return Response.json(
+        { success: false, error: actionAuth.error },
+        { status: actionAuth.status }
+      );
     }
 
+    const effectiveAdminProfile = {
+      id: adminCheck.user.id,
+      email: adminCheck.user.email,
+      role: adminCheck.iam?.primaryRoleId || "admin",
+      admin_role: adminCheck.iam?.primaryRoleId || "admin",
+    };
+
     const { data: targetProfile } = await adminCheck.supabase
-      .from("profiles")
       .select("email")
       .eq("id", userId)
       .maybeSingle();
-
-    const action = String(body?.action || "").trim();
 
     if (isSelfTargetAction(adminCheck.user.id, userId, action)) {
       return Response.json(

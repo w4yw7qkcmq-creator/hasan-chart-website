@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { getAdminPartnersOverview } from "../../../../lib/partner-admin-server";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ function resolveSiteOrigin(request) {
 
 export async function GET(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.PARTNERS_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

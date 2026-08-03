@@ -1,4 +1,5 @@
-import { verifyFinanceCenterAccess } from "../../../../lib/financial-center/financial-center-auth.js";
+import { requireAdminPermission } from "../../../../lib/admin-auth.js";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants.js";
 import { CACHE_NO_STORE } from "../../../../lib/api-response.js";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit.js";
 import { adminReadLimiter } from "../../../../lib/rate-limit.js";
@@ -39,7 +40,7 @@ function jsonResponse(payload, status = 200) {
 
 export async function GET(request) {
   try {
-    const access = await verifyFinanceCenterAccess();
+    const access = await requireAdminPermission(IAM_PERMISSIONS.FINANCE_READ, { request });
     if (!access.ok) {
       return jsonResponse({ success: false, error: access.error }, access.status);
     }

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { CACHE_PUBLIC_CONTENT, jsonError, jsonOk } from "../../../lib/api-response";
 import { runApiRoute } from "../../../lib/api-route";
-import { verifyAdminSession } from "../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../lib/iam/constants";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { adminMutationLimiter, getClientIp } from "../../../lib/rate-limit";
 import { getSupabaseAdmin } from "../../../lib/supabase-admin";
@@ -86,7 +87,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.ANALYSIS_PUBLISH, { request });
 
     if (!adminCheck.ok) {
       return NextResponse.json(

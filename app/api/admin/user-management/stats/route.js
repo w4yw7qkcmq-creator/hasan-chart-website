@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../../lib/api-response";
 import { loadAdminUserDashboardStats } from "../../../../../lib/admin-user-dashboard-stats";
 import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
@@ -6,9 +7,9 @@ import { adminReadLimiter } from "../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.USERS_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(
