@@ -12,7 +12,22 @@
     "install:worker": "npm ci --prefix worker --omit=dev || npm install --prefix worker --omit=dev",
     "railway:worker:install": "npm ci --prefix worker --omit=dev",
     "railway:worker:start": "npm start --prefix worker",
-    "load-test": "node scripts/load-test.js"
+    "load-test": "node scripts/load-test.js",
+    "smoke": "node scripts/e2e/smoke.mjs",
+    "smoke:local": "E2E_ENVIRONMENT=local node scripts/e2e/smoke.mjs",
+    "smoke:staging": "E2E_ENVIRONMENT=staging node scripts/e2e/smoke.mjs",
+    "smoke:production": "E2E_ENVIRONMENT=production node scripts/e2e/smoke.mjs",
+    "e2e:smoke": "node scripts/e2e/smoke.mjs",
+    "e2e:provision": "node scripts/e2e/provision.mjs",
+    "e2e:verify": "node scripts/e2e/verify-infra.mjs",
+    "ops:generate": "node scripts/ops/generate.mjs",
+    "ops:verify": "node scripts/ops/verify-ops.mjs",
+    "cv:verify": "node scripts/continuous-verification/verify-infra.mjs",
+    "cv:test": "node --test scripts/continuous-verification/tests/cv.test.mjs",
+    "cv:run": "CV_DRY_RUN=1 node scripts/continuous-verification/run.mjs",
+    "cv:run:production": "CV_ENVIRONMENT=production CV_DRY_RUN=1 node scripts/continuous-verification/run.mjs",
+    "cv:checkpoint": "CV_DRY_RUN=1 node scripts/continuous-verification/run.mjs",
+    "cv:report": "node scripts/continuous-verification/report-cli.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
@@ -37,6 +52,9 @@
   "devDependencies": {
     "@types/react": "19.2.14",
     "autoprefixer": "^10.4.12",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.52.0",
+    "pngjs": "^7.0.0",
     "postcss": "^8.4.16",
     "tailwindcss": "^3.4.4",
     "typescript": "6.0.3"

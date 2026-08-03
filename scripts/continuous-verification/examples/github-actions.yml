@@ -1,0 +1,41 @@
+# GitHub Actions template — MANUAL ONLY
+# Place in .github/workflows/ only after opt-in review.
+# This file lives in examples/ and is NOT active.
+
+name: Continuous Verification (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      checkpoint:
+        description: Checkpoint id (t1m,t5m,t15m,t1h,t6h,t24h)
+        required: true
+        default: t1m
+      environment:
+        description: staging or production
+        required: true
+        default: staging
+
+# DO NOT add schedule: until explicitly approved
+# schedule:
+#   - cron: '*/5 * * * *'
+
+jobs:
+  cv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Verify CV infrastructure
+        run: npm run cv:verify
+      - name: Run checkpoint (requires secrets — not configured)
+        if: false  # disabled — manual opt-in required
+        env:
+          CV_LIVE: "1"
+          CV_ENVIRONMENT: ${{ github.event.inputs.environment }}
+          PROD_URL: ${{ secrets.PROD_URL }}
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: npm run cv:checkpoint -- --id=${{ github.event.inputs.checkpoint }} --live

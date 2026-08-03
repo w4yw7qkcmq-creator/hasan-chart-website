@@ -8,6 +8,11 @@ worker/news-card.png
 worker/.env
 .env.local
 .env.staging.local
+.env.e2e.local
+scripts/e2e/.artifacts/
+scripts/ops/.artifacts/
+scripts/continuous-verification/.artifacts/
+.env.cv.local
 .staging-db-password.tmp
 .tmp-record-migration.sql
 .tmp-*.sql
