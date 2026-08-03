@@ -8,6 +8,7 @@ import { buildDeploymentVerification } from "./engines/deployment.mjs";
 import { buildIncidentReport } from "./engines/incidents.mjs";
 import { loadCvArtifactsForOps } from "./cv-reader.mjs";
 import { evaluatePostDeployCv } from "../e2e/release-gate.mjs";
+import { collectIamOpsSignals } from "./iam-reader.mjs";
 
 /**
  * Build full Enterprise Operations snapshot from QA artifacts (no live probes).
@@ -82,6 +83,8 @@ export function buildOpsPlatform() {
 
     continuousVerification,
     postDeployGate,
+
+    iam: collectIamOpsSignals().iam,
 
     serviceHealthSummary: serviceHealthSummary(dependencyGraph),
   };
