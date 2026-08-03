@@ -965,7 +965,7 @@ export default function MyDashboard() {
 
               {showAiAnalysis ? (
                 aiResult?.version === "2.0" && aiResult?.v2 ? (
-                  <InstantAnalysisV3Panel result={aiResult} />
+                  <InstantAnalysisV3Panel result={aiResult} key={aiResult.v2.analysisId || aiResult.symbol} />
                 ) : (
                 <>
                   <div className="user-dashboard-ai__result-head">

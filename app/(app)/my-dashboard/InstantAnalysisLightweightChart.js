@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 
 const COLORS = {
   background: "#0B1220",
@@ -86,12 +86,23 @@ function addZoneLines(series, from, to, color, label) {
   addPriceLine(series, to, color, `${label} (سفلي)`, 2);
 }
 
-export default function InstantAnalysisLightweightChart({ candles, annotations, symbol, timeframeLabel }) {
+export default memo(function InstantAnalysisLightweightChart({
+  candles,
+  annotations,
+  symbol,
+  timeframeLabel,
+  analysisId,
+}) {
   const containerRef = useRef(null);
   const legendKeys = useMemo(() => {
     const keys = new Set((annotations || []).map((item) => item.type));
     return LEGEND_ITEMS.filter((item) => keys.has(item.key));
   }, [annotations]);
+
+  const chartSignature = useMemo(
+    () => `${analysisId || symbol}:${(candles || []).length}:${timeframeLabel}`,
+    [analysisId, symbol, candles, timeframeLabel]
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -202,7 +213,7 @@ export default function InstantAnalysisLightweightChart({ candles, annotations, 
       resizeObserver?.disconnect();
       chart?.remove();
     };
-  }, [annotations, candles]);
+  }, [annotations, candles, chartSignature]);
 
   if (!Array.isArray(candles) || candles.length < 8) {
     return (
@@ -232,4 +243,4 @@ export default function InstantAnalysisLightweightChart({ candles, annotations, 
       ) : null}
     </figure>
   );
-}
+});
