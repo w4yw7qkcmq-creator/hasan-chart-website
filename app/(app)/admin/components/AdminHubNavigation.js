@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ADMIN_HUB_QUICK_NAV_ITEMS } from "./admin-hub-config";
+import { ADMIN_HUB_QUICK_NAV_ITEMS, filterAdminNavByPermission } from "./admin-hub-config";
+import { useAuth } from "../../../components/AuthProvider";
 
 function resolveStatValue(stats, key) {
   if (!key) return null;
@@ -11,6 +12,12 @@ function resolveStatValue(stats, key) {
 }
 
 export default function AdminHubNavigation({ stats = {}, onNavigateTab }) {
+  const { can, isAdmin, iamUiEnabled } = useAuth();
+  const navItems = filterAdminNavByPermission(ADMIN_HUB_QUICK_NAV_ITEMS, can, {
+    iamUiEnabled,
+    isAdmin,
+  });
+
   const handleClick = (item, event) => {
     if (item.tab) {
       event.preventDefault();
@@ -26,7 +33,7 @@ export default function AdminHubNavigation({ stats = {}, onNavigateTab }) {
       </div>
 
       <div className="admin-hub-tile-grid">
-        {ADMIN_HUB_QUICK_NAV_ITEMS.map((item, index) => {
+        {navItems.map((item, index) => {
           const statValue = resolveStatValue(stats, item.statKey);
           const needsAttention = item.attentionKey && resolveStatValue(stats, item.attentionKey) > 0;
 
@@ -61,7 +68,7 @@ export default function AdminHubNavigation({ stats = {}, onNavigateTab }) {
           if (item.href) {
             return (
               <Link
-                key={item.id}
+                key={item.id || item.title}
                 href={item.href}
                 className={className}
                 style={{ animationDelay: `${index * 35}ms` }}
@@ -73,7 +80,7 @@ export default function AdminHubNavigation({ stats = {}, onNavigateTab }) {
 
           return (
             <button
-              key={item.id}
+              key={item.id || item.title}
               type="button"
               className={`${className} admin-hub-tile--button`}
               style={{ animationDelay: `${index * 35}ms` }}

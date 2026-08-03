@@ -1,8 +1,8 @@
 import { buildPrivateMetadata } from "../../../lib/seo";
-import AdminLayoutClient from "./AdminLayoutClient";
+import AdminServerGuard from "./AdminServerGuard";
 
 export const metadata = buildPrivateMetadata();
 
 export default function AdminLayout({ children }) {
-  return <AdminLayoutClient>{children}</AdminLayoutClient>;
+  return <AdminServerGuard>{children}</AdminServerGuard>;
 }

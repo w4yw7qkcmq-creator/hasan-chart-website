@@ -33,7 +33,20 @@ function AdminAccessLoading({
 export function AdminAccessGate({ children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { authReady, authResolved, profileReady, user, isAdmin, status, retryAuth } = useAuth();
+  const {
+    authReady,
+    authResolved,
+    profileReady,
+    user,
+    isAdmin,
+    status,
+    retryAuth,
+    iam,
+    iamReady,
+    iamUiEnabled,
+    iamApiEnabled,
+    iamError,
+  } = useAuth();
   const redirectStartedRef = useRef(false);
 
   const isAuthenticated = status === "authenticated" && Boolean(user?.email);
@@ -48,8 +61,25 @@ export function AdminAccessGate({ children }) {
         isAuthenticated,
         isAdmin,
         keepAuthenticatedDuringProfileEnrich: true,
+        iamReady,
+        iamUiEnabled,
+        iamApiEnabled,
+        iamIsAdmin: iam?.isAdmin ?? null,
+        iamError,
       }),
-    [authReady, authResolved, status, profileReady, isAuthenticated, isAdmin]
+    [
+      authReady,
+      authResolved,
+      status,
+      profileReady,
+      isAuthenticated,
+      isAdmin,
+      iamReady,
+      iamUiEnabled,
+      iamApiEnabled,
+      iam?.isAdmin,
+      iamError,
+    ]
   );
 
   useEffect(() => {
