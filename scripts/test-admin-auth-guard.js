@@ -61,6 +61,8 @@ test("valid admin session does not redirect", () => {
     profileReady: true,
     isAuthenticated: true,
     isAdmin: true,
+    iamReady: true,
+    iamUiEnabled: false,
   });
   assert.equal(phase, "authenticated");
   assert.equal(shouldRedirectAdminToLogin(phase), false);
@@ -88,10 +90,78 @@ test("authenticated non-admin shows unauthorized phase", () => {
     profileReady: true,
     isAuthenticated: true,
     isAdmin: false,
+    iamReady: true,
+    iamUiEnabled: false,
   });
   assert.equal(phase, "unauthorized");
   assert.equal(shouldRedirectAdminTo403(phase), true);
   assert.equal(shouldRedirectAdminToLogin(phase), false);
+});
+
+test("profileReady with iamReady=false stays loading (no early 403)", () => {
+  const phase = resolveAdminGatePhase({
+    authReady: true,
+    authResolved: true,
+    status: "authenticated",
+    profileReady: true,
+    isAuthenticated: true,
+    isAdmin: false,
+    iamReady: false,
+    iamUiEnabled: true,
+  });
+  assert.equal(phase, "loading");
+  assert.equal(shouldRedirectAdminTo403(phase), false);
+  assert.equal(shouldRedirectAdminToLogin(phase), false);
+});
+
+test("iamReady with iam.isAdmin=true allows admin gate", () => {
+  const phase = resolveAdminGatePhase({
+    authReady: true,
+    authResolved: true,
+    status: "authenticated",
+    profileReady: true,
+    isAuthenticated: true,
+    isAdmin: false,
+    iamReady: true,
+    iamUiEnabled: true,
+    iamIsAdmin: true,
+  });
+  assert.equal(phase, "authenticated");
+  assert.equal(shouldRedirectAdminTo403(phase), false);
+});
+
+test("iamReady with iam.isAdmin=false is unauthorized", () => {
+  const phase = resolveAdminGatePhase({
+    authReady: true,
+    authResolved: true,
+    status: "authenticated",
+    profileReady: true,
+    isAuthenticated: true,
+    isAdmin: false,
+    iamReady: true,
+    iamUiEnabled: true,
+    iamIsAdmin: false,
+  });
+  assert.equal(phase, "unauthorized");
+  assert.equal(shouldRedirectAdminTo403(phase), true);
+});
+
+test("IAM API error is fail-closed without legacy admin access", () => {
+  const phase = resolveAdminGatePhase({
+    authReady: true,
+    authResolved: true,
+    status: "authenticated",
+    profileReady: true,
+    isAuthenticated: true,
+    isAdmin: true,
+    iamReady: true,
+    iamUiEnabled: true,
+    iamApiEnabled: true,
+    iamError: true,
+    iamIsAdmin: null,
+  });
+  assert.equal(phase, "unauthorized");
+  assert.equal(shouldRedirectAdminTo403(phase), true);
 });
 
 test("persistent error only after bootstrap completes", () => {
@@ -251,6 +321,8 @@ test("authenticated admin stays visible during background profile enrich", () =>
     isAuthenticated: true,
     isAdmin: true,
     keepAuthenticatedDuringProfileEnrich: true,
+    iamReady: true,
+    iamUiEnabled: false,
   });
   assert.equal(phase, "authenticated");
 });
