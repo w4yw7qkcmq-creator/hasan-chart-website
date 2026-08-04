@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createAdaptivePoller } from "../../lib/client/adaptive-poller.js";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout.js";
 
 const SUMMARY_WINDOW = "1d";
@@ -33,10 +34,7 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
       return undefined;
     }
 
-    let cancelled = false;
-    let refreshTimer;
-
-    const load = ({ background = false } = {}) => {
+    const load = ({ background = false, signal } = {}) => {
       const requestId = ++requestIdRef.current;
       const hasCachedData = hasDataRef.current;
 
@@ -50,46 +48,57 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
         setError(null);
       }
 
-      void fetchWithTimeout(
+      return fetchWithTimeout(
         `/api/market-depth/history/flow?${buildQuery(symbol)}`,
-        {},
+        { signal },
         10_000,
       )
         .then((response) => response.json())
         .then((payload) => {
-          if (cancelled || requestId !== requestIdRef.current) return;
+          if (requestId !== requestIdRef.current) return;
           if (!payload?.success) {
             if (!hasDataRef.current) {
               setError("SUMMARY_FETCH_FAILED");
               setSummary(null);
             }
-            return;
+            throw new Error("SUMMARY_FETCH_FAILED");
           }
           setSummary(payload);
           hasDataRef.current = true;
           setError(null);
         })
-        .catch(() => {
-          if (cancelled || requestId !== requestIdRef.current) return;
+        .catch((fetchError) => {
+          if (fetchError?.name === "AbortError") return;
+          if (requestId !== requestIdRef.current) return;
           if (!hasDataRef.current) {
             setError("SUMMARY_FETCH_FAILED");
             setSummary(null);
           }
+          throw fetchError;
         })
         .finally(() => {
-          if (!cancelled && requestId === requestIdRef.current) {
+          if (requestId === requestIdRef.current) {
             setInitialLoading(false);
             setIsRefreshing(false);
           }
         });
     };
 
-    load({ background: false });
-    refreshTimer = setInterval(() => load({ background: true }), REFRESH_MS);
+    const poller = createAdaptivePoller({
+      intervalMs: REFRESH_MS,
+      minIntervalMs: REFRESH_MS,
+      maxIntervalMs: REFRESH_MS * 3,
+      shouldPoll: () => !document.hidden && navigator.onLine !== false,
+      fetch: async ({ signal, reason }) => {
+        await load({ background: reason !== "initial", signal });
+      },
+    });
+
+    poller.start({ immediate: true });
 
     return () => {
-      cancelled = true;
-      clearInterval(refreshTimer);
+      poller.destroy();
+      requestIdRef.current += 1;
     };
   }, [hydrated, symbol]);
 

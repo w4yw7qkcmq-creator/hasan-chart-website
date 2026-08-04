@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createAdaptivePoller } from "../../lib/client/adaptive-poller.js";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout.js";
 
 const REFRESH_MS = 25_000;
@@ -35,10 +36,7 @@ export function useOrderBookLiquidations({ hydrated }) {
       return undefined;
     }
 
-    let cancelled = false;
-    let timer;
-
-    const load = ({ background = false } = {}) => {
+    const load = ({ background = false, signal } = {}) => {
       const requestId = ++requestIdRef.current;
       const hasPriorData = lastSuccessfulRef.current != null;
 
@@ -49,10 +47,10 @@ export function useOrderBookLiquidations({ hydrated }) {
         setError(null);
       }
 
-      void fetchWithTimeout("/api/market-depth/liquidations", {}, LIQUIDATIONS_CLIENT_TIMEOUT_MS)
+      return fetchWithTimeout("/api/market-depth/liquidations", { signal }, LIQUIDATIONS_CLIENT_TIMEOUT_MS)
         .then((response) => response.json())
         .then((payload) => {
-          if (cancelled || requestId !== requestIdRef.current) return;
+          if (requestId !== requestIdRef.current) return;
 
           if (isSuccessfulPayload(payload)) {
             lastSuccessfulRef.current = payload;
@@ -64,38 +62,50 @@ export function useOrderBookLiquidations({ hydrated }) {
           if (lastSuccessfulRef.current) {
             setData({ ...lastSuccessfulRef.current, stale: true });
             setError("REFRESH_FAILED");
-            return;
+            throw new Error("REFRESH_FAILED");
           }
 
           setData(payload);
           setError("UNAVAILABLE");
+          throw new Error("UNAVAILABLE");
         })
-        .catch(() => {
-          if (cancelled || requestId !== requestIdRef.current) return;
+        .catch((fetchError) => {
+          if (fetchError?.name === "AbortError") return;
+          if (requestId !== requestIdRef.current) return;
 
           if (lastSuccessfulRef.current) {
             setData({ ...lastSuccessfulRef.current, stale: true });
             setError("REFRESH_FAILED");
-            return;
+            throw fetchError;
           }
 
           setError("FETCH_FAILED");
           setData(null);
+          throw fetchError;
         })
         .finally(() => {
-          if (!cancelled && requestId === requestIdRef.current) {
+          if (requestId === requestIdRef.current) {
             setInitialLoading(false);
             setIsRefreshing(false);
           }
         });
     };
 
-    load();
-    timer = setInterval(() => load({ background: true }), REFRESH_MS);
+    const poller = createAdaptivePoller({
+      intervalMs: REFRESH_MS,
+      minIntervalMs: REFRESH_MS,
+      maxIntervalMs: REFRESH_MS * 3,
+      shouldPoll: () => !document.hidden && navigator.onLine !== false,
+      fetch: async ({ signal, reason }) => {
+        await load({ background: reason !== "initial", signal });
+      },
+    });
+
+    poller.start({ immediate: true });
 
     return () => {
-      cancelled = true;
-      clearInterval(timer);
+      poller.destroy();
+      requestIdRef.current += 1;
     };
   }, [hydrated]);
 
