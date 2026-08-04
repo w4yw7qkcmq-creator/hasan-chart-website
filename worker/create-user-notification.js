@@ -28,6 +28,9 @@ function buildBaseNotificationPayload({ userEmail, title, message, type }) {
   };
 }
 
+const NOTIFICATION_INSERT_RETURN_COLUMNS =
+  "id,user_email,title,message,type,notification_key,url,metadata,is_read,created_at";
+
 async function createUserNotification(
   supabase,
   {
@@ -99,7 +102,7 @@ async function createUserNotification(
   let { data, error } = await supabase
     .from("notifications")
     .insert(payload)
-    .select("*")
+    .select(NOTIFICATION_INSERT_RETURN_COLUMNS)
     .single();
 
   if (error && isMissingExtendedNotificationColumnError(error)) {
@@ -117,7 +120,7 @@ async function createUserNotification(
     ({ data, error } = await supabase
       .from("notifications")
       .insert(buildBaseNotificationPayload({ userEmail: normalizedEmail, title, message, type }))
-      .select("*")
+      .select("id,user_email,title,message,type,is_read,created_at")
       .single());
   }
 

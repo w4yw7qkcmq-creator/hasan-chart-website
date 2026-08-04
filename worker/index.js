@@ -104,6 +104,8 @@ const CHECK_INTERVAL_MS = resolvePriceAlertCheckIntervalMs(
   process.env.PRICE_ALERT_CHECK_INTERVAL_MS
 );
 const MAX_ALERTS_PER_RUN = 20;
+const PRICE_ALERT_WORKER_COLUMNS =
+  "id,user_id,user_email,coin,target_price,condition,status";
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -819,7 +821,7 @@ async function checkPriceAlerts() {
 
   const { data: alerts, error } = await supabase
     .from("price_alerts")
-    .select("*")
+    .select(PRICE_ALERT_WORKER_COLUMNS)
     .eq("status", "active")
     .limit(MAX_ALERTS_PER_RUN);
 

@@ -165,10 +165,13 @@ async function resolveUserIdByEmail(supabase, userEmail) {
   return data?.id || null;
 }
 
+const NOTIFICATION_DELIVERY_SETTINGS_COLUMNS =
+  "user_id,notifications_enabled,sound_enabled,email_copy_enabled,dnd_enabled,dnd_start_time,dnd_end_time,channel_preferences,sound_volume,price_alert_sound_enabled,vip_signal_sound_enabled,breaking_news_sound_enabled,admin_sound_enabled,default_sound_enabled";
+
 async function fetchSettingsRow(supabase, userId) {
   const { data, error } = await supabase
     .from("user_notification_settings")
-    .select("*")
+    .select(NOTIFICATION_DELIVERY_SETTINGS_COLUMNS)
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -193,7 +196,7 @@ async function createDefaultSettingsRow(supabase, userId) {
       admin_sound_enabled: true,
       default_sound_enabled: true,
     })
-    .select("*")
+    .select(NOTIFICATION_DELIVERY_SETTINGS_COLUMNS)
     .single();
 
   if (error) {
