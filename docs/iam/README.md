@@ -31,4 +31,6 @@ Env (document only — no values in repo):
 
 ## Runbooks
 
-See `docs/iam/runbooks/` for lockout, bootstrap failure, audit writer failure, and RLS rollback.
+- **Production closure & operations:** [`ENTERPRISE_IAM_RUNBOOK.md`](./ENTERPRISE_IAM_RUNBOOK.md)
+- **Historical rollout:** [`production-rollout-runbook.md`](./production-rollout-runbook.md)
+- **Pre-migration dry-run:** [`production-dry-run-checklist.md`](./production-dry-run-checklist.md)

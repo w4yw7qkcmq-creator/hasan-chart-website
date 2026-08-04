@@ -15,6 +15,7 @@ scripts/e2e/.artifacts/
 scripts/ops/.artifacts/
 scripts/continuous-verification/.artifacts/
 scripts/iam/.artifacts/
+artifacts/
 .env.cv.local
 .staging-db-password.tmp
 .tmp-record-migration.sql
