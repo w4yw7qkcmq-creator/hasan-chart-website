@@ -2121,7 +2121,7 @@ async function loadPublishedNewsFromSupabase() {
 
     const { data, error } = await client
       .from("published_news")
-      .select("*")
+      .select("link,title,normalized_title,topic_cluster,published_at,created_at")
       .order("published_at", { ascending: false })
       .limit(200);
 
