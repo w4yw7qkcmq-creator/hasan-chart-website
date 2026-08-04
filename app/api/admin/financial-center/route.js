@@ -60,7 +60,8 @@ export async function GET(request) {
     }
 
     const page = Number(searchParams.get("page") || 1);
-    const pageSize = Number(searchParams.get("pageSize") || 20);
+    const pageSize = Number(searchParams.get("pageSize") || 25);
+    const includeTotal = searchParams.get("includeTotal") === "true";
     const search = String(searchParams.get("search") || "");
     const period = String(searchParams.get("period") || "30d");
     const filters = parseFilters(searchParams);
@@ -94,10 +95,11 @@ export async function GET(request) {
         search,
         filters,
         exportMode,
+        includeTotal,
       });
 
       if (exportMode) {
-        if (result.pagination.total > 500) {
+        if ((result.items?.length || 0) > 500) {
           return jsonResponse(
             {
               success: false,
@@ -161,6 +163,7 @@ export async function GET(request) {
         search,
         status: reviewStatus,
         exportMode,
+        includeTotal,
       });
 
       if (exportMode) {
