@@ -13,6 +13,12 @@ const BASE = "https://www.hasanchartworld.com";
 const ARTIFACT_DIR = join(ROOT, "scripts/iam/.artifacts/production-ui-browser-canary");
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
+const TAB_API_HINTS = {
+  "الجلسات النشطة": "/api/iam/sessions",
+  "الأحداث الأمنية": "/api/iam/security-events",
+  "سجل التدقيق": "/api/iam/audit",
+};
+
 const TAB_LABELS = [
   "نظرة عامة",
   "المستخدمون الإداريون",
@@ -161,7 +167,7 @@ async function waitForIamReady(page, timeoutMs = 35000) {
 
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const loading = await page.locator(".iam-loading, .iam-loading-skeleton").count();
+    const loading = await page.locator(".iam-skeleton, .iam-loading-skeleton").count();
     const checks = await iamDomChecks(page);
     if (checks.hasIamPage && checks.hasOverviewTab && checks.tabsPresentCount >= 6 && loading === 0) {
       return { ok: true, checks };
@@ -286,8 +292,16 @@ async function testTabs(page, report) {
       continue;
     }
     await clickTab(page, label);
+    const apiHint = TAB_API_HINTS[label];
+    if (apiHint) {
+      await page
+        .waitForResponse((res) => res.url().includes(apiHint) && res.status() === 200, {
+          timeout: 15000,
+        })
+        .catch(() => null);
+    }
     await page
-      .waitForFunction(() => !document.querySelector(".iam-loading-skeleton"), { timeout: 12000 })
+      .waitForFunction(() => !document.querySelector(".iam-skeleton"), { timeout: 15000 })
       .catch(() => null);
     await page.waitForTimeout(400);
     const panelVisible = await tabContentVisible(page);
