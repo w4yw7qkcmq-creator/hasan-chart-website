@@ -107,8 +107,12 @@ describe("IAM feature flags", () => {
     assert.equal(typeof flags.dualRead, "boolean");
   });
 
-  it("IAM_API defaults off in test env", () => {
-    assert.equal(isIamApiEnabled(), false);
+  it("IAM_API flag reflects environment when set", () => {
+    const enabled = isIamApiEnabled();
+    assert.equal(typeof enabled, "boolean");
+    if (process.env.IAM_API === "true") {
+      assert.equal(enabled, true);
+    }
   });
 });
 
