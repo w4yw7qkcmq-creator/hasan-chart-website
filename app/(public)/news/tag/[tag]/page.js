@@ -7,7 +7,8 @@ import {
   serializeJsonLd,
 } from "../../../../../lib/seo";
 import { REVALIDATE_PUBLIC_NEWS } from "../../../../../lib/public-cache-config";
-import { getCachedNewsPostsPool } from "../../../../../lib/server-news-cache";
+import { getCachedNewsList } from "../../../../../lib/server-news-cache";
+import { NEWS_TAG_LIST_LIMIT } from "../../../../../lib/public-cache-config";
 
 export const revalidate = REVALIDATE_PUBLIC_NEWS;
 
@@ -125,9 +126,10 @@ export default async function TagPage({ params }) {
     notFound();
   }
 
-  const data = await getCachedNewsPostsPool();
-
-  const news = (data || []).filter((item) => matchesTag(item, config)).slice(0, 120);
+  const { items: news } = await getCachedNewsList({
+    tag: params.tag,
+    limit: NEWS_TAG_LIST_LIMIT,
+  });
 
   const jsonLd = buildNewsCollectionPageJsonLd({
     path: `/news/tag/${params.tag}`,

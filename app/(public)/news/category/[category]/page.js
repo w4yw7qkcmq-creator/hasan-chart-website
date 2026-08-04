@@ -9,7 +9,8 @@ import {
   serializeJsonLd,
 } from "../../../../../lib/seo";
 import { REVALIDATE_PUBLIC_NEWS } from "../../../../../lib/public-cache-config";
-import { getCachedNewsPostsPool } from "../../../../../lib/server-news-cache";
+import { getCachedNewsList } from "../../../../../lib/server-news-cache";
+import { NEWS_CATEGORY_LIST_LIMIT } from "../../../../../lib/public-cache-config";
 
 export const revalidate = REVALIDATE_PUBLIC_NEWS;
 
@@ -85,6 +86,10 @@ function shortText(text, maxLength = 260) {
   return `${cleaned.slice(0, maxLength).trim()}...`;
 }
 
+function getCardExcerpt(item) {
+  return shortText(item.content || item.title || "", 260);
+}
+
 function getNewsImage(item) {
   return resolveNewsImageUrl(item);
 }
@@ -157,9 +162,10 @@ export default async function CategoryPage({ params }) {
     notFound();
   }
 
-  const data = await getCachedNewsPostsPool();
-
-  const news = (data || []).filter((item) => detectCategory(item) === params.category);
+  const { items: news } = await getCachedNewsList({
+    category: params.category,
+    limit: NEWS_CATEGORY_LIST_LIMIT,
+  });
 
   const jsonLd = buildNewsCollectionPageJsonLd({
     path: `/news/category/${params.category}`,
