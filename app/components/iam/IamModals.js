@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { labelRole, labelPermission, groupPermissionsByCategory, IAM_ROLE_DESCRIPTIONS, IAM_ROLE_RISK } from "../../../lib/iam/ui-labels";
-import { IamRoleBadge } from "./IamShared";
+import { labelRole, IAM_ROLE_DESCRIPTIONS, IAM_ROLE_RISK } from "../../../lib/iam/ui-labels";
+import { formatDateTime, formatRelativeTime, resolveUserPermissions } from "../../../lib/iam/ui-utils";
+import { IamAvatar, IamBadge, IamRoleBadge, IamStatusBadge, IamReasonText } from "./IamShared";
 
 const GRANT_REASON_SUGGESTIONS = [
   "توظيف موظف دعم",
@@ -327,7 +328,7 @@ export function IamOverrideRevokeModal({ open, override, onClose, onConfirm, sub
   );
 }
 
-export function IamUserDrawer({ user, assignments, permissions, onClose, showTechnical }) {
+export function IamUserDrawer({ user, assignments, sessions, matrix, onClose, showTechnical }) {
   const drawerRef = useRef(null);
 
   useEffect(() => {
@@ -341,69 +342,104 @@ export function IamUserDrawer({ user, assignments, permissions, onClose, showTec
 
   if (!user) return null;
 
+  const email = user.user_email || user.email || "—";
+  const displayName = user.user_display_name || user.display_name || null;
+  const userSessions = (sessions || []).filter((s) => s.user_id === user.user_id && !s.ended_at);
+  const permIds = resolveUserPermissions(user, matrix || {});
+  const permGroups = groupPermissionsByCategory(permIds.map((id) => ({ id })));
+  const firstAssignment = [...(assignments || [])].sort((a, b) =>
+    String(a.granted_at || "").localeCompare(String(b.granted_at || ""))
+  )[0];
+  const lastActivity = userSessions.reduce((max, s) => {
+    const t = s.last_activity_at || s.started_at;
+    return !max || (t && t > max) ? t : max;
+  }, user.last_granted_at || null);
+
   return (
     <div className="iam-drawer-backdrop" role="presentation" onClick={onClose}>
       <aside
-        className="iam-drawer"
+        className="iam-drawer iam-drawer--pro"
         role="dialog"
         aria-label="تفاصيل المستخدم"
         tabIndex={-1}
         ref={drawerRef}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="iam-drawer__header">
-          <h2>{user.user_email || user.user_display_name || "مستخدم"}</h2>
-          <button type="button" onClick={onClose} aria-label="إغلاق">
-            ×
-          </button>
+        <header className="iam-drawer__hero">
+          <button type="button" className="iam-drawer__close" onClick={onClose} aria-label="إغلاق">×</button>
+          <IamAvatar record={user} size="lg" />
+          <h2>{displayName || email}</h2>
+          {displayName ? <p className="iam-drawer__email">{email}</p> : null}
+          <div className="iam-drawer__badges">
+            {(user.roles || []).map((r) => (
+              <IamRoleBadge key={r} roleId={r} />
+            ))}
+            <IamStatusBadge assignment={user.assignments?.[0]} />
+          </div>
         </header>
+
+        <div className="iam-drawer__stats">
+          <div><span>الجلسات</span><strong>{userSessions.length}</strong></div>
+          <div><span>الصلاحيات</span><strong>{permIds.length}</strong></div>
+          <div><span>التعيينات</span><strong>{(assignments || []).length}</strong></div>
+        </div>
+
         <div className="iam-drawer__body">
-          <section>
-            <h3>الأدوار</h3>
-            <ul>
-              {(user.roles || []).map((r) => (
-                <li key={r}>
-                  <IamRoleBadge roleId={r} />
-                </li>
-              ))}
-            </ul>
+          <section className="iam-drawer__section">
+            <h3>معلومات الحساب</h3>
+            <dl className="iam-meta-grid">
+              <div><dt>تاريخ أول تعيين</dt><dd>{formatDateTime(firstAssignment?.granted_at)}</dd></div>
+              <div><dt>آخر نشاط</dt><dd>{formatRelativeTime(lastActivity)}</dd></div>
+              <div><dt>آخر تعيين</dt><dd>{formatDateTime(user.last_granted_at)}</dd></div>
+              {firstAssignment?.grant_reason ? (
+                <div><dt>سبب التعيين</dt><dd><IamReasonText reason={firstAssignment.grant_reason} /></dd></div>
+              ) : null}
+            </dl>
           </section>
-          {showTechnical ? (
-            <section className="iam-tech-details">
-              <h3>تفاصيل تقنية</h3>
-              <code>{user.user_id}</code>
-            </section>
-          ) : null}
-          {permissions?.length ? (
-            <section>
+
+          <section className="iam-drawer__section">
+            <h3>التعيينات</h3>
+            {!assignments?.length ? (
+              <p className="iam-muted">لا توجد تعيينات.</p>
+            ) : (
+              <ul className="iam-drawer__list">
+                {(assignments || []).map((a) => (
+                  <li key={a.id}>
+                    <IamRoleBadge roleId={a.role_id} />
+                    <span className="iam-muted">{formatDateTime(a.granted_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {permIds.length ? (
+            <section className="iam-drawer__section">
               <h3>الصلاحيات الفعلية</h3>
-              {groupPermissionsByCategory(
-                permissions.map((id) => ({ id: typeof id === "string" ? id : id?.id }))
-              ).map((group) => (
-                <div key={group.category} className="iam-perm-group">
-                  <h4>{group.label}</h4>
+              {permGroups.map((g) => (
+                <div key={g.category} className="iam-perm-group">
+                  <h4>{g.label} ({g.permissions.length})</h4>
                   <ul className="iam-perm-list">
-                    {group.permissions.map((p) => (
-                      <li key={p.id}>
-                        <span>{labelPermission(p.id)}</span>
-                        {showTechnical ? <code className="iam-tech-id">{p.id}</code> : null}
-                      </li>
+                    {g.permissions.slice(0, 8).map((p) => (
+                      <li key={p.id}>{labelPermission(p.id)}</li>
                     ))}
+                    {g.permissions.length > 8 ? (
+                      <li className="iam-muted">+{g.permissions.length - 8} أخرى</li>
+                    ) : null}
                   </ul>
                 </div>
               ))}
             </section>
           ) : null}
-          <section>
-            <h3>التعيينات</h3>
-            <ul>
-              {(assignments || []).map((a) => (
-                <li key={a.id}>
-                  {labelRole(a.role_id)} — {a.granted_at}
-                </li>
-              ))}
-            </ul>
-          </section>
+
+          {showTechnical ? (
+            <details className="iam-tech-details">
+              <summary>تفاصيل تقنية</summary>
+              <dl className="iam-meta-grid">
+                <div><dt>معرف المستخدم</dt><dd><code>{user.user_id}</code></dd></div>
+              </dl>
+            </details>
+          ) : null}
         </div>
       </aside>
     </div>

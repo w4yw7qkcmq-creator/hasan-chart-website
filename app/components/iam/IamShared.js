@@ -1,6 +1,6 @@
 "use client";
 
-import { labelRole, labelPermission, labelAssignmentReason, labelAssignmentStatus, labelSeverity, labelEventType, labelAuditAction, IAM_ROLE_RISK } from "../../../lib/iam/ui-labels";
+import { labelRole, labelPermission, labelAssignmentReason, labelAssignmentStatus, labelSeverity, labelEventType, labelAuditAction, IAM_ROLE_RISK, IAM_EVENT_ICONS } from "../../../lib/iam/ui-labels";
 import { formatDateTime, userDisplayName, userInitials } from "../../../lib/iam/ui-utils";
 
 export function IamToast({ message, type = "ok", onClose }) {
@@ -30,7 +30,26 @@ export function IamEmptyState({ icon = "📭", title, description, action = null
   );
 }
 
-export function IamLoadingSkeleton({ rows = 4 }) {
+export function IamLoadingSkeleton({ rows = 4, variant = "rows" }) {
+  if (variant === "cards") {
+    return (
+      <div className="iam-skeleton iam-skeleton--cards" aria-busy="true" aria-label="جاري التحميل">
+        {Array.from({ length: Math.min(rows, 6) }).map((_, i) => (
+          <div key={i} className="iam-skeleton__card" />
+        ))}
+      </div>
+    );
+  }
+  if (variant === "table") {
+    return (
+      <div className="iam-skeleton iam-skeleton--table" aria-busy="true" aria-label="جاري التحميل">
+        <div className="iam-skeleton__row iam-skeleton__row--head" />
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="iam-skeleton__row" />
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="iam-skeleton" aria-busy="true" aria-label="جاري التحميل">
       {Array.from({ length: rows }).map((_, i) => (
@@ -104,16 +123,17 @@ export function IamStatusBadge({ assignment }) {
 }
 
 export function IamReasonText({ reason }) {
-  const friendly = labelAssignmentReason(reason);
-  const technical = reason && friendly !== labelAssignmentReason(reason) ? null : reason;
-  return (
-    <span className="iam-reason" title={technical || undefined}>
-      {friendly}
-      {technical && friendly === "إجراء إداري" ? (
-        <span className="iam-reason__tech"> ({technical})</span>
-      ) : null}
-    </span>
-  );
+  return <span className="iam-reason">{labelAssignmentReason(reason)}</span>;
+}
+
+export function IamSeverityBadge({ severity }) {
+  const s = String(severity || "info").toLowerCase();
+  const tone = s === "critical" ? "danger" : s === "high" ? "warning" : s === "medium" ? "warning" : "muted";
+  return <IamBadge tone={tone}>{labelSeverity(severity)}</IamBadge>;
+}
+
+export function IamEventIcon({ eventType }) {
+  return <span aria-hidden="true">{IAM_EVENT_ICONS[eventType] || "•"}</span>;
 }
 
 export function IamTableWrap({ children }) {

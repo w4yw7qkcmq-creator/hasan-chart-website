@@ -6,6 +6,7 @@ import {
   IAM_TAB_DEFS,
   IAM_ROLE_LABELS,
   IAM_ASSIGNMENT_REASON_LABELS,
+  IAM_ROLE_ICONS,
   labelRole,
   labelPermission,
   labelAssignmentReason,
@@ -124,9 +125,8 @@ describe("IAM role label coverage", () => {
     }
   });
 
-  it("has Arabic labels for standard assignment reasons", () => {
-    for (const key of ["legacy_backfill", "bootstrap_ceremony", "manual", "role_change"]) {
-      assert.ok(IAM_ASSIGNMENT_REASON_LABELS[key]);
-    }
+  it("has role icons for standard roles", () => {
+    assert.ok(IAM_ROLE_ICONS.super_admin);
+    assert.ok(IAM_ROLE_ICONS.admin);
   });
 });

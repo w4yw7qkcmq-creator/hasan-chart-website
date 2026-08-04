@@ -2,6 +2,7 @@
 
 import "../admin-theme.css";
 import "./iam-ui.css";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "../../../../lib/admin-fetch";
@@ -9,18 +10,19 @@ import { PermissionGate } from "../../../components/PermissionGate";
 import { useAuth } from "../../../components/AuthProvider";
 import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { IAM_TAB_DEFS } from "../../../../lib/iam/ui-labels";
-import { IamToast } from "../../../components/iam/IamShared";
+import { IamToast, IamLoadingSkeleton } from "../../../components/iam/IamShared";
 import { IamGrantModal, IamRevokeModal, IamOverrideRevokeModal, IamUserDrawer } from "../../../components/iam/IamModals";
-import {
-  IamOverviewTab,
-  IamAdminUsersTab,
-  IamRolesTab,
-  IamAssignmentsTab,
-  IamOverridesTab,
-  IamSessionsTab,
-  IamSecurityTab,
-  IamAuditTab,
-} from "../../../components/iam/IamTabs";
+
+const tabLoading = () => <IamLoadingSkeleton rows={6} variant="cards" />;
+
+const IamOverviewTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamOverviewTab), { loading: tabLoading });
+const IamAdminUsersTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamAdminUsersTab), { loading: tabLoading });
+const IamRolesTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamRolesTab), { loading: tabLoading });
+const IamAssignmentsTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamAssignmentsTab), { loading: tabLoading });
+const IamOverridesTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamOverridesTab), { loading: tabLoading });
+const IamSessionsTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamSessionsTab), { loading: tabLoading });
+const IamSecurityTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamSecurityTab), { loading: tabLoading });
+const IamAuditTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamAuditTab), { loading: tabLoading });
 
 export default function AdminIamPage() {
   const { can, iam } = useAuth();
@@ -326,9 +328,12 @@ export default function AdminIamPage() {
           securityEvents={securityEvents}
           auditLogs={auditLogs}
           roles={roles}
+          permissions={permissions}
           featureFlags={flags}
           isSuperAdmin={isSuperAdmin}
           onNavigateTab={setActiveTab}
+          onGrantClick={() => setGrantOpen(true)}
+          canGrant={canGrant}
           loading={loading || tabLoading}
         />
       ) : null}
@@ -344,7 +349,14 @@ export default function AdminIamPage() {
       ) : null}
 
       {activeTab === "roles" ? (
-        <IamRolesTab matrix={matrix} roles={roles} permissions={permissions} loading={loading || tabLoading} />
+        <IamRolesTab
+          matrix={matrix}
+          roles={roles}
+          permissions={permissions}
+          assignments={assignments}
+          loading={loading || tabLoading}
+          showTechnical={isSuperAdmin}
+        />
       ) : null}
 
       {activeTab === "assignments" ? (
@@ -416,6 +428,8 @@ export default function AdminIamPage() {
       <IamUserDrawer
         user={selectedUser}
         assignments={selectedUser?.assignments || []}
+        sessions={sessions}
+        matrix={matrix}
         onClose={() => setSelectedUser(null)}
         showTechnical={isSuperAdmin}
       />
