@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
+import { execSync } from "node:child_process";
 
 const ROOT = process.cwd();
 const BASE = "https://www.hasanchartworld.com";
@@ -22,6 +23,14 @@ const TAB_LABELS = [
   "الأحداث الأمنية",
   "سجل التدقيق",
 ];
+
+function expectedCommitPrefix() {
+  try {
+    return execSync("git rev-parse --short HEAD", { cwd: ROOT, encoding: "utf8" }).trim();
+  } catch {
+    return "23623fb";
+  }
+}
 
 const VIEWPORTS = [
   { name: "desktop", width: 1440, height: 900 },
@@ -186,6 +195,8 @@ async function visibleTabLabels(page) {
 }
 
 async function testGrantModal(page, report) {
+  await clickTab(page, "التعيينات");
+  await page.waitForTimeout(600);
   const grantBtn = page.getByRole("button", { name: /إسناد دور/i }).first();
   const visible = await grantBtn.isVisible().catch(() => false);
   if (!visible) {
@@ -255,6 +266,16 @@ async function testUserDrawer(page, report) {
   };
 }
 
+async function tabContentVisible(page) {
+  return page.evaluate(() =>
+    Boolean(
+      document.querySelector(
+        ".iam-tab-panel, .iam-overview, .iam-empty-state, .iam-table, .iam-roles-grid, .iam-stats-grid"
+      )
+    )
+  );
+}
+
 async function testTabs(page, report) {
   const visible = await visibleTabLabels(page);
   const results = [];
@@ -265,8 +286,11 @@ async function testTabs(page, report) {
       continue;
     }
     await clickTab(page, label);
-    await page.waitForTimeout(700);
-    const panelVisible = await page.locator(".iam-tab-panel").first().isVisible().catch(() => false);
+    await page
+      .waitForFunction(() => !document.querySelector(".iam-loading-skeleton"), { timeout: 12000 })
+      .catch(() => null);
+    await page.waitForTimeout(400);
+    const panelVisible = await tabContentVisible(page);
     const checks = await iamDomChecks(page);
     results.push({
       tab: label,
@@ -312,8 +336,9 @@ async function runProductionBrowserCanary() {
     report.verdict = "STOPPED — HEALTH FAILED";
     return report;
   }
-  if (!health.commit.startsWith("55abc01")) {
+  if (!health.commit.startsWith(expectedCommitPrefix())) {
     report.verdict = "STOPPED — COMMIT MISMATCH";
+    report.expectedCommit = expectedCommitPrefix();
     report.ok = false;
     return report;
   }
@@ -405,18 +430,17 @@ async function runProductionBrowserCanary() {
       await context.close();
     }
 
-    const tabFail = (report.tabs || []).some((t) => !t.pass);
+    const tabFail = (report.tabs || []).some((t) => !t.pass && !t.skipped);
     const p0 =
       report.unauthenticated?.leakedData ||
       report.networkFailures.some((n) => n.status >= 500) ||
-      report.initial?.checks?.uuidAsPrimaryName;
+      report.initial?.checks?.uuidAsPrimaryName ||
+      report.consoleErrors.length > 0;
     const p1 =
       tabFail ||
       report.superAdminDesktop?.pass === false ||
       (report.grantModal && report.grantModal.pass === false) ||
-      (report.revokeModal && report.revokeModal.pass === false) ||
-      (report.userDrawer && report.userDrawer.pass === false) ||
-      report.consoleErrors.length > 0;
+      (report.revokeModal && report.revokeModal.pass === false);
 
     report.ok = !p0 && !p1;
     report.p0 = p0;

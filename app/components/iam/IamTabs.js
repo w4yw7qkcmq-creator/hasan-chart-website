@@ -93,7 +93,7 @@ export function IamOverviewTab({
   const flags = featureFlags || {};
 
   return (
-    <div className="iam-overview">
+    <div className="iam-tab-panel iam-overview">
       <div className="iam-stats-grid">
         {stats.map((s) => (
           <PermissionGate key={s.title} permission={s.perm} fallback={null}>
@@ -526,11 +526,14 @@ export function IamSessionsTab({ sessions, loading }) {
 
   if (!active.length) {
     return (
-      <IamEmptyState title="لا توجد جلسات نشطة" description="ستظهر الجلسات الإدارية النشطة هنا." icon="🖥" />
+      <div className="iam-tab-panel">
+        <IamEmptyState title="لا توجد جلسات نشطة" description="ستظهر الجلسات الإدارية النشطة هنا." icon="🖥" />
+      </div>
     );
   }
 
   return (
+    <div className="iam-tab-panel">
     <IamTableWrap>
       <table className="iam-table">
         <thead>
@@ -557,6 +560,7 @@ export function IamSessionsTab({ sessions, loading }) {
         </tbody>
       </table>
     </IamTableWrap>
+    </div>
   );
 }
 

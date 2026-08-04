@@ -119,18 +119,34 @@ export default function AdminIamPage() {
     setError("");
     try {
       await loadCore();
-      await loadTabData(activeTab);
     } catch (err) {
       setError(err?.message || "تعذر تحميل بيانات الصلاحيات");
     } finally {
       setLoading(false);
       setTabLoading(false);
     }
-  }, [activeTab, loadCore, loadTabData]);
+  }, [loadCore]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setTabLoading(true);
+      try {
+        await loadTabData(activeTab);
+      } catch (err) {
+        if (!cancelled) setError(err?.message || "تعذر تحميل بيانات التبويب");
+      } finally {
+        if (!cancelled) setTabLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, loadTabData]);
 
   useEffect(() => {
     if (!visibleTabs.find((t) => t.id === activeTab) && visibleTabs.length) {
