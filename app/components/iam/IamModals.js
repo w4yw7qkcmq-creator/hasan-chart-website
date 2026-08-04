@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { labelRole, IAM_ROLE_DESCRIPTIONS, IAM_ROLE_RISK } from "../../../lib/iam/ui-labels";
+import { labelRole, labelPermission, groupPermissionsByCategory, IAM_ROLE_DESCRIPTIONS, IAM_ROLE_RISK } from "../../../lib/iam/ui-labels";
 import { IamRoleBadge } from "./IamShared";
 
 const GRANT_REASON_SUGGESTIONS = [
@@ -377,11 +377,21 @@ export function IamUserDrawer({ user, assignments, permissions, onClose, showTec
           {permissions?.length ? (
             <section>
               <h3>الصلاحيات الفعلية</h3>
-              <ul className="iam-perm-list">
-                {permissions.slice(0, 20).map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
+              {groupPermissionsByCategory(
+                permissions.map((id) => ({ id: typeof id === "string" ? id : id?.id }))
+              ).map((group) => (
+                <div key={group.category} className="iam-perm-group">
+                  <h4>{group.label}</h4>
+                  <ul className="iam-perm-list">
+                    {group.permissions.map((p) => (
+                      <li key={p.id}>
+                        <span>{labelPermission(p.id)}</span>
+                        {showTechnical ? <code className="iam-tech-id">{p.id}</code> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </section>
           ) : null}
           <section>

@@ -50,6 +50,7 @@ export default function AdminIamPage() {
     reason: "",
   });
   const [overrideLookup, setOverrideLookup] = useState({ email: "", userId: "" });
+  const [userOverrides, setUserOverrides] = useState([]);
   const [overrideRevokeTarget, setOverrideRevokeTarget] = useState(null);
 
   const visibleTabs = useMemo(
