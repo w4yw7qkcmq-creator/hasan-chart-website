@@ -1,0 +1,269 @@
+#!/usr/bin/env node
+/**
+ * Staging DB + local worker live auth matrix (no secret output).
+ */
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { spawn } from "node:child_process";
+import assert from "node:assert/strict";
+
+const ROOT = process.cwd();
+const STAGING_ENV = resolve(ROOT, ".env.staging.local");
+const WORKER_PORT = 3099;
+const WORKER_BASE = `http://127.0.0.1:${WORKER_PORT}`;
+
+function parseEnvFile(path) {
+  if (!existsSync(path)) return {};
+  const out = {};
+  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const i = t.indexOf("=");
+    if (i <= 0) continue;
+    let val = t.slice(i + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    out[t.slice(0, i).trim()] = val;
+  }
+  return out;
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitForHealth(timeoutMs = 30000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`${WORKER_BASE}/health`);
+      if (res.ok) {
+        const body = await res.json();
+        if (body.success) return body;
+      }
+    } catch {
+      // retry
+    }
+    await sleep(500);
+  }
+  throw new Error("Worker health timeout");
+}
+
+async function probe(path, headers = {}, method = "GET", body = undefined) {
+  const res = await fetch(`${WORKER_BASE}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", ...headers },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // non-json
+  }
+  return { status: res.status, json, text };
+}
+
+function authAllowed(status) {
+  return status !== 401 && status !== 403 && status !== 503;
+}
+
+async function main() {
+  const staging = parseEnvFile(STAGING_ENV);
+  const required = [
+    "STAGING_SUPABASE_URL",
+    "STAGING_SUPABASE_SERVICE_ROLE_KEY",
+    "STAGING_IAM_INSTANT_ANALYSIS_WORKER_SECRET",
+    "STAGING_IAM_CRON_SECRET",
+    "STAGING_IAM_NEWS_WORKER_SECRET",
+  ];
+  const missing = required.filter((k) => !staging[k]);
+  if (missing.length) {
+    console.log(JSON.stringify({ verdict: "STAGING_ENV_INCOMPLETE", missing }));
+    process.exit(1);
+  }
+
+  const pepper = process.env.IAM_SERVICE_SECRET_PEPPER || staging.STAGING_IAM_SERVICE_SECRET_PEPPER || "";
+  if (!pepper || pepper.length < 32) {
+    console.log(
+      JSON.stringify({
+        verdict: "STAGING_PEPPER_REQUIRED",
+        detail: "Set IAM_SERVICE_SECRET_PEPPER (32+ chars) before setup and validation.",
+      })
+    );
+    process.exit(1);
+  }
+
+  const workerEnv = {
+    ...process.env,
+    NODE_ENV: "production",
+    RAILWAY_ENVIRONMENT: "staging",
+    PORT: String(WORKER_PORT),
+    NEXT_PUBLIC_SUPABASE_URL: staging.STAGING_SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: staging.STAGING_SUPABASE_SERVICE_ROLE_KEY,
+    IAM_SERVICE_SECRET_PEPPER: pepper,
+    IAM_WORKER_AUTH: "true",
+    IAM_WORKER_LEGACY_FALLBACK: "true",
+    WORKER_API_SECRET: staging.STAGING_IAM_ANALYSIS_WORKER_SECRET || staging.STAGING_IAM_CRON_SECRET,
+    CRON_SECRET: staging.STAGING_IAM_CRON_SECRET,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || "sk-test-placeholder-not-used",
+  };
+
+  const child = spawn("node", ["worker/index.js"], {
+    cwd: ROOT,
+    env: workerEnv,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let crashed = false;
+  child.on("exit", (code) => {
+    if (code !== 0 && code !== null) crashed = true;
+  });
+
+  const results = [];
+  const record = (name, pass, detail) => results.push({ name, pass, detail });
+
+  try {
+    const health = await waitForHealth();
+    record("worker_health_ready", true, {
+      machineAuthConfigured: health.workerHttpAuth?.machineAuthConfigured,
+      legacyFallbackEnabled: health.workerHttpAuth?.legacyFallbackEnabled,
+    });
+
+    const iaSecret = staging.STAGING_IAM_INSTANT_ANALYSIS_WORKER_SECRET;
+    const cronSecret = staging.STAGING_IAM_CRON_SECRET;
+    const newsSecret = staging.STAGING_IAM_NEWS_WORKER_SECRET;
+    const legacySecret = staging.STAGING_IAM_ANALYSIS_WORKER_SECRET || cronSecret;
+
+    const machineOk = await probe(
+      "/api/instant-analysis",
+      {
+        "x-service-account-id": "instant-analysis-worker",
+        "x-service-account-secret": iaSecret,
+      },
+      "POST",
+      {}
+    );
+    record("machine_correct_secret", authAllowed(machineOk.status), { status: machineOk.status });
+
+    const machineWrong = await probe(
+      "/api/instant-analysis",
+      {
+        "x-service-account-id": "instant-analysis-worker",
+        "x-service-account-secret": "wrong-secret-value",
+      },
+      "POST",
+      {}
+    );
+    record("machine_wrong_secret", machineWrong.status === 401, { status: machineWrong.status });
+
+    const cronAsMachine = await probe(
+      "/api/instant-analysis",
+      {
+        "x-service-account-id": "cron",
+        "x-service-account-secret": cronSecret,
+      },
+      "POST",
+      {}
+    );
+    record("cron_account_denied", cronAsMachine.status === 403, { status: cronAsMachine.status });
+
+    const newsAsMachine = await probe(
+      "/api/instant-analysis",
+      {
+        "x-service-account-id": "news-worker",
+        "x-service-account-secret": newsSecret,
+      },
+      "POST",
+      {}
+    );
+    record("news_account_denied", newsAsMachine.status === 403, { status: newsAsMachine.status });
+
+    const legacyOk = await probe(
+      "/api/instant-analysis",
+      { authorization: `Bearer ${legacySecret}` },
+      "POST",
+      {}
+    );
+    record("legacy_valid_no_machine_headers", authAllowed(legacyOk.status), { status: legacyOk.status });
+
+    const legacyBad = await probe(
+      "/api/instant-analysis",
+      { authorization: "Bearer invalid-legacy-secret" },
+      "POST",
+      {}
+    );
+    record("legacy_invalid", legacyBad.status === 401, { status: legacyBad.status });
+
+    const originOnly = await probe("/api/instant-analysis", { origin: "https://www.hasanchartworld.com" }, "POST", {});
+    record("origin_only_denied", originOnly.status === 403, { status: originOnly.status });
+
+    const refererOnly = await probe(
+      "/api/instant-analysis",
+      { referer: "https://www.hasanchartworld.com/admin" },
+      "POST",
+      {}
+    );
+    record("referer_only_denied", refererOnly.status === 403, { status: refererOnly.status });
+
+    const cookieOnly = await probe(
+      "/api/instant-analysis",
+      { cookie: "hc_access_token=fake-session" },
+      "POST",
+      {}
+    );
+    record("cookie_only_denied", cookieOnly.status === 403, { status: cookieOnly.status });
+
+    const machineWrongLegacyOk = await probe(
+      "/api/instant-analysis",
+      {
+        "x-service-account-id": "instant-analysis-worker",
+        "x-service-account-secret": "wrong",
+        authorization: `Bearer ${legacySecret}`,
+      },
+      "POST",
+      {}
+    );
+    record("machine_wrong_no_legacy_fallback", machineWrongLegacyOk.status === 401, {
+      status: machineWrongLegacyOk.status,
+    });
+
+    const finalHealth = await probe("/health");
+    const metrics = finalHealth.json?.workerHttpAuth || {};
+    const healthBlob = JSON.stringify(finalHealth.json || {});
+    record("health_no_secrets", !/Bearer|secret_hash|authorization/i.test(healthBlob), {});
+    record("metrics_originRejected", typeof metrics.originRejected === "number", {
+      originRejected: metrics.originRejected,
+    });
+    record("metrics_denied_positive", (metrics.denied || 0) > 0, { denied: metrics.denied });
+  } finally {
+    child.kill("SIGTERM");
+    await sleep(500);
+    if (crashed) record("worker_no_crash_loop", false, { crashed: true });
+    else record("worker_no_crash_loop", true, {});
+  }
+
+  const failed = results.filter((r) => !r.pass);
+  console.log(
+    JSON.stringify(
+      {
+        verdict: failed.length ? "STAGING_WORKER_AUTH_FAILED" : "STAGING_WORKER_AUTH_VALIDATED",
+        mode: "local_worker_staging_db",
+        railwayStagingEnvironment: false,
+        pepperConfigured: Boolean(workerEnv.IAM_SERVICE_SECRET_PEPPER),
+        results,
+        failedCount: failed.length,
+      },
+      null,
+      2
+    )
+  );
+  process.exit(failed.length ? 1 : 0);
+}
+
+main().catch((e) => {
+  console.error(JSON.stringify({ error: e.message }));
+  process.exit(1);
+});

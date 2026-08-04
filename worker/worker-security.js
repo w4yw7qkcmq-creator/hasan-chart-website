@@ -1,4 +1,16 @@
 const crypto = require("crypto");
+const {
+  verifyMachineIdentity,
+  isWorkerMachineAuthEnabled,
+  isLegacyFallbackEnabled,
+  getMachineHeaders,
+  hasHumanSessionCookie,
+  hasOriginOrRefererSignal,
+  recordAuthMetric,
+  recordDeniedMetric,
+  getWorkerAuthMetrics,
+  resetWorkerAuthMetrics,
+} = require("./lib/machine-auth");
 
 function normalizeOrigin(value) {
   const raw = String(value || "").trim();
@@ -52,7 +64,11 @@ function getProvidedWorkerSecret(req) {
     ? authHeader.slice(7).trim()
     : "";
 
-  return bearer || String(req.headers["x-worker-secret"] || "").trim();
+  return bearer || String(req.headers["x-worker-secret"] || req.headers["x-cron-secret"] || "").trim();
+}
+
+function hasLegacySecretAttempt(req) {
+  return Boolean(getProvidedWorkerSecret(req));
 }
 
 function hasValidWorkerSecret(req) {
@@ -61,36 +77,64 @@ function hasValidWorkerSecret(req) {
   return secureCompare(getProvidedWorkerSecret(req), secret);
 }
 
-function isAllowedBrowserOrigin(req) {
-  const allowed = getAllowedOrigins();
-  const origin = normalizeOrigin(req.headers.origin);
+async function verifyWorkerApiAccess(req) {
+  const machineHeaders = getMachineHeaders(req);
+  const originSignal = hasOriginOrRefererSignal(req);
 
-  if (origin && allowed.includes(origin)) {
-    return true;
+  if (hasHumanSessionCookie(req) && !machineHeaders.present && !hasLegacySecretAttempt(req)) {
+    recordDeniedMetric("human_session");
+    return {
+      ok: false,
+      status: 403,
+      error: "Human sessions cannot access worker machine routes.",
+    };
   }
 
-  const referer = String(req.headers.referer || "").trim();
+  if (isWorkerMachineAuthEnabled()) {
+    const machine = await verifyMachineIdentity(req);
+    if (machine.ok) {
+      recordAuthMetric("machine");
+      return {
+        ok: true,
+        mode: "machine",
+        serviceAccountId: machine.serviceAccountId,
+      };
+    }
 
-  if (referer) {
-    try {
-      return allowed.includes(new URL(referer).origin);
-    } catch {
-      return false;
+    if (machine.hardFail) {
+      recordDeniedMetric("machine");
+      return {
+        ok: false,
+        status: machine.status || 401,
+        error: machine.error || "Unauthorized machine request.",
+      };
     }
   }
 
-  return false;
-}
-
-function verifyWorkerApiAccess(req) {
-  if (hasValidWorkerSecret(req)) {
-    return { ok: true, mode: "secret" };
+  if (isLegacyFallbackEnabled() && hasValidWorkerSecret(req)) {
+    recordAuthMetric("legacy");
+    return { ok: true, mode: "legacy" };
   }
 
-  if (isAllowedBrowserOrigin(req)) {
-    return { ok: true, mode: "origin" };
+  if (hasLegacySecretAttempt(req)) {
+    recordDeniedMetric("legacy");
+    return {
+      ok: false,
+      status: 401,
+      error: "Unauthorized worker request.",
+    };
   }
 
+  if (originSignal) {
+    recordDeniedMetric("origin");
+    return {
+      ok: false,
+      status: 403,
+      error: "Forbidden worker request.",
+    };
+  }
+
+  recordDeniedMetric("denied");
   return {
     ok: false,
     status: 403,
@@ -123,6 +167,10 @@ function createWorkerCorsOptions() {
       "Authorization",
       "x-worker-secret",
       "x-cron-secret",
+      "x-service-account-id",
+      "x-service-account-secret",
+      "x-iam-service-id",
+      "x-iam-service-secret",
     ],
     maxAge: 600,
   };
@@ -156,17 +204,25 @@ function checkInstantAnalysisRateLimit(req) {
   return entry.count <= ANALYSIS_RATE_MAX;
 }
 
-function workerAccessDeniedMiddleware(req, res, next) {
-  const auth = verifyWorkerApiAccess(req);
+async function workerAccessDeniedMiddleware(req, res, next) {
+  try {
+    const auth = await verifyWorkerApiAccess(req);
 
-  if (!auth.ok) {
-    return res.status(auth.status).json({
+    if (!auth.ok) {
+      return res.status(auth.status).json({
+        success: false,
+        error: auth.error,
+      });
+    }
+
+    req.workerAuth = auth;
+    return next();
+  } catch {
+    return res.status(500).json({
       success: false,
-      error: auth.error,
+      error: "Worker authentication failed.",
     });
   }
-
-  return next();
 }
 
 function instantAnalysisRateLimitMiddleware(req, res, next) {
@@ -186,4 +242,6 @@ module.exports = {
   workerAccessDeniedMiddleware,
   instantAnalysisRateLimitMiddleware,
   getAllowedOrigins,
+  getWorkerAuthMetrics,
+  resetWorkerAuthMetrics,
 };
