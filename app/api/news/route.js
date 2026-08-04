@@ -38,6 +38,7 @@ function parseListParams(searchParams) {
   const cursor = String(searchParams.get("cursor") || "").trim() || null;
   const offset = parseOffset(searchParams.get("offset"));
   const includeTotal = searchParams.get("includeTotal") === "true";
+  const legacyPosts = searchParams.get("legacyPosts") === "true";
   const search = String(searchParams.get("search") || searchParams.get("q") || "").trim();
 
   if (search.length > 0 && search.length < 2) {
@@ -50,10 +51,24 @@ function parseListParams(searchParams) {
     decodeCursor(cursor);
   }
 
-  return { limit, cursor, offset, includeTotal, search };
+  return { limit, cursor, offset, includeTotal, legacyPosts, search };
 }
 
-async function fetchNewsList({ limit, cursor, offset, includeTotal, search }) {
+function buildNewsListResponse({ items, pagination, legacyPosts }) {
+  const body = {
+    success: true,
+    items,
+    pagination,
+  };
+
+  if (legacyPosts) {
+    body.posts = items;
+  }
+
+  return body;
+}
+
+async function fetchNewsList({ limit, cursor, offset, includeTotal, legacyPosts, search }) {
   const supabase = getSupabaseClient();
   const fetchLimit = limit + 1;
 
@@ -103,12 +118,7 @@ async function fetchNewsList({ limit, cursor, offset, includeTotal, search }) {
     pagination.total = count;
   }
 
-  return {
-    success: true,
-    items,
-    posts: items,
-    pagination,
-  };
+  return buildNewsListResponse({ items, pagination, legacyPosts });
 }
 
 export async function GET(request) {
@@ -117,7 +127,7 @@ export async function GET(request) {
     handler: async (req, logContext) => {
       try {
         const params = parseListParams(req.nextUrl.searchParams);
-        const cacheKey = `public:news:list:${params.limit}:${params.cursor || `offset:${params.offset}`}:${params.search}:${params.includeTotal}`;
+        const cacheKey = `public:news:list:${params.limit}:${params.cursor || `offset:${params.offset}`}:${params.search}:${params.includeTotal}:legacy:${params.legacyPosts}`;
 
         const { data } = await withReadCache(cacheKey, NEWS_API_CACHE_MS, async () => fetchNewsList(params));
 

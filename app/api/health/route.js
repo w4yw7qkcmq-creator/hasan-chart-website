@@ -50,6 +50,16 @@ export async function GET(request) {
           readiness: report.readiness,
           build: report.build,
           database: report.database,
+          checks: report.checks?.database
+            ? { database: report.checks.database }
+            : report.database
+              ? {
+                  database: {
+                    status: report.database.status,
+                    latencyMs: report.database.latencyMs ?? null,
+                  },
+                }
+              : undefined,
           iam: report.iam,
           timestamp: report.timestamp,
         };
