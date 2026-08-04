@@ -10,6 +10,7 @@ worker/.env
 .env.staging.local
 .env.staging.bootstrap.local
 .env.production.bootstrap.local
+.env.production.worker-auth.local
 .env.e2e.local
 scripts/e2e/.artifacts/
 scripts/ops/.artifacts/
