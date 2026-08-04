@@ -14,10 +14,15 @@ export const runtime = "nodejs";
 export async function GET(request) {
   const logContext = buildApiErrorLogContext(request, { route: "/api/health" });
   const startedAt = Date.now();
+  const detail = request.nextUrl.searchParams.get("detail") === "1";
 
   try {
-    startMarketStream("api-health");
-    const report = await runWithRedisRoute("/api/health", () => collectHealthReport());
+    if (detail) {
+      startMarketStream("api-health");
+    }
+    const report = await runWithRedisRoute("/api/health", () =>
+      collectHealthReport({ detail })
+    );
     const statusCode = report.status === "down" ? 503 : 200;
 
     logApiRequest({
@@ -27,23 +32,35 @@ export async function GET(request) {
       status: statusCode,
       responseTimeMs: Date.now() - startedAt,
       healthStatus: report.status,
+      detail,
     });
 
-    return jsonResponse(
-      {
-        success: report.status !== "down",
-        service: "hasan-chart-website",
-        endpoint: "/api/health",
-        ...report,
+    const body = detail
+      ? {
+          success: report.status !== "down",
+          service: "hasan-chart-website",
+          endpoint: "/api/health",
+          ...report,
+        }
+      : {
+          success: report.status !== "down",
+          service: "hasan-chart-website",
+          endpoint: "/api/health",
+          status: report.status,
+          readiness: report.readiness,
+          build: report.build,
+          database: report.database,
+          iam: report.iam,
+          timestamp: report.timestamp,
+        };
+
+    return jsonResponse(body, {
+      status: statusCode,
+      cacheControl: CACHE_NO_STORE,
+      extraHeaders: {
+        "x-request-id": logContext.requestId || "",
       },
-      {
-        status: statusCode,
-        cacheControl: CACHE_NO_STORE,
-        extraHeaders: {
-          "x-request-id": logContext.requestId || "",
-        },
-      }
-    );
+    });
   } catch (error) {
     logApiError({
       ...logContext,
