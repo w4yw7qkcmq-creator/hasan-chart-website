@@ -29,6 +29,14 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
+    if (body?.dryRun === true) {
+      return Response.json({
+        success: true,
+        dryRun: true,
+        authMode: authCheck.authMode || (authCheck.user ? "admin" : "unknown"),
+      });
+    }
+
     const message = `
 🚨 <b>خبر اقتصادي عاجل</b>
 
