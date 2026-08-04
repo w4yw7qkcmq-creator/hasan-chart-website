@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { labelRole, IAM_ROLE_DESCRIPTIONS, IAM_ROLE_RISK } from "../../../lib/iam/ui-labels";
+import { labelRole, IAM_ROLE_DESCRIPTIONS, IAM_ROLE_RISK, groupPermissionsByCategory, labelPermission } from "../../../lib/iam/ui-labels";
 import { formatDateTime, formatRelativeTime, resolveUserPermissions } from "../../../lib/iam/ui-utils";
 import { IamAvatar, IamBadge, IamRoleBadge, IamStatusBadge, IamReasonText } from "./IamShared";
 
