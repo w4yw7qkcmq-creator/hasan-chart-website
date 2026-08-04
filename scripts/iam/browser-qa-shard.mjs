@@ -14,6 +14,7 @@ import {
 import {
   DEV_PORT,
   PAGE_READY_MS,
+  PAGE_READY_ADMIN_MS,
   loadEnv,
   assertStagingOnly,
   ensurePortReady,
@@ -65,6 +66,59 @@ function getTestPassword(env) {
   }
   return password;
 }
+
+const BROWSER_QA_ROLE_ACCOUNTS = [
+  { email: `iam-super-admin@${TEST_DOMAIN}`, role: "super_admin" },
+  { email: `iam-test-admin@${TEST_DOMAIN}`, role: "admin" },
+  { email: `iam-test-support@${TEST_DOMAIN}`, role: "support" },
+  { email: `iam-test-accountant@${TEST_DOMAIN}`, role: "accountant" },
+  { email: `iam-test-analyst@${TEST_DOMAIN}`, role: "analyst" },
+  { email: `iam-test-news-editor@${TEST_DOMAIN}`, role: "news_editor" },
+  { email: `iam-test-subscription-manager@${TEST_DOMAIN}`, role: "subscription_manager" },
+];
+
+function superAdminActor(password) {
+  return { email: `iam-super-admin@${TEST_DOMAIN}`, password };
+}
+
+async function findAuthUserByEmail(sb, email) {
+  const target = email.toLowerCase();
+  for (let page = 1; page <= 10; page += 1) {
+    const { data: list, error } = await sb.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const user = list?.users?.find((u) => u.email?.toLowerCase() === target);
+    if (user) return user;
+    if (!list?.users?.length || list.users.length < 1000) break;
+  }
+  return null;
+}
+
+async function ensureRoleAssignments(env) {
+  const sb = createClient(env.STAGING_SUPABASE_URL, env.STAGING_SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
+  const orgId = "00000000-0000-0000-0000-000000000001";
+  for (const acc of BROWSER_QA_ROLE_ACCOUNTS) {
+    const user = await findAuthUserByEmail(sb, acc.email);
+    if (!user) continue;
+    const { data: existing } = await sb
+      .from("iam_user_assignments")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("role_id", acc.role)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (!existing) {
+      const { error } = await sb.from("iam_user_assignments").insert({
+        user_id: user.id,
+        role_id: acc.role,
+        organization_id: orgId,
+        reason: "browser-qa deterministic assignment",
+      });
+      if (error) throw new Error(`ensureRoleAssignments failed for ${acc.role}: ${error.message}`);
+    }
+  }
+}
 const AXE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js";
 
 const VIEWPORTS = [
@@ -115,7 +169,10 @@ function shardArtifactPath(id) {
 }
 
 async function prepareContext(browser, viewport, report) {
-  const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+  const context = await browser.newContext({
+    locale: "ar-SA",
+    viewport: { width: viewport.width, height: viewport.height },
+  });
   const page = await context.newPage();
   attachPageObservers(page, report);
   return { context, page };
@@ -125,25 +182,20 @@ async function resetTestPasswords(env) {
   const sb = createClient(env.STAGING_SUPABASE_URL, env.STAGING_SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
+  const testPassword = getTestPassword(env);
   for (const email of filterCredentialMutationTargets(
     [
-      `iam-super-admin@${TEST_DOMAIN}`,
-      `iam-test-admin@${TEST_DOMAIN}`,
-      `iam-test-support@${TEST_DOMAIN}`,
-      `iam-test-accountant@${TEST_DOMAIN}`,
-      `iam-test-analyst@${TEST_DOMAIN}`,
-      `iam-test-news-editor@${TEST_DOMAIN}`,
-      `iam-test-subscription-manager@${TEST_DOMAIN}`,
+      ...BROWSER_QA_ROLE_ACCOUNTS.map((a) => a.email),
       `iam-test-normal-user@${TEST_DOMAIN}`,
     ],
     env
   )) {
-    const { data: list } = await sb.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const user = list?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    const testPassword = getTestPassword(env);
-    if (user) await sb.auth.admin.updateUserById(user.id, { password: testPassword });
+    const user = await findAuthUserByEmail(sb, email);
+    if (user) {
+      await sb.auth.admin.updateUserById(user.id, { password: testPassword, email_confirm: true });
+    }
   }
-  return getTestPassword(env);
+  return testPassword;
 }
 
 async function auditAnalystPermissions(env) {
@@ -280,26 +332,31 @@ async function openOverridesTab(page) {
   await sleep(400);
 }
 
-async function runRolesShard(browser, base, env, roles, report, password) {
-  for (const role of roles) {
-    if (Date.now() - report.startedAtMs > SHARD_TOTAL_MS) {
-      report.aborted = true;
-      report.abortReason = "shard_timeout";
-      break;
-    }
-    const sessionStarted = Date.now();
-    const email = typeof role.email === "function" ? role.email(env) : role.email;
-    const pwd = role.password?.(env) || password;
-    const { context, page } = await prepareContext(browser, VIEWPORTS[2], report);
-    try {
+async function runRoleSession(browser, base, env, role, report, password) {
+  const sessionStarted = Date.now();
+  const email = typeof role.email === "function" ? role.email(env) : role.email;
+  const pwd = role.password?.(env) || password;
+  const expectedIsAdmin = role.expectedIsAdmin ?? !role.expectForbidden;
+  const { context, page } = await prepareContext(browser, VIEWPORTS[2], report);
+  let retried = false;
+
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       await loginContext(context, env, base, email, pwd);
-      const boot = await bootstrapSession(page, base, {
-        expectedIsAdmin: role.expectedIsAdmin ?? !role.expectForbidden,
-        skipWarm: true,
-      });
+      const boot = await bootstrapSession(page, base, { expectedIsAdmin, skipWarm: true });
       if (!boot.ok) {
-        report.sessions.push({ role: role.role, pass: false, bootstrapError: boot.error, durationMs: Date.now() - sessionStarted });
-        continue;
+        if (attempt === 0 && !role.expectForbidden) {
+          retried = true;
+          await sleep(500);
+          continue;
+        }
+        return {
+          role: role.role,
+          pass: false,
+          bootstrapError: boot.error,
+          retried,
+          durationMs: Date.now() - sessionStarted,
+        };
       }
       await gotoAndWait(page, base, "/admin", {
         expectForbidden: role.expectForbidden,
@@ -307,26 +364,51 @@ async function runRolesShard(browser, base, env, roles, report, password) {
         timeoutMs: SHARD_PAGE_MS,
       });
       const checks = await pageChecks(page);
-      const me = await fetchMe(page);
+      let me = await fetchMe(page);
+      if (me.status === 401 && attempt === 0 && !role.expectForbidden) {
+        retried = true;
+        await sleep(500);
+        continue;
+      }
       const nav = navFromPermissions(me.body?.permissions);
       const { pass, failures } = assertRoleSession(role, checks, nav, me);
-      report.sessions.push({
+      const session = {
         role: role.role,
         pass,
         failures,
         checks: { ...checks, meStatus: me.status, isAdmin: me.body?.isAdmin, permissions: me.body?.permissions },
         nav,
+        retried,
         durationMs: Date.now() - sessionStarted,
-      });
+      };
       if (role.role === "subscription_manager") {
         const can = (p) => (me.body?.permissions || []).includes(p);
         const filtered = filterAdminNavByPermission(ADMIN_HUB_QUICK_NAV_ITEMS, can, { iamUiEnabled: true, isAdmin: true });
         const ids = filtered.map((i) => i.id || i.href);
         report.subscriptionManagerNav = { ids, pass: ids.includes("subscriptions") && !ids.includes("iam") && !ids.includes("users") };
       }
-    } finally {
-      await context.close();
+      return session;
     }
+    return {
+      role: role.role,
+      pass: false,
+      failures: ["session_retry_exhausted"],
+      retried,
+      durationMs: Date.now() - sessionStarted,
+    };
+  } finally {
+    await context.close();
+  }
+}
+
+async function runRolesShard(browser, base, env, roles, report, password) {
+  for (const role of roles) {
+    if (Date.now() - report.startedAtMs > SHARD_TOTAL_MS) {
+      report.aborted = true;
+      report.abortReason = "shard_timeout";
+      break;
+    }
+    report.sessions.push(await runRoleSession(browser, base, env, role, report, password));
   }
 }
 
@@ -392,24 +474,49 @@ async function runDirectUrlsShard(browser, base, env, report, password) {
 }
 
 async function runResponsiveThemeShard(browser, base, env, report, password) {
-  const paths = ["/admin", "/admin/iam", "/admin/news", "/forbidden"];
+  const superAdmin = superAdminActor(password);
   for (const vp of VIEWPORTS) {
     if (Date.now() - report.startedAtMs > SHARD_TOTAL_MS) break;
-    const { context, page } = await prepareContext(browser, vp, report);
-    try {
-      await loginContext(context, env, base, env.IAM_OWNER_EMAIL, env.STAGING_OWNER_PASSWORD);
-      await bootstrapSession(page, base, { expectedIsAdmin: true, skipWarm: true });
-      await gotoAndWait(page, base, "/admin", { expectAdminHub: true, timeoutMs: SHARD_PAGE_MS });
-      const checks = await pageChecks(page);
-      report.responsive.push({ viewport: vp.name, path: "/admin", overflowX: checks.overflowX, rtl: checks.dir === "rtl", pass: !checks.overflowX && checks.dir === "rtl" });
-    } finally {
-      await context.close();
+    let entry = { viewport: vp.name, path: "/admin", overflowX: true, rtl: false, pass: false, retried: false };
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { context, page } = await prepareContext(browser, vp, report);
+      try {
+        await loginContext(context, env, base, superAdmin.email, superAdmin.password);
+        const boot = await bootstrapSession(page, base, { expectedIsAdmin: true, skipWarm: true });
+        if (!boot.ok) {
+          if (attempt === 0) {
+            entry.retried = true;
+            await sleep(600);
+            continue;
+          }
+          break;
+        }
+        await gotoAndWait(page, base, "/admin", {
+          expectAdminHub: true,
+          timeoutMs: PAGE_READY_ADMIN_MS,
+        });
+        const checks = await pageChecks(page);
+        entry = {
+          viewport: vp.name,
+          path: "/admin",
+          overflowX: checks.overflowX,
+          rtl: checks.dir === "rtl",
+          pass: !checks.overflowX && checks.dir === "rtl" && checks.hasAdminHub,
+          retried: entry.retried || attempt > 0,
+        };
+        if (entry.pass || attempt === 1) break;
+        entry.retried = true;
+        await sleep(600);
+      } finally {
+        await context.close();
+      }
     }
+    report.responsive.push(entry);
   }
   for (const theme of ["dark", "light"]) {
     const { context, page } = await prepareContext(browser, VIEWPORTS[2], report);
     try {
-      await loginContext(context, env, base, env.IAM_OWNER_EMAIL, env.STAGING_OWNER_PASSWORD);
+      await loginContext(context, env, base, superAdmin.email, superAdmin.password);
       await bootstrapSession(page, base, { expectedIsAdmin: true, skipWarm: true });
       await gotoAndWait(page, base, "/admin/iam", { expectIam: true, timeoutMs: SHARD_PAGE_MS });
       await setTheme(page, theme);
@@ -426,9 +533,10 @@ async function runResponsiveThemeShard(browser, base, env, report, password) {
 }
 
 async function runA11yShard(browser, base, env, report, password) {
+  const superAdmin = superAdminActor(password);
   const targets = [
-    { label: "admin", path: "/admin", email: env.IAM_OWNER_EMAIL, password: env.STAGING_OWNER_PASSWORD, expectAdminHub: true },
-    { label: "admin-iam", path: "/admin/iam", email: env.IAM_OWNER_EMAIL, password: env.STAGING_OWNER_PASSWORD, expectIam: true },
+    { label: "admin", path: "/admin", email: superAdmin.email, password: superAdmin.password, expectAdminHub: true },
+    { label: "admin-iam", path: "/admin/iam", email: superAdmin.email, password: superAdmin.password, expectIam: true },
     { label: "admin-news", path: "/admin/news", email: `iam-test-news-editor@${TEST_DOMAIN}`, expectNews: true },
     { label: "forbidden", path: "/admin/iam", email: `iam-test-normal-user@${TEST_DOMAIN}`, expectForbidden: true },
   ];
@@ -452,7 +560,7 @@ async function runA11yShard(browser, base, env, report, password) {
   }
   const { context, page } = await prepareContext(browser, VIEWPORTS[2], report);
   try {
-    await loginContext(context, env, base, env.IAM_OWNER_EMAIL, env.STAGING_OWNER_PASSWORD);
+    await loginContext(context, env, base, superAdmin.email, superAdmin.password);
     await bootstrapSession(page, base, { expectedIsAdmin: true, skipWarm: true });
     await gotoAndWait(page, base, "/admin/iam", { expectIam: true, timeoutMs: PAGE_READY_MS });
     await openOverridesTab(page);
@@ -501,6 +609,7 @@ async function main() {
 
   mkdirSync(ARTIFACT_DIR, { recursive: true });
   await ensurePortReady(DEV_PORT);
+  await ensureRoleAssignments(env);
   const password = await resetTestPasswords(env);
   const dev = startDevServer(ROOT, env, DEV_PORT);
 
