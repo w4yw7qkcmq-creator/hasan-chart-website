@@ -1009,6 +1009,7 @@ async function checkPriceAlerts() {
 
 app.get("/health", async (_req, res) => {
   const vapidStatus = getVapidEnvStatus();
+  const { getWorkerAuthMetrics } = require("./worker-security");
 
   res.json({
     success: true,
@@ -1021,6 +1022,7 @@ app.get("/health", async (_req, res) => {
     checkIntervalMs: CHECK_INTERVAL_MS,
     webPushConfigured: vapidStatus.configured,
     vapidStatus,
+    workerHttpAuth: getWorkerAuthMetrics(),
     timestamp: new Date().toISOString(),
   });
 });
