@@ -19,16 +19,24 @@ export async function GET(request) {
     const status = searchParams.get("status") || "all";
     const network = searchParams.get("network") || "all";
     const search = searchParams.get("search") || "";
+    const limit = Number(searchParams.get("limit") || 25);
+    const page = Number(searchParams.get("page") || 1);
     const withdrawals = await listAdminPartnerWithdrawals(adminCheck.supabase, {
       status,
       network,
       search,
+      limit,
+      page,
     });
 
-    return Response.json({
-      success: true,
-      withdrawals,
-    });
+    return Response.json(
+      {
+        success: true,
+        withdrawals,
+        pagination: { page, limit: Math.min(Math.max(limit, 1), 100) },
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error("ADMIN_PARTNER_WITHDRAWALS_API_ERROR");
     return Response.json(

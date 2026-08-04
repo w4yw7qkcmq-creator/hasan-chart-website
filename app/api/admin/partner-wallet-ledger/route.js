@@ -17,17 +17,23 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const partnerId = searchParams.get("partnerId") || undefined;
-    const limit = Number(searchParams.get("limit") || 200);
+    const limit = Number(searchParams.get("limit") || 25);
+    const page = Number(searchParams.get("page") || 1);
 
     const ledger = await listAdminPartnerWalletLedger(adminCheck.supabase, {
       partnerId,
-      limit: Number.isFinite(limit) ? limit : 200,
+      limit: Number.isFinite(limit) ? limit : 25,
+      page,
     });
 
-    return Response.json({
-      success: true,
-      ledger,
-    });
+    return Response.json(
+      {
+        success: true,
+        ledger,
+        pagination: { page, limit: Math.min(Math.max(limit, 1), 100) },
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error("ADMIN_PARTNER_WALLET_LEDGER_API_ERROR");
     return Response.json(
