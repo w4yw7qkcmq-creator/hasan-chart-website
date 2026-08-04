@@ -25,6 +25,11 @@ export const SIGNATURE_FILES = [
   "app/components/AdminAccessGate.js",
   "app/components/AuthProvider.js",
   "lib/admin-auth-guard.js",
+  "lib/iam/require-admin-session.js",
+  "lib/iam/resolve-permissions.js",
+  "lib/iam/machine-auth.js",
+  "lib/iam/service-identities.js",
+  "lib/iam/assignment-enforcement.js",
   "scripts/iam/browser-qa-harness.mjs",
 ];
 

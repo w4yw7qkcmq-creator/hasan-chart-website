@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { verifyCronSecret } from "../../../lib/admin-auth";
+import { requireMachineAuth } from "../../../lib/iam/machine-auth.js";
+import { IAM_PERMISSIONS } from "../../../lib/iam/constants.js";
 import {
   buildMaintenanceResponse,
   isSubscriptionMaintenanceWorkerEnabled,
@@ -20,7 +21,7 @@ const supabase = createClient(
 
 export async function GET(request) {
   try {
-    const authCheck = verifyCronSecret(request);
+    const authCheck = await requireMachineAuth(request, IAM_PERMISSIONS.SYSTEM_CRON_READ);
 
     if (!authCheck.ok) {
       return NextResponse.json(

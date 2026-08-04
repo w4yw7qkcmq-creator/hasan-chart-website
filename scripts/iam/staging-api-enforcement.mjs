@@ -21,7 +21,25 @@ const ROOT = process.cwd();
 const DEV_PORT = 3012;
 const ARTIFACT_DIR = join(ROOT, "scripts/iam/.artifacts");
 const TEST_DOMAIN = "staging-hcw.test";
-const TEST_PASSWORD = crypto.randomBytes(18).toString("base64url");
+let testPassword = "";
+
+function initTestPassword(staging, bootstrap) {
+  testPassword =
+    staging.STAGING_IAM_TEST_PASSWORD ||
+    bootstrap.STAGING_IAM_TEST_PASSWORD ||
+    crypto.randomBytes(24).toString("base64url");
+}
+
+async function resolveSuperAdminCookie(env) {
+  if (env.IAM_OWNER_EMAIL && env.STAGING_OWNER_PASSWORD) {
+    const owner = await loginDirect(env, env.IAM_OWNER_EMAIL, env.STAGING_OWNER_PASSWORD);
+    if (owner.cookie) return { cookie: owner.cookie, source: "bootstrap_owner" };
+  }
+  const email = `iam-super-admin@${TEST_DOMAIN}`;
+  const direct = await loginDirect(env, email, testPassword);
+  if (direct.cookie) return { cookie: direct.cookie, source: "test_super_admin" };
+  return { cookie: "", source: "none" };
+}
 
 const TEST_ACCOUNTS = [
   { key: "admin", role: "admin", local: "iam-test-admin" },
@@ -163,14 +181,14 @@ async function ensureTestUsers(sb, report) {
     if (!user) {
       const created = await sb.auth.admin.createUser({
         email,
-        password: TEST_PASSWORD,
+        password: testPassword,
         email_confirm: true,
         user_metadata: meta,
       });
       if (created.error) throw created.error;
       user = created.data.user;
     } else {
-      await sb.auth.admin.updateUserById(user.id, { password: TEST_PASSWORD, email_confirm: true, user_metadata: meta });
+      await sb.auth.admin.updateUserById(user.id, { password: testPassword, email_confirm: true, user_metadata: meta });
     }
     await sb.from("profiles").upsert({
       id: user.id,
@@ -335,6 +353,10 @@ async function main() {
   const report = { verdict: "API ENFORCEMENT FAILED", ok: false, phases: {} };
 
   const envApi = loadIsolatedEnv(true);
+  initTestPassword(
+    parseEnvFile(resolve(ROOT, ".env.staging.local")),
+    parseEnvFile(resolve(ROOT, ".env.staging.bootstrap.local"))
+  );
   const sb = createClient(envApi.STAGING_SUPABASE_URL, envApi.STAGING_SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
@@ -360,9 +382,10 @@ async function main() {
     await waitForServer(DEV_PORT);
     const base = `http://127.0.0.1:${DEV_PORT}`;
 
-    const ownerLogin = await loginHttp(base, envApi.IAM_OWNER_EMAIL, envApi.STAGING_OWNER_PASSWORD);
-    report.phases.ownerLogin = { status: ownerLogin.status, success: ownerLogin.body?.success === true };
-    if (!ownerLogin.cookie) throw new Error("Owner login failed");
+    const superAdmin = await resolveSuperAdminCookie(envApi);
+    report.phases.ownerLogin = { success: Boolean(superAdmin.cookie), source: superAdmin.source };
+    if (!superAdmin.cookie) throw new Error("Owner login failed");
+    const ownerLogin = { cookie: superAdmin.cookie };
 
     const ownerMe = await httpJson(`${base}/api/iam/me`, { headers: { Cookie: ownerLogin.cookie } });
     report.phases.superAdminBaseline = {
@@ -393,7 +416,7 @@ async function main() {
 
     const sessions = { super_admin: ownerLogin.cookie };
     for (const acc of TEST_ACCOUNTS) {
-      const lg = await loginDirect(envApi, acc.email, TEST_PASSWORD);
+      const lg = await loginDirect(envApi, acc.email, testPassword);
       sessions[acc.key] = lg.cookie;
       if (!lg.cookie) {
         report.loginFailures = report.loginFailures || [];

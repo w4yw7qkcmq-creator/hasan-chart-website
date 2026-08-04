@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyCronSecret } from "../../../lib/admin-auth";
+import { requireMachineAuth } from "../../../lib/iam/machine-auth.js";
+import { IAM_PERMISSIONS } from "../../../lib/iam/constants.js";
 import {
   logPriceAlertEmailBlockedFromSupabaseOrWebsite,
   PRICE_ALERT_CANONICAL_PATH,
@@ -27,9 +28,8 @@ function buildDisabledPriceAlertsResponse(method) {
   );
 }
 
-export async function GET(request) {
-  const authCheck = verifyCronSecret(request);
-
+async function authorizePriceAlertsRoute(request) {
+  const authCheck = await requireMachineAuth(request, IAM_PERMISSIONS.SYSTEM_CRON_READ);
   if (!authCheck.ok) {
     return NextResponse.json(
       {
@@ -39,22 +39,35 @@ export async function GET(request) {
       { status: authCheck.status }
     );
   }
+  return null;
+}
 
+export async function GET(request) {
+  const denied = await authorizePriceAlertsRoute(request);
+  if (denied) return denied;
   return buildDisabledPriceAlertsResponse("GET");
 }
 
-export async function POST() {
+export async function POST(request) {
+  const denied = await authorizePriceAlertsRoute(request);
+  if (denied) return denied;
   return buildDisabledPriceAlertsResponse("POST");
 }
 
-export async function PUT() {
+export async function PUT(request) {
+  const denied = await authorizePriceAlertsRoute(request);
+  if (denied) return denied;
   return buildDisabledPriceAlertsResponse("PUT");
 }
 
-export async function PATCH() {
+export async function PATCH(request) {
+  const denied = await authorizePriceAlertsRoute(request);
+  if (denied) return denied;
   return buildDisabledPriceAlertsResponse("PATCH");
 }
 
-export async function DELETE() {
+export async function DELETE(request) {
+  const denied = await authorizePriceAlertsRoute(request);
+  if (denied) return denied;
   return buildDisabledPriceAlertsResponse("DELETE");
 }

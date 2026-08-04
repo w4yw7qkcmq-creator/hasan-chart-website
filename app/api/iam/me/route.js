@@ -8,19 +8,23 @@ import { CACHE_NO_STORE } from "../../../../lib/api-response.js";
 
 export const dynamic = "force-dynamic";
 
-function publicMePayload() {
+function publicMePayload(iam = null) {
   return {
     ok: true,
     isAdmin: false,
+    hasActiveAssignment: false,
     roles: [],
     permissions: [],
+    legacyDetected: Boolean(iam?.legacyDetected),
+    source: iam?.source || "none",
   };
 }
 
 function adminMePayload(iam, bootstrap) {
   return {
     ok: true,
-    isAdmin: true,
+    isAdmin: Boolean(iam.isAdmin),
+    hasActiveAssignment: Boolean(iam.hasActiveAssignment),
     roles: iam.roleIds || [],
     roleLabels: iam.roleLabels || [],
     primaryRoleId: iam.primaryRoleId || null,
@@ -28,6 +32,8 @@ function adminMePayload(iam, bootstrap) {
     permissions: [...(iam.permissions || [])],
     isSuperAdmin: Boolean(iam.isSuperAdmin),
     source: iam.source || null,
+    legacyDetected: Boolean(iam.legacyDetected),
+    legacyRole: iam.legacyRole || null,
     featureFlags: getIamFeatureFlags(),
     bootstrap: {
       completed: Boolean(bootstrap?.completed),
@@ -46,7 +52,7 @@ export async function GET() {
     const iam = await resolveIamContext(auth.supabase, auth.user);
 
     if (!iam.isAdmin) {
-      return NextResponse.json(publicMePayload(), {
+      return NextResponse.json(publicMePayload(iam), {
         headers: { "Cache-Control": CACHE_NO_STORE },
       });
     }
