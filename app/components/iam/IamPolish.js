@@ -28,7 +28,6 @@ import {
   IamBadge,
   IamEmptyState,
   IamEventIcon,
-  IamRoleBadge,
   IamSeverityBadge,
   IamTableWrap,
   IamUserCell,
