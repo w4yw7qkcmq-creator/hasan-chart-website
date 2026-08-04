@@ -6,6 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 import StatusBadge from "../../components/StatusBadge";
 import { supabase } from "../../../lib/supabase";
+import { createAdaptivePoller } from "../../../lib/client/adaptive-poller.js";
+import { dedupeInFlightRequest } from "../../../lib/client/in-flight-dedupe.js";
+import { incrementPollingMetric } from "../../../lib/client/polling-metrics.js";
 
 function StatCard({ title, value, icon, subtitle }) {
   return (
@@ -90,6 +93,11 @@ export default function MyAnalysisPage() {
   const requestsRef = useRef([]);
   const hasLoadedOnceRef = useRef(false);
   const loadInFlightRef = useRef(false);
+  const loadAbortRef = useRef(null);
+  const loadSeqRef = useRef(0);
+  const realtimeConnectedRef = useRef(false);
+  const pollSuppressUntilRef = useRef(0);
+  const fallbackPollerRef = useRef(null);
   const normalizeRequest = (item) => ({
     id: item.id,
     userEmail: item.user_email || item.userEmail,
@@ -163,24 +171,9 @@ export default function MyAnalysisPage() {
     requestsRef.current = requests;
   }, [requests]);
 
-  const loadRequests = useCallback(async (user, { background = false } = {}) => {
-    if (loadInFlightRef.current) {
-      return;
-    }
-
-    loadInFlightRef.current = true;
-
-    const hasExistingData = requestsRef.current.length > 0 || hasLoadedOnceRef.current;
-
-    if (background || hasExistingData) {
-      setIsFetching(true);
-    } else {
-      setIsLoading(true);
-    }
-
-    setLoadError("");
-
+  const loadRequests = useCallback(async (user, { background = false, signal } = {}) => {
     if (!user?.email) {
+      const hasExistingData = requestsRef.current.length > 0 || hasLoadedOnceRef.current;
       if (!hasExistingData) setRequests([]);
       setIsLoading(false);
       setIsFetching(false);
@@ -190,70 +183,104 @@ export default function MyAnalysisPage() {
       return;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const dedupeKey = `my-analysis:${user.email}`;
 
-    try {
-      const response = await fetch("/api/my-analysis", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "include",
-        signal: controller.signal,
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || !result?.success) {
-        if (!hasExistingData) setRequests([]);
-        setLoadError(result?.error || "تعذر تحميل طلبات التحليل.");
+    return dedupeInFlightRequest(dedupeKey, async () => {
+      if (loadInFlightRef.current) {
         return;
       }
 
-      const formattedRequests = Array.isArray(result.requests)
-        ? result.requests.map(normalizeRequest)
-        : [];
-
-      const previousReplyIds = new Set(
-        requestsRef.current.filter((item) => item.reply).map((item) => item.id)
-      );
-      const newReply = formattedRequests.find(
-        (item) => item.reply && item.status === "مكتمل" && !previousReplyIds.has(item.id)
-      );
-
-      setRequests(formattedRequests);
-      hasLoadedOnceRef.current = true;
-      setDataMode("api");
-      setLastUpdated(
-        new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: true,
-          timeZone: "Asia/Damascus",
-        }).format(new Date())
-      );
-
-      if (newReply && background) {
-        setReplyNotice(`📩 وصل رد الإدارة على طلب تحليل ${newReply.coin}`);
+      loadInFlightRef.current = true;
+      loadAbortRef.current?.abort();
+      const controller = new AbortController();
+      loadAbortRef.current = controller;
+      const seq = ++loadSeqRef.current;
+      if (signal) {
+        signal.addEventListener("abort", () => controller.abort(), { once: true });
       }
 
-      if (process.env.NODE_ENV !== "production") {
-        console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
+      const hasExistingData = requestsRef.current.length > 0 || hasLoadedOnceRef.current;
+
+      if (background || hasExistingData) {
+        setIsFetching(true);
+      } else {
+        setIsLoading(true);
       }
-    } catch (err) {
-      console.error("Load requests API error:", err);
-      if (!hasExistingData) setRequests([]);
-      setLoadError(
-        err?.name === "AbortError"
-          ? "تحميل الطلبات أخذ وقت طويل بسبب حجم صور التحليل. اضغط تحديث الطلبات مرة أخرى."
-          : "حدث خطأ أثناء تحميل طلبات التحليل."
-      );
-    } finally {
-      clearTimeout(timeoutId);
-      loadInFlightRef.current = false;
-      setIsLoading(false);
-      setIsFetching(false);
-    }
+
+      setLoadError("");
+
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const response = await fetch("/api/my-analysis", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        if (seq !== loadSeqRef.current) return;
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result?.success) {
+          if (!hasExistingData) setRequests([]);
+          setLoadError(result?.error || "تعذر تحميل طلبات التحليل.");
+          throw new Error(result?.error || "load failed");
+        }
+
+        const formattedRequests = Array.isArray(result.requests)
+          ? result.requests.map(normalizeRequest)
+          : [];
+
+        const previousReplyIds = new Set(
+          requestsRef.current.filter((item) => item.reply).map((item) => item.id)
+        );
+        const newReply = formattedRequests.find(
+          (item) => item.reply && item.status === "مكتمل" && !previousReplyIds.has(item.id)
+        );
+
+        setRequests(formattedRequests);
+        hasLoadedOnceRef.current = true;
+        setDataMode("api");
+        setLastUpdated(
+          new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+            timeZone: "Asia/Damascus",
+          }).format(new Date())
+        );
+
+        if (newReply && background) {
+          setReplyNotice(`📩 وصل رد الإدارة على طلب تحليل ${newReply.coin}`);
+        }
+
+        fallbackPollerRef.current?.resetBackoff();
+
+        if (process.env.NODE_ENV !== "production") {
+          console.log("طلبات التحليل المحملة من API:", formattedRequests.length);
+        }
+      } catch (err) {
+        if (seq !== loadSeqRef.current || err?.name === "AbortError") return;
+        console.error("Load requests API error:", err);
+        if (!hasExistingData) setRequests([]);
+        setLoadError(
+          err?.name === "AbortError"
+            ? "تحميل الطلبات أخذ وقت طويل بسبب حجم صور التحليل. اضغط تحديث الطلبات مرة أخرى."
+            : "حدث خطأ أثناء تحميل طلبات التحليل."
+        );
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+        if (seq === loadSeqRef.current) {
+          loadInFlightRef.current = false;
+          setIsLoading(false);
+          setIsFetching(false);
+        }
+      }
+    });
   }, [sessionPending]);
 
   useEffect(() => {
@@ -267,9 +294,6 @@ export default function MyAnalysisPage() {
 
     let isMounted = true;
     let channel;
-    let refreshInterval;
-    let refreshIfIdle;
-    let onVisibilityChange;
 
     const start = async () => {
       const user = currentUser;
@@ -283,15 +307,32 @@ export default function MyAnalysisPage() {
 
       if (!isMounted || !user?.email) return;
 
-      refreshIfIdle = () => {
-        if (!selectedAnalysisRef.current) {
-          void loadRequests(user, { background: true });
-        }
+      const syncPollInterval = () => {
+        const pending = requestsRef.current.some((item) => item.status !== "مكتمل");
+        fallbackPollerRef.current?.setIntervalMs(pending ? 30_000 : 45_000);
       };
 
-      onVisibilityChange = () => {
-        if (document.visibilityState === "visible") refreshIfIdle();
-      };
+      const fallbackPoller = createAdaptivePoller({
+        intervalMs: 30_000,
+        minIntervalMs: 30_000,
+        maxIntervalMs: 120_000,
+        visibilityJitterMs: 300,
+        shouldPoll: () => {
+          if (selectedAnalysisRef.current) return false;
+          if (Date.now() < pollSuppressUntilRef.current) return false;
+          const pending = requestsRef.current.some((item) => item.status !== "مكتمل");
+          if (pending) return true;
+          return !realtimeConnectedRef.current;
+        },
+        fetch: async ({ signal }) => {
+          await loadRequests(user, { background: true, signal });
+          syncPollInterval();
+        },
+      });
+
+      fallbackPollerRef.current = fallbackPoller;
+      syncPollInterval();
+      fallbackPoller.start({ immediate: false });
 
       channel = supabase
         .channel(`my-analysis-requests-${user.email}`)
@@ -304,39 +345,49 @@ export default function MyAnalysisPage() {
             filter: `user_email=eq.${String(user.email || "").trim().toLowerCase()}`,
           },
           () => {
+            incrementPollingMetric("realtimeEvents");
+
             if (selectedAnalysisRef.current) {
               setReplyNotice("📩 وصل تحديث جديد على طلبات التحليل. أغلق التحليل لتحديث القائمة.");
+              pollSuppressUntilRef.current = Date.now() + 30_000;
+              syncPollInterval();
+              fallbackPoller.resetBackoff();
+              fallbackPoller.scheduleNext(30_000);
               return;
             }
 
-            void loadRequests(user, { background: true });
+            pollSuppressUntilRef.current = Date.now() + 30_000;
+            syncPollInterval();
+            fallbackPoller.resetBackoff();
+            fallbackPoller.scheduleNext(30_000);
           }
         )
         .subscribe((status) => {
+          realtimeConnectedRef.current = status === "SUBSCRIBED";
+          syncPollInterval();
+
           if (process.env.NODE_ENV !== "production" && status === "SUBSCRIBED") {
             console.log("My analysis realtime connected");
           }
-        });
 
-      refreshInterval = setInterval(() => {
-        if (document.hidden) return;
-        refreshIfIdle();
-      }, 15000);
-      window.addEventListener("focus", refreshIfIdle);
-      document.addEventListener("visibilitychange", onVisibilityChange);
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            realtimeConnectedRef.current = false;
+            if (!document.hidden && !selectedAnalysisRef.current) {
+              fallbackPoller.triggerRefresh("fallback");
+            }
+          }
+        });
     };
 
     void start();
 
     return () => {
       isMounted = false;
-      if (refreshInterval) clearInterval(refreshInterval);
-      if (refreshIfIdle) {
-        window.removeEventListener("focus", refreshIfIdle);
-      }
-      if (onVisibilityChange) {
-        document.removeEventListener("visibilitychange", onVisibilityChange);
-      }
+      loadAbortRef.current?.abort();
+      loadSeqRef.current += 1;
+      loadInFlightRef.current = false;
+      fallbackPollerRef.current?.destroy();
+      fallbackPollerRef.current = null;
       if (channel) supabase.removeChannel(channel);
     };
   }, [sessionPending, shouldShowLogin, currentUser, loadRequests]);
