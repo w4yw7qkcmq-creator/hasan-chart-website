@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminPermission } from "../../../../lib/admin-auth.js";
 import { IAM_PERMISSIONS } from "../../../../lib/iam/constants.js";
 import { grantRole, revokeRole, listAssignments } from "../../../../lib/iam/grant-revoke.js";
+import { enrichAssignmentsForDisplay } from "../../../../lib/iam/display-enrichment.js";
 import { CACHE_NO_STORE } from "../../../../lib/api-response.js";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,10 @@ export async function GET(request) {
       userId: userId || undefined,
       activeOnly,
     });
+    const enriched = await enrichAssignmentsForDisplay(adminCheck.supabase, assignments);
 
     return NextResponse.json(
-      { success: true, assignments, tableMissing },
+      { success: true, assignments: enriched, tableMissing },
       { headers: { "Cache-Control": CACHE_NO_STORE } }
     );
   } catch (error) {

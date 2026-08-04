@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminPermission } from "../../../../lib/admin-auth.js";
 import { IAM_PERMISSIONS } from "../../../../lib/iam/constants.js";
 import { listAdminSessions, forceLogoutSession } from "../../../../lib/iam/session-log.js";
+import { enrichSessionsForDisplay } from "../../../../lib/iam/display-enrichment.js";
 import { CACHE_NO_STORE } from "../../../../lib/api-response.js";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +23,10 @@ export async function GET(request) {
       activeOnly,
       limit: Number(searchParams.get("limit")) || 50,
     });
+    const enriched = await enrichSessionsForDisplay(adminCheck.supabase, sessions);
 
     return NextResponse.json(
-      { success: true, sessions, tableMissing },
+      { success: true, sessions: enriched, tableMissing },
       { headers: { "Cache-Control": CACHE_NO_STORE } }
     );
   } catch (error) {
