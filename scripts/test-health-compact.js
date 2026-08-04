@@ -22,6 +22,8 @@ function testDefaultResponseFields() {
   assert.match(routeSource, /readiness/);
   assert.match(routeSource, /database/);
   assert.match(routeSource, /build/);
+  assert.match(healthSource, /checks:\s*\{\s*database:/);
+  assert.match(healthSource, /iam,/);
 }
 
 function testHealthNoStore() {
