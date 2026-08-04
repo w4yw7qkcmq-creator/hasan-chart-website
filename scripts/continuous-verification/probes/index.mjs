@@ -6,6 +6,12 @@ import { runAuthGate } from "./auth-gate.mjs";
 import { runWorkers } from "./workers.mjs";
 import { runReleaseGate } from "./release-gate.mjs";
 import { runOperationalSignals } from "./operational-signals.mjs";
+import { probeIamHealth } from "./iam-health.mjs";
+
+export async function runIamHealth(ctx) {
+  const result = await probeIamHealth(ctx.baseUrl);
+  return { probe: "iam-health", ...result };
+}
 
 export const PROBE_REGISTRY = Object.freeze({
   "web-health": { id: "web-health", run: runWebHealth, network: true },
@@ -16,6 +22,7 @@ export const PROBE_REGISTRY = Object.freeze({
   workers: { id: "workers", run: runWorkers, network: true },
   "release-gate": { id: "release-gate", run: runReleaseGate, network: false },
   "operational-signals": { id: "operational-signals", run: runOperationalSignals, network: false },
+  "iam-health": { id: "iam-health", run: runIamHealth, network: true },
 });
 
 export function getProbeIdsForCheckpoint(checkpointId, map) {

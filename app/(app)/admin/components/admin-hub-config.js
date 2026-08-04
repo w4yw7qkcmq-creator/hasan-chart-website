@@ -8,6 +8,7 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: "usersCount",
     statLabel: "مستخدم",
     attentionKey: null,
+    permission: "users.read",
   },
   {
     id: "financial",
@@ -18,6 +19,7 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: "pendingPaymentReviews",
     statLabel: "بانتظار المراجعة",
     attentionKey: "pendingPaymentReviews",
+    permission: "finance.read",
   },
   {
     id: "subscriptions",
@@ -28,6 +30,7 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: "pendingSubscriptions",
     statLabel: "معلق",
     attentionKey: "pendingSubscriptions",
+    permission: "subscriptions.manage",
   },
   {
     id: "partners",
@@ -38,6 +41,7 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: "withdrawalsPending",
     statLabel: "طلبات سحب معلقة",
     attentionKey: "withdrawalsPending",
+    permission: "partners.read",
   },
   {
     id: "email",
@@ -48,6 +52,7 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: null,
     statLabel: null,
     attentionKey: null,
+    permission: "email.analytics.read",
   },
   {
     id: "notification-test",
@@ -58,6 +63,18 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: null,
     statLabel: null,
     attentionKey: null,
+    permission: "system.notifications.test",
+  },
+  {
+    id: "news",
+    icon: "📰",
+    title: "إدارة الأخبار",
+    description: "مراجعة ونشر الأخبار الاقتصادية.",
+    href: "/admin/news",
+    statKey: null,
+    statLabel: null,
+    attentionKey: null,
+    permission: "news.read",
   },
   {
     id: "analysis",
@@ -68,6 +85,7 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: "pendingAnalysis",
     statLabel: "معلق",
     attentionKey: "pendingAnalysis",
+    permission: "analysis.read",
   },
   {
     id: "accounts",
@@ -78,9 +96,20 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: "pendingAccounts",
     statLabel: "معلق",
     attentionKey: "pendingAccounts",
+    permission: "accounts.read",
   },
   {
-    id: "alerts",
+    id: "iam",
+    icon: "🔐",
+    title: "IAM / RBAC",
+    description: "الأدوار والصلاحيات والتدقيق.",
+    href: "/admin/iam",
+    statKey: null,
+    statLabel: null,
+    attentionKey: null,
+    permission: "iam.read",
+  },
+  {
     icon: "🚨",
     title: "التنبيهات",
     description: "تنبيهات الأسعار في المنصة.",
@@ -88,5 +117,15 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     statKey: null,
     statLabel: null,
     attentionKey: null,
+    permission: null,
   },
 ];
+
+export function filterAdminNavByPermission(items, can, { iamUiEnabled = false, isAdmin = false } = {}) {
+  return (items || []).filter((item) => {
+    if (!item.permission) return true;
+    if (!isAdmin) return false;
+    if (!iamUiEnabled) return true;
+    return can(item.permission);
+  });
+}

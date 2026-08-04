@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import { getAdminPartnerDetails } from "../../../../../lib/partner-admin-server";
 import { requireValidUuid } from "../../../../../lib/partner-security";
 import { handlePartnerApiError } from "../../../../../lib/partner-api-helpers";
@@ -24,7 +25,7 @@ function resolveSiteOrigin(request) {
 
 export async function GET(request, { params }) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.PARTNERS_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

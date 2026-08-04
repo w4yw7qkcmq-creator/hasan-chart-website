@@ -50,7 +50,7 @@ export default function AdminActivityFeed({
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h2 className="admin-heading text-2xl">آخر نشاطات المنصة</h2>
-          <p className="mt-2 text-sm font-bold text-slate-600">
+          <p className="mt-2 text-sm font-bold admin-activity-feed__desc">
             أحدث الأحداث المهمة من مصادر المنصة المختلفة.
           </p>
         </div>

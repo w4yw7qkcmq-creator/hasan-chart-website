@@ -6,6 +6,11 @@ import {
   refreshIpLimiter,
   RATE_LIMIT_ERROR,
 } from "../../../../lib/rate-limit";
+import { getSupabaseAdmin } from "../../../../lib/auth-session.js";
+import { resolveIamContext } from "../../../../lib/iam/resolve-permissions.js";
+import { touchAdminSessionActivity } from "../../../../lib/iam/session-log.js";
+import { recordSessionRefreshEvent } from "../../../../lib/iam/auth-events.js";
+import { isSessionRevoked, extractTokenIssuedAt } from "../../../../lib/iam/session-revocation.js";
 
 function getSupabaseServerClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,14 +41,29 @@ export async function POST(request) {
     }
 
     const supabase = getSupabaseServerClient();
+    const adminSupabase = getSupabaseAdmin();
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("hc_refresh_token")?.value;
+    const existingAccess = cookieStore.get("hc_access_token")?.value;
 
     if (!refreshToken) {
       return NextResponse.json(
         { success: false, error: "Refresh token غير موجود" },
         { status: 401 }
       );
+    }
+
+    if (existingAccess) {
+      const revoked = await isSessionRevoked(adminSupabase, {
+        token: existingAccess,
+        tokenIssuedAt: extractTokenIssuedAt(existingAccess),
+      });
+      if (revoked.revoked) {
+        return NextResponse.json(
+          { success: false, error: "تم إنهاء الجلسة" },
+          { status: 401 }
+        );
+      }
     }
 
     const { data, error } = await supabase.auth.refreshSession({
@@ -55,6 +75,26 @@ export async function POST(request) {
         { success: false, error: "فشل تجديد الجلسة" },
         { status: 401 }
       );
+    }
+
+    const { data: userData } = await adminSupabase.auth.getUser(data.session.access_token);
+    const user = userData?.user;
+    let isAdmin = false;
+
+    if (user) {
+      const iam = await resolveIamContext(adminSupabase, user);
+      isAdmin = Boolean(iam.isAdmin);
+      if (isAdmin) {
+        await touchAdminSessionActivity(adminSupabase, {
+          userId: user.id,
+          token: data.session.access_token,
+        });
+      }
+      await recordSessionRefreshEvent(adminSupabase, {
+        userId: user.id,
+        isAdmin,
+        request,
+      });
     }
 
     const response = NextResponse.json({

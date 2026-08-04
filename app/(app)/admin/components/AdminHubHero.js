@@ -1,15 +1,25 @@
 "use client";
 
-function resolveAdminRole(user) {
-  const role = String(user?.role || user?.user_metadata?.role || "admin").trim();
-  if (role === "super_admin") return "مدير عام";
-  if (role === "admin") return "مدير";
-  if (role === "accountant") return "محاسب";
-  return role || "مدير";
+function resolveAdminRoleLabel(iam, user, iamUiEnabled) {
+  if (iamUiEnabled && iam?.roleLabels?.length) {
+    return iam.roleLabels[0];
+  }
+  if (iamUiEnabled && iam?.primaryRoleLabel) {
+    return iam.primaryRoleLabel;
+  }
+
+  const legacyRole = String(user?.role || user?.admin_role || "").trim();
+  if (!legacyRole || legacyRole === "user") return "مستخدم";
+  if (legacyRole === "super_admin") return "مدير عام";
+  if (legacyRole === "admin") return "مدير";
+  if (legacyRole === "accountant") return "محاسب";
+  return legacyRole;
 }
 
 export default function AdminHubHero({
   user,
+  iam,
+  iamUiEnabled = false,
   lastUpdatedAt = "",
   isRefreshing = false,
   serverOnline = true,
@@ -29,6 +39,7 @@ export default function AdminHubHero({
 
   const serverLabel = isRefreshing ? "جاري المزامنة" : serverOnline ? "السيرفر متصل" : "تحقق من الاتصال";
   const serverClass = isRefreshing ? "is-sync" : serverOnline ? "is-online" : "is-offline";
+  const roleLabel = resolveAdminRoleLabel(iam, user, iamUiEnabled);
 
   return (
     <header className="admin-hub-hero admin-hub-hero--premium admin-section">
@@ -43,7 +54,7 @@ export default function AdminHubHero({
             <div className="admin-hub-hero__admin-chip">
               <span className="admin-hub-hero__admin-label">المدير الحالي</span>
               <span className="admin-hub-hero__admin-name">{displayName}</span>
-              <span className="admin-hub-hero__admin-role">{resolveAdminRole(user)}</span>
+              <span className="admin-hub-hero__admin-role">{roleLabel}</span>
             </div>
           </div>
         </div>
@@ -61,7 +72,9 @@ export default function AdminHubHero({
             >
               🔔 إشعارات
               {adminUnreadCount > 0 ? (
-                <span className="admin-hub-hero__badge">{adminUnreadCount}</span>
+                <span className="admin-hub-hero__badge" aria-hidden="true">
+                  {adminUnreadCount}
+                </span>
               ) : null}
             </button>
           </div>

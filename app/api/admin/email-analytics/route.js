@@ -1,11 +1,12 @@
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { fetchEmailAnalyticsData } from "../../../../lib/email-analytics-store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.EMAIL_ANALYTICS_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

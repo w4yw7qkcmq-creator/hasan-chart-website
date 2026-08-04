@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
 import { approvePartnerWithdrawal } from "../../../../../../lib/partner-admin-server";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ const ERROR_MESSAGES = {
 
 export async function POST(request, { params }) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.PARTNERS_WITHDRAWALS_MANAGE, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

@@ -5,6 +5,10 @@ import {
   loginIpLimiter,
   RATE_LIMIT_ERROR,
 } from "../../../../lib/rate-limit";
+import { getSupabaseAdmin } from "../../../../lib/auth-session.js";
+import { resolveIamContext } from "../../../../lib/iam/resolve-permissions.js";
+import { startAdminSessionLog } from "../../../../lib/iam/session-log.js";
+import { recordAdminLoginEvent } from "../../../../lib/iam/auth-events.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -66,11 +70,41 @@ export async function POST(request) {
     });
 
     if (error || !data?.session || !data?.user) {
+      const adminSupabase = getSupabaseAdmin();
+      await recordAdminLoginEvent(adminSupabase, {
+        success: false,
+        email: normalizedEmail,
+        request,
+      });
       return NextResponse.json(
         { error: "بيانات الدخول غير صحيحة" },
         { status: 401 }
       );
     }
+
+    const adminSupabase = getSupabaseAdmin();
+    const iam = await resolveIamContext(adminSupabase, data.user);
+    const isAdmin = Boolean(iam.isAdmin);
+
+    const sessionLog = isAdmin
+      ? await startAdminSessionLog(adminSupabase, {
+          userId: data.user.id,
+          token: data.session.access_token,
+          ipAddress: clientIp,
+          userAgent: request.headers.get("user-agent"),
+          isAdminSession: true,
+          roleIds: iam.roleIds || [],
+        })
+      : null;
+
+    await recordAdminLoginEvent(adminSupabase, {
+      success: true,
+      userId: data.user.id,
+      email: data.user.email,
+      isAdmin,
+      sessionLogId: sessionLog?.sessionLogId,
+      request,
+    });
 
     const response = NextResponse.json({
       success: true,

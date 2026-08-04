@@ -1,4 +1,5 @@
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { getAdminPartnerTimeline } from "../../../../lib/partner-analytics";
 import { clampLimit, requireValidUuid } from "../../../../lib/partner-security";
 import { handlePartnerApiError } from "../../../../lib/partner-api-helpers";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.PARTNERS_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

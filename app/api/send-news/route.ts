@@ -1,8 +1,9 @@
-import { verifyAdminOrCronSecret } from "../../../lib/admin-auth";
+import { requireMachineOrAdminPermission } from "../../../lib/iam/machine-auth.js";
+import { IAM_PERMISSIONS } from "../../../lib/iam/constants.js";
 
 export async function POST(req: Request) {
   try {
-    const authCheck = await verifyAdminOrCronSecret(req);
+    const authCheck = await requireMachineOrAdminPermission(req, IAM_PERMISSIONS.NEWS_PUBLISH);
 
     if (!authCheck.ok) {
       return Response.json(
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
     return Response.json({
       success: data.ok === true,
       telegram: data,
+      authMode: authCheck.authMode || (authCheck.user ? "admin" : "unknown"),
     });
   } catch (error) {
     return Response.json({

@@ -1,11 +1,12 @@
-import { verifyAdminSession } from "../../../../lib/admin-auth";
+import { requireAdminPermission } from "../../../../lib/admin-auth";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { listAdminPartnerWithdrawals } from "../../../../lib/partner-admin-server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
-    const adminCheck = await verifyAdminSession();
+    const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.PARTNERS_WITHDRAWALS_READ, { request });
 
     if (!adminCheck.ok) {
       return Response.json(

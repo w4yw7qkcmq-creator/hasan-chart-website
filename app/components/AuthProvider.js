@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -492,7 +493,91 @@ export function AuthProvider({ children }) {
     clearAuthenticatedUser();
   }, [clearAuthenticatedUser]);
 
-  const isAdmin = useMemo(() => isAdminUser(user), [user]);
+  const isAdminLegacy = useMemo(() => isAdminUser(user), [user]);
+  const [iam, setIam] = useState(null);
+  const [iamReady, setIamReady] = useState(false);
+  const [iamUiEnabled, setIamUiEnabled] = useState(false);
+  const [iamApiEnabled, setIamApiEnabled] = useState(false);
+  const [iamError, setIamError] = useState(false);
+
+  useLayoutEffect(() => {
+    if (status === "authenticated" && user?.email) {
+      setIamReady(false);
+      setIamError(false);
+      setIam(null);
+      setIamUiEnabled(false);
+      setIamApiEnabled(false);
+    }
+  }, [status, user?.email]);
+
+  const refreshIam = useCallback(async () => {
+    if (!user?.email) {
+      setIam(null);
+      setIamError(false);
+      setIamReady(true);
+      return null;
+    }
+    try {
+      const response = await fetch("/api/iam/me", { credentials: "same-origin" });
+      if (!response.ok) {
+        setIam(null);
+        setIamError(true);
+        setIamReady(true);
+        return null;
+      }
+      const payload = await response.json();
+      const flags = payload.featureFlags || {};
+      const uiEnabled = Boolean(flags.IAM_UI);
+      const apiEnabled = Boolean(flags.IAM_API);
+      setIamUiEnabled(uiEnabled);
+      setIamApiEnabled(apiEnabled);
+      const perms = payload.permissions || payload.iam?.permissions || [];
+      const next = {
+        isAdmin: Boolean(payload.isAdmin),
+        roleIds: payload.roles || payload.iam?.roleIds || [],
+        roleLabels: payload.roleLabels || payload.iam?.roleLabels || [],
+        primaryRoleId: payload.primaryRoleId || payload.iam?.primaryRoleId || null,
+        primaryRoleLabel: payload.primaryRoleLabel || payload.iam?.primaryRoleLabel || null,
+        isSuperAdmin: Boolean(payload.isSuperAdmin ?? payload.iam?.isSuperAdmin),
+        source: payload.source || payload.iam?.source || null,
+        permissions: new Set(perms),
+        can: (permission) => perms.includes(permission),
+        bootstrap: payload.bootstrap || payload.iam?.bootstrap,
+        featureFlags: flags,
+      };
+      setIam(next);
+      setIamError(false);
+      setIamReady(true);
+      return next;
+    } catch {
+      setIam(null);
+      setIamError(true);
+      setIamReady(true);
+      return null;
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
+    if (status === "authenticated" && user?.email) {
+      void refreshIam();
+    } else if (status === "unauthenticated") {
+      setIam(null);
+      setIamError(false);
+      setIamReady(true);
+      setIamUiEnabled(false);
+      setIamApiEnabled(false);
+    }
+  }, [status, user?.email, refreshIam]);
+
+  const isAdmin = useMemo(() => {
+    if (iamUiEnabled || iamApiEnabled) {
+      if (!iamReady) return false;
+      if (iam?.isAdmin != null) return Boolean(iam.isAdmin);
+      return false;
+    }
+    if (iam?.isAdmin != null) return Boolean(iam.isAdmin);
+    return isAdminLegacy;
+  }, [iam, isAdminLegacy, iamUiEnabled, iamApiEnabled, iamReady]);
 
   const value = useMemo(
     () => ({
@@ -502,12 +587,40 @@ export function AuthProvider({ children }) {
       status,
       user,
       isAdmin,
+      isAdminLegacy,
+      iam,
+      iamReady,
+      iamUiEnabled,
+      iamApiEnabled,
+      iamError,
+      refreshIam,
+      can: (permission) => {
+        if ((iamUiEnabled || iamApiEnabled) && iam?.can) return iam.can(permission);
+        return isAdminLegacy;
+      },
       acknowledgeSignIn,
       logout,
       retryAuth,
       updateUser: setUser,
     }),
-    [authReady, authResolved, profileReady, status, user, isAdmin, acknowledgeSignIn, logout, retryAuth]
+    [
+      authReady,
+      authResolved,
+      profileReady,
+      status,
+      user,
+      isAdmin,
+      isAdminLegacy,
+      iam,
+      iamReady,
+      iamUiEnabled,
+      iamApiEnabled,
+      iamError,
+      refreshIam,
+      acknowledgeSignIn,
+      logout,
+      retryAuth,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

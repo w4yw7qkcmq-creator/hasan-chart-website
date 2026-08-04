@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useAuth } from "../../../components/AuthProvider";
 import AdminHubHero from "./AdminHubHero";
 import AdminHubLiveStatus from "./AdminHubLiveStatus";
 import AdminHubNavigation from "./AdminHubNavigation";
@@ -48,6 +49,7 @@ export default function AdminHubOverview({
   onActivityRefresh,
   onOpenActivityEvent,
 }) {
+  const { iam, iamUiEnabled } = useAuth();
   const visibleEvents = (activityEvents || []).slice(0, 10);
   const enrichedStats = {
     ...stats,
@@ -58,6 +60,8 @@ export default function AdminHubOverview({
     <div className="admin-hub-overview space-y-5 admin-animate-in">
       <AdminHubHero
         user={user}
+        iam={iam}
+        iamUiEnabled={iamUiEnabled}
         lastUpdatedAt={lastUpdatedAt}
         isRefreshing={isRefreshing}
         serverOnline={!statsError}
