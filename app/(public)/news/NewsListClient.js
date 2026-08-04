@@ -30,8 +30,8 @@ import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SILENT_REFRESH_COOLDOWN_MS = 30_000;
-const INITIAL_NEWS_LIMIT = NEWS_LIST_PAGE_SIZE;
-const BACKGROUND_NEWS_LIMIT = NEWS_LIST_MAX_PAGE_SIZE - NEWS_LIST_PAGE_SIZE;
+const INITIAL_NEWS_LIMIT = NEWS_LIST_MAX_PAGE_SIZE;
+const BACKGROUND_NEWS_LIMIT = 0;
 
 function logNewsFetchIssue(error) {
   if (process.env.NODE_ENV === "production") {

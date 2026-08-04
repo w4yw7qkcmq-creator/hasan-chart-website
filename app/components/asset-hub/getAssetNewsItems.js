@@ -1,4 +1,4 @@
-import { getCachedNewsPostsPool } from "../../../lib/server-news-cache";
+import { getCachedNewsList } from "../../../lib/server-news-cache";
 
 function cleanNewsText(text) {
   if (!text) return "";
@@ -50,9 +50,9 @@ export async function getAssetNewsItems(config, limit = 8) {
     return [];
   }
 
-  const data = await getCachedNewsPostsPool();
+  const { items } = await getCachedNewsList({ limit: 50 });
 
-  return (data || [])
+  return (items || [])
     .filter((item) => matchesAssetNews(item, keywords))
     .slice(0, limit)
     .map((item) => ({
@@ -61,7 +61,7 @@ export async function getAssetNewsItems(config, limit = 8) {
       createdAt: item.created_at,
       impactLevel: item.impact_level,
       title: getNewsTitle(item),
-      excerpt: shortText(item.content || item.title),
+      excerpt: shortText(item.title || ""),
       href: `/news/${item?.slug || item?.id}`,
     }));
 }

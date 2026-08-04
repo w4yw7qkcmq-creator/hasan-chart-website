@@ -40,8 +40,9 @@ import {
 import { getNewsTopicServiceLinks } from "../../../../lib/internal-links";
 import { REVALIDATE_PUBLIC_NEWS } from "../../../../lib/public-cache-config";
 import {
+  getCachedAdjacentNews,
   getCachedNewsPost,
-  getCachedNewsRelatedPool,
+  getCachedRelatedNews,
 } from "../../../../lib/server-news-cache";
 
 const CopyArticleButton = dynamic(() => import("../../../components/CopyArticleButton"), {
@@ -158,34 +159,6 @@ function detectTags(news = {}) {
   return tags.slice(0, 5);
 }
 
-function getRelatedNews(currentNews, pool) {
-  const currentCategory = detectCategory(currentNews);
-
-  const categoryMatches = (pool || [])
-    .filter((item) => item.id !== currentNews.id && detectCategory(item) === currentCategory)
-    .slice(0, 6);
-
-  if (categoryMatches.length > 0) {
-    return categoryMatches;
-  }
-
-  return (pool || []).filter((item) => item.id !== currentNews.id).slice(0, 6);
-}
-
-function getAdjacentNewsFromPool(currentNews, pool) {
-  const sorted = pool || [];
-  const index = sorted.findIndex((item) => item.id === currentNews.id);
-
-  if (index < 0) {
-    return { previous: null, next: null };
-  }
-
-  return {
-    previous: sorted[index + 1] || null,
-    next: sorted[index - 1] || null,
-  };
-}
-
 export async function generateMetadata({ params }) {
   const news = await getNewsArticleForRequest(params.id);
 
@@ -221,16 +194,17 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function NewsDetailsPage({ params }) {
-  const [news, newsPool] = await Promise.all([
-    getNewsArticleForRequest(params.id),
-    getCachedNewsRelatedPool(),
-  ]);
-  const relatedNews = news ? getRelatedNews(news, newsPool) : [];
-  const adjacentNews = news ? getAdjacentNewsFromPool(news, newsPool) : { previous: null, next: null };
+  const news = await getNewsArticleForRequest(params.id);
 
   if (!news) {
     notFound();
   }
+
+  const currentCategory = detectCategory(news);
+  const [relatedNews, adjacentNews] = await Promise.all([
+    getCachedRelatedNews({ excludeId: news.id, category: currentCategory, limit: 12 }),
+    getCachedAdjacentNews(news),
+  ]);
 
   const title = getNewsTitle(news);
   const content = cleanText(news.content || title);
