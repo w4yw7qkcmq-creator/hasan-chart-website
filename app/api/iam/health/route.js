@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAdminPermission } from "../../../../lib/admin-auth.js";
 import { IAM_PERMISSIONS } from "../../../../lib/iam/constants.js";
-import { dryRunBackfillLegacyAdmins } from "../../../../lib/iam/grant-revoke.js";
+import {
+  dryRunBackfillLegacyAdmins,
+  backfillLegacyAdmins,
+} from "../../../../lib/iam/grant-revoke.js";
 import { buildIamReadinessReport } from "../../../../lib/iam/health-readiness.js";
 import { CACHE_NO_STORE } from "../../../../lib/api-response.js";
 
@@ -35,16 +38,30 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const action = String(body.action || "").trim();
 
-    if (action === "dry_run_backfill" || action === "backfill_legacy") {
-      const dryRun = action !== "backfill_legacy" || body.execute !== true;
+    if (action === "dry_run_backfill" || action === "backfill_legacy" || action === "execute_backfill") {
+      const isExecute =
+        action === "execute_backfill" || (action === "backfill_legacy" && body.execute === true);
 
-      if (!dryRun) {
+      if (isExecute) {
+        const confirm = String(body.confirm || "").trim();
+        if (confirm && confirm !== "EXECUTE_BACKFILL") {
+          return NextResponse.json(
+            { success: false, error: "Confirmation string mismatch" },
+            { status: 400 }
+          );
+        }
+
+        const result = await backfillLegacyAdmins(adminCheck.supabase, {
+          ownerEmail: process.env.IAM_OWNER_EMAIL || null,
+          actorId: adminCheck.user?.id || null,
+          actorEmail: adminCheck.user?.email || null,
+          actorIam: adminCheck.iam || { isSuperAdmin: true },
+          request,
+        });
+
         return NextResponse.json(
-          {
-            success: false,
-            error: "Execute backfill is disabled until staging migration is applied",
-          },
-          { status: 403 }
+          { success: true, dryRun: false, execute: true, result },
+          { headers: { "Cache-Control": CACHE_NO_STORE } }
         );
       }
 
