@@ -227,6 +227,17 @@ function testMarketLiquidityHistoryMetricsExposure() {
   assert.match(healthSource, /getLiquidityWallWriterStatus/);
 }
 
+function testIamRuntimeProbeExposure() {
+  assert.match(healthSource, /buildIamRuntimeProbe/);
+  assert.match(healthSource, /iam:\s*buildIamRuntimeProbe\(\)/);
+  const runtimeProbeSource = fs.readFileSync(path.join(rootDir, "lib/iam/runtime-probe.js"), "utf8");
+  assert.match(runtimeProbeSource, /getIamFeatureFlags/);
+  assert.match(runtimeProbeSource, /effective:/);
+  assert.match(runtimeProbeSource, /IAM_API:/);
+  assert.doesNotMatch(runtimeProbeSource, /process\.env\.IAM_API/);
+  assert.doesNotMatch(runtimeProbeSource, /CRON_SECRET/);
+}
+
 const tests = [
   ["redis lazy does not degrade overall", testRedisLazyDoesNotDegradeOverall],
   ["transient database timeout keeps overall ok", testTransientDatabaseTimeoutWithRecentSuccess],
@@ -242,6 +253,7 @@ const tests = [
   ["readiness field without breaking status contract", testReadinessFieldAddedWithoutBreakingStatusContract],
   ["market history metrics exposure", testMarketHistoryMetricsExposure],
   ["market liquidity history metrics exposure", testMarketLiquidityHistoryMetricsExposure],
+  ["iam runtime probe exposure", testIamRuntimeProbeExposure],
   ["coverage percent formatting for ui", testCoveragePercentFormattingForUi],
 ];
 
