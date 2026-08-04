@@ -82,21 +82,6 @@ export default function AdminIamPage() {
   }, []);
 
   const loadTabData = useCallback(async (tab) => {
-    if (tab === "sessions" && can(IAM_PERMISSIONS.IAM_SESSIONS_READ)) {
-      const res = await adminFetch("/api/iam/sessions?activeOnly=true&limit=100");
-      const json = await res.json();
-      if (json.success) setSessions(json.sessions || []);
-    }
-    if (tab === "security" && can(IAM_PERMISSIONS.IAM_SECURITY_READ)) {
-      const res = await adminFetch("/api/iam/security-events?limit=50");
-      const json = await res.json();
-      if (json.success) setSecurityEvents(json.events || []);
-    }
-    if (tab === "audit" && can(IAM_PERMISSIONS.IAM_AUDIT_READ)) {
-      const res = await adminFetch("/api/iam/audit?limit=50");
-      const json = await res.json();
-      if (json.success) setAuditLogs(json.logs || []);
-    }
     if (tab === "overview") {
       await Promise.all([
         can(IAM_PERMISSIONS.IAM_SESSIONS_READ)
@@ -109,9 +94,9 @@ export default function AdminIamPage() {
           ? adminFetch("/api/iam/audit?limit=10").then((r) => r.json())
           : Promise.resolve({ success: true, logs: [] }),
       ]).then(([sJson, eJson, aJson]) => {
-        if (sJson.success) setSessions(sJson.sessions || []);
-        if (eJson.success) setSecurityEvents(eJson.events || []);
-        if (aJson.success) setAuditLogs(aJson.logs || []);
+        if (sJson.success) setSessions(sJson.sessions || sJson.items || []);
+        if (eJson.success) setSecurityEvents(eJson.events || eJson.items || []);
+        if (aJson.success) setAuditLogs(aJson.logs || aJson.items || []);
       });
     }
   }, [can]);
@@ -386,15 +371,15 @@ export default function AdminIamPage() {
       ) : null}
 
       {activeTab === "sessions" ? (
-        <IamSessionsTab sessions={sessions} loading={loading || tabLoading} />
+        <IamSessionsTab />
       ) : null}
 
       {activeTab === "security" ? (
-        <IamSecurityTab events={securityEvents} loading={loading || tabLoading} />
+        <IamSecurityTab />
       ) : null}
 
       {activeTab === "audit" ? (
-        <IamAuditTab logs={auditLogs} loading={loading || tabLoading} />
+        <IamAuditTab />
       ) : null}
 
       <PermissionGate permission={IAM_PERMISSIONS.IAM_ASSIGNMENTS_GRANT}>

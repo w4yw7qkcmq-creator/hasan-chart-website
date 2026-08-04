@@ -169,14 +169,32 @@ export function IamRoleCardPro({ role, permCount, userCount, selected, onSelect 
   );
 }
 
-export function IamAuditViewer({ logs, loading }) {
+export function IamAuditViewer({
+  logs,
+  loading,
+  loadingMore = false,
+  hasMore = false,
+  error = "",
+  onLoadMore,
+  onFiltersApply,
+  fetchDetail,
+}) {
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState(null);
+  const [detailRow, setDetailRow] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const applyServerFilters = (next = {}) => {
+    onFiltersApply?.({
+      action: next.action ?? (actionFilter || undefined),
+      dateFrom: next.dateFrom ?? (dateFrom || undefined),
+      dateTo: next.dateTo ?? (dateTo || undefined),
+    });
+  };
 
   const actions = useMemo(
     () => [...new Set((logs || []).map((l) => l.action).filter(Boolean))],
@@ -186,42 +204,61 @@ export function IamAuditViewer({ logs, loading }) {
   const filtered = useMemo(() => {
     let rows = logs || [];
     rows = filterBySearch(rows, query, ["action", "actor_email", "target_type", "target_id", "reason"]);
-    if (actionFilter) rows = rows.filter((r) => r.action === actionFilter);
     if (severityFilter) rows = rows.filter((r) => String(r.severity || "").toLowerCase() === severityFilter);
-    rows = filterByDateRange(rows, "created_at", dateFrom, dateTo);
     return rows;
-  }, [logs, query, actionFilter, severityFilter, dateFrom, dateTo]);
+  }, [logs, query, severityFilter]);
 
-  const { rows: pageRows, totalPages, total } = paginateRows(filtered, page, PAGE_SIZE);
+  const handleToggleDetail = async (logId) => {
+    if (expandedId === logId) {
+      setExpandedId(null);
+      setDetailRow(null);
+      return;
+    }
+    setExpandedId(logId);
+    if (!fetchDetail) {
+      setDetailRow(filtered.find((l) => l.id === logId) || null);
+      return;
+    }
+    setDetailLoading(true);
+    try {
+      const row = await fetchDetail(logId);
+      setDetailRow(row);
+    } catch {
+      setDetailRow(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   if (loading) return null;
 
   return (
     <div className="iam-audit-viewer">
+      {error ? <p className="iam-error">{error}</p> : null}
       <div className="iam-filter-bar">
         <input
           type="search"
           className="iam-search"
           placeholder="بحث في السجل…"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+          onChange={(e) => setQuery(e.target.value)}
           aria-label="بحث سجل التدقيق"
         />
-        <select value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1); }} aria-label="فلتر الإجراء">
+        <select value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); applyServerFilters({ action: e.target.value || undefined }); }} aria-label="فلتر الإجراء">
           <option value="">كل الإجراءات</option>
           {actions.map((a) => (
             <option key={a} value={a}>{labelAuditAction(a)}</option>
           ))}
         </select>
-        <select value={severityFilter} onChange={(e) => { setSeverityFilter(e.target.value); setPage(1); }} aria-label="فلتر الخطورة">
+        <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} aria-label="فلتر الخطورة">
           <option value="">كل المستويات</option>
           <option value="low">منخفض</option>
           <option value="medium">متوسط</option>
           <option value="high">مرتفع</option>
           <option value="critical">حرج</option>
         </select>
-        <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} aria-label="من تاريخ" />
-        <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} aria-label="إلى تاريخ" />
+        <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); applyServerFilters({ dateFrom: e.target.value || undefined }); }} aria-label="من تاريخ" />
+        <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); applyServerFilters({ dateTo: e.target.value || undefined }); }} aria-label="إلى تاريخ" />
         <button type="button" className="iam-btn iam-btn--ghost" onClick={() => exportToJson(filtered, "iam-audit.json")}>
           تصدير JSON
         </button>
@@ -236,7 +273,7 @@ export function IamAuditViewer({ logs, loading }) {
         </button>
       </div>
 
-      {!pageRows.length ? (
+      {!filtered.length ? (
         <IamEmptyState title="لا توجد سجلات" description="لا توجد نتائج مطابقة للفلاتر." icon="📜" />
       ) : (
         <>
@@ -253,7 +290,7 @@ export function IamAuditViewer({ logs, loading }) {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((log) => (
+                {filtered.map((log) => (
                   <tr key={log.id} className={expandedId === log.id ? "is-expanded" : ""}>
                     <td>{labelAuditAction(log.action)}</td>
                     <td>{log.actor_email || "—"}</td>
@@ -261,7 +298,7 @@ export function IamAuditViewer({ logs, loading }) {
                     <td>{log.reason || "—"}</td>
                     <td>{formatTableDate(log.created_at)}</td>
                     <td>
-                      <button type="button" className="iam-btn iam-btn--ghost" onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}>
+                      <button type="button" className="iam-btn iam-btn--ghost" onClick={() => handleToggleDetail(log.id)}>
                         {expandedId === log.id ? "إخفاء" : "تفاصيل"}
                       </button>
                     </td>
@@ -273,31 +310,54 @@ export function IamAuditViewer({ logs, loading }) {
           {expandedId ? (
             <details className="iam-tech-details iam-audit-detail" open>
               <summary>تفاصيل تقنية للسجل المحدد</summary>
-              <pre>{JSON.stringify(pageRows.find((l) => l.id === expandedId) || {}, null, 2)}</pre>
+              {detailLoading ? <p className="iam-muted">جاري التحميل…</p> : null}
+              <pre>{JSON.stringify(detailRow || filtered.find((l) => l.id === expandedId) || {}, null, 2)}</pre>
             </details>
           ) : null}
-          <IamPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+          {hasMore ? (
+            <div className="iam-load-more">
+              <button type="button" className="iam-btn iam-btn--ghost" disabled={loadingMore} onClick={() => onLoadMore?.()}>
+                {loadingMore ? "جاري التحميل…" : "تحميل المزيد"}
+              </button>
+            </div>
+          ) : null}
         </>
       )}
     </div>
   );
 }
 
-export function IamSecurityTimeline({ events, loading }) {
+export function IamSecurityTimeline({
+  events,
+  loading,
+  loadingMore = false,
+  hasMore = false,
+  error = "",
+  onLoadMore,
+  onFiltersApply,
+}) {
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
+  const [eventTypeFilter, setEventTypeFilter] = useState("");
+
+  const applyServerFilters = (next = {}) => {
+    onFiltersApply?.({
+      severity: next.severity ?? (severityFilter || undefined),
+      eventType: next.eventType ?? (eventTypeFilter || undefined),
+    });
+  };
 
   const filtered = useMemo(() => {
     let rows = events || [];
-    rows = filterBySearch(rows, query, ["event_type", "severity", "actor_email"]);
-    if (severityFilter) rows = rows.filter((e) => String(e.severity || "").toLowerCase() === severityFilter);
+    rows = filterBySearch(rows, query, ["event_type", "severity", "actor_email", "message"]);
     return rows;
-  }, [events, query, severityFilter]);
+  }, [events, query]);
 
   if (loading) return null;
 
   return (
     <div className="iam-security-timeline">
+      {error ? <p className="iam-error">{error}</p> : null}
       <div className="iam-filter-bar">
         <input
           type="search"
@@ -307,17 +367,26 @@ export function IamSecurityTimeline({ events, loading }) {
           onChange={(e) => setQuery(e.target.value)}
           aria-label="بحث الأحداث الأمنية"
         />
-        <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} aria-label="فلتر الخطورة">
+        <select value={severityFilter} onChange={(e) => { setSeverityFilter(e.target.value); applyServerFilters({ severity: e.target.value || undefined }); }} aria-label="فلتر الخطورة">
           <option value="">كل المستويات</option>
           <option value="low">منخفض</option>
           <option value="medium">متوسط</option>
           <option value="high">مرتفع</option>
           <option value="critical">حرج</option>
         </select>
+        <input
+          type="search"
+          className="iam-search"
+          placeholder="نوع الحدث…"
+          value={eventTypeFilter}
+          onChange={(e) => { setEventTypeFilter(e.target.value); applyServerFilters({ eventType: e.target.value || undefined }); }}
+          aria-label="فلتر نوع الحدث"
+        />
       </div>
       {!filtered.length ? (
         <IamEmptyState title="لا توجد أحداث" description="لم تُسجَّل أحداث أمنية مطابقة." icon="🔒" />
       ) : (
+        <>
         <ol className="iam-timeline-pro">
           {filtered.map((e) => (
             <li key={e.id} className={`iam-timeline-pro__item iam-timeline-pro__item--${e.severity || "info"}`}>
@@ -331,19 +400,33 @@ export function IamSecurityTimeline({ events, loading }) {
                   <span className="iam-muted">{formatRelativeTime(e.created_at)}</span>
                 </div>
                 <p className="iam-muted">
-                  {e.actor_email || e.user_email || "النظام"}
+                  {e.message || e.actor_email || e.user_email || "النظام"}
                   {e.ip_address ? ` · ${maskIp(e.ip_address) || "—"}` : ""}
                 </p>
               </div>
             </li>
           ))}
         </ol>
+        {hasMore ? (
+          <div className="iam-load-more">
+            <button type="button" className="iam-btn iam-btn--ghost" disabled={loadingMore} onClick={() => onLoadMore?.()}>
+              {loadingMore ? "جاري التحميل…" : "تحميل المزيد"}
+            </button>
+          </div>
+        ) : null}
+        </>
       )}
     </div>
   );
 }
 
-export function IamSessionsTable({ sessions, loading }) {
+export function IamSessionsTable({
+  sessions,
+  loading,
+  loadingMore = false,
+  hasMore = false,
+  onLoadMore,
+}) {
   if (loading) return null;
 
   const active = (sessions || []).filter((s) => !s.ended_at);
@@ -355,6 +438,7 @@ export function IamSessionsTable({ sessions, loading }) {
   }
 
   return (
+    <>
     <IamTableWrap>
       <table className="iam-table iam-table--sessions">
         <thead>
@@ -388,6 +472,14 @@ export function IamSessionsTable({ sessions, loading }) {
         </tbody>
       </table>
     </IamTableWrap>
+    {hasMore ? (
+      <div className="iam-load-more">
+        <button type="button" className="iam-btn iam-btn--ghost" disabled={loadingMore} onClick={() => onLoadMore?.()}>
+          {loadingMore ? "جاري التحميل…" : "تحميل المزيد"}
+        </button>
+      </div>
+    ) : null}
+    </>
   );
 }
 

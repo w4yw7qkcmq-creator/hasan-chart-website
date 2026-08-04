@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PermissionGate } from "../PermissionGate";
 import { IAM_PERMISSIONS } from "../../../lib/iam/constants";
 import {
@@ -39,6 +39,7 @@ import {
   IamSecurityTimeline,
   IamSessionsTable,
 } from "./IamPolish";
+import { useIamListFeed } from "./useIamListFeed";
 
 export function IamOverviewTab({
   assignments,
@@ -425,29 +426,91 @@ export function IamOverridesTab({
   );
 }
 
-export function IamSessionsTab({ sessions, loading }) {
-  if (loading) return <IamLoadingSkeleton rows={6} variant="table" />;
+export function IamSessionsTab() {
+  const feed = useIamListFeed("/api/iam/sessions", { legacyKey: "sessions", defaultLimit: 50 });
+
+  useEffect(() => {
+    feed.load({ activeOnly: "true" });
+  }, []);
+
+  if (feed.loading && !feed.items.length) {
+    return <IamLoadingSkeleton rows={6} variant="table" />;
+  }
+
   return (
     <div className="iam-tab-panel">
-      <IamSessionsTable sessions={sessions} loading={false} />
+      <IamSessionsTable
+        sessions={feed.items}
+        loading={false}
+        loadingMore={feed.loadingMore}
+        hasMore={feed.hasMore}
+        onLoadMore={feed.loadMore}
+      />
     </div>
   );
 }
 
-export function IamSecurityTab({ events, loading }) {
-  if (loading) return <IamLoadingSkeleton rows={6} variant="rows" />;
+export function IamSecurityTab() {
+  const feed = useIamListFeed("/api/iam/security-events", { legacyKey: "events", defaultLimit: 50 });
+  const handleFiltersApply = useCallback(
+    (filters) => {
+      feed.load(filters);
+    },
+    [feed.load]
+  );
+
+  useEffect(() => {
+    feed.load({});
+  }, []);
+
+  if (feed.loading && !feed.items.length) {
+    return <IamLoadingSkeleton rows={6} variant="rows" />;
+  }
+
   return (
     <div className="iam-tab-panel">
-      <IamSecurityTimeline events={events} loading={false} />
+      <IamSecurityTimeline
+        events={feed.items}
+        loading={false}
+        loadingMore={feed.loadingMore}
+        hasMore={feed.hasMore}
+        error={feed.error}
+        onLoadMore={feed.loadMore}
+        onFiltersApply={handleFiltersApply}
+      />
     </div>
   );
 }
 
-export function IamAuditTab({ logs, loading }) {
-  if (loading) return <IamLoadingSkeleton rows={8} variant="table" />;
+export function IamAuditTab() {
+  const feed = useIamListFeed("/api/iam/audit", { legacyKey: "logs", defaultLimit: 50 });
+  const handleFiltersApply = useCallback(
+    (filters) => {
+      feed.load(filters);
+    },
+    [feed.load]
+  );
+
+  useEffect(() => {
+    feed.load({});
+  }, []);
+
+  if (feed.loading && !feed.items.length) {
+    return <IamLoadingSkeleton rows={8} variant="table" />;
+  }
+
   return (
     <div className="iam-tab-panel">
-      <IamAuditViewer logs={logs} loading={false} />
+      <IamAuditViewer
+        logs={feed.items}
+        loading={false}
+        loadingMore={feed.loadingMore}
+        hasMore={feed.hasMore}
+        error={feed.error}
+        onLoadMore={feed.loadMore}
+        onFiltersApply={handleFiltersApply}
+        fetchDetail={feed.fetchDetail}
+      />
     </div>
   );
 }
