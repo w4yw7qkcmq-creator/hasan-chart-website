@@ -373,6 +373,29 @@ describe("Machine identity", () => {
     const hash = hashServiceSecret(secret, "cron");
     assert.notEqual(hash, secret);
   });
+
+  it("22. cron routes require machine auth", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sub = readFileSync("app/api/check-subscription-expiry/route.js", "utf8");
+    const price = readFileSync("app/api/check-price-alerts/route.js", "utf8");
+    assert.match(sub, /requireMachineAuth/);
+    assert.match(price, /requireMachineAuth/);
+  });
+
+  it("23. service-identities rejects cron bearer when IAM_API enabled", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("lib/iam/service-identities.js", "utf8");
+    assert.match(src, /Service account headers required when IAM_API is enabled/);
+    assert.match(src, /resolveLegacyCronAccess\(requiredPermission\)/);
+  });
+
+  it("24. price-alert worker includes SYSTEM_CRON_READ for cron routes", () => {
+    assert.ok(
+      SERVICE_ACCOUNT_PERMISSION_MATRIX["price-alert-worker"].includes(
+        IAM_PERMISSIONS.SYSTEM_CRON_READ
+      )
+    );
+  });
 });
 
 console.log("IAM API enforcement tests loaded");

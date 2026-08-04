@@ -12,6 +12,7 @@ import { assertStagingSupabaseConfig, extractSupabaseProjectRef } from "../../li
 
 const ROOT = process.cwd();
 const STAGING_ENV = resolve(ROOT, ".env.staging.local");
+const BOOTSTRAP_ENV = resolve(ROOT, ".env.staging.bootstrap.local");
 
 function parseEnvFile(path) {
   if (!existsSync(path)) return {};
@@ -31,10 +32,12 @@ function parseEnvFile(path) {
 }
 
 async function main() {
-  const env = parseEnvFile(STAGING_ENV);
+  const staging = parseEnvFile(STAGING_ENV);
+  const bootstrap = parseEnvFile(BOOTSTRAP_ENV);
+  const env = { ...staging, ...bootstrap };
   assertStagingSupabaseConfig({
-    NEXT_PUBLIC_SUPABASE_URL: env.STAGING_SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: env.STAGING_SUPABASE_SERVICE_ROLE_KEY,
+    projectRef: env.STAGING_SUPABASE_PROJECT_REF,
+    url: env.STAGING_SUPABASE_URL,
   });
 
   const sb = createClient(env.STAGING_SUPABASE_URL, env.STAGING_SUPABASE_SERVICE_ROLE_KEY, {
@@ -44,15 +47,15 @@ async function main() {
   const accounts = [
     { id: "cron", secretKey: "STAGING_IAM_CRON_SECRET" },
     { id: "news-worker", secretKey: "STAGING_IAM_NEWS_WORKER_SECRET" },
-    { id: "price-alert-worker", secretKey: "STAGING_IAM_PRICE_ALERT_SECRET" },
-    { id: "instant-analysis-worker", secretKey: "STAGING_IAM_ANALYSIS_WORKER_SECRET" },
-    { id: "telegram-bot", secretKey: "STAGING_IAM_TELEGRAM_SECRET" },
+    { id: "price-alert-worker", secretKey: "STAGING_IAM_PRICE_ALERT_WORKER_SECRET", legacyKey: "STAGING_IAM_PRICE_ALERT_SECRET" },
+    { id: "instant-analysis-worker", secretKey: "STAGING_IAM_INSTANT_ANALYSIS_WORKER_SECRET", legacyKey: "STAGING_IAM_ANALYSIS_WORKER_SECRET" },
+    { id: "telegram-bot", secretKey: "STAGING_IAM_TELEGRAM_BOT_SECRET", legacyKey: "STAGING_IAM_TELEGRAM_SECRET" },
   ];
 
   const report = { configured: [], skipped: [], permissions: [] };
 
   for (const acct of accounts) {
-    const plaintext = env[acct.secretKey];
+    const plaintext = env[acct.secretKey] || (acct.legacyKey ? env[acct.legacyKey] : "");
     if (!plaintext) {
       report.skipped.push({ id: acct.id, reason: "secret_missing_in_env" });
       continue;

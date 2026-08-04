@@ -76,7 +76,7 @@ const VIEWPORTS = [
 const VALID_SHARDS = ["roles-core", "roles-remaining", "direct-urls", "responsive-theme", "a11y"];
 
 const ROLE_CORE = [
-  { role: "super_admin", email: (e) => e.IAM_OWNER_EMAIL, password: (e) => e.STAGING_OWNER_PASSWORD, expectAdminHub: true, expectFinance: true, expectIam: true, expectNews: true, expectSubsManage: true },
+  { role: "super_admin", email: () => `iam-super-admin@${TEST_DOMAIN}`, expectAdminHub: true, expectFinance: true, expectIam: true, expectNews: true, expectSubsManage: true },
   { role: "admin", email: () => `iam-test-admin@${TEST_DOMAIN}`, expectAdminHub: true, expectFinance: true, expectIam: true, expectSubsManage: true },
   { role: "support", email: () => `iam-test-support@${TEST_DOMAIN}`, expectAdminHub: true, expectFinance: false, expectIam: false, expectSubsManage: true },
   { role: "accountant", email: () => `iam-test-accountant@${TEST_DOMAIN}`, expectAdminHub: true, expectFinance: true, expectIam: false, expectSubsManage: false },
@@ -127,6 +127,7 @@ async function resetTestPasswords(env) {
   });
   for (const email of filterCredentialMutationTargets(
     [
+      `iam-super-admin@${TEST_DOMAIN}`,
       `iam-test-admin@${TEST_DOMAIN}`,
       `iam-test-support@${TEST_DOMAIN}`,
       `iam-test-accountant@${TEST_DOMAIN}`,
