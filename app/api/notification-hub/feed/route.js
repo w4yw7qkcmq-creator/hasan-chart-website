@@ -7,6 +7,12 @@ import { normalizeNotificationKey } from "../../../../lib/notification-sound-key
 import { normalizeNotification } from "../../../../lib/notifications-shared";
 import { withInFlightDedup } from "../../../../lib/server-read-cache";
 import {
+  applyCreatedAtIdCursor,
+  buildPaginationResult,
+  decodeCursor,
+  parseLimit,
+} from "../../../../lib/pagination.js";
+import {
   NOTIFICATION_COUNT_COLUMN,
   NOTIFICATION_HUB_FEED_COLUMNS,
 } from "../../../../lib/supabase-query-columns";
@@ -22,7 +28,7 @@ function jsonOk(payload, status = 200) {
     {
       status,
       headers: {
-        "Cache-Control": "no-store, max-age=0",
+        "Cache-Control": "private, no-store, max-age=0",
         Vary: "Cookie",
       },
     }
@@ -71,10 +77,24 @@ function buildListQuery(supabase, { email, limit, cursor, search, key, read }) {
   }
 
   if (cursor) {
-    query = query.lt("created_at", cursor);
+    query = applyCreatedAtIdCursor(query, cursor);
   }
 
   return query;
+}
+
+async function fetchUnreadCount(supabase, email) {
+  const { count, error } = await supabase
+    .from("notifications")
+    .select(NOTIFICATION_COUNT_COLUMN, { count: "exact", head: true })
+    .eq("user_email", email)
+    .eq("is_read", false);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count || 0;
 }
 
 async function fetchNotificationHubFeed({
@@ -85,6 +105,7 @@ async function fetchNotificationHubFeed({
   search,
   key,
   read,
+  includeUnreadCount,
 }) {
   const listQuery = buildListQuery(supabase, {
     email,
@@ -95,27 +116,16 @@ async function fetchNotificationHubFeed({
     read,
   });
 
-  const [{ data: rows, error }, { count: unreadCount, error: countError }] =
-    await Promise.all([
-      listQuery,
-      supabase
-        .from("notifications")
-        .select(NOTIFICATION_COUNT_COLUMN, { count: "exact", head: true })
-        .eq("user_email", email)
-        .eq("is_read", false),
-    ]);
+  const rowsPromise = listQuery;
+  const unreadPromise = includeUnreadCount ? fetchUnreadCount(supabase, email) : Promise.resolve(null);
+
+  const [{ data: rows, error }, unreadCount] = await Promise.all([rowsPromise, unreadPromise]);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  if (countError) {
-    throw new Error(countError.message);
-  }
-
-  const hasMore = (rows || []).length > limit;
-  const pageRows = hasMore ? rows.slice(0, limit) : rows || [];
-  const nextCursor = hasMore ? pageRows[pageRows.length - 1]?.created_at : null;
+  const { items: pageRows, pagination } = buildPaginationResult(rows || [], limit);
 
   const items = pageRows
     .map((row) => enrichHubNotification(normalizeNotification(row)))
@@ -123,9 +133,10 @@ async function fetchNotificationHubFeed({
 
   return {
     items,
-    nextCursor,
-    hasMore,
-    unreadCount: unreadCount || 0,
+    pagination,
+    nextCursor: pagination.nextCursor,
+    hasMore: pagination.hasMore,
+    unreadCount: includeUnreadCount ? unreadCount || 0 : undefined,
   };
 }
 
@@ -139,14 +150,23 @@ export async function GET(request) {
 
     const { email, supabase } = session;
     const { searchParams } = new URL(request.url);
-    const cursor = String(searchParams.get("cursor") || "").trim();
+    const cursorRaw = String(searchParams.get("cursor") || "").trim();
     const search = String(searchParams.get("search") || "").trim();
     const key = String(searchParams.get("key") || "all").trim();
     const read = String(searchParams.get("read") || "all").trim();
-    const limit = Math.min(
-      Math.max(Number(searchParams.get("limit") || DEFAULT_LIMIT), 1),
-      MAX_LIMIT
-    );
+    const limit = parseLimit(searchParams.get("limit"), {
+      defaultLimit: DEFAULT_LIMIT,
+      maxLimit: MAX_LIMIT,
+    });
+    const includeUnreadCount = searchParams.get("includeUnreadCount") !== "false";
+
+    if (cursorRaw) {
+      try {
+        decodeCursor(cursorRaw);
+      } catch {
+        return jsonError("Invalid cursor", 400);
+      }
+    }
 
     const dedupKey = [
       "hub-feed",
@@ -155,7 +175,8 @@ export async function GET(request) {
       read,
       key,
       search,
-      cursor,
+      cursorRaw,
+      includeUnreadCount ? "u1" : "u0",
     ].join(":");
 
     const payload = await withInFlightDedup(dedupKey, () =>
@@ -163,10 +184,11 @@ export async function GET(request) {
         supabase,
         email,
         limit,
-        cursor,
+        cursor: cursorRaw || null,
         search,
         key,
         read,
+        includeUnreadCount,
       })
     );
 
