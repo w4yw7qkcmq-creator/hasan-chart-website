@@ -396,6 +396,70 @@ describe("Machine identity", () => {
       )
     );
   });
+
+  it("26. cron service account has system.cron.read only", () => {
+    const cronPerms = SERVICE_ACCOUNT_PERMISSION_MATRIX.cron;
+    assert.deepEqual(cronPerms, [IAM_PERMISSIONS.SYSTEM_CRON_READ]);
+    assert.equal(cronPerms.length, 1);
+  });
+
+  it("27. cron lacks broad or unrelated permissions", () => {
+    const cronPerms = new Set(SERVICE_ACCOUNT_PERMISSION_MATRIX.cron);
+    const forbidden = [
+      IAM_PERMISSIONS.SUBSCRIPTIONS_MANAGE,
+      IAM_PERMISSIONS.SUBSCRIPTIONS_READ,
+      IAM_PERMISSIONS.DASHBOARD_MUTATIONS,
+      IAM_PERMISSIONS.DASHBOARD_READ,
+      IAM_PERMISSIONS.IAM_MANAGE,
+      IAM_PERMISSIONS.IAM_READ,
+      IAM_PERMISSIONS.USERS_MANAGE,
+      IAM_PERMISSIONS.USERS_READ,
+      IAM_PERMISSIONS.FINANCE_READ,
+      IAM_PERMISSIONS.FINANCE_PROOFS_READ,
+      IAM_PERMISSIONS.FINANCE_EXPORT,
+      IAM_PERMISSIONS.NEWS_PUBLISH,
+      IAM_PERMISSIONS.PARTNERS_JOBS_RUN,
+    ];
+    for (const perm of forbidden) {
+      assert.equal(cronPerms.has(perm), false, `cron must not include ${perm}`);
+    }
+  });
+
+  it("28. cron routes require SYSTEM_CRON_READ permission", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sub = readFileSync("app/api/check-subscription-expiry/route.js", "utf8");
+    const price = readFileSync("app/api/check-price-alerts/route.js", "utf8");
+    assert.match(sub, /SYSTEM_CRON_READ/);
+    assert.match(price, /SYSTEM_CRON_READ/);
+  });
+
+  it("29. cron identity cannot reach IAM assignments or send-news routes", async () => {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const sendNews = readFileSync("app/api/send-news/route.ts", "utf8");
+    assert.match(sendNews, /NEWS_PUBLISH/);
+    const cronPerms = SERVICE_ACCOUNT_PERMISSION_MATRIX.cron;
+    assert.equal(cronPerms.includes(IAM_PERMISSIONS.NEWS_PUBLISH), false);
+    assert.equal(cronPerms.includes(IAM_PERMISSIONS.IAM_ASSIGNMENTS_GRANT), false);
+    assert.equal(cronPerms.includes(IAM_PERMISSIONS.IAM_MANAGE), false);
+    if (existsSync("app/api/iam/assignments/route.js")) {
+      const assignments = readFileSync("app/api/iam/assignments/route.js", "utf8");
+      assert.match(assignments, /requireAdminPermission|requirePermission/);
+    }
+  });
+
+  it("30. non-cron service accounts are not provisioned on Production plan", async () => {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const planPath = "scripts/iam/production-service-accounts-provision.mjs";
+    if (!existsSync(planPath)) {
+      return;
+    }
+    const src = readFileSync(planPath, "utf8");
+    assert.match(src, /provision:\s*false/);
+    assert.match(src, /news-worker[\s\S]*provision:\s*false/);
+    assert.match(src, /price-alert-worker[\s\S]*provision:\s*false/);
+    assert.match(src, /instant-analysis-worker[\s\S]*provision:\s*false/);
+    assert.match(src, /telegram-bot[\s\S]*provision:\s*false/);
+  });
 });
 
 console.log("IAM API enforcement tests loaded");
