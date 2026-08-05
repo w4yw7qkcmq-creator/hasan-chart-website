@@ -154,7 +154,7 @@ console.log(
   })
 );
 const PRICE_ALERT_WORKER_COLUMNS =
-  "id,user_id,user_email,coin,target_price,condition,status";
+  "id,user_email,coin,target_price,condition,status";
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -1093,7 +1093,7 @@ async function checkPriceAlerts() {
             summary,
             alertId: alert.id,
             userEmail,
-            userId: alert.user_id || null,
+            userId: null,
             coin,
             condition,
             targetPrice,
@@ -1107,7 +1107,7 @@ async function checkPriceAlerts() {
           logPriceAlertDeliveryError({
             alertId: alert.id,
             email: userEmail,
-            userId: alert.user_id || null,
+            userId: null,
             phase: "deliverRealPriceAlert",
             message: dispatchError?.message || String(dispatchError),
           });
