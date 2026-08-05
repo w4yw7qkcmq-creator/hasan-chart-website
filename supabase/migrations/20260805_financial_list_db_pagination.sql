@@ -3,6 +3,12 @@
 
 BEGIN;
 
+-- Staging/production schema parity for financial list columns.
+ALTER TABLE public.subscription_requests
+  ADD COLUMN IF NOT EXISTS telegram_username text,
+  ADD COLUMN IF NOT EXISTS started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+
 -- ---------------------------------------------------------------------------
 -- Helpers (immutable / stable)
 -- ---------------------------------------------------------------------------
@@ -247,7 +253,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.financial_subscription_matches_filters(
-  sr public.subscription_requests,
+  p_row public.subscription_requests,
   p_search text,
   p_status text,
   p_service text,
@@ -268,35 +274,35 @@ AS $$
       p_search IS NULL
       OR trim(p_search) = ''
       OR length(trim(p_search)) < 2
-      OR lower(coalesce(sr.user_email, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR lower(coalesce(sr.username, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR lower(coalesce(sr.telegram_username, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR lower(coalesce(sr.plan_name, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR lower(coalesce(sr.category, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR sr.id::text = trim(p_search)
+      OR lower(coalesce((p_row).user_email, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR lower(coalesce((p_row).username, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR lower(coalesce((p_row).telegram_username, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR lower(coalesce((p_row).plan_name, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR lower(coalesce((p_row).category, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR (p_row).id::text = trim(p_search)
     )
     AND (
       coalesce(p_status, 'all') = 'all'
       OR p_status = 'complimentary'
-      OR public.financial_normalize_subscription_status(sr.status, sr.admin_disabled, sr.expires_at) = p_status
+      OR public.financial_normalize_subscription_status((p_row).status, (p_row).admin_disabled, (p_row).expires_at) = p_status
     )
     AND (
       coalesce(p_status, 'all') <> 'complimentary'
-      OR public.financial_price_is_complimentary(sr.price)
+      OR public.financial_price_is_complimentary((p_row).price)
     )
     AND (
       coalesce(p_service, 'all') = 'all'
-      OR public.financial_resolve_service(sr.category, sr.plan_name) = p_service
+      OR public.financial_resolve_service((p_row).category, (p_row).plan_name) = p_service
     )
     AND (
       coalesce(p_source, 'all') = 'all'
       OR public.financial_infer_activation_source(
-        sr.activation_source,
-        sr.status,
-        sr.started_at,
-        sr.price,
-        sr.payment_proof_path,
-        sr.payment_proof,
+        (p_row).activation_source,
+        (p_row).status,
+        (p_row).started_at,
+        (p_row).price,
+        (p_row).payment_proof_path,
+        (p_row).payment_proof,
         p_legacy_read_enabled
       ) = p_source
     )
@@ -304,22 +310,22 @@ AS $$
       coalesce(p_paid, 'all') = 'all'
       OR (
         p_paid = 'complimentary'
-        AND public.financial_price_is_complimentary(sr.price)
+        AND public.financial_price_is_complimentary((p_row).price)
       )
       OR (
         p_paid = 'paid'
-        AND public.financial_price_amount(sr.price) > 0
+        AND public.financial_price_amount((p_row).price) > 0
       )
       OR (
         p_paid = 'unparseable'
-        AND NOT public.financial_price_is_complimentary(sr.price)
-        AND public.financial_price_amount(sr.price) IS NULL
+        AND NOT public.financial_price_is_complimentary((p_row).price)
+        AND public.financial_price_amount((p_row).price) IS NULL
       )
     )
-    AND (p_started_from IS NULL OR sr.started_at IS NULL OR sr.started_at >= p_started_from)
-    AND (p_started_to IS NULL OR sr.started_at IS NULL OR sr.started_at <= p_started_to)
-    AND (p_expires_from IS NULL OR sr.expires_at IS NULL OR sr.expires_at >= p_expires_from)
-    AND (p_expires_to IS NULL OR sr.expires_at IS NULL OR sr.expires_at <= p_expires_to);
+    AND (p_started_from IS NULL OR (p_row).started_at IS NULL OR (p_row).started_at >= p_started_from)
+    AND (p_started_to IS NULL OR (p_row).started_at IS NULL OR (p_row).started_at <= p_started_to)
+    AND (p_expires_from IS NULL OR (p_row).expires_at IS NULL OR (p_row).expires_at >= p_expires_from)
+    AND (p_expires_to IS NULL OR (p_row).expires_at IS NULL OR (p_row).expires_at <= p_expires_to);
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -453,7 +459,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.financial_payment_review_matches_filters(
-  sr public.subscription_requests,
+  p_row public.subscription_requests,
   p_search text,
   p_review_status text,
   p_legacy_read_enabled boolean DEFAULT true
@@ -463,27 +469,27 @@ LANGUAGE sql
 STABLE
 AS $$
   SELECT
-    public.financial_has_payment_proof(sr.payment_proof_path, sr.payment_proof, p_legacy_read_enabled)
+    public.financial_has_payment_proof((p_row).payment_proof_path, (p_row).payment_proof, p_legacy_read_enabled)
     AND (
       p_search IS NULL
       OR trim(p_search) = ''
       OR length(trim(p_search)) < 2
-      OR lower(coalesce(sr.user_email, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR lower(coalesce(sr.username, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR lower(coalesce(sr.plan_name, '')) LIKE '%' || lower(trim(p_search)) || '%'
-      OR sr.id::text = trim(p_search)
+      OR lower(coalesce((p_row).user_email, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR lower(coalesce((p_row).username, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR lower(coalesce((p_row).plan_name, '')) LIKE '%' || lower(trim(p_search)) || '%'
+      OR (p_row).id::text = trim(p_search)
     )
     AND (
       coalesce(p_review_status, 'all') = 'all'
-      OR public.financial_resolve_payment_review_status(sr.status, sr.started_at) = p_review_status
+      OR public.financial_resolve_payment_review_status((p_row).status, (p_row).started_at) = p_review_status
     )
     AND (
       coalesce(p_review_status, 'all') <> 'pending_review'
       OR public.financial_is_pending_payment_review_row(
-        sr.status,
-        sr.started_at,
-        sr.payment_proof_path,
-        sr.payment_proof,
+        (p_row).status,
+        (p_row).started_at,
+        (p_row).payment_proof_path,
+        (p_row).payment_proof,
         p_legacy_read_enabled
       )
     );
