@@ -15,4 +15,4 @@ const third = lock.acquireCycleLock();
 assert.equal(third.acquired, true);
 lock.releaseCycleLock();
 
-console.log("news worker concurrency lock PASS");
+console.log("news worker in-memory concurrency lock PASS");
