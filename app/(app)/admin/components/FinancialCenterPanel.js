@@ -436,17 +436,20 @@ export default function FinancialCenterPanel({ standalone = false }) {
   const [recentActive, setRecentActive] = useState([]);
   const [recentPending, setRecentPending] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
-  const [subscriptionPagination, setSubscriptionPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [subscriptionPagination, setSubscriptionPagination] = useState({ limit: 25, hasMore: false, nextCursor: null });
   const [paymentReviews, setPaymentReviews] = useState([]);
-  const [paymentPagination, setPaymentPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [paymentPagination, setPaymentPagination] = useState({ limit: 25, hasMore: false, nextCursor: null });
   const [revenueReport, setRevenueReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [proofPreview, setProofPreview] = useState(null);
   const [proofLoadingId, setProofLoadingId] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState({ status: "all", service: "all", source: "all", paid: "all" });
   const [reviewStatus, setReviewStatus] = useState("all");
+  const [subscriptionCursor, setSubscriptionCursor] = useState(null);
+  const [paymentCursor, setPaymentCursor] = useState(null);
   const [revenuePeriod, setRevenuePeriod] = useState("30d");
   const [activateTarget, setActivateTarget] = useState(null);
   const [activateLoading, setActivateLoading] = useState(false);
@@ -460,6 +463,19 @@ export default function FinancialCenterPanel({ standalone = false }) {
   const abortRef = useRef(null);
   const backgroundAbortRef = useRef(null);
   const subscriptionActionInFlightRef = useRef(createAdminActionInFlightRegistry());
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setSubscriptionCursor(null);
+  }, [filters, debouncedSearch]);
+
+  useEffect(() => {
+    setPaymentCursor(null);
+  }, [reviewStatus, debouncedSearch]);
 
   const openUser = useCallback(
     (userId) => {
@@ -527,15 +543,17 @@ export default function FinancialCenterPanel({ standalone = false }) {
           const result = await fetchFinancialCenterSection(adminFetch, "subscriptions", {
             signal: controller.signal,
             query: {
-              page: String(subscriptionPagination.page),
-              search,
+              cursor: subscriptionCursor || undefined,
+              search: debouncedSearch,
               status: filters.status,
               service: filters.service,
               source: filters.source,
               paid: filters.paid,
             },
           });
-          setSubscriptions(result.items || []);
+          setSubscriptions((current) =>
+            subscriptionCursor ? [...current, ...(result.items || [])] : result.items || []
+          );
           setSubscriptionPagination(result.pagination || subscriptionPagination);
         }
 
@@ -543,12 +561,14 @@ export default function FinancialCenterPanel({ standalone = false }) {
           const result = await fetchFinancialCenterSection(adminFetch, "payment-reviews", {
             signal: controller.signal,
             query: {
-              page: String(paymentPagination.page),
-              search,
+              cursor: paymentCursor || undefined,
+              search: debouncedSearch,
               reviewStatus,
             },
           });
-          setPaymentReviews(result.items || []);
+          setPaymentReviews((current) =>
+            paymentCursor ? [...current, ...(result.items || [])] : result.items || []
+          );
           setPaymentPagination(result.pagination || paymentPagination);
         }
 
@@ -567,7 +587,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
         if (!controller.signal.aborted && !background) setLoading(false);
       }
     },
-    [filters, loadOverviewBundle, paymentPagination.page, revenuePeriod, reviewStatus, search, subscriptionPagination.page]
+    [debouncedSearch, filters, loadOverviewBundle, paymentCursor, revenuePeriod, reviewStatus, subscriptionCursor]
   );
 
   useEffect(() => {
@@ -583,12 +603,12 @@ export default function FinancialCenterPanel({ standalone = false }) {
   useEffect(() => {
     if (activeTab !== "subscriptions") return;
     void loadSection("subscriptions", { force: true });
-  }, [filters, search, subscriptionPagination.page]);
+  }, [filters, debouncedSearch, subscriptionCursor]);
 
   useEffect(() => {
     if (activeTab !== "payment-reviews") return;
     void loadSection("payment-reviews", { force: true });
-  }, [reviewStatus, search, paymentPagination.page]);
+  }, [reviewStatus, debouncedSearch, paymentCursor]);
 
   useEffect(() => {
     if (activeTab !== "revenue") return;
@@ -603,9 +623,9 @@ export default function FinancialCenterPanel({ standalone = false }) {
     try {
       const query =
         section === "subscriptions"
-          ? { export: "csv", search, status: filters.status, service: filters.service, source: filters.source, paid: filters.paid }
+          ? { export: "csv", search: debouncedSearch, status: filters.status, service: filters.service, source: filters.source, paid: filters.paid }
           : section === "payment-reviews"
-          ? { export: "csv", search, reviewStatus }
+          ? { export: "csv", search: debouncedSearch, reviewStatus }
           : { export: "csv", period: activeTab === "overview" ? selectedPeriod.revenuePeriod : revenuePeriod };
 
       const result = await fetchFinancialCenterSection(adminFetch, section, { query });
@@ -1066,6 +1086,18 @@ export default function FinancialCenterPanel({ standalone = false }) {
               </table>
             </div>
           )}
+          {subscriptionPagination?.hasMore ? (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                className="admin-financial-action-button admin-financial-action-button--secondary"
+                disabled={loading}
+                onClick={() => setSubscriptionCursor(subscriptionPagination.nextCursor)}
+              >
+                {loading ? "..." : "تحميل المزيد"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1129,6 +1161,18 @@ export default function FinancialCenterPanel({ standalone = false }) {
               </table>
             </div>
           )}
+          {paymentPagination?.hasMore ? (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                className="admin-financial-action-button admin-financial-action-button--secondary"
+                disabled={loading}
+                onClick={() => setPaymentCursor(paymentPagination.nextCursor)}
+              >
+                {loading ? "..." : "تحميل المزيد"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

@@ -6,6 +6,7 @@ import { adminReadLimiter } from "../../../../lib/rate-limit.js";
 import { withReadCache } from "../../../../lib/server-read-cache.js";
 import { FINANCIAL_OVERVIEW_CACHE_MS, exportRowsToCsv, sanitizeFinancialError } from "../../../../lib/financial-center/financial-center-shared.js";
 import { FINANCIAL_CENTER_SECTIONS } from "../../../../lib/financial-center/financial-types.js";
+import { decodeCursor } from "../../../../lib/pagination.js";
 import { listPaymentReviews } from "../../../../lib/financial-center/payment-service.js";
 import { getFinancialOverview, getFinancialRevenueReport } from "../../../../lib/financial-center/revenue-service.js";
 import {
@@ -61,10 +62,19 @@ export async function GET(request) {
 
     const page = Number(searchParams.get("page") || 1);
     const pageSize = Number(searchParams.get("pageSize") || 25);
+    const cursor = String(searchParams.get("cursor") || "").trim() || null;
     const includeTotal = searchParams.get("includeTotal") === "true";
     const search = String(searchParams.get("search") || "");
     const period = String(searchParams.get("period") || "30d");
     const filters = parseFilters(searchParams);
+
+    if (cursor) {
+      try {
+        decodeCursor(cursor);
+      } catch {
+        return jsonResponse({ success: false, error: "مؤشر الصفحة غير صالح" }, 400);
+      }
+    }
 
     if (section === "overview") {
       const adminEmail = String(access.user?.email || "admin").toLowerCase();
@@ -92,6 +102,7 @@ export async function GET(request) {
       const result = await listFinancialSubscriptions(access.supabase, {
         page,
         pageSize,
+        cursor,
         search,
         filters,
         exportMode,
@@ -160,6 +171,7 @@ export async function GET(request) {
       const result = await listPaymentReviews(access.supabase, {
         page,
         pageSize,
+        cursor,
         search,
         status: reviewStatus,
         exportMode,
