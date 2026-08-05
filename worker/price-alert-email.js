@@ -1,5 +1,14 @@
-const PRICE_ALERT_FROM = "HasaN CharT Alerts <alerts@hasanchartworld.com>";
-const PRICE_ALERT_CTA_URL = "https://www.hasanchartworld.com/alerts?tab=notifications";
+const PRICE_ALERT_FROM_DEFAULT = "HasaN CharT Alerts <alerts@hasanchartworld.com>";
+const PRICE_ALERT_FROM =
+  String(process.env.EMAIL_FROM || "").trim() || PRICE_ALERT_FROM_DEFAULT;
+const PRICE_ALERT_REPLY_TO =
+  String(process.env.EMAIL_REPLY_TO || "").trim() || "support@hasanchartworld.com";
+const PRICE_ALERT_SITE_BASE = String(process.env.NEXT_PUBLIC_SITE_URL || "")
+  .trim()
+  .replace(/\/+$/, "");
+const PRICE_ALERT_CTA_URL = PRICE_ALERT_SITE_BASE
+  ? `${PRICE_ALERT_SITE_BASE}/alerts?tab=notifications`
+  : "https://www.hasanchartworld.com/alerts?tab=notifications";
 const PRICE_ALERT_EMAIL_TEMPLATE = "dark-compact-v1";
 const PRICE_ALERT_MESSAGE_TYPE = "price-alert";
 
@@ -79,6 +88,7 @@ function buildPriceAlertEmailPayload({
 
   return {
     from: PRICE_ALERT_FROM,
+    reply_to: PRICE_ALERT_REPLY_TO,
     to: email,
     subject,
     tags,

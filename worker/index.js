@@ -44,7 +44,8 @@ const MAX_ALERTS_PER_RUN =
   environmentValidation.maxAlertsPerRun ||
   Number(process.env.PRICE_ALERT_MAX_ALERTS_PER_RUN) ||
   DEFAULT_MAX_ALERTS_PER_RUN;
-const startupReady = environmentValidation.ok && Boolean(supabaseUrl && serviceRoleKey);
+const startupReady = Boolean(supabaseUrl && serviceRoleKey);
+const configurationReady = environmentValidation.ok && startupReady;
 
 if (!startupReady) {
   console.error(
@@ -54,12 +55,25 @@ if (!startupReady) {
       invalidRequiredCount: environmentValidation.invalidRequiredCount,
       missing: environmentValidation.missingRequired,
       invalid: environmentValidation.invalidRequired,
+      reason: "missing_supabase_credentials",
     })
   );
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error("❌ Missing NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-  }
+  console.error("❌ Missing NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   process.exit(1);
+}
+
+if (!configurationReady) {
+  console.error(
+    "PRICE_ALERT_WORKER_MISCONFIGURED",
+    JSON.stringify({
+      missingRequiredCount: environmentValidation.missingRequiredCount,
+      invalidRequiredCount: environmentValidation.invalidRequiredCount,
+      missing: environmentValidation.missingRequired,
+      invalid: environmentValidation.invalidRequired,
+      channelFlags: environmentValidation.channelFlags,
+      dependencies: environmentValidation.dependencies,
+    })
+  );
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -1559,7 +1573,7 @@ app.listen(PORT, () => {
     })
     .catch(() => {});
 
-  if (isPriceAlertWorkerEnabled() && environmentValidation.ok) {
+  if (isPriceAlertWorkerEnabled() && configurationReady) {
     startPriceAlertScheduler({
       intervalMs: CHECK_INTERVAL_MS,
       enabled: true,
