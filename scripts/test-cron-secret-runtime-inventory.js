@@ -40,6 +40,7 @@ const RUNTIME_ALLOWLIST = new Map([
   ["scripts/iam/staging-api-enforcement.mjs", "staging negative legacy bearer test"],
   ["scripts/iam/b2-staging-closure-validation.mjs", "staging B2 closure legacy fallback probe"],
   ["scripts/iam/b2-production-closure-canary.mjs", "production B2 closure canary probe"],
+  ["worker/subscription-maintenance-cron-caller.js", "cron caller logs legacy env presence only; never sends CRON_SECRET"],
   ["scripts/iam/production-worker-auth-canary.mjs", "canary legacy probe"],
   ["scripts/staging-worker-auth-live-validation.mjs", "staging legacy probe"],
   ["scripts/preflight-check.js", "env presence check only"],

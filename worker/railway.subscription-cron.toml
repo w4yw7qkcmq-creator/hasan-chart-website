@@ -1,0 +1,10 @@
+# Subscription maintenance cron caller — Railway service: "Subscription Worker" (Cron Job)
+# Root Directory = worker | Config File = railway.subscription-cron.toml
+# Runs once per schedule tick, POSTs machine identity to the always-on API.
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "node subscription-maintenance-cron-caller.js"
+restartPolicyType = "NEVER"

@@ -10,6 +10,7 @@
     "start:worker:news": "node worker/news-worker.js",
     "subscription-worker": "node worker/subscription-maintenance-worker.js",
     "test:subscription-maintenance-worker": "node scripts/test-subscription-maintenance-worker-local.js",
+    "test:subscription-maintenance-cron-caller": "node --test scripts/test-subscription-maintenance-cron-caller.js",
     "install:worker": "npm ci --prefix worker --omit=dev || npm install --prefix worker --omit=dev",
     "railway:worker:install": "npm ci --prefix worker --omit=dev",
     "railway:worker:start": "npm start --prefix worker",
