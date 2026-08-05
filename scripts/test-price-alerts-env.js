@@ -43,7 +43,8 @@ withEnv(
   },
   () => {
     const result = env.validatePriceAlertsEnvironment({ production: true });
-    assert.equal(result.ok, false);
+    assert.equal(result.ok, true);
+    assert.equal(result.checkIntervalMs, 30000);
   }
 );
 

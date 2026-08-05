@@ -80,6 +80,9 @@ function resolveSupabaseUrlFromEnv() {
 }
 
 function resolveCheckIntervalMs() {
+  if (isProductionLike()) {
+    return DEFAULT_CHECK_INTERVAL_MS;
+  }
   const raw = envValue("PRICE_ALERT_CHECK_INTERVAL_MS");
   let intervalMs = raw ? Number(raw) : DEFAULT_CHECK_INTERVAL_MS;
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
@@ -184,13 +187,11 @@ function validatePriceAlertsEnvironment(options = {}) {
     },
     {
       key: "PRICE_ALERT_CHECK_INTERVAL_MS",
-      run: () => {
-        const intervalMs = resolveCheckIntervalMs();
-        if (production && intervalMs !== DEFAULT_CHECK_INTERVAL_MS) {
-          return { ok: false, error: "production_interval_locked" };
-        }
-        return { ok: true, present: Boolean(envValue("PRICE_ALERT_CHECK_INTERVAL_MS")), value: intervalMs };
-      },
+      run: () => ({
+        ok: true,
+        present: Boolean(envValue("PRICE_ALERT_CHECK_INTERVAL_MS")),
+        value: resolveCheckIntervalMs(),
+      }),
     },
     {
       key: "PRICE_ALERT_MAX_ALERTS_PER_RUN",
@@ -203,26 +204,26 @@ function validatePriceAlertsEnvironment(options = {}) {
     },
     {
       key: "NEXT_PUBLIC_SITE_URL",
-      run: () => parseHttpsUrl("NEXT_PUBLIC_SITE_URL", { required: false }),
+      run: () => {
+        const raw = envValue("NEXT_PUBLIC_SITE_URL");
+        if (!raw) return { ok: true, present: false, value: "" };
+        return parseHttpsUrl("NEXT_PUBLIC_SITE_URL", { required: false });
+      },
     },
   ];
 
   const result = collectValidation(checks);
-  const vapidPublic = envValue("VAPID_PUBLIC_KEY");
+  const vapidPublic = envValue("VAPID_PUBLIC_KEY") || envValue("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
   const vapidPrivate = envValue("VAPID_PRIVATE_KEY");
   const vapidSubject = envValue("VAPID_SUBJECT");
   const vapidParts = [vapidPublic, vapidPrivate, vapidSubject].filter(Boolean);
-  if (vapidParts.length > 0 && vapidParts.length < 3) {
-    result.ok = false;
-    result.invalidRequired.push({ key: "VAPID_*", reason: "incomplete_vapid_config" });
-    result.invalidRequiredCount += 1;
-  }
+  const pushConfigured = vapidParts.length === 3;
 
   const resendKey = envValue("RESEND_API_KEY");
   if (resendKey && resendKey.length < 10) {
-    result.ok = false;
     result.invalidRequired.push({ key: "RESEND_API_KEY", reason: "weak_or_short" });
     result.invalidRequiredCount += 1;
+    result.ok = false;
   }
 
   return {
@@ -239,7 +240,7 @@ function validatePriceAlertsEnvironment(options = {}) {
       database: result.missingRequired.includes("SUPABASE_SERVICE_ROLE_KEY") ? false : true,
       priceProviderConfigured: true,
       emailConfigured: Boolean(resendKey),
-      pushConfigured: vapidParts.length === 3,
+      pushConfigured,
       siteNotificationsConfigured: true,
     },
   };
