@@ -26,13 +26,32 @@ global.WebSocket = WebSocket;
 
 const { createClient } = require("@supabase/supabase-js");
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
 const openaiApiKey = process.env.OPENAI_API_KEY;
 
-if (!supabaseUrl || !serviceRoleKey) {
-  console.error("❌ Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in worker/.env");
+const environmentValidation = validatePriceAlertsEnvironment();
+const CHECK_INTERVAL_MS = environmentValidation.checkIntervalMs || resolveCheckIntervalMs();
+const MAX_ALERTS_PER_RUN =
+  environmentValidation.maxAlertsPerRun ||
+  Number(process.env.PRICE_ALERT_MAX_ALERTS_PER_RUN) ||
+  DEFAULT_MAX_ALERTS_PER_RUN;
+const startupReady = environmentValidation.ok && Boolean(supabaseUrl && serviceRoleKey);
+
+if (!startupReady) {
+  console.error(
+    "PRICE_ALERT_WORKER_STARTUP_BLOCKED",
+    JSON.stringify({
+      missingRequiredCount: environmentValidation.missingRequiredCount,
+      invalidRequiredCount: environmentValidation.invalidRequiredCount,
+      missing: environmentValidation.missingRequired,
+      invalid: environmentValidation.invalidRequired,
+    })
+  );
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error("❌ Missing NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  }
   process.exit(1);
 }
 
@@ -48,6 +67,43 @@ const { sendPriceAlertPushNotifications, getVapidEnvStatus } = require("./push-s
 const { sendPriceAlertEmail } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
+const {
+  validatePriceAlertsEnvironment,
+  isPriceAlertWorkerEnabled,
+  resolveCheckIntervalMs,
+  DEFAULT_MAX_ALERTS_PER_RUN,
+} = require("./alerts/price-alerts-env");
+const { evaluatePriceAlertCondition, normalizeCondition } = require("./lib/price-alert-condition");
+const {
+  normalizeSymbol,
+  normalizeOkxInstrument,
+  fetchOkxTicker,
+  fetchOkxPricesByCoin,
+} = require("./lib/price-alert-market-price");
+const {
+  acquireDistributedCycleLock,
+  releaseDistributedCycleLock,
+  getDistributedLockMetrics,
+  getInstanceId,
+} = require("./lib/price-alert-distributed-lock");
+const { claimActivePriceAlert } = require("./lib/price-alert-atomic-claim");
+const {
+  beginChannelDelivery,
+  finalizeChannelDelivery,
+} = require("./lib/price-alert-delivery-state");
+const {
+  createRunId,
+  buildCycleTelemetryRow,
+  persistCycleTelemetry,
+  cleanupOldRuns,
+} = require("./lib/price-alert-worker-cycle-telemetry");
+const {
+  getCycleMetrics,
+  markCycleStart,
+  markCycleSuccess,
+  markCycleFailed,
+  incrementMetric,
+} = require("./lib/price-alert-worker-metrics");
 
 const WORKER_ENTRY = "worker/index.js";
 const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v25-block-website-price-alert-email";
@@ -83,27 +139,20 @@ console.log(
 );
 
 let priceAlertCheckInProgress = false;
-const MIN_PRICE_ALERT_CHECK_INTERVAL_MS = 30_000;
-const PRICE_ALERT_CHECK_CLAMP_ABOVE_MS = 60_000;
 
-function resolvePriceAlertCheckIntervalMs(rawValue) {
-  let intervalMs = Number(rawValue);
-
-  if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
-    intervalMs = MIN_PRICE_ALERT_CHECK_INTERVAL_MS;
-  }
-
-  if (intervalMs > PRICE_ALERT_CHECK_CLAMP_ABOVE_MS) {
-    intervalMs = MIN_PRICE_ALERT_CHECK_INTERVAL_MS;
-  }
-
-  return Math.max(intervalMs, MIN_PRICE_ALERT_CHECK_INTERVAL_MS);
+function getSupabaseClient() {
+  return supabase;
 }
 
-const CHECK_INTERVAL_MS = resolvePriceAlertCheckIntervalMs(
-  process.env.PRICE_ALERT_CHECK_INTERVAL_MS
+console.log(
+  "price_alert_worker_startup_validated",
+  JSON.stringify({
+    checkIntervalMs: CHECK_INTERVAL_MS,
+    maxAlertsPerRun: MAX_ALERTS_PER_RUN,
+    workerEnabled: isPriceAlertWorkerEnabled(),
+    instanceId: getInstanceId(),
+  })
 );
-const MAX_ALERTS_PER_RUN = 20;
 const PRICE_ALERT_WORKER_COLUMNS =
   "id,user_id,user_email,coin,target_price,condition,status";
 
@@ -114,17 +163,6 @@ app.use(cors(createWorkerCorsOptions()));
 app.use(express.json({ limit: "2mb" }));
 
 const analysisJobs = new Map();
-
-const normalizeSymbol = (value) => {
-  return String(value || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-};
-
-const normalizeCondition = (value) => {
-  return String(value || "above").trim().toLowerCase() === "below" ? "below" : "above";
-};
 
 const escapeHtml = (value) =>
   String(value || "")
@@ -312,63 +350,12 @@ const formatNumber = (value) => {
 };
 
 
-const normalizeOkxInstrument = (coin) => {
-  const raw = String(coin || "").trim().toUpperCase();
-
-  if (!raw) {
-    throw new Error("EMPTY_SYMBOL");
-  }
-
-  if (raw.includes("-")) {
-    return raw.replace(/[^A-Z0-9-]/g, "");
-  }
-
-  const cleanSymbol = normalizeSymbol(coin);
-
-  if (!cleanSymbol) {
-    throw new Error("EMPTY_SYMBOL");
-  }
-
-  if (cleanSymbol.endsWith("USDT")) {
-    const base = cleanSymbol.slice(0, -4);
-
-    if (!base) {
-      throw new Error("EMPTY_SYMBOL");
-    }
-
-    return `${base}-USDT`;
-  }
-
-  return `${cleanSymbol}-USDT`;
-};
-
 const getMarketPrice = async (symbol) => {
-  const cleanSymbol = normalizeSymbol(symbol);
-
-  if (!cleanSymbol) {
-    throw new Error("EMPTY_SYMBOL");
+  const quote = await fetchOkxTicker(symbol);
+  if (!quote.ok) {
+    throw new Error(quote.reason === "stale_price" ? "STALE_PRICE" : `تعذر جلب سعر ${normalizeSymbol(symbol)} من OKX`);
   }
-
-  const okxSymbol = normalizeOkxInstrument(symbol);
-
-  const response = await fetch(
-    `https://www.okx.com/api/v5/market/ticker?instId=${encodeURIComponent(okxSymbol)}`
-  );
-
-  console.log("OKX_PRICE_FETCH_ATTEMPT", {
-    coin: symbol,
-    okxSymbol,
-    status: response.status,
-  });
-
-  const data = await response.json().catch(() => null);
-  const price = Number(data?.data?.[0]?.last);
-
-  if (Number.isFinite(price)) {
-    return price;
-  }
-
-  throw new Error(`تعذر جلب سعر ${cleanSymbol} من OKX`);
+  return quote.price;
 };
 
 const getMarketCandles = async (symbol, bar = "15m", limit = 120) => {
@@ -495,36 +482,73 @@ async function deliverRealPriceAlert({
   let siteNotification = { success: false };
   let delivery = null;
 
-  try {
+  if (normalizedEmail) {
     delivery = await evaluateDeliveryForRecipient(supabase, {
       userEmail: normalizedEmail,
       userId: normalizedUserId,
       notificationKey: "price_alert",
     });
+  }
 
-    siteNotification = await createSiteNotificationForAlert({
-      alertId,
-      email: normalizedEmail,
-      notificationMessage,
-      coin,
-      targetPrice,
-      currentPrice,
-      userId: normalizedUserId,
-      delivery,
-    });
-  } catch (error) {
-    logPriceAlertDeliveryError({
-      alertId,
-      email: normalizedEmail,
-      userId: normalizedUserId,
-      phase: "site-notification",
-      message: error?.message || String(error),
-    });
+  const siteGate = await beginChannelDelivery(supabase, { alertId, channel: "site" });
+  if (siteGate.skipped && siteGate.reason === "already_sent") {
+    siteNotification = { success: true, skipped: false, existing: true };
+    incrementMetric("siteNotificationsSent");
+  } else if (siteGate.proceed) {
+    try {
+      siteNotification = await createSiteNotificationForAlert({
+        alertId,
+        email: normalizedEmail,
+        notificationMessage,
+        coin,
+        targetPrice,
+        currentPrice,
+        userId: normalizedUserId,
+        delivery,
+      });
 
-    siteNotification = {
-      success: false,
-      error: { message: error?.message || String(error) },
-    };
+      if (siteNotification?.success) {
+        await finalizeChannelDelivery(supabase, {
+          alertId,
+          channel: "site",
+          status: "sent",
+        });
+        incrementMetric("siteNotificationsSent");
+      } else if (!siteNotification?.skipped) {
+        await finalizeChannelDelivery(supabase, {
+          alertId,
+          channel: "site",
+          status: "failed",
+          errorCodeSafe: siteNotification?.error?.message || "SITE_NOTIFICATION_FAILED",
+        });
+      } else {
+        await finalizeChannelDelivery(supabase, {
+          alertId,
+          channel: "site",
+          status: "skipped",
+          errorCodeSafe: siteNotification?.reason || "delivery-blocked",
+        });
+      }
+    } catch (error) {
+      await finalizeChannelDelivery(supabase, {
+        alertId,
+        channel: "site",
+        status: "failed",
+        errorCodeSafe: error?.message || "SITE_NOTIFICATION_FAILED",
+      });
+      logPriceAlertDeliveryError({
+        alertId,
+        email: normalizedEmail,
+        userId: normalizedUserId,
+        phase: "site-notification",
+        message: error?.message || String(error),
+      });
+
+      siteNotification = {
+        success: false,
+        error: { message: error?.message || String(error) },
+      };
+    }
   }
 
   if (!siteNotification?.success) {
@@ -543,39 +567,80 @@ async function deliverRealPriceAlert({
 
   let pushStats = { sent: 0, failed: 0, skipped: 0, skipReason: "PUSH_NOT_ATTEMPTED" };
 
-  if (delivery?.push) {
-    try {
-      pushStats = await sendTriggeredAlertWebPush({
-        alertId,
-        email: normalizedEmail,
-        userId: normalizedUserId,
-        coin,
-        targetPrice,
-        currentPrice,
-      });
-    } catch (error) {
-      logPriceAlertDeliveryError({
-        alertId,
-        email: normalizedEmail,
-        userId: normalizedUserId,
-        phase: "web-push",
-        message: error?.message || String(error),
-      });
+  const pushGate = await beginChannelDelivery(supabase, { alertId, channel: "push" });
+  if (pushGate.skipped && pushGate.reason === "already_sent") {
+    pushStats = { sent: 1, failed: 0, skipped: 0, skipReason: "ALREADY_SENT" };
+  } else if (pushGate.proceed) {
+    if (delivery?.push) {
+      try {
+        pushStats = await sendTriggeredAlertWebPush({
+          alertId,
+          email: normalizedEmail,
+          userId: normalizedUserId,
+          coin,
+          targetPrice,
+          currentPrice,
+        });
+        if ((pushStats?.sent || 0) > 0) {
+          await finalizeChannelDelivery(supabase, {
+            alertId,
+            channel: "push",
+            status: "sent",
+          });
+          incrementMetric("pushSent", pushStats.sent || 0);
+        } else if ((pushStats?.failed || 0) > 0) {
+          await finalizeChannelDelivery(supabase, {
+            alertId,
+            channel: "push",
+            status: "failed",
+            errorCodeSafe: pushStats?.skipReason || "WEB_PUSH_SEND_FAILED",
+          });
+          incrementMetric("pushFailed", pushStats.failed || 0);
+        } else {
+          await finalizeChannelDelivery(supabase, {
+            alertId,
+            channel: "push",
+            status: "skipped",
+            errorCodeSafe: pushStats?.skipReason || "WEB_PUSH_NOT_SENT",
+          });
+        }
+      } catch (error) {
+        await finalizeChannelDelivery(supabase, {
+          alertId,
+          channel: "push",
+          status: "failed",
+          errorCodeSafe: error?.message || "WEB_PUSH_DISPATCH_FAILED",
+        });
+        logPriceAlertDeliveryError({
+          alertId,
+          email: normalizedEmail,
+          userId: normalizedUserId,
+          phase: "web-push",
+          message: error?.message || String(error),
+        });
 
+        pushStats = {
+          sent: 0,
+          failed: 1,
+          skipped: 0,
+          skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
+        };
+        incrementMetric("pushFailed");
+      }
+    } else {
       pushStats = {
         sent: 0,
-        failed: 1,
-        skipped: 0,
-        skipReason: error?.message || "WEB_PUSH_DISPATCH_FAILED",
+        failed: 0,
+        skipped: 1,
+        skipReason: delivery?.blockedReason || "PUSH_BLOCKED_BY_SETTINGS",
       };
+      await finalizeChannelDelivery(supabase, {
+        alertId,
+        channel: "push",
+        status: "skipped",
+        errorCodeSafe: pushStats.skipReason,
+      });
     }
-  } else {
-    pushStats = {
-      sent: 0,
-      failed: 0,
-      skipped: 1,
-      skipReason: delivery?.blockedReason || "PUSH_BLOCKED_BY_SETTINGS",
-    };
   }
 
   aggregatePushStats(summary, pushStats);
@@ -671,44 +736,97 @@ async function deliverRealPriceAlert({
       skipped: true,
       reason: delivery?.blockedReason || "EMAIL_BLOCKED_BY_SETTINGS",
     };
+    await finalizeChannelDelivery(supabase, {
+      alertId,
+      channel: "email",
+      status: "skipped",
+      errorCodeSafe: emailResult.reason,
+    });
   } else {
-    summary.emailsQueued += 1;
+    const emailGate = await beginChannelDelivery(supabase, { alertId, channel: "email" });
+    if (emailGate.skipped && emailGate.reason === "already_sent") {
+      emailResult = { success: true, sent: true, skipped: false, existing: true };
+      incrementMetric("emailsSent");
+    } else if (emailGate.proceed) {
+      summary.emailsQueued += 1;
+      incrementMetric("emailsQueued");
 
-    console.log(
-      "PRICE_ALERT_EMAIL_SEND_START",
-      JSON.stringify({
-        path: PRICE_ALERT_SINGLE_PATH,
-        alertId,
-        email: normalizedEmail,
-        userId: normalizedUserId,
-      })
-    );
+      console.log(
+        "PRICE_ALERT_EMAIL_SEND_START",
+        JSON.stringify({
+          path: PRICE_ALERT_SINGLE_PATH,
+          alertId,
+          email: normalizedEmail,
+          userId: normalizedUserId,
+        })
+      );
 
-    try {
-      emailResult = await sendPriceAlertEmail({
-        supabase,
-        resendApiKey,
-        email: normalizedEmail,
-        coinLabel: escapeHtml(formatCoinPair(coin)),
-        conditionLabel: escapeHtml(getConditionLabel(condition)),
-        targetPrice: escapeHtml(formatNumber(targetPrice)),
-        currentPrice: escapeHtml(formatNumber(currentPrice)),
-        alertId,
-        userId: normalizedUserId,
-      });
+      try {
+        emailResult = await sendPriceAlertEmail({
+          supabase,
+          resendApiKey,
+          email: normalizedEmail,
+          coinLabel: escapeHtml(formatCoinPair(coin)),
+          conditionLabel: escapeHtml(getConditionLabel(condition)),
+          targetPrice: escapeHtml(formatNumber(targetPrice)),
+          currentPrice: escapeHtml(formatNumber(currentPrice)),
+          alertId,
+          userId: normalizedUserId,
+        });
 
-      if (emailResult?.sent) {
-        console.log(
-          "PRICE_ALERT_EMAIL_SENT",
-          JSON.stringify({
-            path: PRICE_ALERT_SINGLE_PATH,
+        if (emailResult?.sent) {
+          await finalizeChannelDelivery(supabase, {
             alertId,
-            email: normalizedEmail,
-            userId: normalizedUserId,
-            resendId: emailResult.resendId || null,
-          })
-        );
-      } else if (!emailResult?.skipped) {
+            channel: "email",
+            status: "sent",
+            providerMessageId: emailResult.resendId || null,
+          });
+          incrementMetric("emailsSent");
+          console.log(
+            "PRICE_ALERT_EMAIL_SENT",
+            JSON.stringify({
+              path: PRICE_ALERT_SINGLE_PATH,
+              alertId,
+              email: normalizedEmail,
+              userId: normalizedUserId,
+              resendId: emailResult.resendId || null,
+            })
+          );
+        } else if (!emailResult?.skipped) {
+          await finalizeChannelDelivery(supabase, {
+            alertId,
+            channel: "email",
+            status: "failed",
+            errorCodeSafe: emailResult?.reason || emailResult?.error || "EMAIL_SEND_FAILED",
+          });
+          incrementMetric("deliveryPartialFailures");
+          console.log(
+            "PRICE_ALERT_EMAIL_ERROR",
+            JSON.stringify({
+              path: PRICE_ALERT_SINGLE_PATH,
+              alertId,
+              email: normalizedEmail,
+              userId: normalizedUserId,
+              reason: emailResult?.reason || emailResult?.error || "EMAIL_SEND_FAILED",
+              status: emailResult?.status || null,
+            })
+          );
+        } else {
+          await finalizeChannelDelivery(supabase, {
+            alertId,
+            channel: "email",
+            status: "skipped",
+            errorCodeSafe: emailResult?.reason || "EMAIL_SKIPPED",
+          });
+        }
+      } catch (error) {
+        await finalizeChannelDelivery(supabase, {
+          alertId,
+          channel: "email",
+          status: "failed",
+          errorCodeSafe: error?.message || "EMAIL_SEND_FAILED",
+        });
+        incrementMetric("deliveryPartialFailures");
         console.log(
           "PRICE_ALERT_EMAIL_ERROR",
           JSON.stringify({
@@ -716,49 +834,37 @@ async function deliverRealPriceAlert({
             alertId,
             email: normalizedEmail,
             userId: normalizedUserId,
-            reason: emailResult?.reason || emailResult?.error || "EMAIL_SEND_FAILED",
-            status: emailResult?.status || null,
+            message: error?.message || String(error),
           })
         );
-      }
-    } catch (error) {
-      console.log(
-        "PRICE_ALERT_EMAIL_ERROR",
-        JSON.stringify({
-          path: PRICE_ALERT_SINGLE_PATH,
+
+        logPriceAlertDeliveryError({
           alertId,
           email: normalizedEmail,
           userId: normalizedUserId,
+          phase: "email",
           message: error?.message || String(error),
-        })
-      );
+        });
 
-      logPriceAlertDeliveryError({
-        alertId,
-        email: normalizedEmail,
-        userId: normalizedUserId,
-        phase: "email",
-        message: error?.message || String(error),
-      });
+        emailResult = {
+          success: false,
+          sent: false,
+          error: error?.message || String(error),
+        };
+      }
 
-      emailResult = {
-        success: false,
-        sent: false,
-        error: error?.message || String(error),
-      };
-    }
-
-    if (!emailResult?.sent && !emailResult?.skipped) {
-      logPriceAlertDeliveryError({
-        alertId,
-        email: normalizedEmail,
-        userId: normalizedUserId,
-        phase: "email",
-        message: emailResult?.error || emailResult?.reason || "EMAIL_SEND_FAILED",
-        details: {
-          status: emailResult?.status || null,
-        },
-      });
+      if (!emailResult?.sent && !emailResult?.skipped && !emailResult?.existing) {
+        logPriceAlertDeliveryError({
+          alertId,
+          email: normalizedEmail,
+          userId: normalizedUserId,
+          phase: "email",
+          message: emailResult?.error || emailResult?.reason || "EMAIL_SEND_FAILED",
+          details: {
+            status: emailResult?.status || null,
+          },
+        });
+      }
     }
   }
 
@@ -769,21 +875,14 @@ async function deliverRealPriceAlert({
   };
 }
 
-const shouldTriggerAlert = ({ condition, targetPrice, currentPrice }) => {
-  const cleanCondition = normalizeCondition(condition);
-
-  if (!Number.isFinite(targetPrice) || !Number.isFinite(currentPrice)) {
-    return false;
-  }
-
-  if (cleanCondition === "below") {
-    return currentPrice <= targetPrice;
-  }
-
-  return currentPrice >= targetPrice;
-};
+const shouldTriggerAlert = ({ condition, targetPrice, currentPrice }) =>
+  evaluatePriceAlertCondition({ condition, targetPrice, currentPrice }).triggered;
 
 async function checkPriceAlerts() {
+  if (!isPriceAlertWorkerEnabled()) {
+    return;
+  }
+
   if (priceAlertCheckInProgress) {
     logWorkerEvent("ALERT_CHECK_SKIPPED", {
       worker: WORKER_ENTRY,
@@ -794,82 +893,138 @@ async function checkPriceAlerts() {
   }
 
   priceAlertCheckInProgress = true;
+  markCycleStart();
+  const runId = createRunId();
+  const cycleStartedAt = Date.now();
+  const cycleStartedIso = new Date(cycleStartedAt).toISOString();
+  let distributedOwner = null;
 
-  try {
-  const startedAt = new Date().toISOString();
-
-  logWorkerEvent("ALERT_CHECK_STARTED", {
-    worker: WORKER_ENTRY,
-    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    timestamp: startedAt,
-    intervalMs: CHECK_INTERVAL_MS,
-  });
-
-  const summary = {
-    checked: 0,
-    uniqueCoins: 0,
-    triggered: 0,
-    notificationsCreated: 0,
-    pushesSent: 0,
-    pushesFailed: 0,
-    pushesSkipped: 0,
-    emailsQueued: 0,
-    alertsUpdated: 0,
-    skippedInvalid: 0,
-    emailStats: null,
+  const cycleStats = {
+    alertsFetched: 0,
+    alertsEvaluated: 0,
+    alertsTriggered: 0,
+    alertsClaimed: 0,
+    alertsCompleted: 0,
+    siteSent: 0,
+    pushSent: 0,
+    pushFailed: 0,
+    emailQueued: 0,
+    emailFailed: 0,
+    duplicateClaims: 0,
+    stalePrices: 0,
   };
 
-  const { data: alerts, error } = await supabase
-    .from("price_alerts")
-    .select(PRICE_ALERT_WORKER_COLUMNS)
-    .eq("status", "active")
-    .limit(MAX_ALERTS_PER_RUN);
+  try {
+    const distributedLock = await acquireDistributedCycleLock(getSupabaseClient);
+    if (!distributedLock.acquired) {
+      await persistCycleTelemetry(
+        getSupabaseClient,
+        buildCycleTelemetryRow({
+          runId,
+          startedAt: cycleStartedIso,
+          completedAt: new Date().toISOString(),
+          durationMs: Date.now() - cycleStartedAt,
+          status: "overlap",
+          stats: cycleStats,
+          lock: { acquired: false, contended: true },
+        })
+      );
+      markCycleFailed(Date.now() - cycleStartedAt);
+      return;
+    }
+    distributedOwner = distributedLock.owner;
 
-  if (error) {
-    logWorkerEvent("ALERT_CHECK_FINISHED", {
-      ...summary,
+    logWorkerEvent("ALERT_CHECK_STARTED", {
       worker: WORKER_ENTRY,
-      error: error.message,
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+      timestamp: cycleStartedIso,
+      intervalMs: CHECK_INTERVAL_MS,
+      runId,
     });
-    return;
-  }
 
-  if (!alerts || alerts.length === 0) {
-    logWorkerEvent("ALERT_CHECK_FINISHED", {
-      ...summary,
-      worker: WORKER_ENTRY,
-    });
-    return;
-  }
+    const summary = {
+      checked: 0,
+      uniqueCoins: 0,
+      triggered: 0,
+      notificationsCreated: 0,
+      pushesSent: 0,
+      pushesFailed: 0,
+      pushesSkipped: 0,
+      emailsQueued: 0,
+      alertsUpdated: 0,
+      skippedInvalid: 0,
+      emailStats: null,
+    };
 
-  summary.checked = alerts.length;
+    const { data: alerts, error } = await supabase
+      .from("price_alerts")
+      .select(PRICE_ALERT_WORKER_COLUMNS)
+      .eq("status", "active")
+      .limit(MAX_ALERTS_PER_RUN);
 
-  const alertsByCoin = new Map();
-
-  for (const alert of alerts) {
-    const coin = normalizeSymbol(alert.coin);
-
-    if (!coin) {
-      summary.skippedInvalid += 1;
-      continue;
+    if (error) {
+      throw new Error(error.message);
     }
 
-    if (!alertsByCoin.has(coin)) {
-      alertsByCoin.set(coin, []);
+    cycleStats.alertsFetched = alerts?.length || 0;
+    incrementMetric("alertsFetched", cycleStats.alertsFetched);
+
+    if (!alerts || alerts.length === 0) {
+      await persistCycleTelemetry(
+        getSupabaseClient,
+        buildCycleTelemetryRow({
+          runId,
+          startedAt: cycleStartedIso,
+          completedAt: new Date().toISOString(),
+          durationMs: Date.now() - cycleStartedAt,
+          status: "success",
+          stats: cycleStats,
+          lock: { acquired: true, contended: false },
+        })
+      );
+      markCycleSuccess(Date.now() - cycleStartedAt, getCycleMetrics());
+      logWorkerEvent("ALERT_CHECK_FINISHED", { ...summary, worker: WORKER_ENTRY });
+      return;
     }
 
-    alertsByCoin.get(coin).push(alert);
-  }
+    summary.checked = alerts.length;
 
-  summary.uniqueCoins = alertsByCoin.size;
+    const alertsByCoin = new Map();
+    for (const alert of alerts) {
+      const coin = normalizeSymbol(alert.coin);
+      if (!coin) {
+        summary.skippedInvalid += 1;
+        continue;
+      }
+      if (!alertsByCoin.has(coin)) alertsByCoin.set(coin, []);
+      alertsByCoin.get(coin).push(alert);
+    }
 
-  const triggeredItems = [];
+    summary.uniqueCoins = alertsByCoin.size;
+    const priceQuotes = await fetchOkxPricesByCoin([...alertsByCoin.keys()]);
+    const triggeredItems = [];
 
-  for (const [coin, coinAlerts] of alertsByCoin.entries()) {
-    try {
-      const currentPrice = await getMarketPrice(coin);
+    for (const [coin, coinAlerts] of alertsByCoin.entries()) {
+      const quote = priceQuotes.get(coin);
+      if (!quote?.ok) {
+        if (quote?.reason === "stale_price") {
+          cycleStats.stalePrices += 1;
+          incrementMetric("stalePrices");
+        }
+        logWorkerEvent("ALERT_COIN_CHECK_FAILED", {
+          worker: WORKER_ENTRY,
+          coin,
+          error: quote?.reason || "missing_price",
+        });
+        continue;
+      }
+
+      const currentPrice = quote.price;
 
       for (const alert of coinAlerts) {
+        cycleStats.alertsEvaluated += 1;
+        incrementMetric("alertsEvaluated");
+
         const targetPrice = Number(alert.target_price);
         const condition = normalizeCondition(alert.condition);
         const userEmail = String(alert.user_email || "").trim().toLowerCase();
@@ -879,71 +1034,50 @@ async function checkPriceAlerts() {
           continue;
         }
 
-        const triggered = shouldTriggerAlert({
+        const evaluation = evaluatePriceAlertCondition({
           condition,
           targetPrice,
           currentPrice,
         });
 
-        if (!triggered) {
+        if (!evaluation.triggered) {
           continue;
         }
 
-        const conditionLabel = getConditionLabel(condition);
-
-        console.log("PRICE_ALERT_TRIGGERED", {
-          ts: new Date().toISOString(),
-          alertId: alert.id,
-          email: userEmail,
-          coin: formatCoinPair(coin),
-          targetPrice,
-          currentPrice,
-          condition,
-          conditionLabel,
-        });
+        cycleStats.alertsTriggered += 1;
+        incrementMetric("alertsTriggered");
 
         logWorkerEvent("PRICE_ALERT_TRIGGERED", {
           worker: WORKER_ENTRY,
           alertId: alert.id,
-          email: userEmail,
           coin: formatCoinPair(coin),
           targetPrice,
-          requestedPrice: targetPrice,
           currentPrice,
           condition,
-          conditionLabel,
+          reason: evaluation.reason,
         });
 
-        const { data: claimedAlert, error: claimError } = await supabase
-          .from("price_alerts")
-          .update({
-            status: "triggered",
-            triggered_at: new Date().toISOString(),
-            triggered_price: String(currentPrice),
-          })
-          .eq("id", alert.id)
-          .eq("status", "active")
-          .select("id")
-          .maybeSingle();
+        const claim = await claimActivePriceAlert(supabase, {
+          alertId: alert.id,
+          triggeredPrice: currentPrice,
+          runId,
+        });
 
-        if (claimError) {
-          logWorkerEvent("ALERT_STATUS_UPDATE_FAILED", {
-            worker: WORKER_ENTRY,
-            alertId: alert.id,
-            error: claimError.message,
-          });
-          continue;
-        }
-
-        if (!claimedAlert?.id) {
+        if (!claim.claimed) {
+          if (claim.duplicate) {
+            cycleStats.duplicateClaims += 1;
+            incrementMetric("duplicateClaimsRejected");
+          }
           logWorkerEvent("ALERT_ALREADY_CLAIMED", {
             worker: WORKER_ENTRY,
             alertId: alert.id,
-            email: userEmail,
+            reason: claim.reason,
           });
           continue;
         }
 
+        cycleStats.alertsClaimed += 1;
+        incrementMetric("alertsClaimed");
         summary.alertsUpdated += 1;
         summary.triggered += 1;
 
@@ -966,7 +1100,10 @@ async function checkPriceAlerts() {
             currentPrice,
             notificationMessage,
           });
+          cycleStats.alertsCompleted += 1;
+          incrementMetric("alertsCompleted");
         } catch (dispatchError) {
+          incrementMetric("deliveryPartialFailures");
           logPriceAlertDeliveryError({
             alertId: alert.id,
             email: userEmail,
@@ -974,37 +1111,60 @@ async function checkPriceAlerts() {
             phase: "deliverRealPriceAlert",
             message: dispatchError?.message || String(dispatchError),
           });
-
-          logWorkerEvent("ALERT_DISPATCH_FAILED", {
-            worker: WORKER_ENTRY,
-            alertId: alert.id,
-            email: userEmail,
-            error: dispatchError?.message || String(dispatchError),
-          });
         }
 
-        triggeredItems.push({
-          alertId: alert.id,
-          email: userEmail,
-          coin,
-        });
+        triggeredItems.push({ alertId: alert.id, coin });
       }
-    } catch (error) {
-      logWorkerEvent("ALERT_COIN_CHECK_FAILED", {
-        worker: WORKER_ENTRY,
-        coin,
-        error: error?.message || String(error),
-      });
     }
-  }
 
-  logWorkerEvent("ALERT_CHECK_FINISHED", {
-    ...summary,
-    worker: WORKER_ENTRY,
-    triggeredItems,
-    finishedAt: new Date().toISOString(),
-  });
+    cycleStats.siteSent = getCycleMetrics().siteNotificationsSent;
+    cycleStats.pushSent = getCycleMetrics().pushSent;
+    cycleStats.pushFailed = getCycleMetrics().pushFailed;
+    cycleStats.emailQueued = getCycleMetrics().emailsQueued;
+
+    await persistCycleTelemetry(
+      getSupabaseClient,
+      buildCycleTelemetryRow({
+        runId,
+        startedAt: cycleStartedIso,
+        completedAt: new Date().toISOString(),
+        durationMs: Date.now() - cycleStartedAt,
+        status: "success",
+        stats: cycleStats,
+        lock: { acquired: true, contended: false },
+      })
+    );
+
+    markCycleSuccess(Date.now() - cycleStartedAt);
+    logWorkerEvent("ALERT_CHECK_FINISHED", {
+      ...summary,
+      worker: WORKER_ENTRY,
+      triggeredItems,
+      finishedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    await persistCycleTelemetry(
+      getSupabaseClient,
+      buildCycleTelemetryRow({
+        runId,
+        startedAt: cycleStartedIso,
+        completedAt: new Date().toISOString(),
+        durationMs: Date.now() - cycleStartedAt,
+        status: "failed",
+        stats: cycleStats,
+        lock: { acquired: Boolean(distributedOwner), contended: false },
+        errorCodeSafe: error?.message || "CYCLE_FAILED",
+      })
+    );
+    markCycleFailed(Date.now() - cycleStartedAt);
+    logWorkerEvent("ALERT_CHECK_FAILED", {
+      worker: WORKER_ENTRY,
+      error: error?.message || String(error),
+    });
   } finally {
+    if (distributedOwner) {
+      await releaseDistributedCycleLock(getSupabaseClient, distributedOwner);
+    }
     priceAlertCheckInProgress = false;
   }
 }
@@ -1012,21 +1172,47 @@ async function checkPriceAlerts() {
 app.get("/health", async (_req, res) => {
   const vapidStatus = getVapidEnvStatus();
   const { getWorkerAuthMetrics } = require("./worker-security");
+  const envValidation = validatePriceAlertsEnvironment();
+  const readiness = envValidation.ok && isPriceAlertWorkerEnabled();
+  const lockMetrics = getDistributedLockMetrics();
+  const cycleMetrics = getCycleMetrics();
 
-  res.json({
-    success: true,
-    status: "online",
-    service: "hasan-chart-worker",
+  const body = {
+    success: readiness,
+    status: readiness ? "online" : "misconfigured",
+    readiness,
+    service: "hasan-chart-price-alerts-worker",
+    runtimeMode: process.env.NODE_ENV || "production",
+    workerEnabled: isPriceAlertWorkerEnabled(),
+    checkIntervalMs: CHECK_INTERVAL_MS,
+    maxAlertsPerRun: MAX_ALERTS_PER_RUN,
+    currentCycleInFlight: cycleMetrics.currentCycleInFlight,
+    environmentValidation: {
+      ok: envValidation.ok,
+      missingRequiredCount: envValidation.missingRequiredCount,
+      invalidRequiredCount: envValidation.invalidRequiredCount,
+    },
+    dependencies: envValidation.dependencies,
+    metrics: {
+      ...cycleMetrics,
+      distributedLockAcquired: lockMetrics.distributedLockAcquired,
+      distributedLockContended: lockMetrics.distributedLockContended,
+      distributedLockRecovered: lockMetrics.distributedLockRecovered,
+      distributedLockErrors: lockMetrics.distributedLockErrors,
+    },
+    build: {
+      commit: process.env.RAILWAY_GIT_COMMIT_SHA
+        ? process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7)
+        : null,
+    },
     workerEntry: WORKER_ENTRY,
     priceAlertsModuleVersion: PRICE_ALERTS_MODULE_VERSION,
-    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
-    alertsWorker: true,
-    checkIntervalMs: CHECK_INTERVAL_MS,
     webPushConfigured: vapidStatus.configured,
-    vapidStatus,
     workerHttpAuth: getWorkerAuthMetrics(),
     timestamp: new Date().toISOString(),
-  });
+  };
+
+  res.status(readiness ? 200 : 503).json(body);
 });
 
 app.post(
@@ -1195,26 +1381,27 @@ app.listen(PORT, () => {
     })
   );
 
-  console.log(`🚀 Railway Worker API listening on port ${PORT}`);
-});
+  cleanupOldRuns(getSupabaseClient)
+    .then((result) => {
+      if (result.ok) {
+        console.log(
+          "PRICE_ALERT_TELEMETRY_CLEANUP",
+          JSON.stringify({ deleted: result.deleted, retentionDays: result.retentionDays })
+        );
+      }
+    })
+    .catch(() => {});
 
-setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
+  if (isPriceAlertWorkerEnabled()) {
+    setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
+    checkPriceAlerts();
+  }
 
-console.log(
-  "PRICE_ALERT_SINGLE_PATH",
-  JSON.stringify({
-    phase: "scheduler-started",
-    path: PRICE_ALERT_SINGLE_PATH,
+  logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
+    worker: WORKER_ENTRY,
     moduleVersion: PRICE_ALERTS_MODULE_VERSION,
     intervalMs: CHECK_INTERVAL_MS,
-  })
-);
-
-logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
-  worker: WORKER_ENTRY,
-  moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-  intervalMs: CHECK_INTERVAL_MS,
-  priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
+    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
+    enabled: isPriceAlertWorkerEnabled(),
+  });
 });
-
-checkPriceAlerts();
