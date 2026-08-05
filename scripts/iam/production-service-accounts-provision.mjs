@@ -34,6 +34,23 @@ const EXECUTE = process.argv.includes("--execute");
 /** Route-backed least-privilege plan (Production web app machine auth only). */
 const PRODUCTION_SERVICE_PLAN = Object.freeze([
   {
+    id: "subscription-maintenance-worker",
+    label: "Subscription Maintenance Worker",
+    provision: true,
+    railwayService: "hasan-chart-subscription-maintenance-worker",
+    routes: [{ method: "POST", path: "/run", permission: IAM_PERMISSIONS.SUBSCRIPTIONS_MANAGE }],
+    permissions: permissionsForServiceAccount("subscription-maintenance-worker"),
+    railwayEnv: {
+      accountIdVar: "IAM_SUBSCRIPTION_MAINTENANCE_SERVICE_ACCOUNT_ID",
+      accountIdValue: "subscription-maintenance-worker",
+      secretVar: "IAM_SUBSCRIPTION_MAINTENANCE_SECRET",
+      legacySecretVar: "CRON_SECRET",
+      pepperVar: "IAM_SERVICE_SECRET_PEPPER",
+    },
+    requiredHeaders: ["x-service-account-id", "x-service-account-secret"],
+    legacyHeaders: ["Authorization: Bearer <CRON_SECRET>", "x-cron-secret"],
+  },
+  {
     id: "cron",
     label: "Cron Jobs",
     provision: true,

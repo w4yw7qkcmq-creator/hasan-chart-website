@@ -125,11 +125,42 @@ function isLegacyFallbackEnabled() {
   return process.env.IAM_WORKER_LEGACY_FALLBACK !== "false";
 }
 
+function resolveAllowedServiceAccountIds(options = {}) {
+  const configured = options.allowedServiceAccountIds;
+  if (Array.isArray(configured) && configured.length) {
+    return new Set(configured.map((id) => String(id || "").trim()).filter(Boolean));
+  }
+  return allowedServiceAccountIds();
+}
+
 function allowedServiceAccountIds() {
   const configured = String(
     process.env.IAM_INSTANT_ANALYSIS_WORKER_SERVICE_ACCOUNT_ID || DEFAULT_SERVICE_ACCOUNT_ID
   ).trim();
   return new Set([configured, DEFAULT_SERVICE_ACCOUNT_ID]);
+}
+
+function getWorkerSharedSecret() {
+  return String(process.env.WORKER_API_SECRET || process.env.CRON_SECRET || "").trim();
+}
+
+function getProvidedWorkerSecret(req) {
+  const authHeader = String(req.headers.authorization || "");
+  const bearer = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
+
+  return bearer || String(req.headers["x-worker-secret"] || req.headers["x-cron-secret"] || "").trim();
+}
+
+function hasLegacySecretAttempt(req) {
+  return Boolean(getProvidedWorkerSecret(req));
+}
+
+function hasValidWorkerSecret(req) {
+  const secret = getWorkerSharedSecret();
+  if (!secret) return false;
+  return timingSafeEqual(getProvidedWorkerSecret(req), secret);
 }
 
 function getMachineHeaders(req) {
@@ -241,7 +272,8 @@ async function verifyMachineIdentityWithClient(supabase, req, options = {}) {
     };
   }
 
-  if (!allowedServiceAccountIds().has(accountId)) {
+  const allowedIds = resolveAllowedServiceAccountIds(options);
+  if (!allowedIds.has(accountId)) {
     recordSecurityEvent("machine_invalid");
     return {
       ok: false,
@@ -405,6 +437,56 @@ function resetWorkerAuthMetrics() {
   }
 }
 
+async function verifyWorkerRouteAccess(req, options = {}) {
+  const machineHeaders = getMachineHeaders(req);
+
+  if (machineHeaders.present) {
+    if (isWorkerMachineAuthEnabled()) {
+      const machine = await verifyMachineIdentity(req, options);
+      if (machine.ok) {
+        recordAuthMetric("machine");
+        return { ok: true, mode: "machine", serviceAccountId: machine.serviceAccountId };
+      }
+      if (machine.hardFail) {
+        recordDeniedMetric("machine");
+        return {
+          ok: false,
+          status: machine.status || 401,
+          error: machine.error || "Unauthorized machine request.",
+        };
+      }
+    }
+
+    return {
+      ok: false,
+      status: 401,
+      error: "Unauthorized machine request.",
+    };
+  }
+
+  if (hasLegacySecretAttempt(req)) {
+    if (isLegacyFallbackEnabled() && hasValidWorkerSecret(req)) {
+      recordAuthMetric("legacy");
+      return { ok: true, mode: "legacy" };
+    }
+    recordDeniedMetric("legacy");
+    return {
+      ok: false,
+      status: isLegacyFallbackEnabled() ? 401 : 403,
+      error: isLegacyFallbackEnabled()
+        ? "Unauthorized worker request."
+        : "Legacy worker secret fallback disabled.",
+    };
+  }
+
+  recordDeniedMetric("denied");
+  return {
+    ok: false,
+    status: 401,
+    error: "Unauthorized worker request.",
+  };
+}
+
 module.exports = {
   DEFAULT_SERVICE_ACCOUNT_ID,
   WORKER_HTTP_PERMISSION,
@@ -423,6 +505,10 @@ module.exports = {
   accountHasPermission,
   verifyMachineIdentity,
   verifyMachineIdentityWithClient,
+  verifyWorkerRouteAccess,
+  getWorkerSharedSecret,
+  hasLegacySecretAttempt,
+  hasValidWorkerSecret,
   getSupabaseAdmin,
   setSupabaseAdmin,
   resetSupabaseAdmin,

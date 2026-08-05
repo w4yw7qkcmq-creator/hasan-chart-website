@@ -36,11 +36,14 @@ process.on("unhandledRejection", (reason) => {
   process.exit(1);
 });
 
-logBoot("BEFORE_REQUIRE", { modules: ["http", "crypto", "path"] });
+logBoot("BEFORE_REQUIRE", { modules: ["http", "path"] });
 const http = require("http");
-const crypto = require("crypto");
 const path = require("path");
-logBoot("AFTER_REQUIRE", { modules: ["http", "crypto", "path"] });
+const {
+  verifyWorkerRouteAccess,
+  isLegacyFallbackEnabled,
+} = require("./lib/machine-auth");
+logBoot("AFTER_REQUIRE", { modules: ["http", "path", "./lib/machine-auth"] });
 
 function loadRuntimeModules() {
   logBoot("BEFORE_REQUIRE", { module: "dotenv" });
@@ -87,53 +90,22 @@ function createSupabaseClient() {
   });
 }
 
-function secureCompare(provided, expected) {
-  if (!provided || !expected) return false;
-
-  const providedBuffer = Buffer.from(String(provided));
-  const expectedBuffer = Buffer.from(String(expected));
-
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+function resolveMaintenanceServiceAccountId() {
+  return String(
+    process.env.IAM_SUBSCRIPTION_MAINTENANCE_SERVICE_ACCOUNT_ID ||
+      "subscription-maintenance-worker"
+  ).trim();
 }
 
-function getCronSecretFromRequest(req) {
-  const authHeader = String(req.headers.authorization || "");
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-  const headerSecret = String(req.headers["x-cron-secret"] || "").trim();
-  const querySecret = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
-    .searchParams.get("secret")
-    ?.trim();
-
-  return bearer || headerSecret || querySecret || "";
+function resolveMaintenanceRequiredPermission() {
+  return String(process.env.IAM_SUBSCRIPTION_MAINTENANCE_PERMISSION || "subscriptions.manage").trim();
 }
 
-function verifyCronSecret(req) {
-  const secret =
-    process.env.CRON_SECRET?.trim() || process.env.ADMIN_CRON_SECRET?.trim();
-
-  if (!secret) {
-    return {
-      ok: false,
-      status: 503,
-      error: "Cron secret is not configured on the worker.",
-    };
-  }
-
-  const provided = getCronSecretFromRequest(req);
-
-  if (!secureCompare(provided, secret)) {
-    return {
-      ok: false,
-      status: 401,
-      error: "Unauthorized cron request.",
-    };
-  }
-
-  return { ok: true };
+async function verifyMaintenanceAccess(req) {
+  return verifyWorkerRouteAccess(req, {
+    allowedServiceAccountIds: [resolveMaintenanceServiceAccountId()],
+    requiredPermission: resolveMaintenanceRequiredPermission(),
+  });
 }
 
 function sendJson(res, statusCode, payload) {
@@ -204,6 +176,8 @@ async function handleHealth(_req, res) {
     service: SERVICE_NAME,
     workerEntry: WORKER_ENTRY,
     workerEnabled: isWorkerFeatureEnabled(),
+    legacyFallbackEnabled: isLegacyFallbackEnabled(),
+    machineAuthServiceAccount: resolveMaintenanceServiceAccountId(),
     timestamp: new Date().toISOString(),
   });
 }
@@ -213,7 +187,7 @@ async function handleRun(req, res) {
     method: req.method,
     url: req.url,
   });
-  const authCheck = verifyCronSecret(req);
+  const authCheck = await verifyMaintenanceAccess(req);
 
   if (!authCheck.ok) {
     sendJson(res, authCheck.status, {

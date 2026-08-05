@@ -45,6 +45,7 @@ async function main() {
   });
 
   const accounts = [
+    { id: "subscription-maintenance-worker", secretKey: "STAGING_IAM_SUBSCRIPTION_MAINTENANCE_SECRET" },
     { id: "cron", secretKey: "STAGING_IAM_CRON_SECRET" },
     { id: "news-worker", secretKey: "STAGING_IAM_NEWS_WORKER_SECRET" },
     { id: "price-alert-worker", secretKey: "STAGING_IAM_PRICE_ALERT_WORKER_SECRET", legacyKey: "STAGING_IAM_PRICE_ALERT_SECRET" },
