@@ -1,0 +1,17 @@
+# HasaN CharT World — AI Worker (Instant Analysis HTTP API)
+# Railway service: AI Worker | Root Directory = worker | Config File = railway.ai.toml
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+
+[env]
+AI_WORKER_ENABLED = "true"
+PRICE_ALERT_WORKER_ENABLED = "false"
+IAM_INSTANT_ANALYSIS_WORKER_SERVICE_ACCOUNT_ID = "instant-analysis-worker"

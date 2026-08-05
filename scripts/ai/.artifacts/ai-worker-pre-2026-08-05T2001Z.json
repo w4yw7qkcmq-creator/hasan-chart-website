@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-08-05T2001Z",
+  "phase": "pre-closure",
+  "headCommit": "9c79bda",
+  "aiWorkerUrl": "https://ai-worker-production-a6ea.up.railway.app",
+  "webHealth": {
+    "status": "ok"
+  },
+  "aiWorkerHealth": {
+    "http": 503,
+    "service": "hasan-chart-price-alerts-worker",
+    "readiness": false,
+    "invalidKey": "NEXT_PUBLIC_SITE_URL"
+  },
+  "rootCause": "AI Worker shared price-alerts health gate with invalid NEXT_PUBLIC_SITE_URL (no https)"
+}

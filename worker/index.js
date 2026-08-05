@@ -32,14 +32,23 @@ const {
   getChannelFeatureFlags,
   DEFAULT_MAX_ALERTS_PER_RUN,
 } = require("./alerts/price-alerts-env");
+const {
+  isAiWorkerPrimaryMode,
+  validateAiWorkerEnvironment,
+} = require("./ai/ai-worker-env");
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
 const openaiApiKey = process.env.OPENAI_API_KEY;
 
-const environmentValidation = validatePriceAlertsEnvironment();
-const CHECK_INTERVAL_MS = environmentValidation.checkIntervalMs || resolveCheckIntervalMs();
+const AI_WORKER_PRIMARY = isAiWorkerPrimaryMode();
+const environmentValidation = AI_WORKER_PRIMARY
+  ? validateAiWorkerEnvironment()
+  : validatePriceAlertsEnvironment();
+const CHECK_INTERVAL_MS = AI_WORKER_PRIMARY
+  ? 0
+  : environmentValidation.checkIntervalMs || resolveCheckIntervalMs();
 const MAX_ALERTS_PER_RUN =
   environmentValidation.maxAlertsPerRun ||
   Number(process.env.PRICE_ALERT_MAX_ALERTS_PER_RUN) ||
@@ -63,17 +72,25 @@ if (!startupReady) {
 }
 
 if (!configurationReady) {
-  console.error(
-    "PRICE_ALERT_WORKER_MISCONFIGURED",
-    JSON.stringify({
-      missingRequiredCount: environmentValidation.missingRequiredCount,
-      invalidRequiredCount: environmentValidation.invalidRequiredCount,
-      missing: environmentValidation.missingRequired,
-      invalid: environmentValidation.invalidRequired,
-      channelFlags: environmentValidation.channelFlags,
-      dependencies: environmentValidation.dependencies,
-    })
-  );
+  const misconfiguredPayload = {
+    missingRequiredCount: environmentValidation.missingRequiredCount,
+    invalidRequiredCount: environmentValidation.invalidRequiredCount,
+    missing: environmentValidation.missingRequired,
+    invalid: environmentValidation.invalidRequired,
+    workerMode: AI_WORKER_PRIMARY ? "ai" : "price_alerts",
+  };
+  if (AI_WORKER_PRIMARY) {
+    console.error("AI_WORKER_MISCONFIGURED", JSON.stringify(misconfiguredPayload));
+  } else {
+    console.error(
+      "PRICE_ALERT_WORKER_MISCONFIGURED",
+      JSON.stringify({
+        ...misconfiguredPayload,
+        channelFlags: environmentValidation.channelFlags,
+        dependencies: environmentValidation.dependencies,
+      })
+    );
+  }
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -122,7 +139,9 @@ const {
 const { startPriceAlertScheduler, getProcessMetadata } = require("./lib/price-alert-scheduler");
 const { processRetryableDeliveries } = require("./lib/price-alert-retry-processor");
 
-const channelFeatureFlags = environmentValidation.channelFlags || getChannelFeatureFlags();
+const channelFeatureFlags = AI_WORKER_PRIMARY
+  ? { site: false, push: false, email: false }
+  : environmentValidation.channelFlags || getChannelFeatureFlags();
 const processMetadata = getProcessMetadata();
 
 const WORKER_ENTRY = "worker/index.js";
@@ -1350,10 +1369,51 @@ async function checkPriceAlerts(options = {}) {
 }
 
 app.get("/health", async (_req, res) => {
-  const vapidStatus = getVapidEnvStatus();
   const { getWorkerAuthMetrics } = require("./worker-security");
-  const envValidation = validatePriceAlertsEnvironment();
-  const readiness = envValidation.ok && isPriceAlertWorkerEnabled();
+  const buildCommit = process.env.RAILWAY_GIT_COMMIT_SHA
+    ? process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7)
+    : null;
+
+  if (AI_WORKER_PRIMARY) {
+    const { getAiWorkerMetrics } = require("./lib/ai-worker-metrics");
+    const aiValidation = validateAiWorkerEnvironment();
+    const readiness = aiValidation.ok && startupReady;
+    const workerAuth = getWorkerAuthMetrics();
+
+    const body = {
+      success: readiness,
+      status: readiness ? "online" : "misconfigured",
+      readiness,
+      service: "hasan-chart-ai-worker",
+      runtimeMode: process.env.NODE_ENV || "production",
+      environmentValidation: {
+        ok: aiValidation.ok,
+        missingRequiredCount: aiValidation.missingRequiredCount,
+        invalidRequiredCount: aiValidation.invalidRequiredCount,
+      },
+      machineAuth: {
+        configured: workerAuth.machineAuthConfigured,
+        serviceAccountId: aiValidation.machineAuth.serviceAccountId,
+        legacyFallbackEnabled: aiValidation.machineAuth.legacyFallbackEnabled,
+      },
+      dependencies: aiValidation.dependencies,
+      runtime: {
+        ...aiValidation.runtime,
+        activeJobs: getAiWorkerMetrics().activeJobs,
+        queueDepth: getAiWorkerMetrics().activeJobs,
+      },
+      metrics: getAiWorkerMetrics(),
+      build: { commit: buildCommit },
+      workerEntry: WORKER_ENTRY,
+      timestamp: new Date().toISOString(),
+    };
+
+    return res.status(readiness ? 200 : 503).json(body);
+  }
+
+  const vapidStatus = getVapidEnvStatus();
+  const priceValidation = validatePriceAlertsEnvironment();
+  const readiness = priceValidation.ok && isPriceAlertWorkerEnabled();
   const lockMetrics = getDistributedLockMetrics();
   const cycleMetrics = getCycleMetrics();
 
@@ -1368,12 +1428,12 @@ app.get("/health", async (_req, res) => {
     maxAlertsPerRun: MAX_ALERTS_PER_RUN,
     currentCycleInFlight: cycleMetrics.currentCycleInFlight,
     environmentValidation: {
-      ok: envValidation.ok,
-      missingRequiredCount: envValidation.missingRequiredCount,
-      invalidRequiredCount: envValidation.invalidRequiredCount,
+      ok: priceValidation.ok,
+      missingRequiredCount: priceValidation.missingRequiredCount,
+      invalidRequiredCount: priceValidation.invalidRequiredCount,
     },
-    channelFlags: envValidation.channelFlags,
-    dependencies: envValidation.dependencies,
+    channelFlags: priceValidation.channelFlags,
+    dependencies: priceValidation.dependencies,
     metrics: {
       ...cycleMetrics,
       distributedLockAcquired: lockMetrics.distributedLockAcquired,
@@ -1381,11 +1441,7 @@ app.get("/health", async (_req, res) => {
       distributedLockRecovered: lockMetrics.distributedLockRecovered,
       distributedLockErrors: lockMetrics.distributedLockErrors,
     },
-    build: {
-      commit: process.env.RAILWAY_GIT_COMMIT_SHA
-        ? process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7)
-        : null,
-    },
+    build: { commit: buildCommit },
     workerEntry: WORKER_ENTRY,
     priceAlertsModuleVersion: PRICE_ALERTS_MODULE_VERSION,
     webPushConfigured: vapidStatus.configured,
@@ -1401,6 +1457,17 @@ app.post(
   workerAccessDeniedMiddleware,
   instantAnalysisRateLimitMiddleware,
   async (req, res) => {
+  if (!configurationReady) {
+    return res.status(503).json({
+      success: false,
+      code: "WORKER_NOT_READY",
+      error: "Worker is not ready to accept analysis jobs.",
+    });
+  }
+
+  const { markJobQueued, markJobCompleted, markJobFailed } = require("./lib/ai-worker-metrics");
+  const jobStartedAt = Date.now();
+
   try {
     const symbol = normalizeSymbol(req.body?.symbol);
 
@@ -1433,6 +1500,7 @@ app.post(
       symbol,
       createdAt: new Date().toISOString(),
     });
+    markJobQueued();
 
     process.nextTick(async () => {
       try {
@@ -1456,6 +1524,7 @@ app.post(
           result: analysis,
           completedAt: new Date().toISOString(),
         });
+        markJobCompleted(Date.now() - jobStartedAt);
       } catch (error) {
         analysisJobs.set(jobId, {
           id: jobId,
@@ -1463,6 +1532,7 @@ app.post(
           error: error?.message || "ANALYSIS_FAILED",
           failedAt: new Date().toISOString(),
         });
+        markJobFailed(error?.message || "ANALYSIS_FAILED");
       }
     });
 
@@ -1510,84 +1580,110 @@ app.get(
 );
 
 app.listen(PORT, () => {
-  const vapidStatus = getVapidEnvStatus();
-
-  if (!vapidStatus.configured) {
-    console.log("push:vapid:missing", {
-      worker: WORKER_ENTRY,
-      ...vapidStatus,
-      hint: "Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT on Railway worker",
-    });
+  if (AI_WORKER_PRIMARY) {
+    console.log(
+      "ai_worker_startup_validated",
+      JSON.stringify({
+        workerEnabled: true,
+        maxConcurrency: environmentValidation.runtime?.maxConcurrency,
+        jobTimeoutMs: environmentValidation.runtime?.jobTimeoutMs,
+        machineAuth: environmentValidation.machineAuth,
+        dependencies: environmentValidation.dependencies,
+        instanceId: getInstanceId(),
+      })
+    );
   } else {
-    console.log("push:vapid:ready", {
-      worker: WORKER_ENTRY,
-      hasPublicKey: vapidStatus.hasPublicKey,
-      hasPrivateKey: vapidStatus.hasPrivateKey,
-      hasSubject: vapidStatus.hasSubject,
-      subjectPreview: vapidStatus.subjectPreview,
-    });
+    const vapidStatus = getVapidEnvStatus();
+
+    if (!vapidStatus.configured) {
+      console.log("push:vapid:missing", {
+        worker: WORKER_ENTRY,
+        ...vapidStatus,
+        hint: "Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT on Railway worker",
+      });
+    } else {
+      console.log("push:vapid:ready", {
+        worker: WORKER_ENTRY,
+        hasPublicKey: vapidStatus.hasPublicKey,
+        hasPrivateKey: vapidStatus.hasPrivateKey,
+        hasSubject: vapidStatus.hasSubject,
+        subjectPreview: vapidStatus.subjectPreview,
+      });
+    }
   }
 
-  logWorkerEvent("PRICE_ALERT_WORKER_STARTED", {
-    worker: WORKER_ENTRY,
-    service: "hasan-chart-price-alerts-worker",
-    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    port: PORT,
-    checkIntervalMs: CHECK_INTERVAL_MS,
-    priceAlertsEnabled: true,
-    webPushConfigured: vapidStatus.configured,
-    vapidStatus,
-    note: "Price alert delivery: worker/index.js deliverRealPriceAlert (notification + push + email)",
-  });
-
-  logWorkerEvent("WORKER_BOOT", {
-    worker: WORKER_ENTRY,
-    service: "hasan-chart-price-alerts-worker",
-    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    port: PORT,
-    checkIntervalMs: CHECK_INTERVAL_MS,
-    priceAlertsEnabled: true,
-    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
-    note: "Price alerts: worker/index.js deliverRealPriceAlert only",
-  });
-
-  console.log(
-    "PRICE_ALERT_SINGLE_PATH",
-    JSON.stringify({
-      phase: "worker-listening",
-      path: PRICE_ALERT_SINGLE_PATH,
+  if (!AI_WORKER_PRIMARY) {
+    const vapidStatus = getVapidEnvStatus();
+    logWorkerEvent("PRICE_ALERT_WORKER_STARTED", {
+      worker: WORKER_ENTRY,
+      service: "hasan-chart-price-alerts-worker",
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
       port: PORT,
       checkIntervalMs: CHECK_INTERVAL_MS,
-      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    })
-  );
-
-  cleanupOldRuns(getSupabaseClient)
-    .then((result) => {
-      if (result.ok) {
-        console.log(
-          "PRICE_ALERT_TELEMETRY_CLEANUP",
-          JSON.stringify({ deleted: result.deleted, retentionDays: result.retentionDays })
-        );
-      }
-    })
-    .catch(() => {});
-
-  if (isPriceAlertWorkerEnabled() && configurationReady) {
-    startPriceAlertScheduler({
-      intervalMs: CHECK_INTERVAL_MS,
-      enabled: true,
-      runCycle: ({ triggerSource }) => checkPriceAlerts({ triggerSource }),
+      priceAlertsEnabled: true,
+      webPushConfigured: vapidStatus.configured,
+      vapidStatus,
+      note: "Price alert delivery: worker/index.js deliverRealPriceAlert (notification + push + email)",
     });
-  }
 
-  logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
-    worker: WORKER_ENTRY,
-    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-    intervalMs: CHECK_INTERVAL_MS,
-    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
-    enabled: isPriceAlertWorkerEnabled(),
-    processStartedAt: processMetadata.processStartedAt,
-    deploymentId: processMetadata.deploymentId,
-  });
+    logWorkerEvent("WORKER_BOOT", {
+      worker: WORKER_ENTRY,
+      service: "hasan-chart-price-alerts-worker",
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+      port: PORT,
+      checkIntervalMs: CHECK_INTERVAL_MS,
+      priceAlertsEnabled: true,
+      priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
+      note: "Price alerts: worker/index.js deliverRealPriceAlert only",
+    });
+
+    console.log(
+      "PRICE_ALERT_SINGLE_PATH",
+      JSON.stringify({
+        phase: "worker-listening",
+        path: PRICE_ALERT_SINGLE_PATH,
+        port: PORT,
+        checkIntervalMs: CHECK_INTERVAL_MS,
+        moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+      })
+    );
+
+    cleanupOldRuns(getSupabaseClient)
+      .then((result) => {
+        if (result.ok) {
+          console.log(
+            "PRICE_ALERT_TELEMETRY_CLEANUP",
+            JSON.stringify({ deleted: result.deleted, retentionDays: result.retentionDays })
+          );
+        }
+      })
+      .catch(() => {});
+
+    if (isPriceAlertWorkerEnabled() && configurationReady) {
+      startPriceAlertScheduler({
+        intervalMs: CHECK_INTERVAL_MS,
+        enabled: true,
+        runCycle: ({ triggerSource }) => checkPriceAlerts({ triggerSource }),
+      });
+    }
+
+    logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
+      worker: WORKER_ENTRY,
+      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+      intervalMs: CHECK_INTERVAL_MS,
+      priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
+      enabled: isPriceAlertWorkerEnabled(),
+      processStartedAt: processMetadata.processStartedAt,
+      deploymentId: processMetadata.deploymentId,
+    });
+  } else {
+    console.log(
+      "AI_WORKER_LISTENING",
+      JSON.stringify({
+        port: PORT,
+        service: "hasan-chart-ai-worker",
+        deploymentId: processMetadata.deploymentId,
+      })
+    );
+  }
 });
