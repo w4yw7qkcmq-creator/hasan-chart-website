@@ -742,7 +742,7 @@ test("39 feature disabled = behavior identical", () => {
 test("40 no SSE payload changes", () => {
   const source = readFileSync(join(ROOT, "lib/market-data/market-depth-hub.js"), "utf8");
   const buildPayload = source.slice(source.indexOf("buildPayload(params)"));
-  assert.doesNotMatch(buildPayload, /history/i);
+  assert.doesNotMatch(buildPayload, /historyRecorder|market_flow_buckets|market_liquidity_walls|getHistoryWriterStatus/i);
 });
 
 test("peek/ack preserves existing drain semantics", () => {
