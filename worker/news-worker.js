@@ -24,6 +24,19 @@ const {
   releaseCycleLock,
   isCycleInFlight,
 } = require("./lib/news-worker-cycle-lock");
+const {
+  acquireDistributedCycleLock,
+  releaseDistributedCycleLock,
+  getDistributedLockMetrics,
+} = require("./lib/news-worker-distributed-lock");
+const {
+  createRunId,
+  buildCycleTelemetryRow,
+  persistCycleTelemetry,
+  maybeCleanupOldTelemetry,
+  getTelemetrySnapshot,
+} = require("./lib/news-worker-cycle-telemetry");
+const { auditSitePublishParity, auditHistoricalMissingSitePosts } = require("./lib/news-site-recovery");
 
 const WebSocket = require("ws");
 global.WebSocket = WebSocket;
@@ -2349,7 +2362,7 @@ async function saveNewsPostToSupabase(post) {
     const slug = post.slug || (await buildUniqueNewsSlug(post.title || post.content, post.source_link));
     console.log("🔗 News slug:", slug);
 
-    const { error } = await client
+    const { data, error } = await client
       .from("news_posts")
       .upsert(
         [
@@ -2364,14 +2377,16 @@ async function saveNewsPostToSupabase(post) {
           },
         ],
         { onConflict: "source_link" }
-      );
+      )
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       console.error("❌ News Post Save Error:", error.message);
       return { error: error.message };
     }
 
-    return { ok: true };
+    return { ok: true, id: data?.id || null };
   } catch (error) {
     console.error("❌ News Post Save Exception:", error.message);
     return { error: error.message };
@@ -2457,8 +2472,10 @@ async function sendTelegramMessage(message) {
     });
 
     console.log("✅ Message sent to Telegram");
+    return { ok: true };
   } catch (error) {
     console.error("❌ Telegram Error:", error.response?.data || error.message);
+    return { ok: false, error: error.message };
   }
 }
 
@@ -3420,14 +3437,63 @@ async function fetchForexNews(options = {}) {
   const dryRun = options.dryRun === true || NEWS_DRY_RUN;
   const skipScheduledAlerts = options.skipScheduledAlerts === true || dryRun;
   const cycleStartedAt = Date.now();
+  const cycleStartedIso = new Date(cycleStartedAt).toISOString();
+  const runId = createRunId();
   const stats = createEmptyCycleStats();
 
   const lock = acquireCycleLock();
   if (!lock.acquired) {
     recordCycleSkippedOverlap();
     console.log("⏭️ Previous news fetch still running. Skipping overlap.", JSON.stringify({ owner: lock.owner }));
+    await persistCycleTelemetry(
+      getSupabaseClient,
+      buildCycleTelemetryRow({
+        runId,
+        startedAt: cycleStartedIso,
+        completedAt: new Date().toISOString(),
+        stats: { cycleDurationMs: 0 },
+        status: "overlap",
+        lock: { acquired: false, contended: true },
+        buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA,
+      })
+    );
     return { skipped: true, reason: "overlap", stats };
   }
+
+  let distributedOwner = null;
+  let distributedLockName = "news_worker_cycle";
+  const distributedLock = await acquireDistributedCycleLock(getSupabaseClient);
+  if (!distributedLock.acquired) {
+    releaseCycleLock();
+    recordCycleSkippedOverlap();
+    console.log(
+      "⏭️ Distributed news cycle lock contended or unavailable.",
+      JSON.stringify({
+        reason: distributedLock.reason,
+        owner: distributedLock.owner,
+        distributed: distributedLock.distributed,
+      })
+    );
+    await persistCycleTelemetry(
+      getSupabaseClient,
+      buildCycleTelemetryRow({
+        runId,
+        startedAt: cycleStartedIso,
+        completedAt: new Date().toISOString(),
+        stats: { cycleDurationMs: Date.now() - cycleStartedAt, lastErrorSafe: distributedLock.reason },
+        status: "overlap",
+        lock: { acquired: false, contended: true },
+        buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA,
+      })
+    );
+    return {
+      skipped: true,
+      reason: distributedLock.reason || "distributed_lock_contended",
+      stats,
+    };
+  }
+  distributedOwner = distributedLock.owner;
+  distributedLockName = distributedLock.lockName || distributedLockName;
 
   isFetchingNews = true;
   recordCycleStart();
@@ -3702,6 +3768,14 @@ async function fetchForexNews(options = {}) {
         stats.rejectedDuplicate += 1;
         recordRejection(stats, "duplicate_after_ai_cluster", latestNews.title);
         if (!dryRun) {
+          console.log(
+            "SITE_PUBLISH_DEDUPE_MARKER",
+            JSON.stringify({
+              link: latestLink,
+              topicCluster: combinedTopicCluster,
+              titlePreview: String(latestNews.title || "").slice(0, 80),
+            })
+          );
           savePublishedNewsLink(latestLink, combinedNewsIdentity);
           await savePublishedNewsToSupabase({
             link: latestLink,
@@ -3860,6 +3934,31 @@ async function fetchForexNews(options = {}) {
     return stats;
   } finally {
     isFetchingNews = false;
+    const completedAt = new Date().toISOString();
+    const cycleStatus =
+      stats.lastErrorSafe && stats.cycleDurationMs > 0
+        ? "failed"
+        : stats.cycleDurationMs > 0
+          ? "success"
+          : "skipped";
+    await persistCycleTelemetry(
+      getSupabaseClient,
+      buildCycleTelemetryRow({
+        runId,
+        startedAt: cycleStartedIso,
+        completedAt,
+        stats,
+        status: cycleStatus,
+        lock: {
+          acquired: Boolean(distributedOwner),
+          contended: false,
+        },
+        buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA,
+      })
+    );
+    if (distributedOwner) {
+      await releaseDistributedCycleLock(getSupabaseClient, distributedOwner, distributedLockName);
+    }
     releaseCycleLock();
   }
 }
@@ -3974,7 +4073,11 @@ function getNewsWorkerHealthSnapshot() {
       aiConfigured: Boolean(OPENAI_API_KEY),
       sourcesConfigured: NEWS_FEEDS.length > 0,
     },
-    metrics: getMetricsSnapshot(),
+    metrics: {
+      ...getMetricsSnapshot(),
+      distributedLock: getDistributedLockMetrics(),
+      telemetry: getTelemetrySnapshot(),
+    },
     running: !isFetchingNews,
     lastCycleCompletedAt,
     lastSuccessfulFetchAt,
@@ -4030,6 +4133,8 @@ module.exports = {
   getRequiredEnvStatus,
   runEconomicReleaseDryRun,
   startupValidation,
+  auditSitePublishParity,
+  auditHistoricalMissingSitePosts,
 };
 
 if (process.env.NEWS_WORKER_NO_BOOT === "1") {
@@ -4067,6 +4172,11 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
 
   logWorkerEnvStatus();
   startHealthServer();
+  maybeCleanupOldTelemetry(getSupabaseClient).then((result) => {
+    if (result?.cleaned) {
+      console.log("NEWS_WORKER_TELEMETRY_CLEANUP", JSON.stringify({ deleted: result.deleted, retentionDays: result.retentionDays }));
+    }
+  });
 
   console.log(
     "WORKER_BOOT",
