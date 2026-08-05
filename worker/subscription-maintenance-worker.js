@@ -335,6 +335,7 @@ function startServer() {
     cwd: process.cwd(),
     nodeEnv: process.env.NODE_ENV || "development",
     workerEnabledEnv: process.env.SUBSCRIPTION_MAINTENANCE_WORKER_ENABLED || "false",
+    runtimeMode: "always-on-http-server",
   });
 
   loadRuntimeModules();

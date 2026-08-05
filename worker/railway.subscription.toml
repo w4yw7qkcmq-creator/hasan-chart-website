@@ -1,10 +1,15 @@
 # Subscription maintenance worker — Railway service: "Subscription Worker"
-# Root Directory = worker
+# Root Directory MUST be: worker
+# Config File MUST be: railway.subscription.toml  (set in Railway Dashboard → Settings → Config)
+# Service type MUST be: Web Service (always-on) — NOT Cron Job / one-shot
+# Do NOT set SUBSCRIPTION_WORKER_ONESHOT on this service.
 
 [build]
 builder = "NIXPACKS"
 
 [deploy]
 startCommand = "node subscription-maintenance-worker.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
