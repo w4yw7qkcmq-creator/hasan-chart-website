@@ -29,7 +29,7 @@ function testNoProofBlobInListColumns() {
 }
 
 function testIncludeTotalExplicit() {
-  assert.match(read("lib/financial-center/subscription-service.js"), /includeTotal/);
+  assert.match(read("lib/financial-center/build-financial-list-query.js"), /includeTotal/);
   assert.match(read("app/api/admin/financial-center/route.js"), /includeTotal/);
 }
 
@@ -39,9 +39,9 @@ function testNoSignedUrlInPaymentList() {
   assert.match(payment, /proofAvailable/);
 }
 
-function testClientFilterScanCap() {
-  assert.match(read("lib/financial-center/financial-center-shared.js"), /FINANCIAL_CLIENT_FILTER_SCAN_MAX = 500/);
-  assert.doesNotMatch(read("lib/financial-center/subscription-service.js"), /limit\(1000\)/);
+function testDbLevelPaginationOnly() {
+  assert.match(read("lib/financial-center/build-financial-list-query.js"), /fetchFinancialSubscriptionsPage/);
+  assert.doesNotMatch(read("lib/financial-center/subscription-service.js"), /FINANCIAL_CLIENT_FILTER/);
 }
 
 function testCacheControl() {
@@ -49,7 +49,10 @@ function testCacheControl() {
 }
 
 function testDetailSignedUrlSeparate() {
-  assert.match(read("app/api/admin/financial-center/payment-proof/[requestId]/route.js"), /signedUrl|createAdminPaymentProofSignedReadUrl/);
+  assert.match(
+    read("app/api/admin/financial-center/payment-proof/[requestId]/route.js"),
+    /signedUrl|createAdminPaymentProofSignedReadUrl/
+  );
 }
 
 const tests = [
@@ -57,7 +60,7 @@ const tests = [
   testNoProofBlobInListColumns,
   testIncludeTotalExplicit,
   testNoSignedUrlInPaymentList,
-  testClientFilterScanCap,
+  testDbLevelPaginationOnly,
   testCacheControl,
   testDetailSignedUrlSeparate,
 ];
