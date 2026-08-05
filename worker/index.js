@@ -201,8 +201,6 @@ const PORT = Number(process.env.PORT || 3000);
 app.use(cors(createWorkerCorsOptions()));
 app.use(express.json({ limit: "2mb" }));
 
-const analysisJobs = new Map();
-
 const escapeHtml = (value) =>
   String(value || "")
     .replaceAll("&", "&amp;")
@@ -1466,7 +1464,13 @@ app.post(
   }
 
   const { markJobQueued, markJobCompleted, markJobFailed } = require("./lib/ai-worker-metrics");
-  const jobStartedAt = Date.now();
+  const {
+    createJob,
+    getJob,
+    jobRowToStatusPayload,
+  } = require("./lib/instant-analysis-job-store");
+  const { processInstantAnalysisJob } = require("./lib/instant-analysis-processor");
+  const { getInstanceId } = require("./lib/price-alert-distributed-lock");
 
   try {
     const symbol = normalizeSymbol(req.body?.symbol);
@@ -1493,53 +1497,61 @@ app.post(
 
     const resolvedExecutionTimeframe = timeframeResolution.key;
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    analysisJobs.set(jobId, {
-      id: jobId,
-      status: "processing",
+    const requestId = req.body?.requestId || req.body?.request_id || null;
+    const supabase = getSupabaseClient();
+    const created = await createJob(supabase, {
+      jobId,
       symbol,
-      createdAt: new Date().toISOString(),
+      executionTimeframe: resolvedExecutionTimeframe,
+      requestId,
     });
+
+    if (!created.ok) {
+      return res.status(500).json({
+        success: false,
+        code: created.code || "JOB_CREATE_FAILED",
+        error: "تعذر إنشاء مهمة التحليل.",
+      });
+    }
+
     markJobQueued();
+    const ownerId = getInstanceId();
+    const authMode =
+      req.headers["x-service-account-id"] && req.headers["x-service-account-secret"]
+        ? "machine"
+        : req.headers.authorization
+          ? "legacy"
+          : "none";
 
-    process.nextTick(async () => {
-      try {
-        const { runInstantAnalysisV2 } = require("./lib/instant-analysis-v2/pipeline");
-        const { normalizeV2ToV1Legacy } = require("./lib/instant-analysis-v2/normalize-v1");
-
-        const v2Result = await runInstantAnalysisV2({
-          symbol,
-          analysisId: jobId,
-          fetchCandles: getMarketCandles,
-          fetchPrice: getMarketPrice,
-          openaiApiKey,
-          executionTimeframe: resolvedExecutionTimeframe,
-        });
-
-        const analysis = normalizeV2ToV1Legacy(v2Result);
-
-        analysisJobs.set(jobId, {
-          id: jobId,
-          status: "completed",
-          result: analysis,
-          completedAt: new Date().toISOString(),
-        });
-        markJobCompleted(Date.now() - jobStartedAt);
-      } catch (error) {
-        analysisJobs.set(jobId, {
-          id: jobId,
-          status: "failed",
-          error: error?.message || "ANALYSIS_FAILED",
-          failedAt: new Date().toISOString(),
-        });
-        markJobFailed(error?.message || "ANALYSIS_FAILED");
-      }
+    process.nextTick(() => {
+      processInstantAnalysisJob({
+        supabase,
+        jobId,
+        symbol,
+        executionTimeframe: resolvedExecutionTimeframe,
+        requestId,
+        ownerId,
+        openaiApiKey,
+        fetchCandles: getMarketCandles,
+        fetchPrice: getMarketPrice,
+        authMode,
+        deploymentId: processMetadata.deploymentId,
+        buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || null,
+        markJobCompleted,
+        markJobFailed,
+      }).catch((error) => {
+        console.error(
+          "INSTANT_ANALYSIS_JOB_UNHANDLED",
+          JSON.stringify({ jobId, reason: String(error?.message || error).slice(0, 120) })
+        );
+      });
     });
 
     return res.json({
       success: true,
       queued: true,
       jobId,
+      existing: Boolean(created.existing),
     });
   } catch (error) {
     return res.status(500).json({
@@ -1556,10 +1568,11 @@ app.get(
   async (req, res) => {
   try {
     const jobId = String(req.params?.jobId || "").trim();
+    const supabase = getSupabaseClient();
+    const job = await getJob(supabase, jobId);
+    const payload = jobRowToStatusPayload(job);
 
-    const job = analysisJobs.get(jobId);
-
-    if (!job) {
+    if (!payload) {
       return res.status(404).json({
         success: false,
         error: "JOB_NOT_FOUND",
@@ -1568,7 +1581,7 @@ app.get(
 
     return res.json({
       success: true,
-      ...job,
+      ...payload,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1677,6 +1690,30 @@ app.listen(PORT, () => {
       deploymentId: processMetadata.deploymentId,
     });
   } else {
+    const {
+      recoverStaleJobs,
+      getRecoveryMetrics,
+    } = require("./lib/instant-analysis-job-store");
+
+    recoverStaleJobs(getSupabaseClient())
+      .then((result) => {
+        console.log(
+          "AI_WORKER_STARTUP_RECOVERY",
+          JSON.stringify({
+            ok: result.ok,
+            requeued: result.requeued || 0,
+            timedOut: result.timed_out || 0,
+            metrics: getRecoveryMetrics(),
+          })
+        );
+      })
+      .catch((error) => {
+        console.warn(
+          "AI_WORKER_STARTUP_RECOVERY_FAILED",
+          JSON.stringify({ reason: String(error?.message || error).slice(0, 120) })
+        );
+      });
+
     console.log(
       "AI_WORKER_LISTENING",
       JSON.stringify({

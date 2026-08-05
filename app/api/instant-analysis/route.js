@@ -80,6 +80,7 @@ export async function POST(request) {
         body: {
           ...body,
           symbol,
+          requestId: reservation.requestId,
           source: body?.source || "my-dashboard",
         },
       });
