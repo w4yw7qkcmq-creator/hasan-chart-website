@@ -1,10 +1,9 @@
-# HasaN CharT World — price alerts worker service
-# Railway service setting: Root Directory = worker
+# HasaN CharT World — worker services (Railway Root Directory = worker)
+# Per-service start commands are set on Railway (Subscription Worker → subscription-maintenance-worker.js).
 
 [build]
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "npm start"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
