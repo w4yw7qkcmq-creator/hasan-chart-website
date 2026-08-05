@@ -71,6 +71,9 @@ function getEconomicReleaseImpactText(title, actualValue, forecastValue) {
 }
 
 function formatEconomicReleaseMessage(event, canonical) {
+  if (!event) {
+    throw new Error("Cannot format economic release without merged event");
+  }
   const labels = getFieldLabels(canonical);
   const previous = wrapLtrNumber(formatDisplayValue(event.previous));
   const forecast = wrapLtrNumber(formatDisplayValue(event.forecast));

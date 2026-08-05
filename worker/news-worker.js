@@ -6,6 +6,25 @@ const axios = require("axios");
 const FormData = require("form-data");
 require("dotenv").config();
 
+const {
+  validateNewsWorkerEnvironment,
+  assertNewsWorkerEnvironmentOrThrow,
+  isNewsWorkerEnabled,
+  getPollIntervalMs,
+} = require("./news/news-worker-env");
+const {
+  recordCycleStart,
+  recordCycleSuccess,
+  recordCycleFailure,
+  recordCycleSkippedOverlap,
+  getMetricsSnapshot,
+} = require("./lib/news-worker-metrics");
+const {
+  acquireCycleLock,
+  releaseCycleLock,
+  isCycleInFlight,
+} = require("./lib/news-worker-cycle-lock");
+
 const WebSocket = require("ws");
 global.WebSocket = WebSocket;
 
@@ -1369,6 +1388,8 @@ function normalizeExternalImageUrl(value, baseUrl = "https://www.investing.com")
       : new URL(candidate, baseUrl).href;
 
     if (!/^https?:\/\//i.test(normalizedUrl)) return null;
+    const { isSafeExternalFetchUrl } = require("./news-fetch-security");
+    if (!isSafeExternalFetchUrl(normalizedUrl)) return null;
     if (/t\.me|telegram\.me|telegram\.org/i.test(normalizedUrl)) return null;
     if (/logo|icon|avatar|author|profile|sprite|favicon|placeholder|default|blank|pixel|1x1/i.test(normalizedUrl)) return null;
     if (/\.svg(\?|$)/i.test(normalizedUrl)) return null;
@@ -3401,12 +3422,15 @@ async function fetchForexNews(options = {}) {
   const cycleStartedAt = Date.now();
   const stats = createEmptyCycleStats();
 
-  if (isFetchingNews) {
-    console.log("⏭️ Previous news fetch still running. Skipping overlap.");
+  const lock = acquireCycleLock();
+  if (!lock.acquired) {
+    recordCycleSkippedOverlap();
+    console.log("⏭️ Previous news fetch still running. Skipping overlap.", JSON.stringify({ owner: lock.owner }));
     return { skipped: true, reason: "overlap", stats };
   }
 
   isFetchingNews = true;
+  recordCycleStart();
   try {
     console.log("🚀 Fetching forex news...", JSON.stringify({ dryRun }));
     if (!skipScheduledAlerts) {
@@ -3816,19 +3840,22 @@ async function fetchForexNews(options = {}) {
     stats.cycleDurationMs = Date.now() - cycleStartedAt;
     lastCycleStats = stats;
     lastCycleCompletedAt = lastSuccessfulFetchAt;
+    recordCycleSuccess(stats);
     console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
     return stats;
   } catch (error) {
     stats.lastErrorSafe = error.message;
     consecutiveFailures += 1;
-    console.error("❌ RSS Error:", error.message);
+    console.error("❌ News cycle error:", error.message);
     stats.cycleDurationMs = Date.now() - cycleStartedAt;
     lastCycleStats = stats;
     lastCycleCompletedAt = new Date().toISOString();
+    recordCycleFailure(stats);
     console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
     return stats;
   } finally {
     isFetchingNews = false;
+    releaseCycleLock();
   }
 }
 
@@ -3912,17 +3939,74 @@ async function runNewsCycleDiagnostic(options = {}) {
 }
 
 function getNewsWorkerHealthSnapshot() {
+  const environmentValidation = startupValidation || validateNewsWorkerEnvironment();
+  const ready =
+    environmentValidation.ok &&
+    isNewsWorkerEnabled() &&
+    Boolean(SUPABASE_URL) &&
+    Boolean(SUPABASE_SERVICE_ROLE_KEY) &&
+    Boolean(TELEGRAM_BOT_TOKEN) &&
+    Boolean(TELEGRAM_CHANNEL_ID);
+
   return {
-    enabled: true,
-    running: !isFetchingNews,
+    success: ready,
+    status: ready ? "online" : "degraded",
+    service: "hasan-chart-news-worker",
+    workerEntry: "worker/news-worker.js",
+    workerEnabled: isNewsWorkerEnabled(),
+    runtimeMode: "always-on-polling-worker",
+    pollingIntervalMs: getPollIntervalMs(),
+    currentCycleInFlight: isCycleInFlight() || isFetchingNews,
     dryRun: NEWS_DRY_RUN,
+    environmentValidation: {
+      ok: environmentValidation.ok,
+      missingRequiredCount: environmentValidation.missingRequiredCount,
+      invalidRequiredCount: environmentValidation.invalidRequiredCount,
+    },
+    dependencies: {
+      database: Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY),
+      telegramConfigured: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHANNEL_ID),
+      aiConfigured: Boolean(OPENAI_API_KEY),
+      sourcesConfigured: NEWS_FEEDS.length > 0,
+    },
+    metrics: getMetricsSnapshot(),
+    running: !isFetchingNews,
     lastCycleCompletedAt,
     lastSuccessfulFetchAt,
     consecutiveFailures,
-    nextRunAt: null,
     lastErrorSafe: lastCycleStats.lastErrorSafe || null,
-    ...lastCycleStats,
+    build: process.env.RAILWAY_GIT_COMMIT_SHA
+      ? { commit: process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7) }
+      : undefined,
+    timestamp: new Date().toISOString(),
   };
+}
+
+let startupValidation = null;
+const HEALTH_PORT = Number(process.env.PORT || 3098);
+
+function startHealthServer() {
+  const http = require("http");
+  const server = http.createServer((req, res) => {
+    const pathname = String(req.url || "/").split("?")[0];
+    if (pathname !== "/health") {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Not found." }));
+      return;
+    }
+    const snapshot = getNewsWorkerHealthSnapshot();
+    const statusCode = snapshot.success ? 200 : 503;
+    res.writeHead(statusCode, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify(snapshot));
+  });
+
+  server.listen(HEALTH_PORT, "0.0.0.0", () => {
+    console.log(
+      "NEWS_WORKER_HEALTH_READY",
+      JSON.stringify({ port: HEALTH_PORT, path: "/health" })
+    );
+  });
+  return server;
 }
 
 process.on("unhandledRejection", (reason) => {
@@ -3940,42 +4024,58 @@ module.exports = {
   getNewsWorkerHealthSnapshot,
   getRequiredEnvStatus,
   runEconomicReleaseDryRun,
+  startupValidation,
 };
 
 if (process.env.NEWS_WORKER_NO_BOOT === "1") {
   // Diagnostic import mode.
+} else if (!isNewsWorkerEnabled()) {
+  console.error(
+    "NEWS_WORKER_BOOT_BLOCKED",
+    JSON.stringify({ reason: "NEWS_WORKER_ENABLED=false" })
+  );
+  process.exit(1);
 } else {
-  logWorkerEnvStatus();
-
-  const missingCritical = ["SUPABASE_SERVICE_ROLE_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHANNEL_ID"]
-    .filter((name) => !process.env[name] || !String(process.env[name]).trim());
-
-  if (!SUPABASE_URL) {
-    missingCritical.unshift("SUPABASE_URL");
-  }
-
-  if (missingCritical.length) {
+  try {
+    startupValidation = assertNewsWorkerEnvironmentOrThrow();
+    console.log(
+      "news_worker_startup_validated",
+      JSON.stringify({
+        missingRequiredCount: startupValidation.missingRequiredCount,
+        invalidRequiredCount: startupValidation.invalidRequiredCount,
+        pollingIntervalMs: getPollIntervalMs(),
+        dryRun: NEWS_DRY_RUN,
+      })
+    );
+  } catch (error) {
+    startupValidation = validateNewsWorkerEnvironment();
     console.error(
       "NEWS_WORKER_BOOT_BLOCKED",
       JSON.stringify({
-        missingCritical,
-        note: "News worker will stay alive but cycles cannot publish until Railway variables are restored.",
+        error: error?.message || String(error),
+        missingRequiredCount: startupValidation.missingRequiredCount,
+        invalidRequiredCount: startupValidation.invalidRequiredCount,
       })
     );
-  } else {
-    console.log(
-      "WORKER_BOOT",
-      JSON.stringify({
-        worker: "worker/news-worker.js",
-        service: "hasan-chart-news-worker",
-        priceAlertsEnabled: false,
-        note: "This service does NOT send price alert emails. Use worker/index.js for price_alerts.",
-      })
-    );
-    console.log("🚀 News Worker Started...");
-    fetchForexNews();
-    setInterval(() => {
-      fetchForexNews();
-    }, 60 * 1000);
+    process.exit(1);
   }
+
+  logWorkerEnvStatus();
+  startHealthServer();
+
+  console.log(
+    "WORKER_BOOT",
+    JSON.stringify({
+      worker: "worker/news-worker.js",
+      service: "hasan-chart-news-worker",
+      priceAlertsEnabled: false,
+      note: "This service does NOT send price alert emails. Use worker/index.js for price_alerts.",
+    })
+  );
+  console.log("🚀 News Worker Started...");
+  const pollMs = getPollIntervalMs();
+  fetchForexNews();
+  setInterval(() => {
+    fetchForexNews();
+  }, pollMs);
 }

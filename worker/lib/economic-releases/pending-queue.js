@@ -128,6 +128,15 @@ async function processPendingEntry(entry, { registry, resolveRelease }) {
     };
   }
 
+  if (!result.merged || !entry.canonical?.requiresTripleTemplate) {
+    const nextAttempt = entry.attempt + 1;
+    const reason = !result.merged ? "merged_event_missing" : "plain_news_not_structured_pending";
+    if (nextAttempt >= MAX_ATTEMPTS) {
+      return { action: "drop", reason, validation, merged: result.merged };
+    }
+    return { action: "retry", validation, merged: result.merged, nextAttempt, reason };
+  }
+
   const message = formatEconomicReleaseMessage(result.merged, entry.canonical);
   const publishCheck = canPublishStructuredRelease(validation, message);
   if (!publishCheck.allowed) {

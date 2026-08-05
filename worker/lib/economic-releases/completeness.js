@@ -28,6 +28,16 @@ function validateEconomicReleaseCompleteness(event, canonical = {}) {
     };
   }
 
+  if (!event) {
+    return {
+      complete: false,
+      missingFields: ["merged_event"],
+      requiredFields,
+      eventType: canonical.eventType || "structured_release",
+      reason: "structured_data_incomplete",
+    };
+  }
+
   for (const fieldName of requiredFields) {
     if (fieldName === "previousOrRevised") {
       if (!hasPreviousOrRevised(event)) {
