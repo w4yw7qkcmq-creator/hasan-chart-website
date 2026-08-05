@@ -207,7 +207,11 @@ function validatePriceAlertsEnvironment(options = {}) {
       run: () => {
         const raw = envValue("NEXT_PUBLIC_SITE_URL");
         if (!raw) return { ok: true, present: false, value: "" };
-        return parseHttpsUrl("NEXT_PUBLIC_SITE_URL", { required: false });
+        const parsed = parseHttpsUrl("NEXT_PUBLIC_SITE_URL", { required: false });
+        if (!parsed.ok) {
+          return { ok: true, present: true, value: raw, warning: parsed.error };
+        }
+        return parsed;
       },
     },
   ];
