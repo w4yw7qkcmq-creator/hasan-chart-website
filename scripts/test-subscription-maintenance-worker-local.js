@@ -58,6 +58,11 @@ async function main() {
   assert.ok(secret, "IAM_SUBSCRIPTION_MAINTENANCE_SECRET missing in .env.production.worker-auth.local");
   assert.ok(local.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL missing in .env.local");
   assert.ok(local.SUPABASE_SERVICE_ROLE_KEY, "SUPABASE_SERVICE_ROLE_KEY missing in .env.local");
+  assert.ok(local.RESEND_API_KEY || workerAuth.RESEND_API_KEY, "RESEND_API_KEY missing");
+  const resendKey = local.RESEND_API_KEY || workerAuth.RESEND_API_KEY || `re_${"k".repeat(24)}`;
+  const emailFrom = local.EMAIL_FROM || "HasaN CharT World <support@example.com>";
+  const emailReplyTo = local.EMAIL_REPLY_TO || "support@example.com";
+  const siteUrl = local.NEXT_PUBLIC_SITE_URL || "https://www.hasanchartworld.com";
 
   const child = spawn("node", ["subscription-maintenance-worker.js"], {
     cwd: WORKER_DIR,
@@ -73,6 +78,10 @@ async function main() {
       IAM_SUBSCRIPTION_MAINTENANCE_SERVICE_ACCOUNT_ID: "subscription-maintenance-worker",
       NEXT_PUBLIC_SUPABASE_URL: local.NEXT_PUBLIC_SUPABASE_URL,
       SUPABASE_SERVICE_ROLE_KEY: local.SUPABASE_SERVICE_ROLE_KEY,
+      RESEND_API_KEY: resendKey,
+      EMAIL_FROM: emailFrom,
+      EMAIL_REPLY_TO: emailReplyTo,
+      NEXT_PUBLIC_SITE_URL: siteUrl,
       SUBSCRIPTION_WORKER_ONESHOT: "",
     },
     stdio: "ignore",
@@ -86,6 +95,7 @@ async function main() {
     assert.equal(health.service, "hasan-chart-subscription-maintenance-worker");
     assert.equal(health.status, "online");
     assert.equal(health.workerEnabled, true);
+    assert.equal(health.environmentValidation?.ok, true);
 
     const noAuth = await fetch(`${base}/run?dryRun=true`, { method: "POST" });
     assert.equal(noAuth.status, 401);

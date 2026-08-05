@@ -35,10 +35,14 @@ function runCaller(env, mockBaseUrl) {
       cwd: resolve(ROOT, "worker"),
       env: {
         ...process.env,
+        NODE_ENV: "development",
+        RAILWAY_ENVIRONMENT: "",
         SUBSCRIPTION_MAINTENANCE_API_URL: mockBaseUrl,
         IAM_SUBSCRIPTION_MAINTENANCE_SERVICE_ACCOUNT_ID: "subscription-maintenance-worker",
         IAM_SUBSCRIPTION_MAINTENANCE_SECRET: VALID_SECRET,
         SUBSCRIPTION_MAINTENANCE_DRY_RUN: "true",
+        SUBSCRIPTION_MAINTENANCE_TIMEOUT_MS: "",
+        SUBSCRIPTION_MAINTENANCE_CALL_TIMEOUT_MS: "",
         CRON_SECRET: "legacy-should-not-be-sent",
         ...env,
       },
@@ -101,7 +105,19 @@ test("cron caller exits 1 on HTTP 401", async () => {
   const result = await runCaller({}, mock.baseUrl);
   await mock.close();
   assert.equal(result.code, 1);
-  assert.match(result.combined, /subscription_maintenance_cron_call_failed/);
+  assert.match(result.combined, /subscription_maintenance_cron_call_auth_failed/);
+});
+
+test("cron caller exits 0 on HTTP 409 duplicate", async () => {
+  const mock = await startMockServer((_req, res) => {
+    res.writeHead(409, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: false, error: "already running" }));
+  });
+
+  const result = await runCaller({}, mock.baseUrl);
+  await mock.close();
+  assert.equal(result.code, 0);
+  assert.match(result.combined, /subscription_maintenance_cron_call_duplicate/);
 });
 
 test("cron caller exits 1 on missing secret env", async () => {
@@ -113,7 +129,7 @@ test("cron caller exits 1 on missing secret env", async () => {
   const result = await runCaller({ IAM_SUBSCRIPTION_MAINTENANCE_SECRET: "" }, mock.baseUrl);
   await mock.close();
   assert.equal(result.code, 1);
-  assert.match(result.combined, /IAM_SUBSCRIPTION_MAINTENANCE_SECRET is required/);
+  assert.match(result.combined, /subscription_maintenance_cron_env_invalid/);
 });
 
 test("cron caller respects timeout", async () => {
@@ -121,10 +137,10 @@ test("cron caller respects timeout", async () => {
     // never respond
   });
 
-  const result = await runCaller({ SUBSCRIPTION_MAINTENANCE_CALL_TIMEOUT_MS: "500" }, mock.baseUrl);
+  const result = await runCaller({ SUBSCRIPTION_MAINTENANCE_TIMEOUT_MS: "10000" }, mock.baseUrl);
   await mock.close();
   assert.equal(result.code, 1);
   assert.match(result.combined, /request_timeout/);
-});
+}, 15000);
 
 console.log("subscription-maintenance cron caller tests scheduled");

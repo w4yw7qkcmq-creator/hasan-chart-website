@@ -39,11 +39,29 @@ process.on("unhandledRejection", (reason) => {
 logBoot("BEFORE_REQUIRE", { modules: ["http", "path"] });
 const http = require("http");
 const path = require("path");
+const crypto = require("crypto");
 const {
   verifyWorkerRouteAccess,
   isLegacyFallbackEnabled,
+  isMachineAuthConfigured,
 } = require("./lib/machine-auth");
-logBoot("AFTER_REQUIRE", { modules: ["http", "path", "./lib/machine-auth"] });
+const {
+  validateApiEnvironment,
+  assertApiEnvironmentOrThrow,
+  getMaintenanceAccountId,
+} = require("./lib/subscription-maintenance-env");
+const {
+  recordRunStart,
+  recordRunSuccess,
+  recordRunFailure,
+  recordDuplicateRejected,
+  recordMachineAuthSuccess,
+  recordMachineAuthRejected,
+  getMetricsSnapshot,
+} = require("./lib/subscription-maintenance-metrics");
+logBoot("AFTER_REQUIRE", { modules: ["http", "path", "./lib/machine-auth", "./lib/subscription-maintenance-env"] });
+
+let startupValidation = null;
 
 function loadRuntimeModules() {
   logBoot("BEFORE_REQUIRE", { module: "dotenv" });
@@ -91,10 +109,7 @@ function createSupabaseClient() {
 }
 
 function resolveMaintenanceServiceAccountId() {
-  return String(
-    process.env.IAM_SUBSCRIPTION_MAINTENANCE_SERVICE_ACCOUNT_ID ||
-      "subscription-maintenance-worker"
-  ).trim();
+  return getMaintenanceAccountId();
 }
 
 function resolveMaintenanceRequiredPermission() {
@@ -170,14 +185,27 @@ function isOneShotMode() {
 
 async function handleHealth(_req, res) {
   logBoot("ROUTE_HEALTH_ENTER");
-  sendJson(res, 200, {
-    success: true,
-    status: "online",
+  const environmentValidation = startupValidation || validateApiEnvironment();
+  const ready = environmentValidation.ok && isWorkerFeatureEnabled() && isMachineAuthConfigured();
+  const buildCommit = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) || process.env.GIT_COMMIT?.slice(0, 7) || null;
+
+  sendJson(res, ready ? 200 : 503, {
+    success: ready,
+    status: ready ? "online" : "degraded",
     service: SERVICE_NAME,
     workerEntry: WORKER_ENTRY,
     workerEnabled: isWorkerFeatureEnabled(),
+    runtimeMode: "always-on-http-server",
+    machineAuthConfigured: isMachineAuthConfigured(),
     legacyFallbackEnabled: isLegacyFallbackEnabled(),
     machineAuthServiceAccount: resolveMaintenanceServiceAccountId(),
+    environmentValidation: {
+      ok: environmentValidation.ok,
+      missingRequiredCount: environmentValidation.missingRequiredCount,
+      invalidRequiredCount: environmentValidation.invalidRequiredCount,
+    },
+    metrics: getMetricsSnapshot(),
+    build: buildCommit ? { commit: buildCommit } : undefined,
     timestamp: new Date().toISOString(),
   });
 }
@@ -190,9 +218,20 @@ async function handleRun(req, res) {
   const authCheck = await verifyMaintenanceAccess(req);
 
   if (!authCheck.ok) {
+    recordMachineAuthRejected();
     sendJson(res, authCheck.status, {
       success: false,
       error: authCheck.error,
+    });
+    return;
+  }
+
+  recordMachineAuthSuccess();
+
+  if (!startupValidation?.ok) {
+    sendJson(res, 503, {
+      success: false,
+      error: "Subscription maintenance API environment is not valid.",
     });
     return;
   }
@@ -209,6 +248,7 @@ async function handleRun(req, res) {
   }
 
   if (maintenanceInFlight) {
+    recordDuplicateRejected();
     sendJson(res, 409, {
       success: false,
       error: "Subscription maintenance is already running.",
@@ -218,16 +258,26 @@ async function handleRun(req, res) {
 
   maintenanceInFlight = true;
   const startedAt = Date.now();
+  const runId = crypto.randomUUID();
 
   try {
     const body = await readJsonBody(req);
     const dryRun = parseDryRun(req, body);
+    recordRunStart({ dryRun });
+
+    logBoot("subscription-maintenance:run-start", {
+      runId,
+      dryRun,
+    });
+
     const supabase = createSupabaseClient();
     const summary = await runSubscriptionMaintenance(supabase, { dryRun });
+    recordRunSuccess(summary);
 
     console.log(
       JSON.stringify({
         event: "subscription-maintenance:run-complete",
+        runId,
         dryRun,
         durationMs: summary.durationMs,
         checked: summary.checked,
@@ -239,11 +289,13 @@ async function handleRun(req, res) {
       })
     );
 
-    sendJson(res, 200, buildMaintenanceResponse(summary));
+    sendJson(res, 200, { ...buildMaintenanceResponse(summary), runId });
   } catch (error) {
+    recordRunFailure(Date.now() - startedAt);
     console.error(
       JSON.stringify({
         event: "subscription-maintenance:run-error",
+        runId,
         error: error?.message || String(error),
         durationMs: Date.now() - startedAt,
       })
@@ -253,6 +305,7 @@ async function handleRun(req, res) {
       success: false,
       error: error?.message || "Subscription maintenance failed.",
       durationMs: Date.now() - startedAt,
+      runId,
     });
   } finally {
     maintenanceInFlight = false;
@@ -339,6 +392,24 @@ function startServer() {
   });
 
   loadRuntimeModules();
+
+  try {
+    startupValidation = assertApiEnvironmentOrThrow();
+    createSupabaseClient();
+    logBoot("subscription_maintenance_startup_validated", {
+      missingRequiredCount: startupValidation.missingRequiredCount,
+      invalidRequiredCount: startupValidation.invalidRequiredCount,
+      workerEnabled: isWorkerFeatureEnabled(),
+    });
+  } catch (error) {
+    startupValidation = validateApiEnvironment();
+    logBoot("subscription_maintenance_startup_validation_failed", {
+      error: error?.message || String(error),
+      missingRequiredCount: startupValidation.missingRequiredCount,
+      invalidRequiredCount: startupValidation.invalidRequiredCount,
+    });
+    process.exit(1);
+  }
 
   const server = createHttpServer();
 

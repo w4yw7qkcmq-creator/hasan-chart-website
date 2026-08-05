@@ -3,36 +3,26 @@
  * Railway Cron Job caller — POST /run on Subscription Maintenance API with machine identity.
  * One-shot process (exit after single request). Never logs secrets or headers.
  */
-const DEFAULT_TIMEOUT_MS = 90_000;
+const {
+  assertCronCallerEnvironmentOrThrow,
+  validateCronCallerEnvironment,
+  getCronApiUrl,
+  getMaintenanceAccountId,
+  isDryRunEnabled,
+  getCallerTimeoutMs,
+  envValue,
+} = require("./lib/subscription-maintenance-env");
+const { recordCallerResult } = require("./lib/subscription-maintenance-metrics");
 
 function log(event, extra = {}) {
   console.log(JSON.stringify({ event, timestamp: new Date().toISOString(), ...extra }));
-}
-
-function resolveApiUrl() {
-  return String(process.env.SUBSCRIPTION_MAINTENANCE_API_URL || "").trim().replace(/\/+$/, "");
-}
-
-function resolveAccountId() {
-  return String(
-    process.env.IAM_SUBSCRIPTION_MAINTENANCE_SERVICE_ACCOUNT_ID || "subscription-maintenance-worker"
-  ).trim();
-}
-
-function resolveSecret() {
-  return String(process.env.IAM_SUBSCRIPTION_MAINTENANCE_SECRET || "").trim();
-}
-
-function isDryRun() {
-  const raw = String(process.env.SUBSCRIPTION_MAINTENANCE_DRY_RUN || "false").trim().toLowerCase();
-  return raw === "1" || raw === "true" || raw === "yes";
 }
 
 function rejectLegacyEnv() {
   const hasLegacy = Object.keys(process.env).some(
     (key) =>
       /^(CRON_SECRET|ADMIN_CRON_SECRET|WORKER_API_SECRET)$/i.test(key) &&
-      String(process.env[key] || "").trim()
+      envValue(key)
   );
   if (hasLegacy) {
     log("legacy_env_present_ignored", { note: "caller ignores legacy secret env vars" });
@@ -40,15 +30,29 @@ function rejectLegacyEnv() {
 }
 
 async function callMaintenanceApi() {
-  const apiUrl = resolveApiUrl();
-  const accountId = resolveAccountId();
-  const secret = resolveSecret();
-  const dryRun = isDryRun();
-  const timeoutMs = Number(process.env.SUBSCRIPTION_MAINTENANCE_CALL_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+  const startedAt = Date.now();
+  let validation = null;
 
-  if (!apiUrl) throw new Error("SUBSCRIPTION_MAINTENANCE_API_URL is required.");
-  if (!accountId) throw new Error("IAM_SUBSCRIPTION_MAINTENANCE_SERVICE_ACCOUNT_ID is required.");
-  if (!secret || secret.length < 32) throw new Error("IAM_SUBSCRIPTION_MAINTENANCE_SECRET is required.");
+  try {
+    validation = assertCronCallerEnvironmentOrThrow();
+    log("subscription_maintenance_cron_env_validated", {
+      checks: Object.keys(validation.validated || {}),
+      dryRun: isDryRunEnabled(),
+      timeoutMs: getCallerTimeoutMs(),
+    });
+  } catch (error) {
+    log("subscription_maintenance_cron_env_invalid", {
+      error: error?.message || String(error),
+    });
+    process.exitCode = 1;
+    return;
+  }
+
+  const apiUrl = getCronApiUrl();
+  const accountId = getMaintenanceAccountId();
+  const secret = envValue("IAM_SUBSCRIPTION_MAINTENANCE_SECRET");
+  const dryRun = isDryRunEnabled();
+  const timeoutMs = getCallerTimeoutMs();
 
   rejectLegacyEnv();
 
@@ -88,6 +92,7 @@ async function callMaintenanceApi() {
       body = null;
     }
 
+    const durationMs = Date.now() - startedAt;
     const summary = {
       status: res.status,
       ok: res.ok,
@@ -96,22 +101,46 @@ async function callMaintenanceApi() {
       error: body?.error ? String(body.error).slice(0, 120) : null,
       requestId,
       dryRun,
+      durationMs,
     };
 
-    if (!res.ok || body?.success === false) {
-      log("subscription_maintenance_cron_call_failed", summary);
+    if (res.status === 409) {
+      log("subscription_maintenance_cron_call_duplicate", summary);
+      recordCallerResult({ status: 409, durationMs, success: true });
+      process.exitCode = 0;
+      return;
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      log("subscription_maintenance_cron_call_auth_failed", summary);
+      recordCallerResult({ status: res.status, durationMs, success: false });
       process.exitCode = 1;
       return;
     }
 
+    if (!res.ok || body?.success === false) {
+      log("subscription_maintenance_cron_call_failed", summary);
+      recordCallerResult({ status: res.status, durationMs, success: false });
+      process.exitCode = 1;
+      return;
+    }
+
+    if (durationMs > 120_000) {
+      log("subscription_maintenance_cron_call_slow_warning", { durationMs, thresholdMs: 120_000 });
+    }
+
     log("subscription_maintenance_cron_call_success", summary);
+    recordCallerResult({ status: res.status, durationMs, success: true });
     process.exitCode = 0;
   } catch (error) {
     const timedOut = error?.name === "AbortError";
+    const durationMs = Date.now() - startedAt;
     log("subscription_maintenance_cron_call_error", {
       timedOut,
+      durationMs,
       error: timedOut ? "request_timeout" : String(error?.message || error).slice(0, 120),
     });
+    recordCallerResult({ status: timedOut ? 408 : 0, durationMs, success: false });
     process.exitCode = 1;
   } finally {
     clearTimeout(timer);
