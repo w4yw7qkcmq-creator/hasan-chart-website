@@ -25,6 +25,12 @@ const WebSocket = require("ws");
 global.WebSocket = WebSocket;
 
 const { createClient } = require("@supabase/supabase-js");
+const {
+  validatePriceAlertsEnvironment,
+  isPriceAlertWorkerEnabled,
+  resolveCheckIntervalMs,
+  DEFAULT_MAX_ALERTS_PER_RUN,
+} = require("./alerts/price-alerts-env");
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -67,12 +73,6 @@ const { sendPriceAlertPushNotifications, getVapidEnvStatus } = require("./push-s
 const { sendPriceAlertEmail } = require("./price-alert-email");
 const { createUserNotification } = require("./create-user-notification");
 const { evaluateDeliveryForRecipient } = require("./notification-delivery-gate");
-const {
-  validatePriceAlertsEnvironment,
-  isPriceAlertWorkerEnabled,
-  resolveCheckIntervalMs,
-  DEFAULT_MAX_ALERTS_PER_RUN,
-} = require("./alerts/price-alerts-env");
 const { evaluatePriceAlertCondition, normalizeCondition } = require("./lib/price-alert-condition");
 const {
   normalizeSymbol,
