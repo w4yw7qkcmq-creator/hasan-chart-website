@@ -1,3 +1,5 @@
+const { computeNextAttemptAt, DEFAULT_MAX_ATTEMPTS } = require("./price-alert-retry-processor");
+
 const CHANNELS = Object.freeze(["site", "push", "email"]);
 
 function buildIdempotencyKey(alertId, channel) {
@@ -101,7 +103,7 @@ async function beginChannelDelivery(supabase, { alertId, channel }) {
 
 async function finalizeChannelDelivery(
   supabase,
-  { alertId, channel, status, errorCodeSafe = null, providerMessageId = null }
+  { alertId, channel, status, errorCodeSafe = null, providerMessageId = null, attemptCount = null, maxAttempts = DEFAULT_MAX_ATTEMPTS }
 ) {
   const numericId = normalizeAlertId(alertId);
   if (!numericId) return { ok: false, reason: "invalid_alert_id" };
@@ -112,7 +114,19 @@ async function finalizeChannelDelivery(
     last_error_code_safe: errorCodeSafe,
     provider_message_id: providerMessageId,
     updated_at: now,
-    ...(status === "sent" ? { sent_at: now } : {}),
+    claimed_by: null,
+    claimed_at: null,
+    ...(status === "sent"
+      ? { sent_at: now, terminal_at: now, next_attempt_at: null }
+      : {}),
+    ...(status === "failed"
+      ? {
+          status: "retryable_failed",
+          next_attempt_at: computeNextAttemptAt(attemptCount || 1),
+          max_attempts: maxAttempts,
+        }
+      : {}),
+    ...(status === "skipped" ? { terminal_at: now, next_attempt_at: null } : {}),
   };
 
   const { data, error } = await supabase
@@ -120,7 +134,7 @@ async function finalizeChannelDelivery(
     .update(payload)
     .eq("alert_id", numericId)
     .eq("channel", channel)
-    .select("id, status, sent_at")
+    .select("id, status, sent_at, next_attempt_at")
     .maybeSingle();
 
   if (error) return { ok: false, reason: error.message, error };

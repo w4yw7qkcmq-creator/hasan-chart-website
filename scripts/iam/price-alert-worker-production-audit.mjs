@@ -50,8 +50,22 @@ async function main() {
     .from("price_alerts")
     .select("id, user_email, status, triggered_at, email_sent_at")
     .eq("status", "triggered")
-    .order("triggered_at", { ascending: false })
-    .limit(200);
+    .order("triggered_at", { ascending: false });
+
+  const { data: notificationRows } = await client
+    .from("notifications")
+    .select("id, metadata")
+    .eq("type", "price-alert")
+    .limit(5000);
+
+  const notificationsByAlert = new Map();
+  for (const row of notificationRows || []) {
+    const alertId = row.metadata?.alertId;
+    if (!alertId) continue;
+    const key = String(alertId);
+    if (!notificationsByAlert.has(key)) notificationsByAlert.set(key, []);
+    notificationsByAlert.get(key).push(row);
+  }
 
   const { data: deliveryAttempts, error: deliveryError } = await client
     .from("price_alert_delivery_attempts")
@@ -61,6 +75,7 @@ async function main() {
   const integrity = classifyHistoricalIntegrity({
     triggeredAlerts: triggeredSample || [],
     deliveryAttempts: deliveryError ? [] : deliveryAttempts || [],
+    notificationsByAlert,
   });
 
   const report = {

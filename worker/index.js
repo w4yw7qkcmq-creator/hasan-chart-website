@@ -29,6 +29,7 @@ const {
   validatePriceAlertsEnvironment,
   isPriceAlertWorkerEnabled,
   resolveCheckIntervalMs,
+  getChannelFeatureFlags,
   DEFAULT_MAX_ALERTS_PER_RUN,
 } = require("./alerts/price-alerts-env");
 
@@ -104,6 +105,11 @@ const {
   markCycleFailed,
   incrementMetric,
 } = require("./lib/price-alert-worker-metrics");
+const { startPriceAlertScheduler, getProcessMetadata } = require("./lib/price-alert-scheduler");
+const { processRetryableDeliveries } = require("./lib/price-alert-retry-processor");
+
+const channelFeatureFlags = environmentValidation.channelFlags || getChannelFeatureFlags();
+const processMetadata = getProcessMetadata();
 
 const WORKER_ENTRY = "worker/index.js";
 const PRICE_ALERTS_MODULE_VERSION = "2026-06-23-v25-block-website-price-alert-email";
@@ -490,6 +496,7 @@ async function deliverRealPriceAlert({
     });
   }
 
+  if (channelFeatureFlags.site) {
   const siteGate = await beginChannelDelivery(supabase, { alertId, channel: "site" });
   if (siteGate.skipped && siteGate.reason === "already_sent") {
     siteNotification = { success: true, skipped: false, existing: true };
@@ -550,6 +557,9 @@ async function deliverRealPriceAlert({
       };
     }
   }
+  } else {
+    siteNotification = { success: false, skipped: true, reason: "SITE_CHANNEL_DISABLED" };
+  }
 
   if (!siteNotification?.success) {
     if (!siteNotification?.skipped) {
@@ -567,6 +577,7 @@ async function deliverRealPriceAlert({
 
   let pushStats = { sent: 0, failed: 0, skipped: 0, skipReason: "PUSH_NOT_ATTEMPTED" };
 
+  if (channelFeatureFlags.push) {
   const pushGate = await beginChannelDelivery(supabase, { alertId, channel: "push" });
   if (pushGate.skipped && pushGate.reason === "already_sent") {
     pushStats = { sent: 1, failed: 0, skipped: 0, skipReason: "ALREADY_SENT" };
@@ -642,6 +653,9 @@ async function deliverRealPriceAlert({
       });
     }
   }
+  } else {
+    pushStats = { sent: 0, failed: 0, skipped: 1, skipReason: "PUSH_CHANNEL_DISABLED" };
+  }
 
   aggregatePushStats(summary, pushStats);
 
@@ -715,6 +729,13 @@ async function deliverRealPriceAlert({
       sent: false,
       skipped: true,
       reason: "MISSING_RECIPIENT_EMAIL",
+    };
+  } else if (!channelFeatureFlags.email) {
+    emailResult = {
+      success: false,
+      sent: false,
+      skipped: true,
+      reason: "EMAIL_CHANNEL_DISABLED",
     };
   } else if (!delivery?.email) {
     console.log(
@@ -878,7 +899,133 @@ async function deliverRealPriceAlert({
 const shouldTriggerAlert = ({ condition, targetPrice, currentPrice }) =>
   evaluatePriceAlertCondition({ condition, targetPrice, currentPrice }).triggered;
 
-async function checkPriceAlerts() {
+async function deliverAlertChannelForRetry({ alertId, channel }) {
+  const { data: alert, error } = await supabase
+    .from("price_alerts")
+    .select("id,user_email,coin,target_price,condition,triggered_price,status")
+    .eq("id", alertId)
+    .maybeSingle();
+
+  if (error || !alert || alert.status !== "triggered") {
+    return { sent: false, reason: "alert_not_retryable", errorCodeSafe: "alert_not_retryable" };
+  }
+
+  const currentPrice = Number(alert.triggered_price);
+  const targetPrice = Number(alert.target_price);
+  const userEmail = String(alert.user_email || "").trim().toLowerCase();
+  const coin = normalizeSymbol(alert.coin);
+  const condition = normalizeCondition(alert.condition);
+  const notificationMessage = buildPriceAlertNotificationMessage({
+    coin,
+    targetPrice,
+    currentPrice,
+    condition,
+  });
+
+  const summary = {
+    notificationsCreated: 0,
+    emailsQueued: 0,
+  };
+
+  if (channel === "site" && channelFeatureFlags.site) {
+    const siteGate = await beginChannelDelivery(supabase, { alertId, channel: "site" });
+    if (siteGate.skipped && siteGate.reason === "already_sent") {
+      return { sent: true, reason: "already_sent" };
+    }
+    if (!siteGate.proceed) {
+      return { sent: false, reason: siteGate.reason || "site_not_proceed" };
+    }
+    const delivery = await evaluateDeliveryForRecipient(supabase, {
+      userEmail,
+      userId: null,
+      notificationKey: "price_alert",
+    });
+    const siteNotification = await createSiteNotificationForAlert({
+      alertId,
+      email: userEmail,
+      notificationMessage,
+      coin,
+      targetPrice,
+      currentPrice,
+      userId: null,
+      delivery,
+    });
+    if (siteNotification?.success) {
+      await finalizeChannelDelivery(supabase, { alertId, channel: "site", status: "sent" });
+      return { sent: true };
+    }
+    await finalizeChannelDelivery(supabase, {
+      alertId,
+      channel: "site",
+      status: "failed",
+      errorCodeSafe: siteNotification?.reason || "SITE_RETRY_FAILED",
+    });
+    return { sent: false, reason: "site_retry_failed", errorCodeSafe: "site_retry_failed" };
+  }
+
+  if (channel === "push" && channelFeatureFlags.push) {
+    const pushGate = await beginChannelDelivery(supabase, { alertId, channel: "push" });
+    if (pushGate.skipped && pushGate.reason === "already_sent") return { sent: true, reason: "already_sent" };
+    if (!pushGate.proceed) return { sent: false, reason: pushGate.reason || "push_not_proceed" };
+    const pushStats = await sendTriggeredAlertWebPush({
+      alertId,
+      email: userEmail,
+      userId: null,
+      coin,
+      targetPrice,
+      currentPrice,
+    });
+    if ((pushStats?.sent || 0) > 0) {
+      await finalizeChannelDelivery(supabase, { alertId, channel: "push", status: "sent" });
+      return { sent: true };
+    }
+    await finalizeChannelDelivery(supabase, {
+      alertId,
+      channel: "push",
+      status: "failed",
+      errorCodeSafe: pushStats?.skipReason || "PUSH_RETRY_FAILED",
+    });
+    return { sent: false, reason: "push_retry_failed", errorCodeSafe: "push_retry_failed" };
+  }
+
+  if (channel === "email" && channelFeatureFlags.email) {
+    const emailGate = await beginChannelDelivery(supabase, { alertId, channel: "email" });
+    if (emailGate.skipped && emailGate.reason === "already_sent") return { sent: true, reason: "already_sent" };
+    if (!emailGate.proceed) return { sent: false, reason: emailGate.reason || "email_not_proceed" };
+    const emailResult = await sendPriceAlertEmail({
+      supabase,
+      resendApiKey,
+      email: userEmail,
+      coinLabel: escapeHtml(formatCoinPair(coin)),
+      conditionLabel: escapeHtml(getConditionLabel(condition)),
+      targetPrice: escapeHtml(formatNumber(targetPrice)),
+      currentPrice: escapeHtml(formatNumber(currentPrice)),
+      alertId,
+      userId: null,
+    });
+    if (emailResult?.sent) {
+      await finalizeChannelDelivery(supabase, {
+        alertId,
+        channel: "email",
+        status: "sent",
+        providerMessageId: emailResult.resendId || null,
+      });
+      return { sent: true, providerMessageId: emailResult.resendId || null };
+    }
+    await finalizeChannelDelivery(supabase, {
+      alertId,
+      channel: "email",
+      status: "failed",
+      errorCodeSafe: emailResult?.reason || "EMAIL_RETRY_FAILED",
+    });
+    return { sent: false, reason: "email_retry_failed", errorCodeSafe: "email_retry_failed" };
+  }
+
+  return { sent: false, reason: "channel_disabled", errorCodeSafe: "channel_disabled" };
+}
+
+async function checkPriceAlerts(options = {}) {
+  const triggerSource = options.triggerSource || "interval";
   if (!isPriceAlertWorkerEnabled()) {
     return;
   }
@@ -912,6 +1059,13 @@ async function checkPriceAlerts() {
     emailFailed: 0,
     duplicateClaims: 0,
     stalePrices: 0,
+    retriesProcessed: 0,
+  };
+
+  const telemetryBase = {
+    triggerSource,
+    deploymentId: processMetadata.deploymentId,
+    processStartedAt: processMetadata.processStartedAt,
   };
 
   try {
@@ -927,6 +1081,7 @@ async function checkPriceAlerts() {
           status: "overlap",
           stats: cycleStats,
           lock: { acquired: false, contended: true },
+          ...telemetryBase,
         })
       );
       markCycleFailed(Date.now() - cycleStartedAt);
@@ -980,6 +1135,7 @@ async function checkPriceAlerts() {
           status: "success",
           stats: cycleStats,
           lock: { acquired: true, contended: false },
+          ...telemetryBase,
         })
       );
       markCycleSuccess(Date.now() - cycleStartedAt, getCycleMetrics());
@@ -1122,6 +1278,14 @@ async function checkPriceAlerts() {
     cycleStats.pushFailed = getCycleMetrics().pushFailed;
     cycleStats.emailQueued = getCycleMetrics().emailsQueued;
 
+    const retryResult = await processRetryableDeliveries(supabase, {
+      deliverChannel: deliverAlertChannelForRetry,
+      limit: 10,
+    });
+    if (retryResult.ok) {
+      cycleStats.retriesProcessed = retryResult.stats.retried || 0;
+    }
+
     await persistCycleTelemetry(
       getSupabaseClient,
       buildCycleTelemetryRow({
@@ -1132,6 +1296,7 @@ async function checkPriceAlerts() {
         status: "success",
         stats: cycleStats,
         lock: { acquired: true, contended: false },
+        ...telemetryBase,
       })
     );
 
@@ -1154,6 +1319,7 @@ async function checkPriceAlerts() {
         stats: cycleStats,
         lock: { acquired: Boolean(distributedOwner), contended: false },
         errorCodeSafe: error?.message || "CYCLE_FAILED",
+        ...telemetryBase,
       })
     );
     markCycleFailed(Date.now() - cycleStartedAt);
@@ -1192,6 +1358,7 @@ app.get("/health", async (_req, res) => {
       missingRequiredCount: envValidation.missingRequiredCount,
       invalidRequiredCount: envValidation.invalidRequiredCount,
     },
+    channelFlags: envValidation.channelFlags,
     dependencies: envValidation.dependencies,
     metrics: {
       ...cycleMetrics,
@@ -1392,9 +1559,12 @@ app.listen(PORT, () => {
     })
     .catch(() => {});
 
-  if (isPriceAlertWorkerEnabled()) {
-    setInterval(checkPriceAlerts, CHECK_INTERVAL_MS);
-    checkPriceAlerts();
+  if (isPriceAlertWorkerEnabled() && environmentValidation.ok) {
+    startPriceAlertScheduler({
+      intervalMs: CHECK_INTERVAL_MS,
+      enabled: true,
+      runCycle: ({ triggerSource }) => checkPriceAlerts({ triggerSource }),
+    });
   }
 
   logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
@@ -1403,5 +1573,7 @@ app.listen(PORT, () => {
     intervalMs: CHECK_INTERVAL_MS,
     priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
     enabled: isPriceAlertWorkerEnabled(),
+    processStartedAt: processMetadata.processStartedAt,
+    deploymentId: processMetadata.deploymentId,
   });
 });

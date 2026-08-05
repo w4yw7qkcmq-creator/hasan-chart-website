@@ -1,13 +1,29 @@
 const FINDING = Object.freeze({
-  VALID: "VALID",
-  LEGACY: "LEGACY",
+  VALID_LEGACY_DELIVERED: "VALID_LEGACY_DELIVERED",
+  VALID_LEGACY_UNKNOWN_CHANNELS: "VALID_LEGACY_UNKNOWN_CHANNELS",
+  MISSING_DELIVERY_EVIDENCE: "MISSING_DELIVERY_EVIDENCE",
   DUPLICATE: "DUPLICATE",
   STUCK: "STUCK",
-  MISSING_DELIVERY: "MISSING_DELIVERY",
-  INVALID_DATA: "INVALID_DATA",
+  INVALID: "INVALID",
 });
 
-function classifyHistoricalIntegrity({ triggeredAlerts = [], deliveryAttempts = [] }) {
+function hasDeliveryEvidence(alert, { notificationsByAlert = new Map(), attemptsByAlert = new Map() }) {
+  const alertId = String(alert.id);
+  const attempts = attemptsByAlert.get(alertId) || [];
+  const notifications = notificationsByAlert.get(alertId) || [];
+
+  if (attempts.some((row) => row.status === "sent")) return "delivery_attempts";
+  if (notifications.length > 0) return "site_notification";
+  if (alert.email_sent_at) return "email_sent_at";
+  return null;
+}
+
+function classifyHistoricalIntegrity({
+  triggeredAlerts = [],
+  deliveryAttempts = [],
+  notificationsByAlert = new Map(),
+  activeAlertsBeyondTarget = [],
+}) {
   const attemptsByAlert = new Map();
   for (const row of deliveryAttempts) {
     const key = String(row.alert_id);
@@ -16,12 +32,12 @@ function classifyHistoricalIntegrity({ triggeredAlerts = [], deliveryAttempts = 
   }
 
   const table = [
-    { classification: FINDING.VALID, count: 0, action: "none" },
-    { classification: FINDING.LEGACY, count: 0, action: "none" },
+    { classification: FINDING.VALID_LEGACY_DELIVERED, count: 0, action: "none" },
+    { classification: FINDING.VALID_LEGACY_UNKNOWN_CHANNELS, count: 0, action: "none" },
+    { classification: FINDING.MISSING_DELIVERY_EVIDENCE, count: 0, action: "dry_run_only" },
     { classification: FINDING.DUPLICATE, count: 0, action: "dry_run_only" },
     { classification: FINDING.STUCK, count: 0, action: "dry_run_only" },
-    { classification: FINDING.MISSING_DELIVERY, count: 0, action: "dry_run_only" },
-    { classification: FINDING.INVALID_DATA, count: 0, action: "dry_run_only" },
+    { classification: FINDING.INVALID, count: 0, action: "dry_run_only" },
   ];
 
   const bump = (classification) => {
@@ -34,31 +50,42 @@ function classifyHistoricalIntegrity({ triggeredAlerts = [], deliveryAttempts = 
   for (const alert of triggeredAlerts) {
     const alertId = String(alert.id);
     const attempts = attemptsByAlert.get(alertId) || [];
-    let classification = FINDING.VALID;
-    let reason = "triggered_with_expected_state";
+    let classification = FINDING.VALID_LEGACY_DELIVERED;
+    let reason = "triggered_with_delivery_evidence";
 
     if (!alert.triggered_at) {
-      classification = FINDING.INVALID_DATA;
+      classification = FINDING.INVALID;
       reason = "triggered_missing_timestamp";
-    } else if (attempts.length === 0) {
-      classification = FINDING.LEGACY;
-      reason = "pre_delivery_attempts_tracking";
     } else {
-      const dupChannel = attempts.some((channel, idx, arr) =>
-        arr.findIndex((x) => x.channel === channel.channel) !== idx
-      );
-      if (dupChannel) {
+      const evidence = hasDeliveryEvidence(alert, { notificationsByAlert, attemptsByAlert });
+      const dupNotifications = (notificationsByAlert.get(alertId) || []).length > 1;
+      const dupAttempts = attempts.length > 3;
+
+      if (dupNotifications || dupAttempts) {
         classification = FINDING.DUPLICATE;
-        reason = "duplicate_channel_attempt_row";
+        reason = dupNotifications ? "duplicate_site_notifications" : "duplicate_delivery_attempt_rows";
+      } else if (evidence === "email_sent_at" || evidence === "site_notification" || evidence === "delivery_attempts") {
+        classification = FINDING.VALID_LEGACY_DELIVERED;
+        reason = evidence;
+      } else if (alert.status === "triggered" && alert.triggered_at) {
+        classification = FINDING.VALID_LEGACY_UNKNOWN_CHANNELS;
+        reason = "triggered_status_legacy_semantics";
+      } else {
+        classification = FINDING.MISSING_DELIVERY_EVIDENCE;
+        reason = "no_site_email_or_attempt_evidence";
       }
     }
 
     bump(classification);
+    findings.push({ alertId, classification, reason });
+  }
+
+  for (const stuck of activeAlertsBeyondTarget) {
+    bump(FINDING.STUCK);
     findings.push({
-      alertId,
-      email: alert.user_email,
-      classification,
-      reason,
+      alertId: String(stuck.id),
+      classification: FINDING.STUCK,
+      reason: stuck.reason || "active_beyond_target_with_fresh_quote",
     });
   }
 
@@ -66,10 +93,15 @@ function classifyHistoricalIntegrity({ triggeredAlerts = [], deliveryAttempts = 
     table,
     findings,
     unknownCount: 0,
+    missingDeliveryEvidenceCount: findings.filter(
+      (f) => f.classification === FINDING.MISSING_DELIVERY_EVIDENCE
+    ).length,
+    duplicateCount: findings.filter((f) => f.classification === FINDING.DUPLICATE).length,
   };
 }
 
 module.exports = {
   FINDING,
   classifyHistoricalIntegrity,
+  hasDeliveryEvidence,
 };

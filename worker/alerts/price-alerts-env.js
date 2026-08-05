@@ -15,11 +15,11 @@ function isProductionLike() {
   return nodeEnv === "production" || railwayEnv === "production";
 }
 
-function parseBooleanEnv(key, { required = false, expected = null } = {}) {
+function parseBooleanEnv(key, { required = false, expected = null, defaultValue = true } = {}) {
   const raw = envValue(key);
   if (!raw) {
     if (required) return { ok: false, error: "missing" };
-    return { ok: true, value: true, present: false };
+    return { ok: true, value: defaultValue, present: false };
   }
   const normalized = raw.toLowerCase();
   if (!["true", "false", "1", "0", "yes", "no"].includes(normalized)) {
@@ -94,6 +94,72 @@ function resolveCheckIntervalMs() {
   return Math.max(intervalMs, MIN_CHECK_INTERVAL_MS);
 }
 
+function getChannelFeatureFlags() {
+  return {
+    site: parseBooleanEnv("PRICE_ALERT_SITE_NOTIFICATIONS_ENABLED", { defaultValue: true }).value,
+    push: parseBooleanEnv("PRICE_ALERT_PUSH_ENABLED", { defaultValue: true }).value,
+    email: parseBooleanEnv("PRICE_ALERT_EMAIL_ENABLED", { defaultValue: true }).value,
+  };
+}
+
+function validateChannelProviders(flags) {
+  const invalid = [];
+  const dependencies = {
+    database: true,
+    priceProviderConfigured: true,
+    siteNotificationsConfigured: "disabled",
+    pushConfigured: "disabled",
+    emailConfigured: "disabled",
+  };
+
+  if (flags.site) {
+    const supabaseUrl = resolveSupabaseUrlFromEnv();
+    const serviceKey = parseSecret("SUPABASE_SERVICE_ROLE_KEY", { minLength: 20, required: false });
+    if (!supabaseUrl || !serviceKey.ok || !serviceKey.present) {
+      invalid.push({ key: "PRICE_ALERT_SITE_NOTIFICATIONS_ENABLED", reason: "supabase_path_missing" });
+      dependencies.siteNotificationsConfigured = false;
+    } else {
+      dependencies.siteNotificationsConfigured = true;
+    }
+  }
+
+  if (flags.push) {
+    const vapidPublic = envValue("VAPID_PUBLIC_KEY") || envValue("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
+    const vapidPrivate = envValue("VAPID_PRIVATE_KEY");
+    const vapidSubject = envValue("VAPID_SUBJECT");
+    if (!vapidPublic || !vapidPrivate || !vapidSubject) {
+      invalid.push({ key: "PRICE_ALERT_PUSH_ENABLED", reason: "incomplete_vapid_config" });
+      dependencies.pushConfigured = false;
+    } else {
+      dependencies.pushConfigured = true;
+    }
+  }
+
+  if (flags.email) {
+    const resend = parseSecret("RESEND_API_KEY", { minLength: 10, required: true });
+    const emailFrom = envValue("EMAIL_FROM");
+    const emailReplyTo = envValue("EMAIL_REPLY_TO");
+    const siteUrl = parseHttpsUrl("NEXT_PUBLIC_SITE_URL", { required: true });
+    if (!resend.ok) {
+      invalid.push({ key: "PRICE_ALERT_EMAIL_ENABLED", reason: resend.error || "missing_resend" });
+      dependencies.emailConfigured = false;
+    } else if (!emailFrom) {
+      invalid.push({ key: "EMAIL_FROM", reason: "missing" });
+      dependencies.emailConfigured = false;
+    } else if (!emailReplyTo) {
+      invalid.push({ key: "EMAIL_REPLY_TO", reason: "missing" });
+      dependencies.emailConfigured = false;
+    } else if (!siteUrl.ok) {
+      invalid.push({ key: "NEXT_PUBLIC_SITE_URL", reason: siteUrl.error || "invalid_url" });
+      dependencies.emailConfigured = false;
+    } else {
+      dependencies.emailConfigured = true;
+    }
+  }
+
+  return { invalid, dependencies };
+}
+
 function collectValidation(checks) {
   const missing = [];
   const invalid = [];
@@ -130,11 +196,16 @@ const VARIABLE_CLASSIFICATION = Object.freeze({
   SUPABASE_URL: "OPTIONAL",
   SUPABASE_SERVICE_ROLE_KEY: "REQUIRED",
   RESEND_API_KEY: "OPTIONAL",
+  EMAIL_FROM: "OPTIONAL",
+  EMAIL_REPLY_TO: "OPTIONAL",
   VAPID_PUBLIC_KEY: "OPTIONAL",
   VAPID_PRIVATE_KEY: "OPTIONAL",
   VAPID_SUBJECT: "OPTIONAL",
   NEXT_PUBLIC_SITE_URL: "OPTIONAL",
   PRICE_ALERT_WORKER_ENABLED: "OPTIONAL",
+  PRICE_ALERT_SITE_NOTIFICATIONS_ENABLED: "OPTIONAL",
+  PRICE_ALERT_PUSH_ENABLED: "OPTIONAL",
+  PRICE_ALERT_EMAIL_ENABLED: "OPTIONAL",
   PRICE_ALERT_CHECK_INTERVAL_MS: "OPTIONAL",
   PRICE_ALERT_MAX_ALERTS_PER_RUN: "OPTIONAL",
   OPENAI_API_KEY: "OPTIONAL",
@@ -146,7 +217,6 @@ const VARIABLE_CLASSIFICATION = Object.freeze({
   HOSTNAME: "OPTIONAL",
   PORT: "OPTIONAL",
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: "OPTIONAL",
-  VAPID_PUBLIC_KEY: "OPTIONAL",
   WORKER_HTTP_AUTH_SECRET: "OPTIONAL",
   IAM_API: "OPTIONAL",
   TELEGRAM_BOT_TOKEN: "REMOVE",
@@ -160,6 +230,8 @@ function classifyPriceAlertVariable(key) {
 
 function validatePriceAlertsEnvironment(options = {}) {
   const production = options.production ?? isProductionLike();
+  const channelFlags = getChannelFeatureFlags();
+
   const checks = [
     {
       key: "NEXT_PUBLIC_SUPABASE_URL",
@@ -183,7 +255,19 @@ function validatePriceAlertsEnvironment(options = {}) {
     },
     {
       key: "PRICE_ALERT_WORKER_ENABLED",
-      run: () => parseBooleanEnv("PRICE_ALERT_WORKER_ENABLED", { required: false }),
+      run: () => parseBooleanEnv("PRICE_ALERT_WORKER_ENABLED", { defaultValue: true }),
+    },
+    {
+      key: "PRICE_ALERT_SITE_NOTIFICATIONS_ENABLED",
+      run: () => parseBooleanEnv("PRICE_ALERT_SITE_NOTIFICATIONS_ENABLED", { defaultValue: true }),
+    },
+    {
+      key: "PRICE_ALERT_PUSH_ENABLED",
+      run: () => parseBooleanEnv("PRICE_ALERT_PUSH_ENABLED", { defaultValue: true }),
+    },
+    {
+      key: "PRICE_ALERT_EMAIL_ENABLED",
+      run: () => parseBooleanEnv("PRICE_ALERT_EMAIL_ENABLED", { defaultValue: true }),
     },
     {
       key: "PRICE_ALERT_CHECK_INTERVAL_MS",
@@ -202,33 +286,13 @@ function validatePriceAlertsEnvironment(options = {}) {
           max: 100,
         }),
     },
-    {
-      key: "NEXT_PUBLIC_SITE_URL",
-      run: () => {
-        const raw = envValue("NEXT_PUBLIC_SITE_URL");
-        if (!raw) return { ok: true, present: false, value: "" };
-        const parsed = parseHttpsUrl("NEXT_PUBLIC_SITE_URL", { required: false });
-        if (!parsed.ok) {
-          return { ok: true, present: true, value: raw, warning: parsed.error };
-        }
-        return parsed;
-      },
-    },
   ];
 
   const result = collectValidation(checks);
-  const vapidPublic = envValue("VAPID_PUBLIC_KEY") || envValue("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
-  const vapidPrivate = envValue("VAPID_PRIVATE_KEY");
-  const vapidSubject = envValue("VAPID_SUBJECT");
-  const vapidParts = [vapidPublic, vapidPrivate, vapidSubject].filter(Boolean);
-  const pushConfigured = vapidParts.length === 3;
-
-  const resendKey = envValue("RESEND_API_KEY");
-  if (resendKey && resendKey.length < 10) {
-    result.invalidRequired.push({ key: "RESEND_API_KEY", reason: "weak_or_short" });
-    result.invalidRequiredCount += 1;
-    result.ok = false;
-  }
+  const channelValidation = validateChannelProviders(channelFlags);
+  result.invalidRequired.push(...channelValidation.invalid);
+  result.invalidRequiredCount = result.invalidRequired.length;
+  result.ok = result.missingRequiredCount === 0 && result.invalidRequiredCount === 0;
 
   return {
     ...result,
@@ -240,18 +304,13 @@ function validatePriceAlertsEnvironment(options = {}) {
         max: 100,
       }).value || DEFAULT_MAX_ALERTS_PER_RUN,
     production,
-    dependencies: {
-      database: result.missingRequired.includes("SUPABASE_SERVICE_ROLE_KEY") ? false : true,
-      priceProviderConfigured: true,
-      emailConfigured: Boolean(resendKey),
-      pushConfigured,
-      siteNotificationsConfigured: true,
-    },
+    channelFlags,
+    dependencies: channelValidation.dependencies,
   };
 }
 
 function isPriceAlertWorkerEnabled() {
-  const parsed = parseBooleanEnv("PRICE_ALERT_WORKER_ENABLED", { required: false });
+  const parsed = parseBooleanEnv("PRICE_ALERT_WORKER_ENABLED", { defaultValue: true });
   return parsed.value !== false;
 }
 
@@ -273,6 +332,7 @@ module.exports = {
   DEFAULT_MAX_ALERTS_PER_RUN,
   validatePriceAlertsEnvironment,
   isPriceAlertWorkerEnabled,
+  getChannelFeatureFlags,
   classifyPriceAlertVariable,
   listKnownVariables,
   assertNoUnknownVariables,

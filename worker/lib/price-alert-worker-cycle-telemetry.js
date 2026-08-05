@@ -15,6 +15,9 @@ function buildCycleTelemetryRow({
   lock = {},
   buildCommit = null,
   errorCodeSafe = null,
+  triggerSource = null,
+  deploymentId = null,
+  processStartedAt = null,
 }) {
   return {
     run_id: runId,
@@ -37,8 +40,12 @@ function buildCycleTelemetryRow({
     lock_acquired: Boolean(lock.acquired),
     lock_contended: Boolean(lock.contended),
     stale_prices: stats.stalePrices || 0,
+    retries_processed: stats.retriesProcessed || 0,
     error_code_safe: errorCodeSafe,
     build_commit: buildCommit || process.env.RAILWAY_GIT_COMMIT_SHA || null,
+    trigger_source: triggerSource,
+    deployment_id: deploymentId || process.env.RAILWAY_DEPLOYMENT_ID || null,
+    process_started_at: processStartedAt,
   };
 }
 
