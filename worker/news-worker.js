@@ -3440,23 +3440,28 @@ async function fetchForexNews(options = {}) {
     const economicRegistry = getProviderRegistry({ tradingEconomicsClient: TRADING_ECONOMICS_CLIENT });
     mergeProviderMetricsIntoCycle(stats, economicRegistry.getAllMetrics());
 
-    const pendingResults = await processDuePendingReleases({
-      registry: economicRegistry,
-      queue: getPendingQueue(),
-      dryRun,
-    });
+    try {
+      const pendingResults = await processDuePendingReleases({
+        registry: economicRegistry,
+        queue: getPendingQueue(),
+        dryRun,
+      });
 
-    for (const pendingResult of pendingResults) {
-      if (pendingResult.action === "publish") {
-        stats.economicEventsDetected += 1;
-        stats.economicEventsComplete += 1;
-        await publishStructuredEconomicReleaseResult(pendingResult, stats, dryRun);
-      } else if (pendingResult.action === "drop") {
-        stats.economicEventsDroppedIncomplete += 1;
-        logEconomicReleaseDroppedIncomplete(pendingResult, pendingResult.validation);
-      } else if (pendingResult.action === "retry") {
-        stats.economicEventsPending += 1;
+      for (const pendingResult of pendingResults) {
+        if (pendingResult.action === "publish") {
+          stats.economicEventsDetected += 1;
+          stats.economicEventsComplete += 1;
+          await publishStructuredEconomicReleaseResult(pendingResult, stats, dryRun);
+        } else if (pendingResult.action === "drop") {
+          stats.economicEventsDroppedIncomplete += 1;
+          logEconomicReleaseDroppedIncomplete(pendingResult, pendingResult.validation);
+        } else if (pendingResult.action === "retry") {
+          stats.economicEventsPending += 1;
+        }
       }
+    } catch (error) {
+      stats.lastErrorSafe = error.message;
+      console.error("⚠️ Economic pending queue error:", error.message);
     }
 
     const allItems = [];
