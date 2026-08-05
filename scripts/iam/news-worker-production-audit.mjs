@@ -86,6 +86,19 @@ async function dbIntegrity(client) {
     .maybeSingle();
   checks.latestPostAt = latestPost?.created_at || null;
 
+  try {
+    const { auditSitePublishParity } = require("../../worker/lib/news-site-recovery.js");
+    const parity = await auditSitePublishParity(() => client, {
+      since: "2026-08-03T07:03:02.521+00:00",
+      limit: 300,
+    });
+    if (parity.ok) {
+      checks.sitePublishParity = parity.summary;
+    }
+  } catch {
+    // optional in audit environments without module resolution
+  }
+
   return checks;
 }
 

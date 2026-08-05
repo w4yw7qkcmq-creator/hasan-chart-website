@@ -5,6 +5,12 @@ const { sanitizeChannelArtifacts, assertNoChannelArtifacts } = require("./channe
 const { buildPublishFingerprintBundle } = require("./semantic-fingerprints");
 const { isSourcePublishable, updateBaselineAfterPublish } = require("./publish-state");
 const { buildPremiumImageContextFromCandidate } = require("../news-images/important-events");
+const {
+  PUBLISH_STATES,
+  createPublishLegState,
+  transitionPublishLegState,
+  resolveRetryLeg,
+} = require("../news-publish-state");
 
 /** @type {Set<string>} */
 const memoryReservations = new Set();
@@ -153,10 +159,21 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   }
 
   const fingerprint = reserve.fingerprint;
-  const state = publishStates.get(fingerprint) || { state: "reserved" };
+  let legState = createPublishLegState({
+    state: PUBLISH_STATES.RESERVED,
+    fingerprint,
+    sourceLink:
+      candidate.post?.sourceUrl || `telegram:${candidate.post?.sourceChannel}/${candidate.post?.sourceMessageId}`,
+  });
 
   if (deps.dryRun) {
-    publishStates.set(fingerprint, { state: "completed", telegramSent: true, dbInserted: true, dryRun: true });
+    legState = transitionPublishLegState(legState, {
+      state: PUBLISH_STATES.COMPLETED,
+      telegramSent: true,
+      siteInserted: true,
+      publishedNewsRecorded: true,
+    });
+    publishStates.set(fingerprint, { ...legState, dryRun: true });
     return {
       dryRun: true,
       published: true,
@@ -171,32 +188,37 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   try {
     if (deps.deliverTelegramNews) {
       const delivery = await deps.deliverTelegramNews({ message, candidate, dryRun: deps.dryRun });
-      if (delivery?.delivery === "dry_run") {
-        state.telegramSent = true;
-        state.state = "telegram_sent";
-        publishStates.set(fingerprint, state);
-      } else {
-        state.telegramSent = true;
-        state.state = "telegram_sent";
-        state.premiumImage = delivery?.premiumImage === true;
-        publishStates.set(fingerprint, state);
+      legState = transitionPublishLegState(legState, {
+        telegramSent: true,
+        telegramMessageId: delivery?.telegramMessageId || null,
+        state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
+      });
+      if (delivery?.premiumImage === true) {
+        legState.premiumImage = true;
       }
     } else {
-      await deps.sendTelegramMessage(message);
-      state.telegramSent = true;
-      state.state = "telegram_sent";
-      publishStates.set(fingerprint, state);
+      const delivery = await deps.sendTelegramMessage(message);
+      if (delivery?.ok === false) {
+        throw new Error(delivery.error || "telegram_send_failed");
+      }
+      legState = transitionPublishLegState(legState, {
+        telegramSent: true,
+        telegramMessageId: delivery?.telegramMessageId || delivery?.message_id || null,
+        state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
+      });
     }
   } catch (error) {
-    state.state = "failed";
-    publishStates.set(fingerprint, state);
+    legState = transitionPublishLegState(legState, {
+      state: PUBLISH_STATES.FAILED_RETRYABLE,
+      retryable: true,
+      reason: error.message,
+    });
+    publishStates.set(fingerprint, legState);
     releaseMemoryReservation(fingerprint);
-    return { failed: true, state: "failed", reason: error.message, fingerprint };
+    return { failed: true, state: legState.state, reason: error.message, fingerprint, legState };
   }
 
-  const sourceLink =
-    candidate.post?.sourceUrl || `telegram:${candidate.post?.sourceChannel}/${candidate.post?.sourceMessageId}`;
-  state.sourceLink = sourceLink;
+  const sourceLink = legState.sourceLink;
   const dbTitle = validation.resolvedTitle || candidate.facts?.title || "خبر سوق";
   const impactLevel = candidate.newsType === "economic" ? "HIGH" : "MEDIUM";
 
@@ -209,6 +231,7 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
       published_at: new Date().toISOString(),
       telegramFingerprint: fingerprint,
     });
+    legState = transitionPublishLegState(legState, { publishedNewsRecorded: true });
   }
 
   const saveResult = await deps.saveNewsPostToSupabase({
@@ -220,22 +243,32 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   });
 
   if (saveResult?.error) {
-    state.state = "telegram_sent";
-    state.dbInserted = false;
-    publishStates.set(fingerprint, state);
+    legState = transitionPublishLegState(legState, {
+      siteInserted: false,
+      state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
+      retryable: true,
+      reason: "db_insert_failed",
+    });
+    publishStates.set(fingerprint, legState);
     return {
       partial: true,
-      state: "telegram_sent",
+      state: legState.state,
       reason: "db_insert_failed",
       fingerprint,
       telegramSent: true,
       dbInserted: false,
+      retryLeg: resolveRetryLeg(legState),
+      legState,
     };
   }
 
-  state.dbInserted = true;
-  state.state = "completed";
-  publishStates.set(fingerprint, state);
+  legState = transitionPublishLegState(legState, {
+    siteInserted: true,
+    sitePostId: saveResult?.id || null,
+    state: PUBLISH_STATES.COMPLETED,
+    retryable: false,
+  });
+  publishStates.set(fingerprint, legState);
 
   if (deps.savePublishedNewsLink) {
     deps.savePublishedNewsLink(sourceLink, `${dbTitle} ${message}`);
@@ -245,14 +278,71 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
 
   return {
     published: true,
-    state: "completed",
+    state: legState.state,
     fingerprint,
     sourceLink,
     resolvedTitle: validation.resolvedTitle,
     messageLength: message.length,
     telegramSent: true,
     dbInserted: true,
+    telegramMessageId: legState.telegramMessageId,
+    sitePostId: legState.sitePostId,
+    legState,
   };
+}
+
+async function retryPublishLeg(candidate, legState, ctx = {}, deps = {}) {
+  const retryLeg = resolveRetryLeg(legState);
+  if (!retryLeg) {
+    return { skipped: true, reason: "nothing_to_retry", legState };
+  }
+
+  const validation = validateCandidateForAtomicPublish(candidate, ctx);
+  const message = validation.sanitizedMessage || candidate.formattedMessage;
+  const dbTitle = validation.resolvedTitle || candidate.facts?.title || "خبر سوق";
+  const sourceLink = legState.sourceLink;
+  const impactLevel = candidate.newsType === "economic" ? "HIGH" : "MEDIUM";
+
+  let nextState = { ...legState };
+
+  if ((retryLeg === "telegram_only" || retryLeg === "full") && !legState.telegramSent) {
+    if (deps.deliverTelegramNews) {
+      await deps.deliverTelegramNews({ message, candidate, dryRun: deps.dryRun });
+    } else {
+      await deps.sendTelegramMessage(message);
+    }
+    nextState = transitionPublishLegState(nextState, { telegramSent: true, state: PUBLISH_STATES.TELEGRAM_PUBLISHED });
+  }
+
+  if ((retryLeg === "site_only" || retryLeg === "full") && !legState.siteInserted) {
+    const saveResult = await deps.saveNewsPostToSupabase({
+      title: dbTitle,
+      content: message,
+      image_url: null,
+      impact_level: impactLevel,
+      source_link: sourceLink,
+    });
+    if (saveResult?.error) {
+      return {
+        partial: true,
+        reason: "db_insert_failed",
+        retryLeg,
+        legState: transitionPublishLegState(nextState, {
+          retryable: true,
+          reason: "db_insert_failed",
+          state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
+        }),
+      };
+    }
+    nextState = transitionPublishLegState(nextState, {
+      siteInserted: true,
+      sitePostId: saveResult?.id || null,
+      state: PUBLISH_STATES.COMPLETED,
+    });
+  }
+
+  publishStates.set(legState.fingerprint, nextState);
+  return { published: nextState.state === PUBLISH_STATES.COMPLETED, retryLeg, legState: nextState };
 }
 
 function resetAtomicPublishForTests() {
@@ -268,6 +358,7 @@ module.exports = {
   validateCandidateForAtomicPublish,
   reserveNewsPublishFingerprint,
   publishValidatedTelegramNewsCandidate,
+  retryPublishLeg,
   extractResolvedTitle,
   resetAtomicPublishForTests,
   getPublishStateForFingerprint,
