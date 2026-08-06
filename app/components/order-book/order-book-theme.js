@@ -20,7 +20,15 @@ export const ob = {
   body: "text-sm leading-6 ob-text-normal",
   input:
     "ob-input h-10 w-full min-w-0 rounded-xl border py-2 pl-3 pr-9 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ob-focus-ring)]",
-  select: "ob-input appearance-none pr-9",
+  listboxTrigger:
+    "ob-input flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-xl border py-2 pl-3 pr-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ob-focus-ring)]",
+  listboxMenu:
+    "ob-listbox-menu max-h-56 overflow-y-auto overscroll-contain rounded-xl border py-1 shadow-lg backdrop-blur-sm",
+  listboxOption:
+    "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-right text-sm transition motion-reduce:transition-none",
+  listboxOptionActive: "bg-[var(--ob-accent-soft)] ob-text-strong",
+  listboxOptionIdle: "ob-text-normal hover:bg-[var(--ob-table-row-hover)]",
+  listboxSelectedMark: "shrink-0 text-xs ob-positive",
   focusRing:
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ob-focus-ring)]",
   positive: "ob-positive",

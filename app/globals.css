@@ -26,6 +26,20 @@ html.theme-ready #site-root {
   --blue-soft: rgba(37, 99, 235, 0.18);
   --green-main: #34d399;
   --shadow-main: rgba(0, 0, 0, 0.28);
+  --header-bg: rgba(2, 8, 23, 0.92);
+  --header-border: rgba(34, 211, 238, 0.15);
+  --header-text: #f8fafc;
+  --header-text-muted: #cbd5e1;
+  --header-surface: rgba(34, 211, 238, 0.1);
+  --header-surface-hover: rgba(34, 211, 238, 0.2);
+  --header-accent: #a5f3fc;
+  --header-danger-text: #fecaca;
+  --header-danger-soft: rgba(239, 68, 68, 0.16);
+  --header-danger-border: rgba(248, 113, 113, 0.28);
+  --header-focus-ring: rgba(56, 189, 248, 0.55);
+  --header-logo-bg: rgba(37, 99, 235, 0.22);
+  --header-logo-text: #f8fafc;
+  --header-shadow: 0 14px 50px rgba(0, 102, 255, 0.16);
 }
 
 html[data-theme="light"] {
@@ -40,6 +54,20 @@ html[data-theme="light"] {
   --blue-soft: rgba(14, 165, 233, 0.12);
   --green-main: #10b981;
   --shadow-main: rgba(37, 99, 235, 0.12);
+  --header-bg: rgba(248, 251, 255, 0.94);
+  --header-border: rgba(47, 150, 255, 0.2);
+  --header-text: #0f172a;
+  --header-text-muted: #475569;
+  --header-surface: rgba(47, 150, 255, 0.08);
+  --header-surface-hover: rgba(47, 150, 255, 0.14);
+  --header-accent: #1d4ed8;
+  --header-danger-text: #991b1b;
+  --header-danger-soft: #fee2e2;
+  --header-danger-border: rgba(239, 68, 68, 0.24);
+  --header-focus-ring: rgba(37, 99, 235, 0.35);
+  --header-logo-bg: rgba(37, 99, 235, 0.12);
+  --header-logo-text: #0f172a;
+  --header-shadow: 0 14px 45px rgba(47, 150, 255, 0.1);
 }
 
 * {
@@ -249,11 +277,12 @@ html[data-theme="light"] .lg\:flex {
   color: #0f172a !important;
 }
 
-html[data-theme="light"] header {
-  background: rgba(248, 251, 255, 0.92) !important;
-  border-color: rgba(47, 150, 255, 0.18) !important;
-  color: #0f172a !important;
-  box-shadow: 0 14px 45px rgba(47, 150, 255, 0.10) !important;
+html[data-theme="light"] header,
+html[data-theme="light"] .site-top-header {
+  background: var(--header-bg) !important;
+  border-color: var(--header-border) !important;
+  color: var(--header-text) !important;
+  box-shadow: var(--header-shadow) !important;
 }
 
 html[data-theme="light"] aside {
@@ -770,9 +799,9 @@ html[data-theme="light"] .bootstrapScreen__tagline {
 }
 
 .browserPushBtn {
-  border-color: rgba(34, 211, 238, 0.22);
-  background: rgba(34, 211, 238, 0.1);
-  color: rgb(224 242 254);
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
@@ -815,12 +844,135 @@ select:focus:not(:focus-visible) {
   min-width: 0;
   flex: 1;
   justify-content: center;
+  color: var(--header-text);
 }
 
 .site-header-brand__text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--header-text);
+}
+
+.site-top-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  box-shadow: var(--header-shadow);
+  color: var(--header-text);
+}
+
+.site-top-header__gradient {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(11, 99, 255, 0.2), transparent 28%),
+    linear-gradient(90deg, rgba(2, 6, 23, 0.92), rgba(7, 20, 47, 0.88), rgba(2, 6, 23, 0.92));
+}
+
+html[data-theme="light"] .site-top-header__gradient {
+  background: linear-gradient(90deg, rgba(248, 251, 255, 0.72), rgba(237, 247, 255, 0.45));
+  opacity: 0.95;
+}
+
+.site-header-logo-badge {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  border: 1px solid var(--header-border);
+  background: var(--header-logo-bg);
+  color: var(--header-logo-text);
+  box-shadow: 0 0 20px rgba(0, 163, 255, 0.12);
+}
+
+.site-header-menu-btn {
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  shrink: 0;
+  place-items: center;
+  border-radius: 1rem;
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text);
+  font-size: 1.5rem;
+  font-weight: 900;
+  box-shadow: 0 0 24px rgba(0, 163, 255, 0.12);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.site-header-menu-btn:hover {
+  background: var(--header-surface-hover);
+}
+
+.site-header-theme-btn {
+  display: inline-flex;
+  shrink: 0;
+  align-items: center;
+  border-radius: 1rem;
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.site-header-theme-btn:hover {
+  background: var(--header-surface-hover);
+}
+
+.topUserChip {
+  display: inline-flex;
+  max-width: 12rem;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 1rem;
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text);
+  padding: 0.5rem 1rem;
+  font-weight: 800;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.topUserChip:hover {
+  background: var(--header-surface-hover);
+}
+
+.topLogoutBtn {
+  border-radius: 1rem;
+  border: 1px solid var(--header-danger-border);
+  background: var(--header-danger-soft);
+  color: var(--header-danger-text);
+  padding: 0.5rem 1rem;
+  font-weight: 800;
+  transition: filter 0.15s ease, background 0.15s ease;
+}
+
+.topLogoutBtn:hover {
+  filter: brightness(1.06);
+}
+
+.topLoginBtn {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 1rem;
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.topLoginBtn:hover {
+  background: var(--header-surface-hover);
 }
 
 @media (min-width: 640px) {
@@ -852,15 +1004,15 @@ select:focus:not(:focus-visible) {
 }
 
 .notificationBell {
-  border-color: rgba(34, 211, 238, 0.22);
-  background: rgba(7, 20, 47, 0.72);
-  color: rgb(224 242 254);
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text);
   box-shadow: 0 10px 30px rgba(0, 102, 255, 0.14);
 }
 
 .notificationBell:hover {
-  border-color: rgba(34, 211, 238, 0.38);
-  background: rgba(12, 32, 72, 0.88);
+  border-color: var(--header-border);
+  background: var(--header-surface-hover);
 }
 
 .notificationBell[data-shake] {

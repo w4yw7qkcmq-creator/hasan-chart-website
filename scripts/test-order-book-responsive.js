@@ -26,7 +26,8 @@ passed += 3;
 assert.match(page, /dir="rtl"/);
 passed += 1;
 
-assert.match(ui, /mobileScrollable|max-lg:overflow-x-auto/);
-passed += 1;
+assert.match(ui, /OrderBookListbox/);
+assert.match(ui, /useListboxMenuPosition|createPortal/);
+passed += 2;
 
 console.log(`test-order-book-responsive: PASS (${passed} checks)`);

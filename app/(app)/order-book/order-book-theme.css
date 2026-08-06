@@ -100,6 +100,13 @@ html[data-theme="light"] .ob-page {
   color: var(--ob-text-subtle);
 }
 
+.ob-page .ob-listbox-menu {
+  background: var(--ob-surface-elevated);
+  border-color: var(--ob-border);
+  color: var(--ob-text);
+  box-shadow: var(--ob-shadow);
+}
+
 .ob-page .ob-text-strong {
   color: var(--ob-text-strong);
 }

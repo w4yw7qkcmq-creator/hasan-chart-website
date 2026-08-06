@@ -32,7 +32,11 @@ passed += 4;
 
 assert.match(ui, /text-xs font-semibold ob-text-muted|ob\.label/);
 assert.match(ui, /ob\.badgeBuy/);
-assert.match(ui, /ob\.badgeCoverage/);
-passed += 3;
+assert.match(ui, /role="listbox"/);
+assert.match(ui, /role="option"/);
+assert.match(ui, /aria-selected/);
+assert.match(ui, /aria-expanded/);
+assert.match(ui, /OrderBookListbox/);
+passed += 5;
 
 console.log(`test-order-book-accessibility: PASS (${passed} checks)`);

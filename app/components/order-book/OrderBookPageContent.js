@@ -60,7 +60,7 @@ import {
   SegmentedControl,
   SideBadge,
   StatTile,
-  StyledSelect,
+  OrderBookListbox,
   SymbolSearchCombobox,
 } from "./order-book-ui";
 import { ob } from "./order-book-theme";
@@ -467,11 +467,13 @@ export default function OrderBookPageContent() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <StyledSelect
+          <OrderBookListbox
             label="نطاق السيولة"
+            ariaLabel="نطاق السيولة"
             value={String(prefs.liquidityRange ?? DEFAULT_LIQUIDITY_RANGE_PERCENT)}
             onChange={(value) => setPrefs({ liquidityRange: Number(value) })}
-            options={LIQUIDITY_RANGE_OPTIONS.map((value) => ({ value: String(value), label: `${value}%` }))}
+            options={LIQUIDITY_RANGE_OPTIONS.map((entry) => ({ value: String(entry), label: `${entry}%` }))}
+            optionValueDir="ltr"
           />
           <SegmentedControl
             label="عرض الجوال"
@@ -487,17 +489,21 @@ export default function OrderBookPageContent() {
         </div>
 
         <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 border-[var(--ob-border)]">
-          <StyledSelect
+          <OrderBookListbox
             label="دقة السعر"
+            ariaLabel="دقة السعر"
             value={String(prefs.precision ?? getDefaultPrecision(prefs.symbol))}
             onChange={(value) => setPrefs({ precision: Number(value) })}
-            options={precisionOptions.map((value) => ({ value: String(value), label: String(value) }))}
+            options={precisionOptions.map((entry) => ({ value: String(entry), label: String(entry) }))}
+            optionValueDir="ltr"
           />
-          <StyledSelect
+          <OrderBookListbox
             label="عدد المستويات"
+            ariaLabel="عدد المستويات"
             value={String(prefs.levels)}
             onChange={(value) => setPrefs({ levels: Number(value) })}
-            options={DEPTH_LEVEL_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+            options={DEPTH_LEVEL_OPTIONS.map((entry) => ({ value: String(entry), label: String(entry) }))}
+            optionValueDir="ltr"
           />
         </div>
       </section>

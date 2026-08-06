@@ -1214,22 +1214,19 @@ function RootLayoutShell({ children }) {
           </aside>
 
           <div className="min-w-0 flex-1 overflow-x-hidden">
-            <header className="sticky top-0 z-40 overflow-visible bg-[#020817]/90 border-b border-cyan-300/15 backdrop-blur-2xl px-4 md:px-6 py-4 shadow-[0_14px_50px_rgba(0,102,255,0.16)]">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.20),transparent_28%),linear-gradient(90deg,rgba(2,6,23,0.92),rgba(7,20,47,0.88),rgba(2,6,23,0.92))]" />
+            <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl">
+              <div className="site-top-header__gradient pointer-events-none absolute inset-0" />
               <div className="relative z-10 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(true)}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-2xl font-black text-cyan-100 shadow-[0_0_24px_rgba(0,163,255,0.18)] lg:hidden"
+                  className="site-header-menu-btn lg:hidden"
                   aria-label="فتح القائمة"
                 >
                   <span aria-hidden="true">⋮</span>
                 </button>
                 <Link href="/" className="site-header-brand font-black text-lg flex items-center gap-2 min-w-0">
-                  <span
-                    aria-hidden="true"
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-blue-600/20 border border-cyan-300/25 shadow-[0_0_20px_rgba(0,163,255,0.18)]"
-                  >
+                  <span aria-hidden="true" className="site-header-logo-badge font-black">
                     HC
                   </span>
                   <span className="site-header-brand__text">HasaN CharT</span>
@@ -1263,7 +1260,8 @@ function RootLayoutShell({ children }) {
                 <button
                   type="button"
                   onClick={toggleTheme}
-                  className="hidden shrink-0 rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20 md:inline-flex"
+                  aria-label={headerThemeLabel}
+                  className="site-header-theme-btn hidden md:inline-flex"
                 >
                   {headerThemeLabel}
                 </button>
@@ -1271,9 +1269,17 @@ function RootLayoutShell({ children }) {
                 {authLoading ? (
                   <AuthAccountSkeleton compact />
                 ) : shellUser ? (
-                  <div className="hidden sm:flex items-center gap-3">
-                    <Link href="/my-dashboard" className="topUserChip">{shellUser.username || shellUser.email || "حسابي"}</Link>
-                    <button onClick={logoutAndRedirect} className="topLogoutBtn">تسجيل الخروج</button>
+                  <div className="hidden sm:flex items-center gap-3 min-w-0">
+                    <Link
+                      href="/my-dashboard"
+                      className="topUserChip"
+                      title={shellUser.username || shellUser.email || "حسابي"}
+                    >
+                      {shellUser.username || shellUser.email || "حسابي"}
+                    </Link>
+                    <button type="button" onClick={logoutAndRedirect} className="topLogoutBtn" aria-label="تسجيل الخروج">
+                      تسجيل الخروج
+                    </button>
                   </div>
                 ) : (
                   <AuthLoginLink className="topLoginBtn hidden sm:inline-flex" compact />

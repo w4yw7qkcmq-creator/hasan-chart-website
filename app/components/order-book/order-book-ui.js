@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CLIENT_REGISTRY_RETRY_MS } from "../../../lib/market-data/dynamic-symbol-constants.js";
 import { formatMarketSymbol } from "../../../lib/market-data/symbols.js";
 import { formatCoveragePercent } from "../../../lib/market-data/history/window-utils.js";
@@ -127,32 +128,206 @@ export function SegmentedControl({
   );
 }
 
-export function StyledSelect({ label, value, onChange, options, compact = false }) {
+const LISTBOX_MENU_MAX_HEIGHT = 224;
+
+function useListboxMenuPosition(open, triggerRef) {
+  const [style, setStyle] = useState(null);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) {
+      setStyle(null);
+      return undefined;
+    }
+
+    const update = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const openUp = spaceBelow < LISTBOX_MENU_MAX_HEIGHT && spaceAbove > spaceBelow;
+      setStyle({
+        position: "fixed",
+        left: `${Math.max(8, rect.left)}px`,
+        width: `${rect.width}px`,
+        top: openUp ? `${rect.top - 4}px` : `${rect.bottom + 4}px`,
+        transform: openUp ? "translateY(-100%)" : undefined,
+        zIndex: 60,
+      });
+    };
+
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, triggerRef]);
+
+  return style;
+}
+
+export function OrderBookListbox({
+  label,
+  value,
+  onChange,
+  options,
+  ariaLabel,
+  loading = false,
+  disabled = false,
+  compact = false,
+  optionValueDir = "rtl",
+}) {
+  const listId = useId();
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const menuStyle = useListboxMenuPosition(open, triggerRef);
+
+  const selectedIndex = useMemo(
+    () => Math.max(0, options.findIndex((option) => option.value === value)),
+    [options, value],
+  );
+  const selected = options[selectedIndex] || options[0];
+
+  useEffect(() => {
+    if (!open) return undefined;
+    setActiveIndex(selectedIndex);
+  }, [open, selectedIndex]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  function selectOption(option) {
+    if (!option || disabled) return;
+    onChange(option.value);
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function onKeyDown(event) {
+    if (disabled) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+      return;
+    }
+
+    if (!open && (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      setOpen(true);
+      return;
+    }
+
+    if (!open) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((index) => Math.min(index + 1, Math.max(options.length - 1, 0)));
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((index) => Math.max(index - 1, 0));
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectOption(options[activeIndex]);
+    }
+  }
+
+  const menu = open && menuStyle && typeof document !== "undefined"
+    ? createPortal(
+        <ul
+          ref={menuRef}
+          id={listId}
+          role="listbox"
+          aria-label={ariaLabel || label}
+          style={menuStyle}
+          className={`${ob.listboxMenu} ${ob.focusRing}`}
+        >
+          {options.map((option, index) => {
+            const active = index === activeIndex;
+            const isSelected = option.value === value;
+            return (
+              <li key={option.value} role="presentation">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={`${ob.listboxOption} ${active ? ob.listboxOptionActive : ob.listboxOptionIdle}`}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => selectOption(option)}
+                >
+                  <span dir={optionValueDir} className={`min-w-0 flex-1 text-right ${optionValueDir === "ltr" ? "tabular-nums" : ""}`}>
+                    {option.label}
+                  </span>
+                  {isSelected ? (
+                    <span aria-hidden="true" className={ob.listboxSelectedMark}>
+                      ✓
+                    </span>
+                  ) : (
+                    <span aria-hidden="true" className="w-3 shrink-0" />
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>,
+        document.body,
+      )
+    : null;
+
   return (
-    <label className={`flex min-w-0 flex-col gap-1.5 text-sm ${compact ? "min-w-[7rem]" : ""}`}>
-      {label ? <span className={ob.label}>{label}</span> : null}
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={`${ob.select} ${ob.focusRing}`}
+    <div ref={rootRef} className={`relative min-w-0 ${compact ? "min-w-[7rem]" : ""}`}>
+      <div className="flex min-w-0 flex-col gap-1.5 text-sm">
+        {label ? <span className={ob.label}>{label}</span> : null}
+        <button
+          ref={triggerRef}
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-label={ariaLabel || label}
+          disabled={disabled || loading}
+          onClick={() => setOpen((current) => !current)}
+          onKeyDown={onKeyDown}
+          className={`${ob.listboxTrigger} ${ob.focusRing} disabled:cursor-not-allowed disabled:opacity-60`}
         >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <span
-          aria-hidden="true"
-          className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${ob.textSubtle}`}
-        >
-          ▾
-        </span>
+          <span dir={optionValueDir} className={`min-w-0 flex-1 truncate text-right ${optionValueDir === "ltr" ? "tabular-nums" : ""}`}>
+            {selected?.label || "—"}
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1.5">
+            {loading ? <RefreshSpinner className="h-3.5 w-3.5" /> : null}
+            <span aria-hidden="true" className={ob.textSubtle}>
+              ▾
+            </span>
+          </span>
+        </button>
       </div>
-    </label>
+      {menu}
+    </div>
   );
 }
+
+/** @deprecated Use OrderBookListbox */
+export const StyledSelect = OrderBookListbox;
 
 export function SymbolSearchCombobox({
   label = "العملة",
@@ -166,6 +341,7 @@ export function SymbolSearchCombobox({
   const listId = useId();
   const inputRef = useRef(null);
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
   const abortRef = useRef(null);
   const debounceRef = useRef(null);
   const retryTimerRef = useRef(null);
@@ -268,7 +444,9 @@ export function SymbolSearchCombobox({
   useEffect(() => {
     if (!open) return undefined;
     const onPointerDown = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
+      const target = event.target;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
@@ -346,6 +524,75 @@ export function SymbolSearchCombobox({
 
   const listLoading = fetchState === "loading" || loading;
   const listUnavailable = fetchState === "unavailable" || unavailable;
+  const menuStyle = useListboxMenuPosition(open, inputRef);
+
+  const symbolMenu = open && menuStyle && typeof document !== "undefined"
+    ? createPortal(
+        <ul
+          ref={menuRef}
+          id={listId}
+          role="listbox"
+          aria-label={ariaLabel || label}
+          style={menuStyle}
+          className={`${ob.listboxMenu} ${ob.focusRing}`}
+        >
+          {listLoading && !filtered.length ? (
+            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
+              جاري البحث...
+            </li>
+          ) : null}
+          {listUnavailable && !filtered.length ? (
+            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
+              قائمة العملات غير متاحة مؤقتًا
+            </li>
+          ) : null}
+          {filtered.length ? (
+            filtered.map((entry, index) => {
+              const active = index === activeIndex;
+              const isSelected = entry.value === value;
+              const exchangeLabel =
+                entry.supportedExchangeCount >= 3
+                  ? "3 منصات"
+                  : entry.supportedExchangeCount === 2
+                    ? "منصتان"
+                    : null;
+              return (
+                <li key={entry.value} role="presentation">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    className={`${ob.listboxOption} ${active ? ob.listboxOptionActive : ob.listboxOptionIdle}`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => selectEntry(entry)}
+                  >
+                    <span className="min-w-0 text-right">
+                      <span className="block font-medium">{entry.label}</span>
+                      {entry.displayName ? (
+                        <span className={`block text-xs ${ob.textMuted}`}>{entry.displayName}</span>
+                      ) : null}
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-2">
+                      <span dir="ltr" className={`text-left tabular-nums text-xs ${ob.textMuted}`}>
+                        {exchangeLabel || entry.value}
+                      </span>
+                      {isSelected ? (
+                        <span aria-hidden="true" className={ob.listboxSelectedMark}>
+                          ✓
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                </li>
+              );
+            })
+          ) : !listLoading ? (
+            <li className={`px-3 py-2 text-sm ${ob.textMuted}`}>لا توجد نتائج</li>
+          ) : null}
+        </ul>,
+        document.body,
+      )
+    : null;
 
   return (
     <div ref={rootRef} className="relative min-w-0">
@@ -387,61 +634,7 @@ export function SymbolSearchCombobox({
         </div>
       </label>
 
-      {open ? (
-        <ul
-          id={listId}
-          role="listbox"
-          className={`absolute z-30 mt-1 max-h-56 w-full overflow-y-auto overscroll-contain rounded-xl border py-1 shadow-lg ob-surface ${ob.focusRing}`}
-        >
-          {listLoading && !filtered.length ? (
-            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
-              جاري البحث...
-            </li>
-          ) : null}
-          {listUnavailable && !filtered.length ? (
-            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
-              قائمة العملات غير متاحة مؤقتًا
-            </li>
-          ) : null}
-          {filtered.length ? (
-            filtered.map((entry, index) => {
-              const active = index === activeIndex;
-              const exchangeLabel =
-                entry.supportedExchangeCount >= 3
-                  ? "3 منصات"
-                  : entry.supportedExchangeCount === 2
-                    ? "منصتان"
-                    : null;
-              return (
-                <li key={entry.value} role="option" aria-selected={entry.value === value}>
-                  <button
-                    type="button"
-                    className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-right text-sm transition motion-reduce:transition-none ${
-                      active
-                        ? "bg-[var(--ob-accent-soft)] ob-text-strong"
-                        : `${ob.textNormal} hover:bg-[var(--ob-table-row-hover)]`
-                    }`}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => selectEntry(entry)}
-                  >
-                    <span className="min-w-0 text-right">
-                      <span className="block font-medium">{entry.label}</span>
-                      {entry.displayName ? (
-                        <span className={`block text-xs ${ob.textMuted}`}>{entry.displayName}</span>
-                      ) : null}
-                    </span>
-                    <span dir="ltr" className={`shrink-0 text-left tabular-nums text-xs ${ob.textMuted}`}>
-                      {exchangeLabel || entry.value}
-                    </span>
-                  </button>
-                </li>
-              );
-            })
-          ) : !listLoading ? (
-            <li className={`px-3 py-2 text-sm ${ob.textMuted}`}>لا توجد نتائج</li>
-          ) : null}
-        </ul>
-      ) : null}
+      {symbolMenu}
     </div>
   );
 }

@@ -129,11 +129,19 @@ for (const rel of runtimeFiles) {
 
 assert.match(ui, /export function ConnectionStatusBadge/);
 assert.match(ui, /role="status"/);
+assert.match(ui, /export function OrderBookListbox/);
+assert.match(ui, /role="listbox"/);
+assert.match(ui, /createPortal/);
+assert.match(ui, /ob\.listboxMenu/);
+assert.doesNotMatch(ui, /<select\b/);
+assert.doesNotMatch(page, /<select\b/);
+assert.match(page, /OrderBookListbox/);
+assert.match(css, /\.ob-listbox-menu/);
 assert.match(css, /html\[data-theme="light"\] \.ob-page/);
 assert.match(css, /--ob-text-strong/);
 assert.match(css, /--ob-chart-buy/);
 assert.match(ob.page, /ob-page/);
-passed += 6;
+passed += 14;
 
 console.log(
   `test-order-book-theme: PASS (${passed} checks, ${runtimeFiles.length} runtime files)`,
