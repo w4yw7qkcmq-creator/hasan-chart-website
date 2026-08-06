@@ -48,7 +48,9 @@ import {
   subscribeAdminSubscriptionUpdated,
 } from "../../../lib/admin-subscription-updated-client";
 import StatusBadge from "./components/StatusBadge";
-import VipRecentRecommendationsPanel from "./components/VipRecentRecommendationsPanel";
+import VipRecentRecommendationsPanel, {
+  VIP_RECOMMENDATIONS_REFRESH_EVENT,
+} from "./components/VipRecentRecommendationsPanel";
 import AdminProofPreviewModal from "./components/AdminProofPreviewModal";
 import SubscriptionRejectModal from "./components/SubscriptionRejectModal";
 import SubscriptionRemoveModal from "./components/SubscriptionRemoveModal";
@@ -1662,6 +1664,8 @@ export default function AdminPage() {
           ? "تم نشر توصية VIP Spot"
           : "تم نشر توصية VIP Futures"
       );
+
+      window.dispatchEvent(new CustomEvent(VIP_RECOMMENDATIONS_REFRESH_EVENT));
 
       setVipSignalForm({
         signal_type: signalType,

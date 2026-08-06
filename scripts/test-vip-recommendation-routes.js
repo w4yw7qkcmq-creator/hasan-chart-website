@@ -22,6 +22,13 @@ describe("VIP recommendation route permissions", () => {
     );
   });
 
+  it("maps GET completed to recommendations.status.read", () => {
+    assert.equal(
+      permissionForRoute("GET", "/api/admin/vip-recommendations/completed"),
+      IAM_PERMISSIONS.RECOMMENDATIONS_STATUS_READ
+    );
+  });
+
   it("maps POST status-update to recommendations.status.update", () => {
     assert.equal(
       permissionForRoute("POST", "/api/admin/vip-recommendations/[id]/status-update"),

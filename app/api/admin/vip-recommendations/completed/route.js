@@ -2,7 +2,7 @@ import { requireAdminPermission } from "../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
 import { adminReadLimiter } from "../../../../../lib/rate-limit";
-import { listActiveVipRecommendations } from "../../../../../lib/vip-recommendation-status-dispatch.js";
+import { listCompletedVipRecommendations } from "../../../../../lib/vip-recommendation-status-dispatch.js";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,7 +31,7 @@ export async function GET(request) {
     );
     if (rateLimited) return rateLimited;
 
-    const result = await listActiveVipRecommendations(adminCheck.supabase);
+    const result = await listCompletedVipRecommendations(adminCheck.supabase);
 
     if (!result.ok) {
       return Response.json(
