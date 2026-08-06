@@ -63,8 +63,9 @@
     "test:vip-recommendation-status": "node --test scripts/test-vip-recommendation-status.js",
     "test:vip-recommendation-routes": "node --test scripts/test-vip-recommendation-routes.js",
     "test:vip-recommendation-rls": "node --test scripts/test-vip-recommendation-rls-static.js",
+    "test:vip-recommendation-rpc-grants": "node --test scripts/test-vip-recommendation-rpc-grants-static.js",
     "test:vip-recommendation-browser": "node scripts/test-vip-recommendation-browser-matrix.mjs",
-    "test:vip-recommendation": "npm run test:vip-recommendation-status && npm run test:vip-recommendation-routes && npm run test:vip-recommendation-rls && npm run test:vip-recommendation-browser"
+    "test:vip-recommendation": "npm run test:vip-recommendation-status && npm run test:vip-recommendation-routes && npm run test:vip-recommendation-rls && npm run test:vip-recommendation-rpc-grants && npm run test:vip-recommendation-browser"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
