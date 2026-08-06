@@ -1,0 +1,38 @@
+{
+  "paths": [
+    "app/components/notifications/",
+    "app/components/news/",
+    "app/components/partner/",
+    "app/components/daily-analysis/",
+    "app/(public)/",
+    "app/components/crypto/",
+    "app/components/forex/",
+    "app/components/stocks/",
+    "app/components/gold/",
+    "app/components/oil/",
+    "app/components/commodities/",
+    "app/components/economic-news/",
+    "app/components/technical-analysis/",
+    "app/components/price-alerts/",
+    "app/components/company/",
+    "app/components/about/",
+    "app/components/public-seo/",
+    "app/components/notification-hub/",
+    "app/(app)/news/",
+    "app/(app)/subscriptions/",
+    "app/(app)/my-dashboard/",
+    "app/(app)/my-analysis/",
+    "app/(app)/notifications/",
+    "app/(app)/notification-settings/",
+    "app/(app)/account-management/",
+    "app/(app)/partner-center/",
+    "app/(app)/daily-analysis/",
+    "app/(app)/login/",
+    "app/(app)/register/"
+  ],
+  "financialChartExceptions": [
+    "TradingView",
+    "tradingview-widget-container",
+    "lightweight-charts"
+  ]
+}
