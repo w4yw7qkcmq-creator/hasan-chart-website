@@ -27,13 +27,20 @@ export const dowjonesAssetConfig = {
     platform: "TradingView",
   },
   news: {
-    keywords: ["dow", "dow jones", "dji", "djia", "داو", "داوجونز", "stocks", "أسهم"],
+    keywords: [
+      "dow",
+      "dow jones",
+      "dji",
+      "djia",
+      "داو",
+      "داوجونز",
+      "stocks",
+      "أسهم",
+    ],
     tagHref: "/news/tag/stocks",
     archiveLabel: "أرشيف أخبار الأسهم",
   },
-  analysis: {
-    keywords: ["dow", "dow jones", "dji", "djia", "داو"],
-  },
+  analysis: { keywords: ["dow", "dow jones", "dji", "djia", "داو"] },
   faq: [
     {
       q: "ما هو مؤشر داو جونز؟",
@@ -57,10 +64,30 @@ export const dowjonesAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "SPX", name: "S&P 500", description: "المؤشر الأمريكي الأوسع.", href: "/sp500" },
-    { symbol: "NDX", name: "ناسداك", description: "مؤشر التكنولوجيا.", href: "/nasdaq" },
-    { symbol: "DAX", name: "داكس", description: "المؤشر الألماني.", href: "/dax" },
-    { symbol: "DXY", name: "مؤشر الدولار", description: "يؤثر على تدفقات الأسهم.", href: "/dxy" },
+    {
+      symbol: "SPX",
+      name: "S&P 500",
+      description: "المؤشر الأمريكي الأوسع.",
+      href: "/sp500",
+    },
+    {
+      symbol: "NDX",
+      name: "ناسداك",
+      description: "مؤشر التكنولوجيا.",
+      href: "/nasdaq",
+    },
+    {
+      symbol: "DAX",
+      name: "داكس",
+      description: "المؤشر الألماني.",
+      href: "/dax",
+    },
+    {
+      symbol: "DXY",
+      name: "مؤشر الدولار",
+      description: "يؤثر على تدفقات الأسهم.",
+      href: "/dxy",
+    },
   ],
   links: {
     internal: [
@@ -113,7 +140,15 @@ export const dowjonesAssetConfig = {
     title: "HasaN CharT World | داو جونز — مركز المؤشرات",
     description:
       "مركز معلومات داو جونز: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات Dow Jones، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "داو جونز", "Dow Jones", "DJI", "DJIA", "المؤشرات", "الأسهم"],
+    keywords: [
+      "HasaN CharT World",
+      "داو جونز",
+      "Dow Jones",
+      "DJI",
+      "DJIA",
+      "المؤشرات",
+      "الأسهم",
+    ],
   },
   jsonLd: {
     productName: "Dow Jones Industrial Average",

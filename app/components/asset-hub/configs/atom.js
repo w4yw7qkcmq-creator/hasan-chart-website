@@ -31,9 +31,7 @@ export const atomAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["atom", "cosmos", "كوزموس", "atomusdt"],
-  },
+  analysis: { keywords: ["atom", "cosmos", "كوزموس", "atomusdt"] },
   faq: [
     {
       q: "ما هو كوزموس (ATOM)؟",
@@ -57,10 +55,30 @@ export const atomAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "DOT", name: "بولكادوت", description: "شبكة متعددة السلاسل.", href: "/dot" },
-    { symbol: "AVAX", name: "أفالانش", description: "بلوكتشين متعدد السلاسل.", href: "/avax" },
-    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية.", href: "/eth" },
-    { symbol: "LINK", name: "تشين لينك", description: "شبكة أوراكل.", href: "/link" },
+    {
+      symbol: "DOT",
+      name: "بولكادوت",
+      description: "شبكة متعددة السلاسل.",
+      href: "/dot",
+    },
+    {
+      symbol: "AVAX",
+      name: "أفالانش",
+      description: "بلوكتشين متعدد السلاسل.",
+      href: "/avax",
+    },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "منصة العقود الذكية.",
+      href: "/eth",
+    },
+    {
+      symbol: "LINK",
+      name: "تشين لينك",
+      description: "شبكة أوراكل.",
+      href: "/link",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const atomAssetConfig = {
     title: "HasaN CharT World | كوزموس ATOM — مركز المعلومات",
     description:
       "مركز معلومات كوزموس: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات ATOM، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "كوزموس", "ATOM", "Cosmos", "IBC", "سعر ATOM"],
+    keywords: [
+      "HasaN CharT World",
+      "كوزموس",
+      "ATOM",
+      "Cosmos",
+      "IBC",
+      "سعر ATOM",
+    ],
   },
   jsonLd: {
     productName: "Cosmos",

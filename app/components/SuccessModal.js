@@ -1,8 +1,5 @@
-
 "use client";
-
 import AppModal from "./AppModal";
-
 export default function SuccessModal({
   open,
   type = "success",

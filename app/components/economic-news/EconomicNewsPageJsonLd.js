@@ -1,9 +1,7 @@
 import { buildEconomicNewsPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const ECONOMIC_NEWS_TITLE = "HasaN CharT World | الأخبار الاقتصادية";
 const ECONOMIC_NEWS_DESCRIPTION =
   "تابع الأخبار الاقتصادية مع HasaN CharT World، قرارات الفيدرالي، التضخم، البطالة، NFP، الفائدة، GDP وتأثيرها على الفوركس والذهب والعملات الرقمية.";
-
 export const ECONOMIC_NEWS_ITEM_LIST = [
   { name: "الأخبار الاقتصادية", url: "/news/category/economy" },
   { name: "الفيدرالي الأمريكي", url: "/news/tag/fed" },
@@ -16,7 +14,6 @@ export const ECONOMIC_NEWS_ITEM_LIST = [
   { name: "تأثير على الكريبتو", url: "/crypto" },
   { name: "التحليلات اليومية", url: "/daily-analysis" },
 ];
-
 const ECONOMIC_NEWS_FAQ = [
   {
     q: "ما هي الأخبار الاقتصادية؟",
@@ -39,7 +36,6 @@ const ECONOMIC_NEWS_FAQ = [
     a: "أنشئ حساباً واستكشف قسم الأخبار الاقتصادية أو التحليلات اليومية أو صفحات الأسواق المتخصصة.",
   },
 ];
-
 export default function EconomicNewsPageJsonLd() {
   const jsonLd = buildEconomicNewsPageJsonLd({
     path: "/economic-news",
@@ -48,7 +44,6 @@ export default function EconomicNewsPageJsonLd() {
     items: ECONOMIC_NEWS_ITEM_LIST,
     faq: ECONOMIC_NEWS_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

@@ -31,9 +31,7 @@ export const ltcAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["ltc", "litecoin", "لايتكوين", "ltcusdt"],
-  },
+  analysis: { keywords: ["ltc", "litecoin", "لايتكوين", "ltcusdt"] },
   faq: [
     {
       q: "ما هو لايتكوين (LTC)؟",
@@ -57,10 +55,30 @@ export const ltcAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
-    { symbol: "ETH", name: "الإيثيريوم", description: "ثاني أكبر عملة رقمية.", href: "/eth" },
-    { symbol: "DOGE", name: "دوجكوين", description: "عملة ميم مرتبطة بـ LTC تقنياً.", href: "/doge" },
-    { symbol: "XRP", name: "ريبل", description: "عملة رقمية للمدفوعات.", href: "/xrp" },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "المرجع الرئيسي لسوق الكريبتو.",
+      href: "/btc",
+    },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "ثاني أكبر عملة رقمية.",
+      href: "/eth",
+    },
+    {
+      symbol: "DOGE",
+      name: "دوجكوين",
+      description: "عملة ميم مرتبطة بـ LTC تقنياً.",
+      href: "/doge",
+    },
+    {
+      symbol: "XRP",
+      name: "ريبل",
+      description: "عملة رقمية للمدفوعات.",
+      href: "/xrp",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const ltcAssetConfig = {
     title: "HasaN CharT World | لايتكوين LTC — مركز المعلومات",
     description:
       "مركز معلومات لايتكوين: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات LTC، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "لايتكوين", "LTC", "Litecoin", "سعر LTC", "تحليل Litecoin"],
+    keywords: [
+      "HasaN CharT World",
+      "لايتكوين",
+      "LTC",
+      "Litecoin",
+      "سعر LTC",
+      "تحليل Litecoin",
+    ],
   },
   jsonLd: {
     productName: "Litecoin",

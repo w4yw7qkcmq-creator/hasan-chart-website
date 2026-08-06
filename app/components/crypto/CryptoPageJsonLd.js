@@ -1,9 +1,7 @@
 import { buildCryptoPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const CRYPTO_TITLE = "HasaN CharT World | العملات الرقمية";
 const CRYPTO_DESCRIPTION =
   "تعرف على سوق العملات الرقمية مع HasaN CharT World، من تحليل البيتكوين والإيثيريوم إلى إشارات الكريبتو، VIP Spot، VIP Futures، الأخبار وإدارة المخاطر.";
-
 export const CRYPTO_ITEM_LIST = [
   { name: "سوق العملات الرقمية", url: "/markets" },
   { name: "بيتكوين وإيثيريوم", url: "/news/tag/bitcoin" },
@@ -16,7 +14,6 @@ export const CRYPTO_ITEM_LIST = [
   { name: "التحليلات اليومية", url: "/daily-analysis" },
   { name: "الفوركس", url: "/forex" },
 ];
-
 const CRYPTO_FAQ = [
   {
     q: "ما هو سوق العملات الرقمية؟",
@@ -39,7 +36,6 @@ const CRYPTO_FAQ = [
     a: "أنشئ حساباً واستكشف تحليل العملات الرقمية أو الاشتراكات أو خدمات VIP Spot و VIP Futures.",
   },
 ];
-
 export default function CryptoPageJsonLd() {
   const jsonLd = buildCryptoPageJsonLd({
     path: "/crypto",
@@ -48,7 +44,6 @@ export default function CryptoPageJsonLd() {
     items: CRYPTO_ITEM_LIST,
     faq: CRYPTO_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

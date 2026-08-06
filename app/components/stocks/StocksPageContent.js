@@ -1,12 +1,10 @@
 import Link from "next/link";
 import Breadcrumbs from "../seo/Breadcrumbs";
-
 const breadcrumbs = [
   { label: "الرئيسية", href: "/" },
   { label: "الأسواق المالية", href: "/markets" },
   { label: "الأسهم والمؤشرات", href: "/stocks" },
 ];
-
 const stocksSections = [
   {
     icon: "📈",
@@ -102,7 +100,6 @@ const stocksSections = [
     ],
   },
 ];
-
 const faqItems = [
   {
     q: "ما هو سوق الأسهم؟",
@@ -125,7 +122,6 @@ const faqItems = [
     a: "أنشئ حساباً واستكشف التحليلات اليومية أو أخبار الأسهم أو طلب تحليل مخصص والاشتراكات.",
   },
 ];
-
 const internalLinks = [
   { label: "الأصول والأسواق", href: "/assets" },
   { label: "الأسواق المالية", href: "/markets" },
@@ -146,120 +142,155 @@ const internalLinks = [
   { label: "العلامة التجارية", href: "/brand" },
   { label: "الشركة", href: "/company" },
 ];
-
 function StocksSection({ icon, title, description, links }) {
   return (
-    <section className="public-seo-card rounded-[34px] border border-cyan-300/15 bg-white/[0.045] p-8 shadow-2xl backdrop-blur-2xl md:p-10">
+    <section className="ui-public-seo-card public-seo-card">
+      {" "}
       <div className="flex items-start gap-4">
-        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-3xl">
-          {icon}
-        </div>
+        {" "}
+        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border admin-panel-border admin-panel text-3xl">
+          {" "}
+          {icon}{" "}
+        </div>{" "}
         <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-black text-white md:text-3xl">{title}</h2>
-          <p className="mt-4 text-lg leading-9 text-slate-300">{description}</p>
+          {" "}
+          <h2 className="ui-public-seo-title ui-public-seo-title--card">
+            {title}
+          </h2>{" "}
+          <p className="ui-public-seo-body ui-public-seo-body--lg mt-4">
+            {description}
+          </p>{" "}
           <div className="mt-5 flex flex-wrap gap-3">
+            {" "}
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-black text-cyan-100 no-underline transition hover:border-cyan-300/40 hover:bg-cyan-400/20 hover:text-white"
+                className="ui-public-seo-link-chip"
               >
-                {link.label}
+                {" "}
+                {link.label}{" "}
               </Link>
-            ))}
-          </div>
-        </div>
-      </div>
+            ))}{" "}
+          </div>{" "}
+        </div>{" "}
+      </div>{" "}
     </section>
   );
 }
-
 function FaqItem({ question, answer }) {
   return (
-    <details className="public-seo-card group rounded-[24px] border border-cyan-300/15 bg-white/[0.04] p-5 backdrop-blur-xl">
-      <summary className="cursor-pointer list-none text-lg font-black text-white marker:content-none">
+    <details className="ui-public-seo-card ui-public-seo-card--faq group public-seo-card">
+      {" "}
+      <summary className="cursor-pointer list-none ui-public-seo-title text-lg marker:content-none">
+        {" "}
         <span className="flex items-center justify-between gap-4">
-          {question}
-          <span className="text-cyan-300 transition group-open:rotate-45">+</span>
-        </span>
-      </summary>
-      <p className="mt-4 leading-8 text-slate-300">{answer}</p>
+          {" "}
+          {question}{" "}
+          <span className="admin-text-muted transition group-open:rotate-45">
+            +
+          </span>{" "}
+        </span>{" "}
+      </summary>{" "}
+      <p className="ui-public-seo-body mt-4">{answer}</p>{" "}
     </details>
   );
 }
-
 export default function StocksPageContent() {
   return (
-    <main className="public-seo-page relative min-h-screen overflow-hidden bg-[#020617] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
-
+    <main className="ui-public-seo-page public-seo-page ui-text-strong">
+      {" "}
+      <div className="ui-public-seo-page__backdrop pointer-events-none absolute inset-0" />{" "}
+      <div className="ui-public-seo-page__grid pointer-events-none absolute inset-0" />{" "}
       <div className="relative z-10 mx-auto max-w-6xl space-y-8 px-4 py-12 md:px-6 md:py-16">
-        <Breadcrumbs items={breadcrumbs} variant="dark" />
-
-        <section className="public-seo-hero relative overflow-hidden rounded-[34px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/85 via-[#040b1c]/90 to-[#020617]/95 p-8 text-center shadow-2xl backdrop-blur-2xl md:p-12">
+        {" "}
+        <Breadcrumbs items={breadcrumbs} variant="dark" />{" "}
+        <section className="ui-public-seo-hero public-seo-hero">
+          {" "}
           <div className="relative z-10">
-            <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-5 py-2 text-xs font-black text-cyan-200">
+            {" "}
+            <span className="inline-flex rounded-full border admin-panel-border admin-panel px-5 py-2 text-xs font-black admin-text-muted">
+              {" "}
+              الأسهم والمؤشرات{" "}
+            </span>{" "}
+            <h1 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
               الأسهم والمؤشرات
-            </span>
-            <h1 className="mt-6 text-4xl font-black leading-tight md:text-6xl">الأسهم والمؤشرات</h1>
-            <p className="mx-auto mt-6 max-w-4xl text-lg leading-9 text-slate-300">
-              من ناسداك وداو جونز وS&P 500 إلى أسهم التكنولوجيا وأرباح الشركات — HasaN CharT World
-              تقدّم تغطية عربية احترافية للأسهم والمؤشرات مع تحليلات وأخبار وإدارة مخاطر.
-            </p>
+            </h1>{" "}
+            <p className="ui-public-seo-body ui-public-seo-body--lg mx-auto mt-6 max-w-4xl">
+              {" "}
+              من ناسداك وداو جونز وS&P 500 إلى أسهم التكنولوجيا وأرباح الشركات —
+              HasaN CharT World تقدّم تغطية عربية احترافية للأسهم والمؤشرات مع
+              تحليلات وأخبار وإدارة مخاطر.{" "}
+            </p>{" "}
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+              {" "}
               <Link
                 href="/daily-analysis"
-                className="rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-8 py-4 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.32)]"
+                className="ui-public-seo-cta-primary"
               >
-                التحليلات اليومية
-              </Link>
+                {" "}
+                التحليلات اليومية{" "}
+              </Link>{" "}
               <Link
                 href="/news/category/stocks"
-                className="rounded-2xl border border-cyan-300/20 bg-black/25 px-8 py-4 font-black text-cyan-100 transition hover:bg-cyan-400/10"
+                className="ui-public-seo-cta-secondary"
               >
-                أخبار الأسهم
-              </Link>
-            </div>
-          </div>
-        </section>
-
+                {" "}
+                أخبار الأسهم{" "}
+              </Link>{" "}
+            </div>{" "}
+          </div>{" "}
+        </section>{" "}
         <div className="space-y-6">
+          {" "}
           {stocksSections.map((section) => (
             <StocksSection key={section.title} {...section} />
-          ))}
-        </div>
-
+          ))}{" "}
+        </div>{" "}
         <section className="space-y-5">
+          {" "}
           <div className="text-center">
-            <h2 className="text-3xl font-black text-white md:text-4xl">الأسئلة الشائعة</h2>
-            <p className="mt-3 text-slate-400">إجابات عن الأسهم والمؤشرات في HasaN CharT World</p>
-          </div>
+            {" "}
+            <h2 className="ui-public-seo-title ui-public-seo-title--section">
+              الأسئلة الشائعة
+            </h2>{" "}
+            <p className="ui-public-seo-subtitle mt-3">
+              إجابات عن الأسهم والمؤشرات في HasaN CharT World
+            </p>{" "}
+          </div>{" "}
           <div className="space-y-3">
+            {" "}
             {faqItems.map((item) => (
               <FaqItem key={item.q} question={item.q} answer={item.a} />
-            ))}
-          </div>
-        </section>
-
+            ))}{" "}
+          </div>{" "}
+        </section>{" "}
         <section className="space-y-5">
+          {" "}
           <div className="text-center">
-            <h2 className="text-3xl font-black text-white md:text-4xl">روابط داخلية</h2>
-            <p className="mt-3 text-slate-400">انتقل إلى صفحات HasaN CharT World المرتبطة بالأسهم</p>
-          </div>
+            {" "}
+            <h2 className="ui-public-seo-title ui-public-seo-title--section">
+              روابط داخلية
+            </h2>{" "}
+            <p className="ui-public-seo-subtitle mt-3">
+              انتقل إلى صفحات HasaN CharT World المرتبطة بالأسهم
+            </p>{" "}
+          </div>{" "}
           <div className="flex flex-wrap justify-center gap-3">
+            {" "}
             {internalLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-5 py-3 text-sm font-black text-cyan-100 no-underline transition hover:border-cyan-300/40 hover:bg-cyan-400/20 hover:text-white"
+                className="ui-public-seo-link-chip"
               >
-                {link.label}
+                {" "}
+                {link.label}{" "}
               </Link>
-            ))}
-          </div>
-        </section>
-      </div>
+            ))}{" "}
+          </div>{" "}
+        </section>{" "}
+      </div>{" "}
     </main>
   );
 }

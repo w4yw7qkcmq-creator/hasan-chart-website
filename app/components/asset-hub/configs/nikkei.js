@@ -27,7 +27,18 @@ export const nikkeiAssetConfig = {
     platform: "TVC",
   },
   news: {
-    keywords: ["nikkei", "japan", "tokyo", "boj", "boj", "نيكاي", "اليابان", "stocks", "أسهم", "yen"],
+    keywords: [
+      "nikkei",
+      "japan",
+      "tokyo",
+      "boj",
+      "boj",
+      "نيكاي",
+      "اليابان",
+      "stocks",
+      "أسهم",
+      "yen",
+    ],
     tagHref: "/news/tag/stocks",
     archiveLabel: "أرشيف أخبار الأسهم",
   },
@@ -57,10 +68,30 @@ export const nikkeiAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "JPY", name: "الدولار ين", description: "USD/JPY — مرتبط بالاقتصاد الياباني.", href: "/usdjpy" },
-    { symbol: "EUR", name: "اليورو ين", description: "EUR/JPY — زوج متقاطع ياباني.", href: "/eurjpy" },
-    { symbol: "SPX", name: "S&P 500", description: "المؤشر الأمريكي المرجعي.", href: "/sp500" },
-    { symbol: "DAX", name: "داكس", description: "مؤشر أوروبي رئيسي.", href: "/dax" },
+    {
+      symbol: "JPY",
+      name: "الدولار ين",
+      description: "USD/JPY — مرتبط بالاقتصاد الياباني.",
+      href: "/usdjpy",
+    },
+    {
+      symbol: "EUR",
+      name: "اليورو ين",
+      description: "EUR/JPY — زوج متقاطع ياباني.",
+      href: "/eurjpy",
+    },
+    {
+      symbol: "SPX",
+      name: "S&P 500",
+      description: "المؤشر الأمريكي المرجعي.",
+      href: "/sp500",
+    },
+    {
+      symbol: "DAX",
+      name: "داكس",
+      description: "مؤشر أوروبي رئيسي.",
+      href: "/dax",
+    },
   ],
   links: {
     internal: [
@@ -115,7 +146,15 @@ export const nikkeiAssetConfig = {
     title: "HasaN CharT World | Nikkei 225 — مركز المؤشرات",
     description:
       "مركز معلومات Nikkei 225: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات مؤشر نيكاي الياباني، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "Nikkei", "Nikkei 225", "نيكاي", "اليابان", "المؤشرات", "الأسهم"],
+    keywords: [
+      "HasaN CharT World",
+      "Nikkei",
+      "Nikkei 225",
+      "نيكاي",
+      "اليابان",
+      "المؤشرات",
+      "الأسهم",
+    ],
   },
   jsonLd: {
     productName: "Nikkei 225",

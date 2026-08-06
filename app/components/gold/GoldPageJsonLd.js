@@ -1,9 +1,7 @@
 import { buildGoldPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const GOLD_TITLE = "HasaN CharT World | الذهب";
 const GOLD_DESCRIPTION =
   "تابع تحليلات الذهب مع HasaN CharT World، من حركة الدولار والفائدة والتضخم إلى التحليل الفني، الأخبار، الإشارات وإدارة المخاطر.";
-
 export const GOLD_ITEM_LIST = [
   { name: "سوق الذهب", url: "/markets" },
   { name: "الدولار الأمريكي والذهب", url: "/forex" },
@@ -16,7 +14,6 @@ export const GOLD_ITEM_LIST = [
   { name: "VIP Futures", url: "/vip-futures" },
   { name: "طلب تحليل", url: "/analysis/request" },
 ];
-
 const GOLD_FAQ = [
   {
     q: "ما هو سوق الذهب؟",
@@ -39,7 +36,6 @@ const GOLD_FAQ = [
     a: "أنشئ حساباً واستكشف التحليلات اليومية أو أخبار الذهب أو إشارات الفوركس والاشتراكات.",
   },
 ];
-
 export default function GoldPageJsonLd() {
   const jsonLd = buildGoldPageJsonLd({
     path: "/gold",
@@ -48,7 +44,6 @@ export default function GoldPageJsonLd() {
     items: GOLD_ITEM_LIST,
     faq: GOLD_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

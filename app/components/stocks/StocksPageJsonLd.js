@@ -1,9 +1,7 @@
 import { buildStocksPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const STOCKS_TITLE = "HasaN CharT World | الأسهم والمؤشرات";
 const STOCKS_DESCRIPTION =
   "تابع تحليلات الأسهم والمؤشرات مع HasaN CharT World، أخبار السوق الأمريكي، ناسداك، داو جونز، S&P 500، أرباح الشركات والتحليل الفني.";
-
 export const STOCKS_ITEM_LIST = [
   { name: "سوق الأسهم", url: "/markets" },
   { name: "S&P 500", url: "/daily-analysis" },
@@ -16,7 +14,6 @@ export const STOCKS_ITEM_LIST = [
   { name: "أخبار الأسهم", url: "/news/category/stocks" },
   { name: "وسم الأسهم", url: "/news/tag/stocks" },
 ];
-
 const STOCKS_FAQ = [
   {
     q: "ما هو سوق الأسهم؟",
@@ -39,7 +36,6 @@ const STOCKS_FAQ = [
     a: "أنشئ حساباً واستكشف التحليلات اليومية أو أخبار الأسهم أو طلب تحليل مخصص والاشتراكات.",
   },
 ];
-
 export default function StocksPageJsonLd() {
   const jsonLd = buildStocksPageJsonLd({
     path: "/stocks",
@@ -48,7 +44,6 @@ export default function StocksPageJsonLd() {
     items: STOCKS_ITEM_LIST,
     faq: STOCKS_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

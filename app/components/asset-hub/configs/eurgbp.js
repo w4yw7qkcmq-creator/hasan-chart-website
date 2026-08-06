@@ -27,7 +27,17 @@ export const eurgbpAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: ["eurgbp", "eur/gbp", "euro pound", "ecb", "boe", "اليورو", "جنيه", "forex", "فوركس"],
+    keywords: [
+      "eurgbp",
+      "eur/gbp",
+      "euro pound",
+      "ecb",
+      "boe",
+      "اليورو",
+      "جنيه",
+      "forex",
+      "فوركس",
+    ],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -57,10 +67,30 @@ export const eurgbpAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — الجانب الأوروبي.", href: "/eurusd" },
-    { symbol: "GBP", name: "الجنيه دولار", description: "زوج GBP/USD — الكابل.", href: "/gbpusd" },
-    { symbol: "JPY", name: "اليورو ين", description: "زوج EUR/JPY — متقاطع أوروبي.", href: "/eurjpy" },
-    { symbol: "DXY", name: "مؤشر الدولار", description: "مرجع قوة الدولار.", href: "/dxy" },
+    {
+      symbol: "EUR",
+      name: "اليورو دولار",
+      description: "زوج EUR/USD — الجانب الأوروبي.",
+      href: "/eurusd",
+    },
+    {
+      symbol: "GBP",
+      name: "الجنيه دولار",
+      description: "زوج GBP/USD — الكابل.",
+      href: "/gbpusd",
+    },
+    {
+      symbol: "JPY",
+      name: "اليورو ين",
+      description: "زوج EUR/JPY — متقاطع أوروبي.",
+      href: "/eurjpy",
+    },
+    {
+      symbol: "DXY",
+      name: "مؤشر الدولار",
+      description: "مرجع قوة الدولار.",
+      href: "/dxy",
+    },
   ],
   links: {
     internal: [
@@ -114,7 +144,14 @@ export const eurgbpAssetConfig = {
     title: "HasaN CharT World | EUR/GBP — مركز معلومات الفوركس",
     description:
       "مركز معلومات EUR/GBP: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات اليورو جنيه، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "EUR/GBP", "EURGBP", "اليورو جنيه", "الفوركس", "Forex"],
+    keywords: [
+      "HasaN CharT World",
+      "EUR/GBP",
+      "EURGBP",
+      "اليورو جنيه",
+      "الفوركس",
+      "Forex",
+    ],
   },
   jsonLd: {
     productName: "EUR/GBP",

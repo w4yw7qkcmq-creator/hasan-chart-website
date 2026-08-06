@@ -27,7 +27,17 @@ export const audusdAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: ["audusd", "aud/usd", "aud", "aussie", "australia", "rba", "أسترالي", "أستراليا", "forex"],
+    keywords: [
+      "audusd",
+      "aud/usd",
+      "aud",
+      "aussie",
+      "australia",
+      "rba",
+      "أسترالي",
+      "أستراليا",
+      "forex",
+    ],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -57,10 +67,30 @@ export const audusdAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "NZD", name: "النيوزيلندي دولار", description: "زوج NZD/USD — كيوي.", href: "/nzdusd" },
-    { symbol: "CAD", name: "الدولار كندي", description: "زوج USD/CAD — لوني.", href: "/usdcad" },
-    { symbol: "XAU", name: "الذهب", description: "سلعة مرتبطة بعملات السلع.", href: "/xauusd" },
-    { symbol: "OIL", name: "النفط", description: "USOIL — يؤثر على عملات السلع.", href: "/usoil" },
+    {
+      symbol: "NZD",
+      name: "النيوزيلندي دولار",
+      description: "زوج NZD/USD — كيوي.",
+      href: "/nzdusd",
+    },
+    {
+      symbol: "CAD",
+      name: "الدولار كندي",
+      description: "زوج USD/CAD — لوني.",
+      href: "/usdcad",
+    },
+    {
+      symbol: "XAU",
+      name: "الذهب",
+      description: "سلعة مرتبطة بعملات السلع.",
+      href: "/xauusd",
+    },
+    {
+      symbol: "OIL",
+      name: "النفط",
+      description: "USOIL — يؤثر على عملات السلع.",
+      href: "/usoil",
+    },
   ],
   links: {
     internal: [
@@ -112,7 +142,14 @@ export const audusdAssetConfig = {
     title: "HasaN CharT World | AUD/USD — مركز معلومات الفوركس",
     description:
       "مركز معلومات AUD/USD: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات الأسترالي دولار، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "AUD/USD", "AUDUSD", "الأوزي", "Aussie", "الفوركس"],
+    keywords: [
+      "HasaN CharT World",
+      "AUD/USD",
+      "AUDUSD",
+      "الأوزي",
+      "Aussie",
+      "الفوركس",
+    ],
   },
   jsonLd: {
     productName: "AUD/USD",

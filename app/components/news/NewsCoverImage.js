@@ -1,5 +1,4 @@
 "use client";
-
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
@@ -9,20 +8,20 @@ import {
 } from "../../../lib/news-images";
 import { shouldUnoptimizeImageSrc } from "../../../lib/media-image";
 import { NewsCategoryFallbackCover } from "./NewsCategoryFallbackCover";
-
 function getSafeImageSrc(src) {
   const value = String(src || "").trim();
-  if (!value || isBlockedNewsImageUrl(value) || isSiteBrandingNewsImageUrl(value)) {
+  if (
+    !value ||
+    isBlockedNewsImageUrl(value) ||
+    isSiteBrandingNewsImageUrl(value)
+  ) {
     return null;
   }
-
   if (value.startsWith("/")) {
     return value;
   }
-
   return normalizeNewsImageUrl(value);
 }
-
 function NewsImageCore({
   src,
   alt,
@@ -37,9 +36,9 @@ function NewsImageCore({
   if (!src || hidden) {
     return null;
   }
-
   return (
     <div className={shellClassName}>
+      {" "}
       <Image
         src={src}
         alt={alt}
@@ -54,11 +53,10 @@ function NewsImageCore({
         referrerPolicy="no-referrer"
         onError={onError}
         className={imageClassName}
-      />
+      />{" "}
     </div>
   );
 }
-
 export function NewsCoverImage({
   src,
   alt,
@@ -75,18 +73,19 @@ export function NewsCoverImage({
   const showImage = Boolean(safeSrc) && !failed;
   const resolvedAlt = alt || title || "صورة الخبر";
   const fallbackTitle = title || alt || "";
-
   return (
     <>
+      {" "}
       {!showImage ? (
         <div className={fallbackClassName}>
+          {" "}
           <NewsCategoryFallbackCover
             item={item}
             category={category}
             variant="card"
-          />
+          />{" "}
         </div>
-      ) : null}
+      ) : null}{" "}
       <NewsImageCore
         src={safeSrc}
         alt={resolvedAlt}
@@ -96,11 +95,10 @@ export function NewsCoverImage({
         imageClassName={className}
         hidden={!showImage}
         onError={() => setFailed(true)}
-      />
+      />{" "}
     </>
   );
 }
-
 export function NewsArticleCoverImage({
   src,
   alt,
@@ -117,18 +115,19 @@ export function NewsArticleCoverImage({
   const showImage = Boolean(safeSrc) && !failed;
   const resolvedAlt = alt || title || "صورة الخبر";
   const fallbackTitle = title || alt || "";
-
   return (
     <>
+      {" "}
       {!showImage ? (
         <div className={fallbackClassName}>
+          {" "}
           <NewsCategoryFallbackCover
             item={item}
             category={category}
             variant="article"
-          />
+          />{" "}
         </div>
-      ) : null}
+      ) : null}{" "}
       <NewsImageCore
         src={safeSrc}
         alt={resolvedAlt}
@@ -139,7 +138,7 @@ export function NewsArticleCoverImage({
         imageClassName={className}
         hidden={!showImage}
         onError={() => setFailed(true)}
-      />
+      />{" "}
     </>
   );
 }

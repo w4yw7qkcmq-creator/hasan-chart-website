@@ -31,9 +31,7 @@ export const ethAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["eth", "ethereum", "إيثيريوم", "إيثريوم", "ethusdt"],
-  },
+  analysis: { keywords: ["eth", "ethereum", "إيثيريوم", "إيثريوم", "ethusdt"] },
   faq: [
     {
       q: "ما هو الإيثيريوم (ETH)؟",
@@ -57,10 +55,30 @@ export const ethAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "BTC", name: "البيتكوين", description: "المرجع الأول لسوق الكريبتو.", href: "/btc" },
-    { symbol: "SOL", name: "سولانا", description: "بلوكتشين عالي السرعة للتطبيقات اللامركزية.", href: "/crypto" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/gold" },
-    { symbol: "FX", name: "الفوركس", description: "أسواق العملات — ارتباط الدولار بالكريبتو.", href: "/forex" },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "المرجع الأول لسوق الكريبتو.",
+      href: "/btc",
+    },
+    {
+      symbol: "SOL",
+      name: "سولانا",
+      description: "بلوكتشين عالي السرعة للتطبيقات اللامركزية.",
+      href: "/crypto",
+    },
+    {
+      symbol: "XAU",
+      name: "الذهب",
+      description: "ملاذ آمن مرتبط بمعنويات المخاطرة.",
+      href: "/gold",
+    },
+    {
+      symbol: "FX",
+      name: "الفوركس",
+      description: "أسواق العملات — ارتباط الدولار بالكريبتو.",
+      href: "/forex",
+    },
   ],
   links: {
     internal: [
@@ -115,7 +133,14 @@ export const ethAssetConfig = {
     title: "HasaN CharT World | الإيثيريوم ETH — مركز المعلومات",
     description:
       "مركز معلومات الإيثيريوم: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات ETH، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "الإيثيريوم", "ETH", "Ethereum", "سعر الإيثيريوم", "تحليل ETH"],
+    keywords: [
+      "HasaN CharT World",
+      "الإيثيريوم",
+      "ETH",
+      "Ethereum",
+      "سعر الإيثيريوم",
+      "تحليل ETH",
+    ],
   },
   jsonLd: {
     productName: "Ethereum",

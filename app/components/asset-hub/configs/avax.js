@@ -31,9 +31,7 @@ export const avaxAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["avax", "avalanche", "أفالانش", "avaxusdt"],
-  },
+  analysis: { keywords: ["avax", "avalanche", "أفالانش", "avaxusdt"] },
   faq: [
     {
       q: "ما هي أفالانش (AVAX)؟",
@@ -57,10 +55,30 @@ export const avaxAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
-    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية الرائدة.", href: "/eth" },
-    { symbol: "SOL", name: "سولانا", description: "بلوكتشين عالي الأداء منافس.", href: "/sol" },
-    { symbol: "DOT", name: "بولكادوت", description: "شبكة متعددة السلاسل.", href: "/dot" },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "المرجع الرئيسي لسوق الكريبتو.",
+      href: "/btc",
+    },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "منصة العقود الذكية الرائدة.",
+      href: "/eth",
+    },
+    {
+      symbol: "SOL",
+      name: "سولانا",
+      description: "بلوكتشين عالي الأداء منافس.",
+      href: "/sol",
+    },
+    {
+      symbol: "DOT",
+      name: "بولكادوت",
+      description: "شبكة متعددة السلاسل.",
+      href: "/dot",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const avaxAssetConfig = {
     title: "HasaN CharT World | أفالانش AVAX — مركز المعلومات",
     description:
       "مركز معلومات أفالانش: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات AVAX، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "أفالانش", "AVAX", "Avalanche", "سعر أفالانش", "تحليل AVAX"],
+    keywords: [
+      "HasaN CharT World",
+      "أفالانش",
+      "AVAX",
+      "Avalanche",
+      "سعر أفالانش",
+      "تحليل AVAX",
+    ],
   },
   jsonLd: {
     productName: "Avalanche",

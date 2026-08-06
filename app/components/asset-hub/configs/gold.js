@@ -31,9 +31,7 @@ export const goldAssetConfig = {
     tagHref: "/news/tag/gold",
     archiveLabel: "أرشيف أخبار الذهب",
   },
-  analysis: {
-    keywords: ["gold", "xau", "xauusd", "ذهب"],
-  },
+  analysis: { keywords: ["gold", "xau", "xauusd", "ذهب"] },
   faq: [
     {
       q: "ما هو تداول الذهب (XAU)؟",
@@ -57,10 +55,30 @@ export const goldAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "XAG", name: "الفضة", description: "معدن ثمين مرتبط بالذهب والصناعة.", href: "/commodities" },
-    { symbol: "OIL", name: "النفط", description: "سلعة طاقة مؤثرة على التضخم.", href: "/oil" },
-    { symbol: "FX", name: "الفوركس", description: "الدولار يؤثر مباشرة على سعر الذهب.", href: "/forex" },
-    { symbol: "BTC", name: "البيتكوين", description: "أصل رقمي يُقارن أحياناً بالذهب.", href: "/btc" },
+    {
+      symbol: "XAG",
+      name: "الفضة",
+      description: "معدن ثمين مرتبط بالذهب والصناعة.",
+      href: "/commodities",
+    },
+    {
+      symbol: "OIL",
+      name: "النفط",
+      description: "سلعة طاقة مؤثرة على التضخم.",
+      href: "/oil",
+    },
+    {
+      symbol: "FX",
+      name: "الفوركس",
+      description: "الدولار يؤثر مباشرة على سعر الذهب.",
+      href: "/forex",
+    },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "أصل رقمي يُقارن أحياناً بالذهب.",
+      href: "/btc",
+    },
   ],
   links: {
     internal: [
@@ -114,7 +132,14 @@ export const goldAssetConfig = {
     title: "HasaN CharT World | الذهب XAU — مركز المعلومات",
     description:
       "مركز معلومات الذهب: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات XAU، التنبيهات السعرية وخدمات التداول.",
-    keywords: ["HasaN CharT World", "الذهب", "XAU", "Gold", "سعر الذهب", "تحليل الذهب"],
+    keywords: [
+      "HasaN CharT World",
+      "الذهب",
+      "XAU",
+      "Gold",
+      "سعر الذهب",
+      "تحليل الذهب",
+    ],
   },
   jsonLd: {
     productName: "Gold",

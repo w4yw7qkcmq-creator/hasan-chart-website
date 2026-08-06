@@ -27,7 +27,17 @@ export const usdchfAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: ["usdchf", "usd/chf", "chf", "swiss", "snb", "فرنك", "سويسرا", "forex", "فوركس"],
+    keywords: [
+      "usdchf",
+      "usd/chf",
+      "chf",
+      "swiss",
+      "snb",
+      "فرنك",
+      "سويسرا",
+      "forex",
+      "فوركس",
+    ],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -57,10 +67,30 @@ export const usdchfAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — مرتبط بالفوركس الأوروبي.", href: "/eurusd" },
-    { symbol: "GBP", name: "الجنيه دولار", description: "زوج GBP/USD — الكابل.", href: "/gbpusd" },
-    { symbol: "XAU", name: "الذهب دولار", description: "ملاذ آمن مثل الفرنك.", href: "/xauusd" },
-    { symbol: "DXY", name: "مؤشر الدولار", description: "مرجع قوة الدولار.", href: "/dxy" },
+    {
+      symbol: "EUR",
+      name: "اليورو دولار",
+      description: "زوج EUR/USD — مرتبط بالفوركس الأوروبي.",
+      href: "/eurusd",
+    },
+    {
+      symbol: "GBP",
+      name: "الجنيه دولار",
+      description: "زوج GBP/USD — الكابل.",
+      href: "/gbpusd",
+    },
+    {
+      symbol: "XAU",
+      name: "الذهب دولار",
+      description: "ملاذ آمن مثل الفرنك.",
+      href: "/xauusd",
+    },
+    {
+      symbol: "DXY",
+      name: "مؤشر الدولار",
+      description: "مرجع قوة الدولار.",
+      href: "/dxy",
+    },
   ],
   links: {
     internal: [
@@ -112,7 +142,14 @@ export const usdchfAssetConfig = {
     title: "HasaN CharT World | USD/CHF — مركز معلومات الفوركس",
     description:
       "مركز معلومات USD/CHF: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات الدولار فرنك، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "USD/CHF", "USDCHF", "الفرنك السويسري", "الفوركس", "Forex"],
+    keywords: [
+      "HasaN CharT World",
+      "USD/CHF",
+      "USDCHF",
+      "الفرنك السويسري",
+      "الفوركس",
+      "Forex",
+    ],
   },
   jsonLd: {
     productName: "USD/CHF",

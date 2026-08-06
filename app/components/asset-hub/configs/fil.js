@@ -31,9 +31,7 @@ export const filAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["fil", "filecoin", "فايلكوين", "filusdt"],
-  },
+  analysis: { keywords: ["fil", "filecoin", "فايلكوين", "filusdt"] },
   faq: [
     {
       q: "ما هو فايلكوين (FIL)؟",
@@ -57,10 +55,30 @@ export const filAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
-    { symbol: "ETH", name: "الإيثيريوم", description: "منصة Web3 الرائدة.", href: "/eth" },
-    { symbol: "DOT", name: "بولكادوت", description: "شبكة متعددة السلاسل.", href: "/dot" },
-    { symbol: "ATOM", name: "كوزموس", description: "شبكة Interchain.", href: "/atom" },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "المرجع الرئيسي لسوق الكريبتو.",
+      href: "/btc",
+    },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "منصة Web3 الرائدة.",
+      href: "/eth",
+    },
+    {
+      symbol: "DOT",
+      name: "بولكادوت",
+      description: "شبكة متعددة السلاسل.",
+      href: "/dot",
+    },
+    {
+      symbol: "ATOM",
+      name: "كوزموس",
+      description: "شبكة Interchain.",
+      href: "/atom",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const filAssetConfig = {
     title: "HasaN CharT World | فايلكوين FIL — مركز المعلومات",
     description:
       "مركز معلومات فايلكوين: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات FIL، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "فايلكوين", "FIL", "Filecoin", "Web3", "سعر FIL"],
+    keywords: [
+      "HasaN CharT World",
+      "فايلكوين",
+      "FIL",
+      "Filecoin",
+      "Web3",
+      "سعر FIL",
+    ],
   },
   jsonLd: {
     productName: "Filecoin",

@@ -31,9 +31,7 @@ export const btcAssetConfig = {
     tagHref: "/news/tag/bitcoin",
     archiveLabel: "أرشيف أخبار البيتكوين",
   },
-  analysis: {
-    keywords: ["btc", "bitcoin", "بيتكوين", "btcusdt"],
-  },
+  analysis: { keywords: ["btc", "bitcoin", "بيتكوين", "btcusdt"] },
   faq: [
     {
       q: "ما هو البيتكوين (BTC)؟",
@@ -121,21 +119,24 @@ export const btcAssetConfig = {
     {
       icon: "💎",
       title: "VIP Spot",
-      description: "توصيات وتغطية احترافية لتداول البيتكوين والكريبتو في السوق الفوري (Spot).",
+      description:
+        "توصيات وتغطية احترافية لتداول البيتكوين والكريبتو في السوق الفوري (Spot).",
       href: "/vip-spot",
       cta: "استكشف VIP Spot",
     },
     {
       icon: "⚡",
       title: "VIP Futures",
-      description: "تحليلات وإشارات لتداول عقود البيتكوين الآجلة مع إدارة مخاطر واضحة.",
+      description:
+        "تحليلات وإشارات لتداول عقود البيتكوين الآجلة مع إدارة مخاطر واضحة.",
       href: "/vip-futures",
       cta: "استكشف VIP Futures",
     },
     {
       icon: "🛡️",
       title: "إدارة الحسابات",
-      description: "إدارة محافظ الكريبتو والمخاطر باحترافية ضمن خدمات HasaN CharT World.",
+      description:
+        "إدارة محافظ الكريبتو والمخاطر باحترافية ضمن خدمات HasaN CharT World.",
       href: "/account-management",
       cta: "إدارة الحسابات",
     },

@@ -27,12 +27,31 @@ export const gbpusdAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: ["gbpusd", "gbp/usd", "gbp", "pound", "sterling", "cable", "جنيه", "باون", "forex", "فوركس"],
+    keywords: [
+      "gbpusd",
+      "gbp/usd",
+      "gbp",
+      "pound",
+      "sterling",
+      "cable",
+      "جنيه",
+      "باون",
+      "forex",
+      "فوركس",
+    ],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
   analysis: {
-    keywords: ["gbpusd", "gbp/usd", "gbp usd", "cable", "pound", "sterling", "جنيه"],
+    keywords: [
+      "gbpusd",
+      "gbp/usd",
+      "gbp usd",
+      "cable",
+      "pound",
+      "sterling",
+      "جنيه",
+    ],
   },
   faq: [
     {
@@ -57,10 +76,30 @@ export const gbpusdAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — الأكثر تداولاً.", href: "/eurusd" },
-    { symbol: "JPY", name: "الدولار ين", description: "زوج USD/JPY — ملاذ الين الياباني.", href: "/usdjpy" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالدولار.", href: "/xau" },
-    { symbol: "OIL", name: "النفط", description: "سلعة طاقة مؤثرة على الجنيه.", href: "/usoil" },
+    {
+      symbol: "EUR",
+      name: "اليورو دولار",
+      description: "زوج EUR/USD — الأكثر تداولاً.",
+      href: "/eurusd",
+    },
+    {
+      symbol: "JPY",
+      name: "الدولار ين",
+      description: "زوج USD/JPY — ملاذ الين الياباني.",
+      href: "/usdjpy",
+    },
+    {
+      symbol: "XAU",
+      name: "الذهب",
+      description: "ملاذ آمن مرتبط بالدولار.",
+      href: "/xau",
+    },
+    {
+      symbol: "OIL",
+      name: "النفط",
+      description: "سلعة طاقة مؤثرة على الجنيه.",
+      href: "/usoil",
+    },
   ],
   links: {
     internal: [

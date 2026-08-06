@@ -31,9 +31,7 @@ export const opAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["op", "optimism", "أوبتيميزم", "opusdt"],
-  },
+  analysis: { keywords: ["op", "optimism", "أوبتيميزم", "opusdt"] },
   faq: [
     {
       q: "ما هو Optimism (OP)؟",
@@ -57,10 +55,30 @@ export const opAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "ETH", name: "الإيثيريوم", description: "الشبكة الأساسية لـ Optimism.", href: "/eth" },
-    { symbol: "ARB", name: "أربيتروم", description: "Layer 2 منافس لإيثيريوم.", href: "/arb" },
-    { symbol: "MATIC", name: "بوليجون", description: "Layer 2 لإيثيريوم.", href: "/matic" },
-    { symbol: "UNI", name: "يونيسواب", description: "بروتوكول DeFi على L2.", href: "/uni" },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "الشبكة الأساسية لـ Optimism.",
+      href: "/eth",
+    },
+    {
+      symbol: "ARB",
+      name: "أربيتروم",
+      description: "Layer 2 منافس لإيثيريوم.",
+      href: "/arb",
+    },
+    {
+      symbol: "MATIC",
+      name: "بوليجون",
+      description: "Layer 2 لإيثيريوم.",
+      href: "/matic",
+    },
+    {
+      symbol: "UNI",
+      name: "يونيسواب",
+      description: "بروتوكول DeFi على L2.",
+      href: "/uni",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const opAssetConfig = {
     title: "HasaN CharT World | أوبتيميزم OP — مركز المعلومات",
     description:
       "مركز معلومات Optimism: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات OP، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "أوبتيميزم", "OP", "Optimism", "Layer 2", "سعر OP"],
+    keywords: [
+      "HasaN CharT World",
+      "أوبتيميزم",
+      "OP",
+      "Optimism",
+      "Layer 2",
+      "سعر OP",
+    ],
   },
   jsonLd: {
     productName: "Optimism",

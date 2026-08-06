@@ -1,9 +1,7 @@
 import { buildOilPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const OIL_TITLE = "HasaN CharT World | النفط والطاقة";
 const OIL_DESCRIPTION =
   "تابع تحليلات النفط والطاقة مع HasaN CharT World، خام برنت، WTI، أخبار أوبك، المخزونات الأمريكية، التضخم، الدولار والتحليل الفني.";
-
 export const OIL_ITEM_LIST = [
   { name: "سوق النفط", url: "/markets" },
   { name: "خام برنت", url: "/news/category/commodities" },
@@ -16,7 +14,6 @@ export const OIL_ITEM_LIST = [
   { name: "التحليل الفني", url: "/daily-analysis" },
   { name: "أخبار النفط", url: "/news/category/commodities" },
 ];
-
 const OIL_FAQ = [
   {
     q: "ما هو سوق النفط؟",
@@ -39,7 +36,6 @@ const OIL_FAQ = [
     a: "أنشئ حساباً واستكشف أخبار النفط أو التحليلات اليومية أو طلب تحليل مخصص والاشتراكات.",
   },
 ];
-
 export default function OilPageJsonLd() {
   const jsonLd = buildOilPageJsonLd({
     path: "/oil",
@@ -48,7 +44,6 @@ export default function OilPageJsonLd() {
     items: OIL_ITEM_LIST,
     faq: OIL_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

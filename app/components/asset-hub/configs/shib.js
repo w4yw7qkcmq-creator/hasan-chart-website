@@ -31,9 +31,7 @@ export const shibAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["shib", "shiba", "شيبا", "shibusdt"],
-  },
+  analysis: { keywords: ["shib", "shiba", "شيبا", "shibusdt"] },
   faq: [
     {
       q: "ما هو شيبا إينو (SHIB)؟",
@@ -57,10 +55,30 @@ export const shibAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "DOGE", name: "دوجكوين", description: "عملة الميم الأصلية.", href: "/doge" },
-    { symbol: "PEPE", name: "بيبي", description: "عملة ميم شهيرة.", href: "/pepe" },
-    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
-    { symbol: "ETH", name: "الإيثيريوم", description: "الشبكة الأساسية لـ SHIB.", href: "/eth" },
+    {
+      symbol: "DOGE",
+      name: "دوجكوين",
+      description: "عملة الميم الأصلية.",
+      href: "/doge",
+    },
+    {
+      symbol: "PEPE",
+      name: "بيبي",
+      description: "عملة ميم شهيرة.",
+      href: "/pepe",
+    },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "المرجع الرئيسي لسوق الكريبتو.",
+      href: "/btc",
+    },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "الشبكة الأساسية لـ SHIB.",
+      href: "/eth",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const shibAssetConfig = {
     title: "HasaN CharT World | شيبا إينو SHIB — مركز المعلومات",
     description:
       "مركز معلومات شيبا إينو: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات SHIB، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "شيبا إينو", "SHIB", "Shiba Inu", "ميم كوين", "سعر SHIB"],
+    keywords: [
+      "HasaN CharT World",
+      "شيبا إينو",
+      "SHIB",
+      "Shiba Inu",
+      "ميم كوين",
+      "سعر SHIB",
+    ],
   },
   jsonLd: {
     productName: "Shiba Inu",

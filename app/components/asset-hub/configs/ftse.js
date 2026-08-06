@@ -27,7 +27,18 @@ export const ftseAssetConfig = {
     platform: "TVC",
   },
   news: {
-    keywords: ["ftse", "uk", "london", "britain", "boe", "فوتسي", "بريطانيا", "stocks", "أسهم", "pound"],
+    keywords: [
+      "ftse",
+      "uk",
+      "london",
+      "britain",
+      "boe",
+      "فوتسي",
+      "بريطانيا",
+      "stocks",
+      "أسهم",
+      "pound",
+    ],
     tagHref: "/news/tag/stocks",
     archiveLabel: "أرشيف أخبار الأسهم",
   },
@@ -57,10 +68,30 @@ export const ftseAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "GBP", name: "الجنيه دولار", description: "GBP/USD — الكابل البريطاني.", href: "/gbpusd" },
-    { symbol: "EUR", name: "اليورو جنيه", description: "EUR/GBP — مرتبط ببريطانيا.", href: "/eurgbp" },
-    { symbol: "DAX", name: "داكس", description: "مؤشر أوروبي رئيسي.", href: "/dax" },
-    { symbol: "CAC", name: "كاك 40", description: "مؤشر فرنسا.", href: "/cac40" },
+    {
+      symbol: "GBP",
+      name: "الجنيه دولار",
+      description: "GBP/USD — الكابل البريطاني.",
+      href: "/gbpusd",
+    },
+    {
+      symbol: "EUR",
+      name: "اليورو جنيه",
+      description: "EUR/GBP — مرتبط ببريطانيا.",
+      href: "/eurgbp",
+    },
+    {
+      symbol: "DAX",
+      name: "داكس",
+      description: "مؤشر أوروبي رئيسي.",
+      href: "/dax",
+    },
+    {
+      symbol: "CAC",
+      name: "كاك 40",
+      description: "مؤشر فرنسا.",
+      href: "/cac40",
+    },
   ],
   links: {
     internal: [
@@ -115,7 +146,15 @@ export const ftseAssetConfig = {
     title: "HasaN CharT World | FTSE 100 — مركز المؤشرات",
     description:
       "مركز معلومات FTSE 100: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات مؤشر فوتسي البريطاني، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "FTSE", "FTSE 100", "فوتسي", "بريطانيا", "المؤشرات", "الأسهم"],
+    keywords: [
+      "HasaN CharT World",
+      "FTSE",
+      "FTSE 100",
+      "فوتسي",
+      "بريطانيا",
+      "المؤشرات",
+      "الأسهم",
+    ],
   },
   jsonLd: {
     productName: "FTSE 100",

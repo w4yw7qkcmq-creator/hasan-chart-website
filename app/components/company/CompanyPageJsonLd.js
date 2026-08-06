@@ -1,9 +1,7 @@
 import { buildCompanyPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const COMPANY_TITLE = "HasaN CharT World | الشركة";
 const COMPANY_DESCRIPTION =
   "صفحة الشركة الرسمية لمنصة HasaN CharT World، المتخصصة في التحليلات المالية، الأخبار الاقتصادية، التنبيهات السعرية، توصيات التداول، إدارة الحسابات، وخدمات المستثمرين.";
-
 const COMPANY_FAQ = [
   {
     q: "ما هي HasaN CharT World؟",
@@ -26,7 +24,6 @@ const COMPANY_FAQ = [
     a: "بعض المحتوى والصفحات العامة متاحة للجميع. الخدمات الكاملة تتطلب إنشاء حساب والاشتراك في الباقات المناسبة.",
   },
 ];
-
 export default function CompanyPageJsonLd() {
   const jsonLd = buildCompanyPageJsonLd({
     path: "/company",
@@ -34,7 +31,6 @@ export default function CompanyPageJsonLd() {
     description: COMPANY_DESCRIPTION,
     faq: COMPANY_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

@@ -1,9 +1,7 @@
 import { buildCommoditiesPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const COMMODITIES_TITLE = "HasaN CharT World | السلع العالمية";
 const COMMODITIES_DESCRIPTION =
   "تابع تحليلات السلع العالمية مع HasaN CharT World، الذهب، الفضة، النفط، الغاز الطبيعي، السلع الزراعية، أخبار الطاقة، التضخم والتحليل الفني.";
-
 export const COMMODITIES_ITEM_LIST = [
   { name: "الذهب", url: "/gold" },
   { name: "الفضة", url: "/gold" },
@@ -16,7 +14,6 @@ export const COMMODITIES_ITEM_LIST = [
   { name: "التحليل الفني", url: "/daily-analysis" },
   { name: "الأسواق المالية", url: "/markets" },
 ];
-
 const COMMODITIES_FAQ = [
   {
     q: "ما هي السلع في الأسواق المالية؟",
@@ -39,7 +36,6 @@ const COMMODITIES_FAQ = [
     a: "أنشئ حساباً واستكشف صفحات الذهب والنفط أو أخبار السلع أو التحليلات اليومية والاشتراكات.",
   },
 ];
-
 export default function CommoditiesPageJsonLd() {
   const jsonLd = buildCommoditiesPageJsonLd({
     path: "/commodities",
@@ -48,7 +44,6 @@ export default function CommoditiesPageJsonLd() {
     items: COMMODITIES_ITEM_LIST,
     faq: COMMODITIES_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

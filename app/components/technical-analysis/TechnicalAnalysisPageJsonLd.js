@@ -1,9 +1,10 @@
-import { buildTechnicalAnalysisPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
+import {
+  buildTechnicalAnalysisPageJsonLd,
+  serializeJsonLd,
+} from "../../../lib/seo";
 const TECHNICAL_ANALYSIS_TITLE = "HasaN CharT World | التحليل الفني";
 const TECHNICAL_ANALYSIS_DESCRIPTION =
   "تعلم التحليل الفني مع HasaN CharT World، الدعوم والمقاومات، الشموع اليابانية، النماذج الفنية، SMC، Price Action وإدارة المخاطر.";
-
 export const TECHNICAL_ANALYSIS_ITEM_LIST = [
   { name: "التحليل الفني", url: "/technical-analysis" },
   { name: "الدعوم والمقاومات", url: "/daily-analysis" },
@@ -16,7 +17,6 @@ export const TECHNICAL_ANALYSIS_ITEM_LIST = [
   { name: "أكاديمية التداول", url: "/trading-academy" },
   { name: "الأسواق المالية", url: "/markets" },
 ];
-
 const TECHNICAL_ANALYSIS_FAQ = [
   {
     q: "ما هو التحليل الفني؟",
@@ -39,7 +39,6 @@ const TECHNICAL_ANALYSIS_FAQ = [
     a: "استكشف التحليلات اليومية أو أكاديمية التداول أو طلب تحليل مخصص والاشتراكات.",
   },
 ];
-
 export default function TechnicalAnalysisPageJsonLd() {
   const jsonLd = buildTechnicalAnalysisPageJsonLd({
     path: "/technical-analysis",
@@ -48,7 +47,6 @@ export default function TechnicalAnalysisPageJsonLd() {
     items: TECHNICAL_ANALYSIS_ITEM_LIST,
     faq: TECHNICAL_ANALYSIS_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

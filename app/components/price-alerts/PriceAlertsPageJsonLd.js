@@ -1,9 +1,7 @@
 import { buildPriceAlertsPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
 const PRICE_ALERTS_TITLE = "HasaN CharT World | التنبيهات السعرية";
 const PRICE_ALERTS_DESCRIPTION =
   "استخدم التنبيهات السعرية في HasaN CharT World لمتابعة العملات الرقمية، الفوركس، الذهب والأسواق المالية عبر إشعارات المتصفح والبريد الإلكتروني.";
-
 export const PRICE_ALERTS_ITEM_LIST = [
   { name: "التنبيهات السعرية", url: "/alerts" },
   { name: "تنبيهات الكريبتو", url: "/crypto" },
@@ -16,7 +14,6 @@ export const PRICE_ALERTS_ITEM_LIST = [
   { name: "الاشتراكات", url: "/subscriptions" },
   { name: "الأسواق المالية", url: "/markets" },
 ];
-
 const PRICE_ALERTS_FAQ = [
   {
     q: "ما هي التنبيهات السعرية؟",
@@ -39,7 +36,6 @@ const PRICE_ALERTS_FAQ = [
     a: "أنشئ حساباً وانتقل إلى صفحة التنبيهات أو الاشتراكات لضبط مستوياتك المفضلة.",
   },
 ];
-
 export default function PriceAlertsPageJsonLd() {
   const jsonLd = buildPriceAlertsPageJsonLd({
     path: "/price-alerts",
@@ -48,7 +44,6 @@ export default function PriceAlertsPageJsonLd() {
     items: PRICE_ALERTS_ITEM_LIST,
     faq: PRICE_ALERTS_FAQ,
   });
-
   return (
     <script
       type="application/ld+json"

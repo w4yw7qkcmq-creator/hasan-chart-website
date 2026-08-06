@@ -31,9 +31,7 @@ export const dotAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["dot", "polkadot", "بولكادوت", "dotusdt"],
-  },
+  analysis: { keywords: ["dot", "polkadot", "بولكادوت", "dotusdt"] },
   faq: [
     {
       q: "ما هو بولكادوت (DOT)؟",
@@ -57,10 +55,30 @@ export const dotAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
-    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية الرائدة.", href: "/eth" },
-    { symbol: "AVAX", name: "أفالانش", description: "بلوكتشين متعدد السلاسل.", href: "/avax" },
-    { symbol: "LINK", name: "تشين لينك", description: "شبكة أوراكل لامركزية.", href: "/link" },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "المرجع الرئيسي لسوق الكريبتو.",
+      href: "/btc",
+    },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "منصة العقود الذكية الرائدة.",
+      href: "/eth",
+    },
+    {
+      symbol: "AVAX",
+      name: "أفالانش",
+      description: "بلوكتشين متعدد السلاسل.",
+      href: "/avax",
+    },
+    {
+      symbol: "LINK",
+      name: "تشين لينك",
+      description: "شبكة أوراكل لامركزية.",
+      href: "/link",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const dotAssetConfig = {
     title: "HasaN CharT World | بولكادوت DOT — مركز المعلومات",
     description:
       "مركز معلومات بولكادوت: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات DOT، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "بولكادوت", "DOT", "Polkadot", "سعر DOT", "تحليل Polkadot"],
+    keywords: [
+      "HasaN CharT World",
+      "بولكادوت",
+      "DOT",
+      "Polkadot",
+      "سعر DOT",
+      "تحليل Polkadot",
+    ],
   },
   jsonLd: {
     productName: "Polkadot",

@@ -57,10 +57,30 @@ export const oilAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالتضخم — مركز XAU.", href: "/xau" },
-    { symbol: "XAG", name: "الفضة", description: "معدن ثمين مرتبط بالصناعة — مركز XAG.", href: "/xag" },
-    { symbol: "FX", name: "الفوركس", description: "الدولار والعملات النفطية.", href: "/forex" },
-    { symbol: "BTC", name: "البيتكوين", description: "أصل رقمي يتأثر بمعنويات المخاطرة.", href: "/btc" },
+    {
+      symbol: "XAU",
+      name: "الذهب",
+      description: "ملاذ آمن مرتبط بالتضخم — مركز XAU.",
+      href: "/xau",
+    },
+    {
+      symbol: "XAG",
+      name: "الفضة",
+      description: "معدن ثمين مرتبط بالصناعة — مركز XAG.",
+      href: "/xag",
+    },
+    {
+      symbol: "FX",
+      name: "الفوركس",
+      description: "الدولار والعملات النفطية.",
+      href: "/forex",
+    },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "أصل رقمي يتأثر بمعنويات المخاطرة.",
+      href: "/btc",
+    },
   ],
   links: {
     internal: [
@@ -116,7 +136,16 @@ export const oilAssetConfig = {
     title: "HasaN CharT World | النفط الأمريكي USOIL — مركز المعلومات",
     description:
       "مركز معلومات النفط الأمريكي WTI (USOIL): السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات النفط، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "النفط", "USOIL", "WTI", "Oil", "Brent", "أوبك", "سعر النفط"],
+    keywords: [
+      "HasaN CharT World",
+      "النفط",
+      "USOIL",
+      "WTI",
+      "Oil",
+      "Brent",
+      "أوبك",
+      "سعر النفط",
+    ],
   },
   jsonLd: {
     productName: "US Crude Oil",

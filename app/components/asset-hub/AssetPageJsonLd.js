@@ -1,8 +1,7 @@
-import { buildAssetPageJsonLd, serializeJsonLd } from "../../../lib/seo";
-
-/**
- * @param {{ config: import("./configs/types").AssetHubConfig }} props
- */
+import {
+  buildAssetPageJsonLd,
+  serializeJsonLd,
+} from "../../../lib/seo"; /** * @param {{ config: import("./configs/types").AssetHubConfig }} props */
 export default function AssetPageJsonLd({ config }) {
   const jsonLd = buildAssetPageJsonLd({
     path: config.path,
@@ -12,7 +11,6 @@ export default function AssetPageJsonLd({ config }) {
     faq: config.faq,
     asset: config.jsonLd,
   });
-
   return (
     <script
       type="application/ld+json"

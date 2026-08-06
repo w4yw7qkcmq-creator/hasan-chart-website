@@ -27,7 +27,17 @@ export const eurjpyAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: ["eurjpy", "eur/jpy", "euro yen", "ecb", "boj", "اليورو", "ين", "forex", "فوركس"],
+    keywords: [
+      "eurjpy",
+      "eur/jpy",
+      "euro yen",
+      "ecb",
+      "boj",
+      "اليورو",
+      "ين",
+      "forex",
+      "فوركس",
+    ],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -57,10 +67,30 @@ export const eurjpyAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — الجانب الأوروبي.", href: "/eurusd" },
-    { symbol: "JPY", name: "الدولار ين", description: "زوج USD/JPY — الجانب الياباني.", href: "/usdjpy" },
-    { symbol: "GBP", name: "الجنيه ين", description: "زوج GBP/JPY — متقاطع مشابه.", href: "/gbpjpy" },
-    { symbol: "DXY", name: "مؤشر الدولار", description: "مرجع قوة الدولار.", href: "/dxy" },
+    {
+      symbol: "EUR",
+      name: "اليورو دولار",
+      description: "زوج EUR/USD — الجانب الأوروبي.",
+      href: "/eurusd",
+    },
+    {
+      symbol: "JPY",
+      name: "الدولار ين",
+      description: "زوج USD/JPY — الجانب الياباني.",
+      href: "/usdjpy",
+    },
+    {
+      symbol: "GBP",
+      name: "الجنيه ين",
+      description: "زوج GBP/JPY — متقاطع مشابه.",
+      href: "/gbpjpy",
+    },
+    {
+      symbol: "DXY",
+      name: "مؤشر الدولار",
+      description: "مرجع قوة الدولار.",
+      href: "/dxy",
+    },
   ],
   links: {
     internal: [
@@ -114,7 +144,14 @@ export const eurjpyAssetConfig = {
     title: "HasaN CharT World | EUR/JPY — مركز معلومات الفوركس",
     description:
       "مركز معلومات EUR/JPY: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات اليورو ين، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "EUR/JPY", "EURJPY", "اليورو ين", "الفوركس", "Forex"],
+    keywords: [
+      "HasaN CharT World",
+      "EUR/JPY",
+      "EURJPY",
+      "اليورو ين",
+      "الفوركس",
+      "Forex",
+    ],
   },
   jsonLd: {
     productName: "EUR/JPY",

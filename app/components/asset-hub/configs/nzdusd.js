@@ -27,7 +27,17 @@ export const nzdusdAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: ["nzdusd", "nzd/usd", "nzd", "kiwi", "new zealand", "rbnz", "نيوزيلندا", "كيوي", "forex"],
+    keywords: [
+      "nzdusd",
+      "nzd/usd",
+      "nzd",
+      "kiwi",
+      "new zealand",
+      "rbnz",
+      "نيوزيلندا",
+      "كيوي",
+      "forex",
+    ],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -57,10 +67,30 @@ export const nzdusdAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "AUD", name: "الأسترالي دولار", description: "زوج AUD/USD — أوزي.", href: "/audusd" },
-    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD.", href: "/eurusd" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/xauusd" },
-    { symbol: "OIL", name: "النفط", description: "USOIL — سلعة طاقة.", href: "/usoil" },
+    {
+      symbol: "AUD",
+      name: "الأسترالي دولار",
+      description: "زوج AUD/USD — أوزي.",
+      href: "/audusd",
+    },
+    {
+      symbol: "EUR",
+      name: "اليورو دولار",
+      description: "زوج EUR/USD.",
+      href: "/eurusd",
+    },
+    {
+      symbol: "XAU",
+      name: "الذهب",
+      description: "ملاذ آمن مرتبط بمعنويات المخاطرة.",
+      href: "/xauusd",
+    },
+    {
+      symbol: "OIL",
+      name: "النفط",
+      description: "USOIL — سلعة طاقة.",
+      href: "/usoil",
+    },
   ],
   links: {
     internal: [
@@ -112,7 +142,14 @@ export const nzdusdAssetConfig = {
     title: "HasaN CharT World | NZD/USD — مركز معلومات الفوركس",
     description:
       "مركز معلومات NZD/USD: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات النيوزيلندي دولار، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "NZD/USD", "NZDUSD", "الكيوي", "Kiwi", "الفوركس"],
+    keywords: [
+      "HasaN CharT World",
+      "NZD/USD",
+      "NZDUSD",
+      "الكيوي",
+      "Kiwi",
+      "الفوركس",
+    ],
   },
   jsonLd: {
     productName: "NZD/USD",

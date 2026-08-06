@@ -27,13 +27,22 @@ export const cac40AssetConfig = {
     platform: "TVC",
   },
   news: {
-    keywords: ["cac", "cac40", "france", "paris", "ecb", "كاك", "فرنسا", "stocks", "أسهم", "euro"],
+    keywords: [
+      "cac",
+      "cac40",
+      "france",
+      "paris",
+      "ecb",
+      "كاك",
+      "فرنسا",
+      "stocks",
+      "أسهم",
+      "euro",
+    ],
     tagHref: "/news/tag/stocks",
     archiveLabel: "أرشيف أخبار الأسهم",
   },
-  analysis: {
-    keywords: ["cac", "cac 40", "cac40", "france", "كاك", "فرنسا"],
-  },
+  analysis: { keywords: ["cac", "cac 40", "cac40", "france", "كاك", "فرنسا"] },
   faq: [
     {
       q: "ما هو مؤشر CAC 40؟",
@@ -57,10 +66,25 @@ export const cac40AssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "EUR", name: "اليورو دولار", description: "EUR/USD — مرتبط باقتصاد فرنسا.", href: "/eurusd" },
+    {
+      symbol: "EUR",
+      name: "اليورو دولار",
+      description: "EUR/USD — مرتبط باقتصاد فرنسا.",
+      href: "/eurusd",
+    },
     { symbol: "DAX", name: "داكس", description: "مؤشر ألمانيا.", href: "/dax" },
-    { symbol: "FTSE", name: "فوتسي", description: "مؤشر بريطانيا.", href: "/ftse" },
-    { symbol: "SPX", name: "S&P 500", description: "المؤشر الأمريكي المرجعي.", href: "/sp500" },
+    {
+      symbol: "FTSE",
+      name: "فوتسي",
+      description: "مؤشر بريطانيا.",
+      href: "/ftse",
+    },
+    {
+      symbol: "SPX",
+      name: "S&P 500",
+      description: "المؤشر الأمريكي المرجعي.",
+      href: "/sp500",
+    },
   ],
   links: {
     internal: [
@@ -114,7 +138,15 @@ export const cac40AssetConfig = {
     title: "HasaN CharT World | CAC 40 — مركز المؤشرات",
     description:
       "مركز معلومات CAC 40: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات مؤشر كاك الفرنسي، التنبيهات السعرية.",
-    keywords: ["HasaN CharT World", "CAC", "CAC 40", "كاك", "فرنسا", "المؤشرات", "الأسهم"],
+    keywords: [
+      "HasaN CharT World",
+      "CAC",
+      "CAC 40",
+      "كاك",
+      "فرنسا",
+      "المؤشرات",
+      "الأسهم",
+    ],
   },
   jsonLd: {
     productName: "CAC 40",

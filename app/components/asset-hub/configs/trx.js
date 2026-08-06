@@ -31,9 +31,7 @@ export const trxAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: {
-    keywords: ["trx", "tron", "ترون", "trxusdt"],
-  },
+  analysis: { keywords: ["trx", "tron", "ترون", "trxusdt"] },
   faq: [
     {
       q: "ما هو ترون (TRX)؟",
@@ -57,10 +55,30 @@ export const trxAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
-    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية الرائدة.", href: "/eth" },
-    { symbol: "BNB", name: "BNB", description: "عملة منصة Binance.", href: "/bnb" },
-    { symbol: "XRP", name: "ريبل", description: "عملة رقمية للمدفوعات.", href: "/xrp" },
+    {
+      symbol: "BTC",
+      name: "البيتكوين",
+      description: "المرجع الرئيسي لسوق الكريبتو.",
+      href: "/btc",
+    },
+    {
+      symbol: "ETH",
+      name: "الإيثيريوم",
+      description: "منصة العقود الذكية الرائدة.",
+      href: "/eth",
+    },
+    {
+      symbol: "BNB",
+      name: "BNB",
+      description: "عملة منصة Binance.",
+      href: "/bnb",
+    },
+    {
+      symbol: "XRP",
+      name: "ريبل",
+      description: "عملة رقمية للمدفوعات.",
+      href: "/xrp",
+    },
   ],
   links: {
     internal: [
@@ -111,7 +129,14 @@ export const trxAssetConfig = {
     title: "HasaN CharT World | ترون TRX — مركز المعلومات",
     description:
       "مركز معلومات ترون: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات TRX، التنبيهات السعرية وخدمات VIP.",
-    keywords: ["HasaN CharT World", "ترون", "TRX", "TRON", "سعر TRX", "تحليل TRON"],
+    keywords: [
+      "HasaN CharT World",
+      "ترون",
+      "TRX",
+      "TRON",
+      "سعر TRX",
+      "تحليل TRON",
+    ],
   },
   jsonLd: {
     productName: "TRON",
