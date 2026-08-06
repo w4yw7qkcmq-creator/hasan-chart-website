@@ -131,8 +131,8 @@ test("historical liquidity walls panel arabic and tabs", () => {
 test("buy green sell red without blue on trade elements", () => {
   const { page, walls, panel, chart, ui } = readSources();
   const combined = page + walls + panel + chart + ui;
-  assert.match(combined, /text-emerald|bg-emerald|emerald-/);
-  assert.match(combined, /text-rose|bg-rose|rose-/);
+  assert.match(combined, /ob\.positive|ob-badge-buy|--ob-positive|ob\.depthBuy|var\(--ob-chart-buy\)/);
+  assert.match(combined, /ob\.negative|ob-badge-sell|--ob-negative|ob\.depthSell|var\(--ob-chart-sell\)/);
   assert.doesNotMatch(panel, /text-blue|bg-blue|border-blue|text-cyan|text-sky|text-teal/);
   assert.doesNotMatch(chart, /#3b82f6|#0ea5e9|#06b6d4|blue/);
   assert.doesNotMatch(walls, /["']Buy["']|["']Sell["']/);
@@ -213,7 +213,7 @@ test("24h summary separates initialLoading from isRefreshing", () => {
   const { summaryHook, page, ui } = readSources();
   assert.match(summaryHook, /initialLoading/);
   assert.match(summaryHook, /isRefreshing/);
-  assert.match(summaryHook, /background:\s*true/);
+  assert.match(summaryHook, /background:\s*(true|reason !== "initial")/);
   assert.match(summaryHook, /hasDataRef/);
   assert.match(page, /initialLoading:\s*summary24hInitialLoading/);
   assert.match(page, /isRefreshing:\s*summary24hRefreshing/);
@@ -319,7 +319,7 @@ test("segmented controls stay inside cards with width constraints", () => {
   const { ui, page } = readSources();
   assert.match(ui, /min-w-0 max-w-full/);
   assert.match(ui, /overflow-x-auto scrollbar-none/);
-  assert.match(ui, /whitespace-nowrap/);
+  assert.match(ui, /ob\.segmentedBtn|whitespace-nowrap/);
   assert.match(page, /Panel[\s\S]*SegmentedControl/);
   assert.doesNotMatch(page, /action=\{\s*<SegmentedControl/);
 });
@@ -434,8 +434,8 @@ test("liquidity depth chart renders multi-level histogram with axes and tooltip"
   assert.match(chart, /sqrtScale/);
   assert.match(chart, /buildPriceTicks/);
   assert.match(chart, /buildValueTicks/);
-  assert.match(chart, /#10b981/);
-  assert.match(chart, /#f43f5e/);
+  assert.match(chart, /var\(--ob-chart-buy\)|#10b981/);
+  assert.match(chart, /var\(--ob-chart-sell\)|#f43f5e/);
   assert.match(chart, /strokeDasharray="4 3"/);
   assert.match(chart, /buildTooltipLines/);
   assert.match(chart, /البعد عن السعر/);

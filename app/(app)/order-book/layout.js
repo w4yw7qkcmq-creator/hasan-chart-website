@@ -22,6 +22,8 @@ export const metadata = buildPublicPageMetadata({
   ],
 });
 
+import "./order-book-theme.css";
+
 export default function OrderBookLayout({ children }) {
   return children;
 }

@@ -102,7 +102,7 @@ test("historical walls panel binds analytics to selected window", () => {
   assert.match(wallsPanel, /displayHistory\?\.analytics/);
   assert.match(wallsPanel, /الإطار المطلوب/);
   assert.match(wallsPanel, /يعرض مؤقتًا بيانات/);
-  assert.match(wallsPanel, /pointer-events-none absolute inset-0/);
+  assert.match(wallsPanel, /ob\.overlayScrim|pointer-events-none absolute inset-0/);
   assert.match(wallsPanel, /refreshError && displayHistory/);
 });
 

@@ -51,6 +51,7 @@ import {
 } from "./formatters";
 import {
   EmptyState,
+  ConnectionStatusBadge,
   FlowSplitBar,
   HistoryState,
   MetricLine,
@@ -62,6 +63,7 @@ import {
   StyledSelect,
   SymbolSearchCombobox,
 } from "./order-book-ui";
+import { ob } from "./order-book-theme";
 
 const breadcrumbs = [
   { label: "الرئيسية", href: "/" },
@@ -312,77 +314,82 @@ export default function OrderBookPageContent() {
 
   if (!hydrated) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="h-96 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/5" />
+      <div className={`mx-auto max-w-7xl px-4 py-8 ${ob.page}`}>
+        <div className="h-96 animate-pulse rounded-2xl bg-[var(--ob-surface-muted)] motion-reduce:animate-none" aria-hidden="true" />
+        <p className="sr-only" role="status" aria-live="polite">
+          جاري تحميل دفتر الأوامر...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8" dir="rtl">
+    <div className={`mx-auto max-w-7xl px-4 py-6 sm:py-8 ${ob.page}`} dir="rtl">
       <Breadcrumbs items={breadcrumbs} />
 
-      <header className="mt-4 mb-5">
-        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">عمق السوق</p>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white sm:text-[1.65rem]">
-          دفتر الأوامر والسيولة
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+      <header className="mt-4 mb-6">
+        <p className={ob.eyebrow}>عمق السوق</p>
+        <h1 className={`mt-1 ${ob.heading}`}>دفتر الأوامر والسيولة</h1>
+        <p className={`mt-2 max-w-2xl ${ob.body} ob-text-muted`}>
           متابعة لحظية لدفتر الأوامر، السيولة، جدران الأوامر، الصفقات الكبيرة، وحجم التداول المنفذ.
         </p>
       </header>
 
+      <div className="sr-only" role="status" aria-live="polite">
+        {coverageLabel}
+      </div>
+
       {data?.symbolLoadError ? (
-        <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+        <p className={`mb-4 ${ob.alertError}`} role="alert">
           {data.symbolLoadError}
         </p>
       ) : null}
 
       {symbolNotice ? (
-        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+        <p className={`mb-4 ${ob.alertWarning}`} role="status">
           {symbolNotice}
         </p>
       ) : null}
 
       {symbolRateLimitMessage ? (
-        <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+        <p className={`mb-4 ${ob.alertError}`} role="alert">
           {symbolRateLimitMessage}
         </p>
       ) : null}
 
       {symbolSwitching ? (
-        <p className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+        <p className={`mb-4 ${ob.alertInfo}`} role="status" aria-live="polite">
           جاري تحميل {formatMarketSymbol(prefs.symbol)}...
         </p>
       ) : null}
 
       {/* Row 1 — price hero + quick stats */}
       <section className="mb-5 grid items-stretch gap-3 lg:grid-cols-12 lg:gap-4">
-        <div className="flex min-h-[7.5rem] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5 lg:col-span-5">
+        <div className={`flex min-h-[7.75rem] flex-col justify-between p-4 sm:p-5 lg:col-span-5 ${ob.surface}`}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xs text-slate-500 dark:text-slate-400">الرمز</p>
-              <h2 className="truncate text-xl font-bold text-slate-900 dark:text-white">
-                {displaySymbol}
-              </h2>
-              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className={ob.label}>الرمز</p>
+              <h2 className={`truncate text-xl font-bold ${ob.textStrong}`}>{displaySymbol}</h2>
+              <p className={`mt-0.5 text-xs ${ob.textSubtle}`}>
                 {EXCHANGE_LABELS[prefs.mode] || prefs.mode}
               </p>
             </div>
-            <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-              {coverageLabel}
-            </span>
+            <ConnectionStatusBadge
+              connectedCount={connectedCount}
+              totalExchanges={totalExchanges}
+              probing={probing}
+            />
           </div>
           <div className="mt-3">
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">آخر سعر</p>
-            <NumericValue className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
+            <p className={ob.label}>آخر سعر</p>
+            <NumericValue className={`text-2xl font-bold sm:text-3xl ${ob.textStrong}`}>
               {formatPrice(data?.lastPrice)}
             </NumericValue>
           </div>
         </div>
 
         <div className="grid min-w-0 grid-cols-2 gap-3 lg:col-span-7 lg:grid-cols-4">
-          <StatTile label="السبريد" sublabel="لحظي" value={formatPrice(data?.spread, 4)} />
+          <StatTile label="السبريد" sublabel="لحظي" value={formatPrice(data?.spread, 4)} tone="neutral" icon="↔" />
           <StatTile
             label="نسبة الشراء"
             sublabel="آخر 24 ساعة"
@@ -435,7 +442,7 @@ export default function OrderBookPageContent() {
       </section>
 
       {/* Controls */}
-      <section className="mb-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5">
+      <section className={`mb-5 grid gap-4 p-4 sm:p-5 ${ob.surface}`}>
         <div className="grid gap-4 xl:grid-cols-2">
           <SymbolSearchCombobox
             label="العملة"
@@ -479,7 +486,7 @@ export default function OrderBookPageContent() {
           />
         </div>
 
-        <div className="grid gap-3 border-t border-slate-100 pt-4 dark:border-white/5 sm:grid-cols-2">
+        <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 border-[var(--ob-border)]">
           <StyledSelect
             label="دقة السعر"
             value={String(prefs.precision ?? getDefaultPrecision(prefs.symbol))}
@@ -539,7 +546,7 @@ export default function OrderBookPageContent() {
                   sellPercent={dominanceFlow.sellPercent}
                 />
               ) : (
-                <div className="h-8 rounded-lg bg-slate-100/80 dark:bg-white/5" aria-hidden="true" />
+                <div className="h-8 rounded-lg ob-surface-muted" aria-hidden="true" />
               )}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -557,7 +564,7 @@ export default function OrderBookPageContent() {
                 label="صافي التدفق"
                 value={formatUsd(dominanceFlow?.netNotional ?? dominanceFlow?.netFlow, { compact: true })}
               />
-              <p className="flex items-center justify-center rounded-lg bg-slate-50 px-2.5 py-2 text-center text-xs font-medium text-slate-800 sm:col-span-2 dark:bg-white/5 dark:text-slate-100">
+              <p className={`flex items-center justify-center rounded-lg px-2.5 py-2 text-center text-xs font-medium sm:col-span-2 ob-surface-muted ${ob.textStrong}`}>
                 {dominanceFlow?.dominanceLabel || dominanceFlow?.dominanceClassification || "متوازن"}
               </p>
             </div>
@@ -605,7 +612,7 @@ export default function OrderBookPageContent() {
                   sellPercent={executedFlow.sellPercent}
                 />
               ) : (
-                <div className="h-8 rounded-lg bg-slate-100/80 dark:bg-white/5" aria-hidden="true" />
+                <div className="h-8 rounded-lg ob-surface-muted" aria-hidden="true" />
               )}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 transition-opacity duration-200">
@@ -623,14 +630,14 @@ export default function OrderBookPageContent() {
                 label="صافي التدفق"
                 value={formatUsd(executedFlow?.netNotional ?? executedFlow?.netFlow, { compact: true })}
               />
-              <p className="flex min-h-[2.75rem] items-center justify-center rounded-lg bg-slate-50 px-2.5 py-2 text-center text-xs font-medium text-slate-800 sm:col-span-2 dark:bg-white/5 dark:text-slate-100">
+              <p className={`flex min-h-[2.75rem] items-center justify-center rounded-lg px-2.5 py-2 text-center text-xs font-medium sm:col-span-2 ob-surface-muted ${ob.textStrong}`}>
                 {executedFlow?.dominanceLabel || executedFlow?.dominanceClassification || "متوازن"}
               </p>
             </div>
             {executedFlow?.window ? (
-              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className={`mt-2 text-xs ${ob.textMuted}`}>
                 الإطار الحالي:{" "}
-                <NumericValue className="font-medium text-slate-700 dark:text-slate-200">
+                <NumericValue className={`font-medium ${ob.textNormal}`}>
                   {executedFlow.window}
                 </NumericValue>
                 {Number.isFinite(executedFlow.tradeCount) ? (
@@ -649,7 +656,7 @@ export default function OrderBookPageContent() {
                 ) : null}
               </p>
             ) : executedFlowLoading ? (
-              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">جاري تحديث الإطار...</p>
+              <p className={`mt-2 text-xs ${ob.textMuted}`}>جاري تحديث الإطار...</p>
             ) : null}
           </Panel>
         </div>
@@ -781,9 +788,9 @@ export default function OrderBookPageContent() {
           </div>
           <div className="mt-3 min-h-0 flex-1 min-w-0">
           {displayedLargeTrades.length ? (
-            <div className="max-h-[26rem] overflow-y-auto overflow-x-auto overscroll-contain rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
+            <div className="max-h-[26rem] overflow-y-auto overflow-x-auto overscroll-contain rounded-xl border [scrollbar-width:thin] border-[var(--ob-border)]">
               <table className="w-full min-w-[42rem] table-auto text-sm tabular-nums">
-                <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] leading-normal text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                <thead className={`${ob.tableHeader} text-xs leading-normal`}>
                   <tr>
                     <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">الوقت</th>
                     <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">المنصة</th>
@@ -793,11 +800,11 @@ export default function OrderBookPageContent() {
                     <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-3">القيمة</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                <tbody className="divide-y divide-[var(--ob-border)]">
                   {displayedLargeTrades.map((trade) => (
                     <tr
                       key={`${trade.exchange}-${trade.ts}-${trade.price}-${trade.quantity}`}
-                      className="align-middle transition hover:bg-slate-50/80 dark:hover:bg-white/5"
+                      className={`align-middle ${ob.rowHover}`}
                     >
                       <td className="whitespace-nowrap px-2 py-2.5 align-middle sm:px-3">
                         <NumericValue className="text-xs leading-normal">{formatTime(trade.ts)}</NumericValue>
@@ -815,7 +822,7 @@ export default function OrderBookPageContent() {
                         <NumericValue className="text-xs leading-normal">{formatQuantity(trade.quantity)}</NumericValue>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2.5 align-middle sm:px-3">
-                        <NumericValue className="font-semibold leading-normal text-slate-900 dark:text-white">
+                        <NumericValue className={`font-semibold leading-normal ${ob.textStrong}`}>
                           {formatUsd(trade.notional, { compact: true })}
                         </NumericValue>
                       </td>
@@ -858,19 +865,19 @@ export default function OrderBookPageContent() {
 
       {/* Last — data sources */}
       <section>
-        <details open className="group rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80">
-          <summary className="cursor-pointer list-none p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
+        <details open className={`group ${ob.surface}`}>
+          <summary className={`cursor-pointer list-none p-4 sm:p-5 [&::-webkit-details-marker]:hidden ${ob.focusRing}`}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">مصادر البيانات</h2>
-                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                <h2 className={ob.subheading}>مصادر البيانات</h2>
+                <p className={`mt-0.5 text-sm ${ob.textMuted}`}>
                   حالة اتصال منصات دفتر الأوامر والتنفيذ.
                 </p>
               </div>
-              <span className="text-xs text-slate-400 group-open:rotate-180 transition-transform">▾</span>
+              <span className={`text-xs ${ob.textSubtle} group-open:rotate-180 transition-transform motion-reduce:transition-none`} aria-hidden="true">▾</span>
             </div>
           </summary>
-          <div className="border-t border-slate-100 px-4 pb-4 pt-3 dark:border-white/5 sm:px-5 sm:pb-5">
+          <div className={`${ob.divider} px-4 pb-4 pt-3 sm:px-5 sm:pb-5`}>
             <div className="grid gap-2 sm:grid-cols-3">
               {(data?.exchangeStatuses || []).map((item) => {
                 const connected = item.status === "connected";
@@ -878,21 +885,29 @@ export default function OrderBookPageContent() {
                 return (
                   <div
                     key={item.exchange}
-                    className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-sm dark:border-white/10"
+                    className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm ${ob.surfaceMuted}`}
                   >
                     <div className="flex items-center gap-2">
                       <span
-                        className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : item.status === "probing" ? "bg-sky-500 animate-pulse" : "bg-amber-500"}`}
+                        className={
+                          connected
+                            ? "ob-status-dot-connected h-2 w-2 rounded-full"
+                            : item.status === "probing"
+                              ? "ob-status-dot-probing h-2 w-2 rounded-full"
+                              : ob.statusDotWarning
+                        }
                       />
-                      <span className="font-medium">{EXCHANGE_LABELS[item.exchange] || item.exchange}</span>
+                      <span className={`font-medium ${ob.textStrong}`}>
+                        {EXCHANGE_LABELS[item.exchange] || item.exchange}
+                      </span>
                     </div>
                     <span
                       className={
                         connected
-                          ? "text-xs text-emerald-600 dark:text-emerald-400"
+                          ? `text-xs ${ob.positive}`
                           : item.status === "probing"
-                            ? "text-xs text-sky-600 dark:text-sky-400"
-                            : "text-xs text-amber-600 dark:text-amber-400"
+                            ? `text-xs ${ob.neutral}`
+                            : `text-xs ${ob.textMuted}`
                       }
                     >
                       {label}
@@ -902,7 +917,7 @@ export default function OrderBookPageContent() {
               })}
             </div>
             {data?.disclaimer ? (
-              <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{data.disclaimer}</p>
+              <p className={`mt-2 text-xs leading-5 ${ob.textMuted}`}>{data.disclaimer}</p>
             ) : null}
           </div>
         </details>

@@ -1,19 +1,36 @@
 "use client";
 
 import { formatPrice, formatTime, formatUsd } from "./formatters";
+import { ob } from "./order-book-theme";
 import { EmptyState, NumericValue, Panel } from "./order-book-ui";
+
+function SideBadgeLabel({ side }) {
+  if (side === "long") {
+    return (
+      <span className={`inline-flex items-center gap-1 text-xs font-semibold ${ob.negative}`}>
+        <span aria-hidden="true">▲</span>
+        Long (تصفية مراكز شراء)
+      </span>
+    );
+  }
+  if (side === "short") {
+    return (
+      <span className={`inline-flex items-center gap-1 text-xs font-semibold ${ob.positive}`}>
+        <span aria-hidden="true">▼</span>
+        Short (تصفية مراكز بيع)
+      </span>
+    );
+  }
+  return "—";
+}
 
 function SideValue({ label, value, tone }) {
   const toneClass =
-    tone === "long"
-      ? "text-rose-600 dark:text-rose-400"
-      : tone === "short"
-        ? "text-emerald-600 dark:text-emerald-400"
-        : "text-slate-900 dark:text-white";
+    tone === "long" ? ob.negative : tone === "short" ? ob.positive : ob.textStrong;
 
   return (
-    <div className="rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10">
-      <div className="text-[11px] text-slate-500 dark:text-slate-400">{label}</div>
+    <div className={`rounded-xl border px-3 py-2 ${ob.surfaceMuted}`}>
+      <div className={`text-[11px] ${ob.textMuted}`}>{label}</div>
       <NumericValue className={`mt-0.5 text-sm font-semibold ${toneClass}`}>
         {formatUsd(value, { compact: true })}
       </NumericValue>
@@ -23,9 +40,9 @@ function SideValue({ label, value, tone }) {
 
 function SummaryWindowCard({ title, bucket }) {
   return (
-    <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
-      <div className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{title}</div>
-      <div className="mb-2 text-lg font-bold text-slate-900 dark:text-white">
+    <div className={`rounded-xl border p-3 ${ob.surfaceMuted}`}>
+      <div className={`mb-2 text-xs font-semibold ${ob.textMuted}`}>{title}</div>
+      <div className={`mb-2 text-lg font-bold ${ob.textStrong}`}>
         <NumericValue>{formatUsd(bucket?.total, { compact: true })}</NumericValue>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -42,9 +59,9 @@ function ExchangeTable({ rows }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
+    <div className={`overflow-x-auto rounded-xl border [scrollbar-width:thin] ${ob.surfaceMuted}`}>
       <table className="w-full min-w-[520px] text-sm">
-        <thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+        <thead className={`text-[11px] ${ob.tableHeader} ${ob.textMuted}`}>
           <tr>
             <th className="px-3 py-2 text-right">المنصة</th>
             <th className="px-3 py-2 text-right">الإجمالي</th>
@@ -55,18 +72,18 @@ function ExchangeTable({ rows }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.exchange} className="border-t border-slate-100 dark:border-white/5">
-              <td className="px-3 py-2 font-medium">{row.exchange}</td>
+            <tr key={row.exchange} className={`border-t border-[var(--ob-border)] ${ob.rowHover}`}>
+              <td className={`px-3 py-2 font-medium ${ob.textStrong}`}>{row.exchange}</td>
               <td className="px-3 py-2">
                 <NumericValue>{formatUsd(row.total, { compact: true })}</NumericValue>
               </td>
-              <td className="px-3 py-2 text-rose-600 dark:text-rose-400">
+              <td className={`px-3 py-2 ${ob.negative}`}>
                 <NumericValue>{formatUsd(row.long, { compact: true })}</NumericValue>
               </td>
-              <td className="px-3 py-2 text-emerald-600 dark:text-emerald-400">
+              <td className={`px-3 py-2 ${ob.positive}`}>
                 <NumericValue>{formatUsd(row.short, { compact: true })}</NumericValue>
               </td>
-              <td className="px-3 py-2 text-left">
+              <td className={`px-3 py-2 text-left ${ob.textNormal}`}>
                 <NumericValue>{row.sharePercent != null ? `${row.sharePercent}%` : "—"}</NumericValue>
               </td>
             </tr>
@@ -83,9 +100,9 @@ function RealtimeTable({ rows }) {
   }
 
   return (
-    <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 [scrollbar-width:thin] dark:border-white/10">
+    <div className={`max-h-72 overflow-y-auto overflow-x-auto rounded-xl border [scrollbar-width:thin] ${ob.surfaceMuted}`}>
       <table className="w-full min-w-[560px] text-sm">
-        <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+        <thead className={`sticky top-0 z-10 text-[11px] ${ob.tableHeader} ${ob.textMuted}`}>
           <tr>
             <th className="px-3 py-2 text-right">الرمز</th>
             <th className="px-3 py-2 text-right">السعر</th>
@@ -96,28 +113,24 @@ function RealtimeTable({ rows }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-t border-slate-100 dark:border-white/5">
-              <td className="px-3 py-1.5 font-medium">{row.symbol || "—"}</td>
+          {rows.map((row, index) => (
+            <tr key={`${row.id ?? "liq"}-${index}`} className={`border-t border-[var(--ob-border)] ${ob.rowHover}`}>
+              <td className={`px-3 py-1.5 font-medium ${ob.textStrong}`}>{row.symbol || "—"}</td>
               <td className="px-3 py-1.5">
                 <NumericValue className="text-xs">{formatPrice(row.price)}</NumericValue>
               </td>
               <td className="px-3 py-1.5">
-                <NumericValue className="font-semibold">{formatUsd(row.notional, { compact: true })}</NumericValue>
+                <NumericValue className={`font-semibold ${ob.textStrong}`}>
+                  {formatUsd(row.notional, { compact: true })}
+                </NumericValue>
               </td>
               <td className="px-3 py-1.5">
-                <NumericValue className="text-xs">{formatTime(row.time)}</NumericValue>
+                <NumericValue className={`text-xs ${ob.textMuted}`}>{formatTime(row.time)}</NumericValue>
               </td>
               <td className="px-3 py-1.5">
-                {row.side === "long" ? (
-                  <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">Long</span>
-                ) : row.side === "short" ? (
-                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Short</span>
-                ) : (
-                  "—"
-                )}
+                <SideBadgeLabel side={row.side} />
               </td>
-              <td className="px-3 py-1.5 text-left text-xs">{row.exchange || "—"}</td>
+              <td className={`px-3 py-1.5 text-left text-xs ${ob.textMuted}`}>{row.exchange || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -144,13 +157,9 @@ export default function LiquidationsPanel({ data, initialLoading, isRefreshing, 
   const realtime = data?.realtime || [];
   const showStaleBadge = Boolean(data?.stale);
   const statusAction = showStaleBadge ? (
-    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-      بيانات قديمة
-    </span>
+    <span className={ob.badgeStale}>بيانات قديمة</span>
   ) : isRefreshing ? (
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
-      جاري التحديث...
-    </span>
+    <span className={ob.badgeRefreshing}>جاري التحديث...</span>
   ) : null;
 
   if (initialLoading && !hasData) {
@@ -159,7 +168,7 @@ export default function LiquidationsPanel({ data, initialLoading, isRefreshing, 
         <Panel title="تصفيات السوق" description="جاري تحميل بيانات التصفيات...">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+              <div key={index} className={`h-28 animate-pulse rounded-xl ${ob.surfaceMuted}`} />
             ))}
           </div>
         </Panel>
@@ -198,7 +207,7 @@ export default function LiquidationsPanel({ data, initialLoading, isRefreshing, 
 
       <Panel title="التصفيات في الوقت الفعلي" description="آخر أوامر التصفية الظاهرة على CoinGlass.">
         <RealtimeTable rows={realtime} />
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        <p className={`mt-3 text-xs ${ob.textMuted}`}>
           المصدر: البيانات العامة المتاحة من CoinGlass.
         </p>
       </Panel>

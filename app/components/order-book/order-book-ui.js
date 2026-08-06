@@ -4,6 +4,16 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { CLIENT_REGISTRY_RETRY_MS } from "../../../lib/market-data/dynamic-symbol-constants.js";
 import { formatMarketSymbol } from "../../../lib/market-data/symbols.js";
 import { formatCoveragePercent } from "../../../lib/market-data/history/window-utils.js";
+import { ob } from "./order-book-theme.js";
+
+const STAT_ICONS = {
+  spread: "↔",
+  buy: "▲",
+  sell: "▼",
+  flow: "⇄",
+  coverage: "◔",
+  default: "◆",
+};
 
 export function NumericValue({ children, className = "" }) {
   return (
@@ -13,18 +23,54 @@ export function NumericValue({ children, className = "" }) {
   );
 }
 
+export function ConnectionStatusBadge({ connectedCount, totalExchanges, probing }) {
+  const connected = Number(connectedCount) || 0;
+  const total = Number(totalExchanges) || 3;
+  const allConnected = connected >= total && !probing;
+  const partial = connected > 0 && connected < total;
+  const label = probing
+    ? "جاري التحقق من المنصات..."
+    : allConnected
+      ? `${connected}/${total} متصل`
+      : partial
+        ? `${connected}/${total} اتصال جزئي`
+        : "غير متصل";
+
+  const className = probing
+    ? ob.badgePartial
+    : allConnected
+      ? ob.badgeConnected
+      : partial
+        ? ob.badgePartial
+        : ob.badgeDisconnected;
+
+  return (
+    <span className={className} role="status" aria-live="polite">
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${
+          allConnected
+            ? ob.statusDotConnected
+            : partial
+              ? ob.statusDotWarning
+              : ob.statusDotDisconnected
+        }`}
+      />
+      {label}
+    </span>
+  );
+}
+
 export function Panel({ title, description, children, action, className = "", compact = false }) {
   return (
     <section
-      className={`min-w-0 overflow-x-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/80 ${
+      className={`min-w-0 overflow-x-hidden ${ob.surface} ${
         compact ? "p-3 sm:p-4" : "p-4 sm:p-5"
       } ${className}`}
     >
       <div className={`min-w-0 shrink-0 ${compact ? "mb-3" : "mb-4"}`}>
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
-        ) : null}
+        <h2 className={`${ob.subheading} text-lg`}>{title}</h2>
+        {description ? <p className={`mt-1 ${ob.body} ob-text-muted`}>{description}</p> : null}
         {action ? <div className="mt-3 w-full min-w-0 max-w-full">{action}</div> : null}
       </div>
       {children}
@@ -51,11 +97,9 @@ export function SegmentedControl({
 
   return (
     <div className={`flex min-w-0 max-w-full flex-col gap-1.5 ${className}`}>
-      {label ? (
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
-      ) : null}
+      {label ? <span className={ob.label}>{label}</span> : null}
       <div
-        className={`flex min-w-0 max-w-full rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/60 ${trackClass}`}
+        className={`${ob.segmentedTrack} ${trackClass}`}
         role="tablist"
         aria-label={ariaLabel || label}
       >
@@ -68,12 +112,10 @@ export function SegmentedControl({
               role="tab"
               aria-selected={active}
               onClick={() => onChange(option.value)}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-3 ${compact ? "py-1.5" : "py-2"} text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 sm:text-sm ${
-                active
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white"
-                  : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-              } ${option.tone === "buy" && active ? "ring-1 ring-emerald-500/30" : ""} ${
-                option.tone === "sell" && active ? "ring-1 ring-rose-500/30" : ""
+              className={`${ob.segmentedBtn} ${ob.focusRing} ${compact ? "py-1.5" : "py-2"} ${
+                active ? ob.segmentedActive : ob.segmentedIdle
+              } ${option.tone === "buy" && active ? ob.segmentedRingBuy : ""} ${
+                option.tone === "sell" && active ? ob.segmentedRingSell : ""
               }`}
             >
               {option.label}
@@ -88,14 +130,12 @@ export function SegmentedControl({
 export function StyledSelect({ label, value, onChange, options, compact = false }) {
   return (
     <label className={`flex min-w-0 flex-col gap-1.5 text-sm ${compact ? "min-w-[7rem]" : ""}`}>
-      {label ? (
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
-      ) : null}
+      {label ? <span className={ob.label}>{label}</span> : null}
       <div className="relative">
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-800 outline-none transition focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:focus-visible:ring-white/20"
+          className={`${ob.select} ${ob.focusRing}`}
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
@@ -105,7 +145,7 @@ export function StyledSelect({ label, value, onChange, options, compact = false 
         </select>
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${ob.textSubtle}`}
         >
           ▾
         </span>
@@ -310,7 +350,7 @@ export function SymbolSearchCombobox({
   return (
     <div ref={rootRef} className="relative min-w-0">
       <label className="flex min-w-0 flex-col gap-1.5 text-sm">
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
+        <span className={ob.label}>{label}</span>
         <div className="relative min-w-0">
           <input
             ref={inputRef}
@@ -331,7 +371,7 @@ export function SymbolSearchCombobox({
               setOpen(true);
             }}
             onKeyDown={onKeyDown}
-            className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm text-slate-800 outline-none transition focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:focus-visible:ring-white/20"
+            className={`${ob.input} pr-10 ${ob.focusRing}`}
           />
           {listLoading ? (
             <span className="pointer-events-none absolute left-8 top-1/2 -translate-y-1/2">
@@ -340,7 +380,7 @@ export function SymbolSearchCombobox({
           ) : null}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${ob.textSubtle}`}
           >
             ▾
           </span>
@@ -351,13 +391,15 @@ export function SymbolSearchCombobox({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-slate-900"
+          className={`absolute z-30 mt-1 max-h-56 w-full overflow-y-auto overscroll-contain rounded-xl border py-1 shadow-lg ob-surface ${ob.focusRing}`}
         >
           {listLoading && !filtered.length ? (
-            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">جاري البحث...</li>
+            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
+              جاري البحث...
+            </li>
           ) : null}
           {listUnavailable && !filtered.length ? (
-            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
+            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
               قائمة العملات غير متاحة مؤقتًا
             </li>
           ) : null}
@@ -374,10 +416,10 @@ export function SymbolSearchCombobox({
                 <li key={entry.value} role="option" aria-selected={entry.value === value}>
                   <button
                     type="button"
-                    className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-right text-sm transition ${
+                    className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-right text-sm transition motion-reduce:transition-none ${
                       active
-                        ? "bg-slate-100 text-slate-900 dark:bg-white/10 dark:text-white"
-                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+                        ? "bg-[var(--ob-accent-soft)] ob-text-strong"
+                        : `${ob.textNormal} hover:bg-[var(--ob-table-row-hover)]`
                     }`}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => selectEntry(entry)}
@@ -385,10 +427,10 @@ export function SymbolSearchCombobox({
                     <span className="min-w-0 text-right">
                       <span className="block font-medium">{entry.label}</span>
                       {entry.displayName ? (
-                        <span className="block text-xs text-slate-500 dark:text-slate-400">{entry.displayName}</span>
+                        <span className={`block text-xs ${ob.textMuted}`}>{entry.displayName}</span>
                       ) : null}
                     </span>
-                    <span dir="ltr" className="shrink-0 text-left tabular-nums text-xs text-slate-500 dark:text-slate-400">
+                    <span dir="ltr" className={`shrink-0 text-left tabular-nums text-xs ${ob.textMuted}`}>
                       {exchangeLabel || entry.value}
                     </span>
                   </button>
@@ -396,7 +438,7 @@ export function SymbolSearchCombobox({
               );
             })
           ) : !listLoading ? (
-            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">لا توجد نتائج</li>
+            <li className={`px-3 py-2 text-sm ${ob.textMuted}`}>لا توجد نتائج</li>
           ) : null}
         </ul>
       ) : null}
@@ -407,13 +449,7 @@ export function SymbolSearchCombobox({
 export function SideBadge({ side, variant = "bid" }) {
   const isBuy = variant === "bid" || side === "bid" || side === "buy";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        isBuy
-          ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
-          : "border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300"
-      }`}
-    >
+    <span className={isBuy ? ob.badgeBuy : ob.badgeSell}>
       {isBuy ? "شراء" : "بيع"}
     </span>
   );
@@ -426,9 +462,7 @@ export function CoverageBadge({ partial, coveragePercent, compact = false, force
   return (
     <span
       title="تمثل نسبة البيانات التاريخية المتوفرة لهذا الإطار الزمني."
-      className={`inline-flex items-center rounded-full border border-amber-200/80 bg-amber-50/90 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 ${
-        compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs"
-      }`}
+      className={`${ob.badgeCoverage} ${compact ? "px-2 py-0.5 text-[10px]" : ""}`}
     >
       التغطية <NumericValue className="mx-0.5">{label}%</NumericValue>
     </span>
@@ -439,7 +473,7 @@ export function RefreshSpinner({ className = "" }) {
   return (
     <span
       aria-hidden="true"
-      className={`inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-200 ${className}`}
+      className={`${ob.spinner} ${className}`}
     />
   );
 }
@@ -447,7 +481,7 @@ export function RefreshSpinner({ className = "" }) {
 export function DepthHistoryState({ loading, error, partial, coveragePercent, collecting, minHeight = "h-44 sm:h-48" }) {
   if (loading) {
     return (
-      <div className={`mb-3 flex ${minHeight} items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400`}>
+      <div className={`mb-3 flex ${minHeight} items-center justify-center rounded-xl text-sm ob-surface-muted ob-text-muted`} role="status" aria-live="polite">
         جاري تحميل جدران السيولة التاريخية...
       </div>
     );
@@ -455,7 +489,7 @@ export function DepthHistoryState({ loading, error, partial, coveragePercent, co
 
   if (error) {
     return (
-      <div className={`mb-3 flex ${minHeight} items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200`}>
+      <div className={`mb-3 flex ${minHeight} items-center justify-center rounded-xl border px-4 text-sm ${ob.alertError}`} role="alert">
         تعذّر تحميل بيانات السيولة التاريخية.
       </div>
     );
@@ -463,7 +497,7 @@ export function DepthHistoryState({ loading, error, partial, coveragePercent, co
 
   if (collecting && (!Number.isFinite(coveragePercent) || coveragePercent <= 0)) {
     return (
-      <p className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+      <p className={`mb-3 ${ob.badgeWarningCompact} border px-2.5 py-1.5`}>
         البيانات التاريخية قيد التجميع
       </p>
     );
@@ -492,7 +526,7 @@ export function HistoryState({
 }) {
   if (loading) {
     return (
-      <p className="mb-3 min-h-[2.5rem] rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+      <p className={`mb-3 min-h-[2.5rem] rounded-lg px-3 py-2 text-xs ${ob.alertInfo}`} role="status" aria-live="polite">
         جاري تحميل البيانات التاريخية...
       </p>
     );
@@ -500,7 +534,7 @@ export function HistoryState({
 
   if (error) {
     return (
-      <p className="mb-3 min-h-[2.5rem] rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+      <p className={`mb-3 min-h-[2.5rem] rounded-lg px-3 py-2 text-xs ${ob.alertError}`} role="alert">
         {errorMessage}
       </p>
     );
@@ -508,7 +542,7 @@ export function HistoryState({
 
   if (collecting) {
     return (
-      <p className="mb-3 min-h-[2.5rem] rounded-lg border border-amber-200/80 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+      <p className={`mb-3 min-h-[2.5rem] rounded-lg px-2.5 py-1.5 text-xs ${ob.alertWarning}`} role="status" aria-live="polite">
         جاري جمع البيانات التاريخية لهذا الرمز.
       </p>
     );
@@ -516,7 +550,7 @@ export function HistoryState({
 
   if (empty) {
     return (
-      <p className="mb-3 min-h-[2.5rem] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+      <p className={`mb-3 min-h-[2.5rem] rounded-lg px-3 py-2 text-xs ${ob.alertInfo}`} role="status">
         {emptyMessage}
       </p>
     );
@@ -535,15 +569,11 @@ export function HistoryState({
 
 export function MetricLine({ label, value, tone }) {
   const toneClass =
-    tone === "buy"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : tone === "sell"
-        ? "text-rose-600 dark:text-rose-400"
-        : "text-slate-900 dark:text-white";
+    tone === "buy" ? ob.positive : tone === "sell" ? ob.negative : ob.textStrong;
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm last:border-b-0 dark:border-white/5">
-      <span className="text-slate-600 dark:text-slate-300">{label}</span>
+    <div className={`flex items-center justify-between gap-3 border-b py-2 text-sm last:border-b-0 border-[var(--ob-border)]`}>
+      <span className={ob.textNormal}>{label}</span>
       <NumericValue className={`font-semibold ${toneClass}`}>{value}</NumericValue>
     </div>
   );
@@ -558,19 +588,19 @@ export function FlowSplitBar({ buyPercent = 0, sellPercent = 0 }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
+      <div className="flex h-2.5 overflow-hidden rounded-full bg-[var(--ob-surface-muted)]">
         <div
-          className="bg-emerald-500 transition-all dark:bg-emerald-500/90"
+          className={ob.depthBuy}
           style={{ width: `${buyWidth}%` }}
           aria-hidden="true"
         />
         <div
-          className="bg-rose-500 transition-all dark:bg-rose-500/90"
+          className={ob.depthSell}
           style={{ width: `${sellWidth}%` }}
           aria-hidden="true"
         />
       </div>
-      <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex justify-between text-xs ob-text-muted">
         <span>
           شراء <NumericValue>{buy.toFixed(1)}%</NumericValue>
         </span>
@@ -591,26 +621,29 @@ export function StatTile({
   partial,
   isRefreshing = false,
   initialLoading = false,
+  icon,
 }) {
   const toneClass =
-    tone === "buy"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : tone === "sell"
-        ? "text-rose-600 dark:text-rose-400"
-        : "text-slate-900 dark:text-white";
+    tone === "buy" ? ob.positive : tone === "sell" ? ob.negative : tone === "neutral" ? ob.neutral : ob.textStrong;
+
+  const iconGlyph =
+    icon || (tone === "buy" ? STAT_ICONS.buy : tone === "sell" ? STAT_ICONS.sell : STAT_ICONS.default);
 
   const showCoverage =
     partial && Number.isFinite(coveragePercent) && coveragePercent > 0 && coveragePercent < 99;
   const showSkeleton = initialLoading && (value == null || value === "");
 
   return (
-    <div className="flex h-full min-h-[7.5rem] min-w-0 flex-col rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/5">
+    <div className={ob.statTile}>
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-          {sublabel ? (
-            <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{sublabel}</p>
-          ) : null}
+        <div className="min-w-0 flex items-start gap-2">
+          <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm ${ob.surfaceMuted} ob-text-muted`} aria-hidden="true">
+            {iconGlyph}
+          </span>
+          <div className="min-w-0">
+            <p className={ob.label}>{label}</p>
+            {sublabel ? <p className={`mt-0.5 text-xs ${ob.textSubtle}`}>{sublabel}</p> : null}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {isRefreshing ? <RefreshSpinner /> : null}
@@ -619,7 +652,7 @@ export function StatTile({
       </div>
       <div className="mt-auto pt-2">
         {showSkeleton ? (
-          <div className="h-7 w-20 animate-pulse rounded-md bg-slate-200/80 dark:bg-white/10" />
+          <div className="h-7 w-20 animate-pulse rounded-md bg-[var(--ob-surface-muted)] motion-reduce:animate-none" />
         ) : (
           <p className={`text-xl font-bold sm:text-2xl ${toneClass}`}>
             <NumericValue>{value ?? "—"}</NumericValue>
@@ -632,11 +665,13 @@ export function StatTile({
 
 export function EmptyState({ message, icon = "◌" }) {
   return (
-    <div className="flex min-h-[8rem] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center dark:border-white/10">
-      <span className="mb-2 text-2xl text-slate-300 dark:text-slate-600" aria-hidden="true">
+    <div className={`flex min-h-[8rem] flex-col items-center justify-center rounded-xl border border-dashed px-4 py-8 text-center ob-surface-muted`}>
+      <span className={`mb-2 text-2xl ${ob.textSubtle}`} aria-hidden="true">
         {icon}
       </span>
-      <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">{message}</p>
+      <p className={`text-sm leading-6 ${ob.textMuted}`} role="status">
+        {message}
+      </p>
     </div>
   );
 }
@@ -644,7 +679,8 @@ export function EmptyState({ message, icon = "◌" }) {
 export function ChartPlaceholder({ message, minHeight = "h-44 sm:h-48" }) {
   return (
     <div
-      className={`flex ${minHeight} items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/30 dark:text-slate-400`}
+      className={`flex ${minHeight} items-center justify-center rounded-xl border border-dashed text-sm ob-surface-muted ob-text-muted`}
+      role="status"
     >
       {message}
     </div>

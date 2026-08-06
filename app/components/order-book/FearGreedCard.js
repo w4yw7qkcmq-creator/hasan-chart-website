@@ -9,6 +9,7 @@ import {
   fearGreedClassificationAr,
   fearGreedPointerPosition,
 } from "./fear-greed-gauge";
+import { ob } from "./order-book-theme";
 
 export { fearGreedClassificationAr, fearGreedPointerPosition } from "./fear-greed-gauge";
 
@@ -16,14 +17,19 @@ export const FEAR_GREED_REFRESH_MS = 15 * 60 * 1000;
 const ORDER_BOOK_FEAR_GREED_URL = "/api/market-sentiment/fear-greed?source=coinmarketcap";
 const LEGACY_FEAR_GREED_URL = "/api/market-sentiment/fear-greed";
 
-function SemicircleGauge({ value }) {
+function SemicircleGauge({ value, themed = false }) {
   const numericValue = Number(value);
   const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
   const pointer = fearGreedPointerPosition(safeValue);
   const label = fearGreedClassificationAr(safeValue);
 
+  const scoreClass = themed ? ob.textStrong : "font-bold";
+  const labelClass = themed ? ob.textMuted : "text-sm opacity-80";
+  const pointerFill = themed ? "var(--ob-text-strong)" : "currentColor";
+  const pointerStroke = themed ? "var(--ob-surface-elevated)" : "var(--ob-surface, #fff)";
+
   return (
-    <div className="relative mx-auto w-full max-w-[280px]">
+    <div className={`relative mx-auto w-full max-w-[280px] ${themed ? ob.textStrong : ""}`}>
       <svg viewBox="0 0 200 118" className="h-[7.5rem] w-full" role="img" aria-label="مؤشر الخوف والطمع">
         {FEAR_GREED_GAUGE_SEGMENTS.map((segment) => (
           <path
@@ -39,17 +45,15 @@ function SemicircleGauge({ value }) {
           cx={pointer.x}
           cy={pointer.y}
           r="5.5"
-          className="fill-slate-900 stroke-white stroke-[2px] transition-all duration-300 dark:fill-white dark:stroke-slate-900"
+          fill={pointerFill}
+          stroke={pointerStroke}
+          strokeWidth="2"
+          className="transition-all duration-300"
         />
-        <text
-          x="100"
-          y="88"
-          textAnchor="middle"
-          className="fill-slate-900 text-[2rem] font-bold dark:fill-white"
-        >
+        <text x="100" y="88" textAnchor="middle" fill={pointerFill} className={`text-[2rem] ${scoreClass}`}>
           {formatInteger(safeValue)}
         </text>
-        <text x="100" y="108" textAnchor="middle" className="fill-slate-600 text-sm dark:fill-slate-300">
+        <text x="100" y="108" textAnchor="middle" fill={themed ? "var(--ob-text-muted)" : "currentColor"} className={labelClass}>
           {label}
         </text>
       </svg>
@@ -161,8 +165,8 @@ export default function FearGreedCard({ variant = "default" }) {
   const numericValue = Number(value);
 
   const wrapperClass = isOrderBook
-    ? "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80 sm:p-5"
-    : "site-price-card rounded-2xl border border-slate-200/80 bg-white/90 p-5 dark:border-white/10 dark:bg-slate-900/70";
+    ? `${ob.surface} p-4 sm:p-5`
+    : "site-price-card rounded-2xl border p-5";
 
   const bodyHeightClass = isOrderBook ? "min-h-[11.5rem]" : "min-h-[8rem]";
 
@@ -170,14 +174,14 @@ export default function FearGreedCard({ variant = "default" }) {
     return (
       <div className={wrapperClass}>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">مؤشر الخوف والطمع</h3>
+          <h3 className={`text-lg font-bold ${ob.textStrong}`}>مؤشر الخوف والطمع</h3>
           {isRefreshing ? (
             <span
               aria-hidden="true"
-              className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-200"
+              className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--ob-border)] border-t-[var(--ob-text-strong)]"
             />
           ) : (
-            <span className="text-slate-400" aria-hidden="true">
+            <span className={ob.textSubtle} aria-hidden="true">
               ›
             </span>
           )}
@@ -185,21 +189,25 @@ export default function FearGreedCard({ variant = "default" }) {
 
         {initialLoading && !displayPayload?.current ? (
           <div className={`flex ${bodyHeightClass} flex-col items-center justify-center gap-2`}>
-            <div className="h-[7.5rem] w-full max-w-[280px] animate-pulse rounded-t-full bg-slate-100 dark:bg-white/5" />
-            <div className="h-4 w-24 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
+            <div className={`h-[7.5rem] w-full max-w-[280px] animate-pulse rounded-t-full ${ob.surfaceMuted}`} />
+            <div className={`h-4 w-24 animate-pulse rounded ${ob.surfaceMuted}`} />
           </div>
         ) : !displayPayload?.current ? (
-          <p className={`${bodyHeightClass} text-sm text-slate-500 dark:text-slate-400`}>
+          <p className={`${bodyHeightClass} text-sm ${ob.textMuted}`}>
             تعذّر تحميل مؤشر الخوف والطمع حاليًا.
           </p>
         ) : (
-          <SemicircleGauge value={numericValue} />
+          <SemicircleGauge value={numericValue} themed />
         )}
 
         {displayPayload?.staleNotice ? (
-          <p className="mt-2 text-center text-[10px] text-amber-700 dark:text-amber-300">
+          <p className={`mt-2 text-center text-[10px] ${ob.alertWarning} border-0 bg-transparent px-0 py-0`}>
             {displayPayload.staleNotice}
           </p>
+        ) : null}
+
+        {displayPayload?.attribution ? (
+          <p className={`mt-2 text-center text-[10px] ${ob.textSubtle}`}>{displayPayload.attribution}</p>
         ) : null}
       </div>
     );
@@ -213,7 +221,7 @@ export default function FearGreedCard({ variant = "default" }) {
           <h3 className="site-price-card__title mb-0">مؤشر الخوف والطمع</h3>
         </div>
         {displayPayload?.staleNotice ? (
-          <span className="rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-[10px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          <span className={ob.badgeWarningCompact}>
             {displayPayload.staleNotice}
           </span>
         ) : null}
@@ -221,18 +229,16 @@ export default function FearGreedCard({ variant = "default" }) {
 
       {initialLoading && !displayPayload?.current ? (
         <div className="flex min-h-[8rem] flex-col items-center justify-center gap-3">
-          <div className="h-24 w-full max-w-xs animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
-          <div className="h-4 w-32 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
+          <div className="h-24 w-full max-w-xs animate-pulse rounded-xl bg-black/5 dark:bg-black/20" />
+          <div className="h-4 w-32 animate-pulse rounded bg-black/5 dark:bg-black/20" />
         </div>
       ) : !displayPayload?.current ? (
-        <p className="min-h-[5rem] text-sm text-slate-500 dark:text-slate-400">
-          تعذّر تحميل المؤشر حاليًا
-        </p>
+        <p className="site-price-card__meta min-h-[5rem] text-sm">تعذّر تحميل المؤشر حاليًا</p>
       ) : (
         <>
           <div className="flex flex-col items-center gap-2">
             <SemicircleGauge value={numericValue} />
-            <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
+            <p className="site-price-card__value text-base font-semibold">
               {displayPayload.current.classificationAr || fearGreedClassificationAr(numericValue)}
             </p>
           </div>
@@ -256,7 +262,7 @@ export default function FearGreedCard({ variant = "default" }) {
           ) : null}
 
           {displayPayload.attribution ? (
-            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">{displayPayload.attribution}</p>
+            <p className="site-price-card__meta mt-4 text-xs">{displayPayload.attribution}</p>
           ) : null}
         </>
       )}

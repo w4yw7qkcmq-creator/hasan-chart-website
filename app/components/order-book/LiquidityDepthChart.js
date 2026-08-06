@@ -9,6 +9,7 @@ import {
   formatSpreadPercent,
   formatUsd,
 } from "./formatters";
+import { ob } from "./order-book-theme";
 import { ChartPlaceholder, DepthHistoryState, NumericValue } from "./order-book-ui";
 
 export const DEPTH_CHART_MIN_ROWS = 1;
@@ -100,8 +101,8 @@ function buildTooltipLines(point, mode, midPrice) {
 
 function ChartFrame({ fillContainer, children, className = "" }) {
   const shell = fillContainer
-    ? `flex ${CHART_SHELL_MIN} flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 dark:border-white/10 dark:bg-slate-950/40`
-    : `min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 dark:border-white/10 dark:bg-slate-950/40`;
+    ? `flex ${CHART_SHELL_MIN} flex-1 flex-col overflow-hidden ${ob.chartShell}`
+    : `min-w-0 overflow-hidden ${ob.chartShell}`;
   const inner = fillContainer ? "relative min-h-0 flex-1" : "relative";
 
   return (
@@ -241,23 +242,26 @@ export default function LiquidityDepthChart({
         />
       ) : null}
 
-      <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 text-xs">
+      <div className={`mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 text-xs ${ob.textNormal}`}>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-[var(--ob-chart-buy)]" aria-hidden="true" />
             شراء
           </span>
-          <span className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-            <span className="h-2.5 w-2.5 rounded-sm bg-rose-500" />
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-[var(--ob-chart-sell)]" aria-hidden="true" />
             بيع
           </span>
-          <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-            <span className="h-px w-3 border-t border-dashed border-slate-400 dark:border-slate-500" />
+          <span className={`inline-flex items-center gap-1.5 ${ob.textMuted}`}>
+            <span
+              className="h-px w-3 border-t border-dashed border-[var(--ob-chart-axis)]"
+              aria-hidden="true"
+            />
             السعر الحالي
           </span>
         </div>
-        <span className="rounded-lg bg-slate-100 px-2 py-1 text-slate-600 dark:bg-white/5 dark:text-slate-300">
-          <NumericValue className="font-semibold text-slate-800 dark:text-slate-100">
+        <span className={`rounded-lg px-2 py-1 ${ob.surfaceMuted}`}>
+          <NumericValue className={`font-semibold ${ob.textStrong}`}>
             {formatPrice(midPrice)}
           </NumericValue>
         </span>
@@ -280,15 +284,15 @@ export default function LiquidityDepthChart({
                   y1={y}
                   x2={VIEW_WIDTH - MARGIN.right}
                   y2={y}
-                  stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-700/80"
+                  stroke="var(--ob-chart-grid)"
                   strokeDasharray="3 4"
                 />
                 <text
                   x={MARGIN.left - 6}
                   y={y + 3}
                   textAnchor="end"
-                  className="fill-slate-400 text-[9px] dark:fill-slate-500"
+                  fill="var(--ob-chart-axis)"
+                  className="text-[9px]"
                 >
                   {formatUsd(tickValue, { compact: true })}
                 </text>
@@ -301,8 +305,7 @@ export default function LiquidityDepthChart({
             y1={BASELINE_Y}
             x2={VIEW_WIDTH - MARGIN.right}
             y2={BASELINE_Y}
-            stroke="currentColor"
-            className="text-slate-300 dark:text-slate-600"
+            stroke="var(--ob-chart-axis)"
           />
 
           <line
@@ -310,14 +313,13 @@ export default function LiquidityDepthChart({
             y1={MARGIN.top - 4}
             x2={chartModel.midX}
             y2={BASELINE_Y + 4}
-            stroke="currentColor"
-            className="text-slate-400 dark:text-slate-500"
+            stroke="var(--ob-chart-axis)"
             strokeDasharray="4 3"
           />
 
           {chartModel.bars.map((bar) => {
             const isBid = bar.point.side === "bid";
-            const fill = isBid ? "#10b981" : "#f43f5e";
+            const fill = isBid ? "var(--ob-chart-buy)" : "var(--ob-chart-sell)";
             const opacity =
               0.35 +
               sqrtScale(Number(bar.point.notional) || 0, chartModel.maxNotional) * 0.6;
@@ -349,7 +351,8 @@ export default function LiquidityDepthChart({
                 x={x}
                 y={VIEW_HEIGHT - 10}
                 textAnchor="middle"
-                className="fill-slate-500 text-[9px] dark:fill-slate-400"
+                fill="var(--ob-chart-axis)"
+                className="text-[9px]"
               >
                 {formatPrice(tickPrice, tickPrice >= 1000 ? 0 : 2)}
               </text>
@@ -359,7 +362,7 @@ export default function LiquidityDepthChart({
 
         {hovered ? (
           <div
-            className="pointer-events-none absolute bottom-2 left-2 z-10 max-w-[min(100%,16rem)] rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[11px] leading-5 text-slate-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200"
+            className={`pointer-events-none absolute bottom-2 left-2 z-10 max-w-[min(100%,16rem)] ${ob.chartTooltip}`}
             dir="rtl"
           >
             {buildTooltipLines(hovered, mode, midPrice).map((line) => (
@@ -371,7 +374,7 @@ export default function LiquidityDepthChart({
         ) : null}
       </ChartFrame>
 
-      <p className="mt-1 shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
+      <p className={`mt-1 shrink-0 text-[10px] ${ob.textSubtle}`}>
         {chartModel.bids.length} مستوى شراء · {chartModel.asks.length} مستوى بيع · مقياس sqrt
       </p>
     </div>

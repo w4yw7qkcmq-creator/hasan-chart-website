@@ -11,6 +11,7 @@ import {
   formatQuantity,
   formatUsd,
 } from "./formatters";
+import { ob } from "./order-book-theme";
 import {
   CoverageBadge,
   EmptyState,
@@ -61,34 +62,34 @@ function AnalyticsCard({ label, hint, row }) {
     <div
       className={`flex h-full min-h-[8.5rem] flex-col rounded-xl border p-3 sm:p-4 ${
         isBuy
-          ? "border-emerald-200/80 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-          : "border-rose-200/80 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-950/20"
+          ? "border-[var(--ob-positive-border)] bg-[var(--ob-positive-soft)]"
+          : "border-[var(--ob-negative-border)] bg-[var(--ob-negative-soft)]"
       }`}
       title={hint}
     >
-      <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</p>
+      <p className={`text-xs font-medium ${ob.textMuted}`}>{label}</p>
       <div className="mt-2 flex flex-1 flex-col justify-end gap-1.5 text-sm">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400">السعر</span>
-          <NumericValue className="font-bold text-slate-900 dark:text-white">
+          <span className={`text-xs ${ob.textSubtle}`}>السعر</span>
+          <NumericValue className={`font-bold ${ob.textStrong}`}>
             {formatPrice(row.price)}
           </NumericValue>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400">الاتجاه</span>
+          <span className={`text-xs ${ob.textSubtle}`}>الاتجاه</span>
           <SideBadge side={row.side} />
         </div>
         {Number.isFinite(row.notional) ? (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400">القيمة</span>
-            <NumericValue className="font-semibold text-slate-900 dark:text-white">
+            <span className={`text-xs ${ob.textSubtle}`}>القيمة</span>
+            <NumericValue className={`font-semibold ${ob.textStrong}`}>
               {formatUsd(row.notional, { compact: true })}
             </NumericValue>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400">الثبات</span>
-            <NumericValue className={`font-semibold ${isBuy ? "text-emerald-600" : "text-rose-600"}`}>
+            <span className={`text-xs ${ob.textSubtle}`}>الثبات</span>
+            <NumericValue className={`font-semibold ${isBuy ? ob.positive : ob.negative}`}>
               {Math.round(row.persistenceScore)}%
             </NumericValue>
           </div>
@@ -141,14 +142,14 @@ function WallsTable({ rows, showLastSeen = false, usingFallback = false }) {
   return (
     <div>
       {usingFallback ? (
-        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+        <p className={`mb-3 text-xs ${ob.textMuted}`}>
           لا توجد نتائج في هذا التبويب حاليًا — يُعرض أفضل ما هو متاح من بقية السجل.
         </p>
       ) : null}
       <div className="hidden overflow-x-auto md:block">
-        <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-200 dark:border-white/10">
+        <div className={`max-h-80 overflow-y-auto rounded-xl border ${ob.surfaceMuted}`}>
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+            <thead className={`text-xs ${ob.tableHeader} ${ob.textMuted}`}>
               <tr>
                 <th className="px-3 py-2.5 text-right">الاتجاه</th>
                 <th className="px-3 py-2.5 text-right">السعر</th>
@@ -165,7 +166,7 @@ function WallsTable({ rows, showLastSeen = false, usingFallback = false }) {
               {visibleRows.map((row) => (
                 <tr
                   key={row.wallKey}
-                  className="border-t border-slate-100 transition hover:bg-slate-50/80 dark:border-white/5 dark:hover:bg-white/5"
+                  className={`border-t border-[var(--ob-border)] ${ob.rowHover}`}
                 >
                   <td className="px-3 py-2.5">
                     <SideBadge side={row.side} />
@@ -188,7 +189,7 @@ function WallsTable({ rows, showLastSeen = false, usingFallback = false }) {
                   </td>
                   <td className="px-3 py-2.5">{EXCHANGE_LABELS[row.exchange] || row.exchange}</td>
                   {showLastSeen ? (
-                    <td className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                    <td className={`px-3 py-2.5 text-xs ${ob.textMuted}`}>
                       {formatMinutesAgoAr(row.lastSeen)}
                     </td>
                   ) : null}
@@ -207,40 +208,44 @@ function WallsTable({ rows, showLastSeen = false, usingFallback = false }) {
               key={row.wallKey}
               className={`rounded-xl border p-3 ${
                 isBuy
-                  ? "border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900/30 dark:bg-emerald-950/15"
-                  : "border-rose-200/70 bg-rose-50/40 dark:border-rose-900/30 dark:bg-rose-950/15"
+                  ? "border-[var(--ob-positive-border)] bg-[var(--ob-positive-soft)]"
+                  : "border-[var(--ob-negative-border)] bg-[var(--ob-negative-soft)]"
               }`}
             >
               <div className="mb-2 flex items-center justify-between">
                 <SideBadge side={row.side} />
-                <span className="text-xs text-slate-500">{EXCHANGE_LABELS[row.exchange] || row.exchange}</span>
+                <span className={`text-xs ${ob.textMuted}`}>
+                  {EXCHANGE_LABELS[row.exchange] || row.exchange}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <span className="text-slate-500">السعر</span>
-                  <p className="font-semibold">
+                  <span className={ob.textSubtle}>السعر</span>
+                  <p className={`font-semibold ${ob.textStrong}`}>
                     <NumericValue>{formatPrice(row.price)}</NumericValue>
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-500">الثبات</span>
-                  <p className="font-semibold">
+                  <span className={ob.textSubtle}>الثبات</span>
+                  <p className={`font-semibold ${ob.textStrong}`}>
                     <NumericValue>{Math.round(row.persistenceScore)}%</NumericValue>
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-500">مدة البقاء</span>
-                  <p>{formatDurationAr(row.lifetimeSeconds)}</p>
+                  <span className={ob.textSubtle}>مدة البقاء</span>
+                  <p className={ob.textNormal}>{formatDurationAr(row.lifetimeSeconds)}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">مرات الظهور</span>
-                  <p>
+                  <span className={ob.textSubtle}>مرات الظهور</span>
+                  <p className={ob.textNormal}>
                     <NumericValue>{row.appearanceCount}</NumericValue>
                   </p>
                 </div>
               </div>
               {showLastSeen ? (
-                <p className="mt-2 text-xs text-slate-500">آخر ظهور: {formatMinutesAgoAr(row.lastSeen)}</p>
+                <p className={`mt-2 text-xs ${ob.textMuted}`}>
+                  آخر ظهور: {formatMinutesAgoAr(row.lastSeen)}
+                </p>
               ) : null}
             </div>
           );
@@ -251,7 +256,7 @@ function WallsTable({ rows, showLastSeen = false, usingFallback = false }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-3 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 dark:text-slate-300 dark:hover:bg-white/5"
+          className={`mt-3 rounded-lg px-3 py-1.5 text-xs font-medium ${ob.segmentedIdle} ${ob.focusRing}`}
         >
           {expanded ? "عرض أقل" : `عرض المزيد (${Math.min(rows.length, EXPANDED_VISIBLE) - DEFAULT_VISIBLE}+)`}
         </button>
@@ -302,13 +307,9 @@ export default function HistoricalLiquidityWallsPanel({
       action={
         <div className="flex flex-wrap items-center gap-2">
           {displayHistory?.stale && !isShowingPreviousWindow ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-              بيانات قديمة
-            </span>
+            <span className={ob.badgeStale}>بيانات قديمة</span>
           ) : isRefreshing && !isShowingPreviousWindow ? (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
-              جاري التحديث...
-            </span>
+            <span className={ob.badgeRefreshing}>جاري التحديث...</span>
           ) : null}
           <SegmentedControl
             compact
@@ -323,9 +324,9 @@ export default function HistoricalLiquidityWallsPanel({
       }
       className="col-span-full"
     >
-      <details className="mb-4 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-        <summary className="cursor-pointer font-medium">ما المقصود بالجدار؟</summary>
-        <ul className="mt-2 list-disc space-y-1 pr-4 leading-6">
+      <details className={`mb-4 rounded-xl border px-3 py-2 text-xs ${ob.surfaceMuted} ${ob.textNormal}`}>
+        <summary className={`cursor-pointer font-medium ${ob.textStrong}`}>ما المقصود بالجدار؟</summary>
+        <ul className={`mt-2 list-disc space-y-1 pr-4 leading-6 ${ob.textMuted}`}>
           <li>الجدار المستمر: مستوى سيولة بقي ظاهرًا لفترة طويلة.</li>
           <li>مرات الظهور: عدد المرات التي سُجّل فيها الجدار.</li>
           <li>مدة البقاء: الزمن بين أول وآخر ظهور.</li>
@@ -334,19 +335,19 @@ export default function HistoricalLiquidityWallsPanel({
       </details>
 
       {showInitialLoading ? (
-        <p className="mb-4 min-h-[2.5rem] rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+        <p className={`mb-4 min-h-[2.5rem] ${ob.alertInfo}`}>
           جاري تحميل بيانات إطار {selectedWindow}...
         </p>
       ) : null}
 
       {!showInitialLoading && error && !displayHistory ? (
-        <p className="mb-4 min-h-[2.5rem] rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+        <p className={`mb-4 min-h-[2.5rem] ${ob.alertError}`}>
           تعذر تحميل البيانات التاريخية. حاول تحديث الإطار أو أعد المحاولة لاحقًا.
         </p>
       ) : null}
 
       {refreshError && displayHistory ? (
-        <p className="mb-4 min-h-[2.5rem] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+        <p className={`mb-4 min-h-[2.5rem] ${ob.alertWarning}`}>
           تعذّر تحديث بيانات هذا الإطار. يتم عرض آخر بيانات ناجحة.
         </p>
       ) : null}
@@ -355,23 +356,23 @@ export default function HistoricalLiquidityWallsPanel({
         <div className="mb-4 space-y-2">
           {isShowingPreviousWindow ? (
             <>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className={`text-[11px] ${ob.textMuted}`}>
                 الإطار المطلوب:{" "}
-                <NumericValue className="font-medium text-slate-700 dark:text-slate-200">
+                <NumericValue className={`font-medium ${ob.textStrong}`}>
                   {selectedFrameLabel}
                 </NumericValue>
               </p>
-              <span className="inline-flex items-center rounded-full border border-sky-200/80 bg-sky-50/90 px-2.5 py-1 text-[11px] text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-100">
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] ${ob.alertInfo}`}>
                 يعرض مؤقتًا بيانات {displayedFrameLabel}
               </span>
-              <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+              <p className={`text-[11px] leading-5 ${ob.textMuted}`}>
                 البيانات المعروضة من الإطار السابق حتى اكتمال التحديث.
               </p>
             </>
           ) : (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className={`text-[11px] ${ob.textMuted}`}>
               الإطار الحالي:{" "}
-              <NumericValue className="font-medium text-slate-700 dark:text-slate-200">
+              <NumericValue className={`font-medium ${ob.textStrong}`}>
                 {displayedFrameLabel}
               </NumericValue>
               {Number.isFinite(displayHistory.totalCount) ? (
@@ -389,7 +390,7 @@ export default function HistoricalLiquidityWallsPanel({
             coveragePercent={displayHistory.coveragePercent}
           />
           {!isShowingPreviousWindow ? (
-            <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+            <p className={`text-[11px] leading-5 ${ob.textMuted}`}>
               قد تبقى أسعار الجدران متطابقة بين الإطارات إذا كان نفس الجدار هو الأقوى خلالها.
             </p>
           ) : null}
@@ -406,9 +407,9 @@ export default function HistoricalLiquidityWallsPanel({
           {showRefreshOverlay ? (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-white/55 backdrop-blur-[1px] dark:bg-slate-950/45"
+              className={`${ob.overlayScrim} flex items-center justify-center rounded-xl`}
             >
-              <p className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-200">
+              <p className={ob.overlayPanel}>
                 جاري تحميل بيانات إطار {selectedFrameLabel}...
               </p>
             </div>
@@ -424,14 +425,11 @@ export default function HistoricalLiquidityWallsPanel({
         options={WALL_TABS.map((tab) => ({ value: tab.id, label: tab.label }))}
       />
 
-      <p className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{currentTab.hint}</p>
+      <p className={`mt-3 text-xs leading-6 ${ob.textMuted}`}>{currentTab.hint}</p>
 
       <div className="relative mt-4">
         {showRefreshOverlay ? (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/40 backdrop-blur-[1px] dark:bg-slate-950/35"
-          />
+          <div aria-hidden="true" className={`${ob.overlayScrim} z-10 rounded-xl`} />
         ) : null}
         {!showInitialLoading && !(error && !displayHistory) && !rows.length && !analytics.length ? (
           <EmptyState message="لا توجد جدران تاريخية ضمن الإطار المختار بعد." />
