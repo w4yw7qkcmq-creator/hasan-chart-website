@@ -31,7 +31,9 @@ export const injAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["inj", "injective", "إينجكتيف", "injusdt"] },
+  analysis: {
+    keywords: ["inj", "injective", "إينجكتيف", "injusdt"],
+  },
   faq: [
     {
       q: "ما هو Injective (INJ)؟",
@@ -55,30 +57,10 @@ export const injAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "ATOM",
-      name: "كوزموس",
-      description: "شبكة Interchain مرتبطة.",
-      href: "/atom",
-    },
-    {
-      symbol: "UNI",
-      name: "يونيسواب",
-      description: "بروتوكول DEX.",
-      href: "/uni",
-    },
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "منصة DeFi الرائدة.",
-      href: "/eth",
-    },
-    {
-      symbol: "SOL",
-      name: "سولانا",
-      description: "بلوكتشين عالي الأداء.",
-      href: "/sol",
-    },
+    { symbol: "ATOM", name: "كوزموس", description: "شبكة Interchain مرتبطة.", href: "/atom" },
+    { symbol: "UNI", name: "يونيسواب", description: "بروتوكول DEX.", href: "/uni" },
+    { symbol: "ETH", name: "الإيثيريوم", description: "منصة DeFi الرائدة.", href: "/eth" },
+    { symbol: "SOL", name: "سولانا", description: "بلوكتشين عالي الأداء.", href: "/sol" },
   ],
   links: {
     internal: [
@@ -129,14 +111,7 @@ export const injAssetConfig = {
     title: "HasaN CharT World | إينجكتيف INJ — مركز المعلومات",
     description:
       "مركز معلومات Injective: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات INJ، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "إينجكتيف",
-      "INJ",
-      "Injective",
-      "DeFi",
-      "سعر INJ",
-    ],
+    keywords: ["HasaN CharT World", "إينجكتيف", "INJ", "Injective", "DeFi", "سعر INJ"],
   },
   jsonLd: {
     productName: "Injective",

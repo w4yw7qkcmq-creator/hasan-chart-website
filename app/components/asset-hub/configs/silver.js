@@ -31,7 +31,9 @@ export const silverAssetConfig = {
     tagHref: "/news/tag/commodities",
     archiveLabel: "أرشيف أخبار السلع",
   },
-  analysis: { keywords: ["silver", "xag", "xagusd", "فضة"] },
+  analysis: {
+    keywords: ["silver", "xag", "xagusd", "فضة"],
+  },
   faq: [
     {
       q: "ما هو تداول الفضة (XAG)؟",
@@ -55,30 +57,10 @@ export const silverAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "XAU",
-      name: "الذهب",
-      description: "المعدن الثمين المرجعي — مركز XAU.",
-      href: "/xau",
-    },
-    {
-      symbol: "OIL",
-      name: "النفط الأمريكي",
-      description: "سلعة طاقة WTI — مركز USOIL.",
-      href: "/usoil",
-    },
-    {
-      symbol: "FX",
-      name: "الفوركس",
-      description: "الدولار يؤثر على أسعار المعادن.",
-      href: "/forex",
-    },
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "أصل رقمي مرتبط بمعنويات المخاطرة.",
-      href: "/btc",
-    },
+    { symbol: "XAU", name: "الذهب", description: "المعدن الثمين المرجعي — مركز XAU.", href: "/xau" },
+    { symbol: "OIL", name: "النفط الأمريكي", description: "سلعة طاقة WTI — مركز USOIL.", href: "/usoil" },
+    { symbol: "FX", name: "الفوركس", description: "الدولار يؤثر على أسعار المعادن.", href: "/forex" },
+    { symbol: "BTC", name: "البيتكوين", description: "أصل رقمي مرتبط بمعنويات المخاطرة.", href: "/btc" },
   ],
   links: {
     internal: [

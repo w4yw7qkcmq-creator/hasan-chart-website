@@ -1,4 +1,5 @@
 "use client";
+
 import dynamic from "next/dynamic";
 import { memo, useEffect, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
@@ -6,95 +7,76 @@ import { createPriceAlert } from "../../lib/price-alert-create-client";
 import { useAppModal } from "../components/AppModalProvider";
 import { useAuth } from "../components/AuthProvider";
 import { HomeMarketPulsePanel } from "../components/home/HomeMarketPulsePanel";
-import { ui } from "../components/ui/ui-theme";
 import { useVisibilityRefresh } from "../hooks/useVisibilityRefresh";
+
 const HomeMarketWindowsSection = dynamic(
   () =>
     import("../components/market/HomeMarketWindowsSection").then(
-      (mod) => mod.HomeMarketWindowsSection,
+      (mod) => mod.HomeMarketWindowsSection
     ),
   {
     ssr: false,
     loading: () => (
-      <section
-        id="market-windows"
-        className="site-market-windows-shell w-full"
-        aria-busy="true"
-        aria-live="polite"
-      >
-        {" "}
-        <h2 className="sectionTitle text-center lg:text-right">
-          نوافذ السوق السريعة
-        </h2>{" "}
+      <section id="market-windows" className="w-full" aria-busy="true" aria-live="polite">
+        <h2 className="sectionTitle text-center lg:text-right">نوافذ السوق السريعة</h2>
         <div className="market-windows-grid grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 w-full">
-          {" "}
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className={ui.homeSkeletonCard} />
-          ))}{" "}
-        </div>{" "}
+            <div
+              key={index}
+              className="site-price-card site-price-card--tv min-h-[220px] animate-pulse rounded-2xl border border-white/10 bg-white/5"
+            />
+          ))}
+        </div>
       </section>
     ),
-  },
+  }
 );
+
 const HomeLivePricesSection = dynamic(
   () =>
-    import("../components/market/HomeLivePricesSection").then(
-      (mod) => mod.HomeLivePricesSection,
-    ),
+    import("../components/market/HomeLivePricesSection").then((mod) => mod.HomeLivePricesSection),
   {
     ssr: false,
     loading: () => (
-      <section
-        id="prices"
-        className="w-full"
-        aria-busy="true"
-        aria-live="polite"
-      >
-        {" "}
-        <h2 className="sectionTitle text-center lg:text-right">
-          الأسعار المباشرة
-        </h2>{" "}
+      <section id="prices" className="w-full" aria-busy="true" aria-live="polite">
+        <h2 className="sectionTitle text-center lg:text-right">الأسعار المباشرة</h2>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 w-full">
-          {" "}
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className={ui.homeSkeletonCard} />
-          ))}{" "}
-        </div>{" "}
+            <div
+              key={index}
+              className="site-price-card site-price-card--tv min-h-[220px] animate-pulse rounded-2xl border border-white/10 bg-white/5"
+            />
+          ))}
+        </div>
       </section>
     ),
-  },
+  }
 );
+
 const LiveChartSection = dynamic(
-  () =>
-    import("../components/market/LiveChartSection").then(
-      (mod) => mod.LiveChartSection,
-    ),
+  () => import("../components/market/LiveChartSection").then((mod) => mod.LiveChartSection),
   {
     ssr: false,
     loading: () => (
       <section id="chart" className="site-live-chart-section w-full">
-        {" "}
-        <div className={ui.homeChartLoading}>جاري تحميل الشارت...</div>{" "}
+        <div className="site-live-chart-panel glassPanel p-8 text-center text-sm text-slate-300">
+          جاري تحميل الشارت...
+        </div>
       </section>
     ),
-  },
+  }
 );
+
 const MARKET_WINDOWS = [
   { title: "BTC.D", label: "استحواذ البيتكوين", symbol: "CRYPTOCAP:BTC.D" },
   { title: "USDT.D", label: "استحواذ الدولار", symbol: "CRYPTOCAP:USDT.D" },
   { title: "USDT", label: "Market Cap USDT", symbol: "CRYPTOCAP:USDT" },
-  {
-    title: "OTHERS.D",
-    label: "استحواذ العملات باستثناء التوب 10",
-    symbol: "CRYPTOCAP:OTHERS.D",
-  },
-  {
-    title: "OTHERS",
-    label: "القيمة السوقية للعملات باستثناء توب 10",
-    symbol: "CRYPTOCAP:OTHERS",
-  },
+  { title: "OTHERS.D", label: "استحواذ العملات باستثناء التوب 10", symbol: "CRYPTOCAP:OTHERS.D" },
+  { title: "OTHERS", label: "القيمة السوقية للعملات باستثناء توب 10", symbol: "CRYPTOCAP:OTHERS" },
 ];
+
 const MARKET_WINDOW_WIDGET_HEIGHT = "136";
+
 const ANALYSIS_FRAME_SUGGESTIONS = [
   { value: "4h", label: "4 ساعات", hint: "4h / 4 hours / أربع ساعات" },
   { value: "12h", label: "12 ساعة", hint: "12h / 12 hours / 12 ساعة" },
@@ -106,10 +88,24 @@ const ANALYSIS_FRAME_SUGGESTIONS = [
   { value: "2M", label: "شهرين", hint: "2M / 2 months / شهرين" },
   { value: "1y", label: "سنة", hint: "1y / 1 year / سنة" },
 ];
+
+const withTimeout = (promise, ms, message = "REQUEST_TIMEOUT") => {
+  let timeoutId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+};
+
 export default function HomePageClient({ heroCopy }) {
   const { showAppModal } = useAppModal();
   const { authResolved, user } = useAuth();
   const [activeNotice, setActiveNotice] = useState("");
+
   const [analysisCoin, setAnalysisCoin] = useState("");
   const [analysisFrame, setAnalysisFrame] = useState("");
   const [analysisCooldownText, setAnalysisCooldownText] = useState("");
@@ -122,39 +118,50 @@ export default function HomePageClient({ heroCopy }) {
   const [chartSearch, setChartSearch] = useState("BTCUSDT");
   const [chartInterval, setChartInterval] = useState("15");
   const [chartSearchError, setChartSearchError] = useState("");
+
   const getCooldownMessage = (createdAt) => {
     if (!createdAt) return { blocked: false, text: "" };
+
     const dayMs = 24 * 60 * 60 * 1000;
     const lastRequestTime = new Date(createdAt).getTime();
     const remainingMs = dayMs - (Date.now() - lastRequestTime);
+
     if (remainingMs <= 0) return { blocked: false, text: "" };
+
     const hours = Math.floor(remainingMs / (1000 * 60 * 60));
     const minutes = Math.ceil((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+
     return {
       blocked: true,
       text: `يمكنك إرسال طلب تحليل جديد بعد ${hours} ساعة و ${minutes} دقيقة`,
     };
   };
+
   const refreshAnalysisCooldown = async (user) => {
     if (!user?.email) {
       setCanRequestAnalysis(false);
       setAnalysisCooldownText("");
       return;
     }
+
     setCanRequestAnalysis(false);
+
     try {
       const response = await fetchWithTimeout(
         `/api/analysis-request?email=${encodeURIComponent(user.email)}`,
-        { method: "GET", cache: "no-store" },
-        5000,
+        {
+          method: "GET",
+          cache: "no-store",
+        },
+        5000
       );
+
       const result = await response.json().catch(() => null);
+
       if (!response.ok || !result?.success) {
-        throw new Error(
-          result?.error ||
-            `فشل التحقق من مدة الانتظار. كود الخطأ: ${response.status}`,
-        );
+        throw new Error(result?.error || `فشل التحقق من مدة الانتظار. كود الخطأ: ${response.status}`);
       }
+
       setCanRequestAnalysis(!result.blocked);
       setAnalysisCooldownText(result.text || "");
     } catch (err) {
@@ -163,18 +170,26 @@ export default function HomePageClient({ heroCopy }) {
       setAnalysisCooldownText("");
     }
   };
+
   useEffect(() => {
     if (!authResolved) return;
     void refreshAnalysisCooldown(user);
   }, [authResolved, user?.email]);
+
   useVisibilityRefresh(() => refreshAnalysisCooldown(user), {
     enabled: authResolved,
     intervalMs: 60000,
     refreshOnVisible: false,
     refreshOnFocus: false,
   });
+
+  const checkUserAlerts = () => {
+    return;
+  };
+
   const requireLogin = () => {
     const user = JSON.parse(localStorage.getItem("currentUser") || "null");
+
     if (!user) {
       showAppModal({
         type: "warning",
@@ -184,14 +199,19 @@ export default function HomePageClient({ heroCopy }) {
       window.location.href = "/login";
       return null;
     }
+
     return user;
   };
+
   const submitAnalysis = async () => {
     if (analysisSubmitting) return;
+
     const user = requireLogin();
     if (!user) return;
+
     const cleanCoin = analysisCoin.trim().toUpperCase();
     const cleanFrame = analysisFrame.trim();
+
     if (!cleanCoin || !cleanFrame) {
       showAppModal({
         type: "warning",
@@ -200,20 +220,25 @@ export default function HomePageClient({ heroCopy }) {
       });
       return;
     }
+
     if (!canRequestAnalysis) {
       setAnalysisCooldownText(
-        analysisCooldownText ||
-          "يمكنك إرسال طلب تحليل جديد بعد انتهاء مدة الانتظار",
+        analysisCooldownText || "يمكنك إرسال طلب تحليل جديد بعد انتهاء مدة الانتظار"
       );
       return;
     }
+
     setAnalysisSubmitting(true);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 9000);
+
     try {
       const response = await fetch("/api/analysis-request", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         signal: controller.signal,
         body: JSON.stringify({
           user_email: user.email,
@@ -222,7 +247,9 @@ export default function HomePageClient({ heroCopy }) {
           frame: cleanFrame,
         }),
       });
+
       const result = await response.json().catch(() => null);
+
       if (!response.ok || !result?.success) {
         if (response.status === 429 && result?.error) {
           setCanRequestAnalysis(false);
@@ -234,15 +261,12 @@ export default function HomePageClient({ heroCopy }) {
           });
           return;
         }
-        throw new Error(
-          result?.error ||
-            `فشل إرسال طلب التحليل. كود الخطأ: ${response.status}`,
-        );
+
+        throw new Error(result?.error || `فشل إرسال طلب التحليل. كود الخطأ: ${response.status}`);
       }
+
       setCanRequestAnalysis(false);
-      setAnalysisCooldownText(
-        "يمكنك إرسال طلب تحليل جديد بعد 24 ساعة و 0 دقيقة",
-      );
+      setAnalysisCooldownText("يمكنك إرسال طلب تحليل جديد بعد 24 ساعة و 0 دقيقة");
       await refreshAnalysisCooldown(user);
       setAnalysisCoin("");
       setAnalysisFrame("");
@@ -266,32 +290,45 @@ export default function HomePageClient({ heroCopy }) {
       setAnalysisSubmitting(false);
     }
   };
+
   const applyChartSearch = async () => {
     const { warmupBybitNetwork } = await import("../../lib/bybit-network");
     warmupBybitNetwork();
+
     let symbol = String(chartSearch || "")
       .toUpperCase()
       .trim()
       .replace(/[^A-Z0-9]/g, "");
+
     if (!symbol) {
       setChartSearchError("اكتب رمز العملة أولاً مثل BTC أو BTCUSDT");
       return;
     }
+
     if (!symbol.endsWith("USDT")) {
       symbol = `${symbol}USDT`;
     }
+
     setChartSearchError("");
+
     try {
       const response = await fetch(
         `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(symbol)}`,
-        { headers: { Accept: "application/json" } },
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        }
       );
+
       const data = await response.json().catch(() => null);
       const foundPrice = Number(data?.result?.list?.[0]?.lastPrice);
+
       if (!response.ok || data?.retCode !== 0 || !Number.isFinite(foundPrice)) {
         setChartSearchError("لم يتم العثور على هذه العملة في سوق USDT");
         return;
       }
+
       setChartSymbol(symbol);
       setChartSearch(symbol);
     } catch (err) {
@@ -299,8 +336,10 @@ export default function HomePageClient({ heroCopy }) {
       setChartSearchError("حدث خطأ أثناء البحث عن العملة");
     }
   };
+
   const submitAlert = async () => {
     if (alertSubmitting) return;
+
     if (!authResolved) {
       showAppModal({
         type: "info",
@@ -309,6 +348,7 @@ export default function HomePageClient({ heroCopy }) {
       });
       return;
     }
+
     if (!user?.email) {
       showAppModal({
         type: "error",
@@ -318,8 +358,10 @@ export default function HomePageClient({ heroCopy }) {
       window.location.href = "/login";
       return;
     }
+
     const cleanCoin = alertCoin.trim().toUpperCase();
     const cleanPrice = String(alertPrice || "").trim();
+
     if (!cleanCoin || !cleanPrice) {
       showAppModal({
         type: "warning",
@@ -328,9 +370,12 @@ export default function HomePageClient({ heroCopy }) {
       });
       return;
     }
+
     setAlertSubmitting(true);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       const result = await createPriceAlert({
         coin: cleanCoin,
@@ -338,18 +383,22 @@ export default function HomePageClient({ heroCopy }) {
         condition: "auto",
         signal: controller.signal,
       });
+
       if (!result?.alert?.id) {
         throw new Error("لم يتم حفظ التنبيه في قاعدة البيانات.");
       }
+
       showAppModal({
         type: "success",
         title: "تم إضافة التنبيه بنجاح",
         message: result?.message || "وسيتم إرسال الإيميل فقط عند تحقق السعر.",
       });
+
       setAlertCoin("");
       setAlertPrice("");
     } catch (err) {
       console.error("PRICE_ALERT_CREATE_FAILED", err);
+
       showAppModal({
         type: "error",
         title: "تعذر إنشاء التنبيه",
@@ -363,40 +412,38 @@ export default function HomePageClient({ heroCopy }) {
       setAlertSubmitting(false);
     }
   };
+
   return (
-    <main className={ui.homeRoot}>
-      {" "}
+    <main className="min-h-screen text-white w-full">
       {activeNotice && (
-        <div className={ui.homeNotice}>
-          {" "}
+        <div className="fixed top-5 left-5 z-[999] max-w-md rounded-3xl bg-emerald-500 text-black p-5 shadow-2xl font-bold">
           <div className="flex justify-between gap-4">
-            {" "}
-            <span>{activeNotice}</span>{" "}
-            <button type="button" onClick={() => setActiveNotice("")}>
-              ✕
-            </button>{" "}
-          </div>{" "}
+            <span>{activeNotice}</span>
+            <button onClick={() => setActiveNotice("")}>✕</button>
+          </div>
         </div>
-      )}{" "}
+      )}
+
       <div className="space-y-10 w-full">
-        {" "}
         <section className="glassPanel site-hero-section p-8 md:p-10 overflow-hidden relative">
-          {" "}
-          <div className={ui.homeHeroOverlay} />{" "}
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.28),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(52,211,153,0.18),transparent_30%)]" />
+
           <div className="relative grid lg:grid-cols-12 gap-8 items-center">
-            {" "}
-            {heroCopy}{" "}
+            {heroCopy}
+
             <div className="lg:col-span-5">
-              {" "}
-              <HomeMarketPulsePanel />{" "}
-            </div>{" "}
-          </div>{" "}
-        </section>{" "}
+              <HomeMarketPulsePanel />
+            </div>
+          </div>
+        </section>
+
         <HomeMarketWindowsSection
           marketWindows={MARKET_WINDOWS}
           widgetHeight={MARKET_WINDOW_WIDGET_HEIGHT}
-        />{" "}
-        <HomeLivePricesSection />{" "}
+        />
+
+        <HomeLivePricesSection />
+
         <LiveChartSection
           chartSearch={chartSearch}
           setChartSearch={setChartSearch}
@@ -405,187 +452,224 @@ export default function HomePageClient({ heroCopy }) {
           chartSymbol={chartSymbol}
           chartSearchError={chartSearchError}
           onApplySearch={applyChartSearch}
-        />{" "}
+        />
+
         <section id="services">
-          {" "}
-          <h2 className="sectionTitle text-center lg:text-right">
-            الخدمات
-          </h2>{" "}
+          <h2 className="sectionTitle text-center lg:text-right">الخدمات</h2>
+
           <div className="grid md:grid-cols-3 gap-5">
-            {" "}
-            <Service
-              title="توصيات Spot"
-              text="باقات سبوت شهرية وربع سنوية وسنوية."
-              href="/subscriptions"
-              onRequireLogin={requireLogin}
-            />{" "}
-            <Service
-              title="توصيات Futures"
-              text="فرص فيوتشر مع متابعة وإدارة مخاطر."
-              href="/subscriptions"
-              onRequireLogin={requireLogin}
-            />{" "}
-            <Service
-              title="HasaN CharT Academy"
-              text="محتوى تعليمي صور وفيديوهات للمشتركين."
-              href="/daily-analysis"
-              onRequireLogin={requireLogin}
-            />{" "}
-            <Service
-              title="إدارة حسابات Spot"
-              text="إدارة محافظ سبوت باحتراف."
-              href="/account-management"
-              onRequireLogin={requireLogin}
-            />{" "}
-            <Service
-              title="إدارة حسابات Futures"
-              text="إدارة حسابات فيوتشر."
-              href="/account-management"
-              onRequireLogin={requireLogin}
-            />{" "}
-            <Service
-              title="أخبار وتحليلات"
-              text="أهم الأخبار والتحليلات اليومية."
-              href="/news"
-              publicLink
-            />{" "}
-          </div>{" "}
-        </section>{" "}
+            <Service title="توصيات Spot" text="باقات سبوت شهرية وربع سنوية وسنوية." href="/subscriptions" onRequireLogin={requireLogin} />
+            <Service title="توصيات Futures" text="فرص فيوتشر مع متابعة وإدارة مخاطر." href="/subscriptions" onRequireLogin={requireLogin} />
+            <Service title="HasaN CharT Academy" text="محتوى تعليمي صور وفيديوهات للمشتركين." href="/daily-analysis" onRequireLogin={requireLogin} />
+            <Service title="إدارة حسابات Spot" text="إدارة محافظ سبوت باحتراف." href="/account-management" onRequireLogin={requireLogin} />
+            <Service title="إدارة حسابات Futures" text="إدارة حسابات فيوتشر." href="/account-management" onRequireLogin={requireLogin} />
+            <Service title="أخبار وتحليلات" text="أهم الأخبار والتحليلات اليومية." href="/news" publicLink />
+          </div>
+        </section>
+
         <section className="grid lg:grid-cols-2 gap-6">
-          {" "}
-          <div id="analysis" className={ui.homeFormPanel}>
-            {" "}
-            <h2 className={ui.homeFormTitle}>🧠 طلب تحليل عملة</h2>{" "}
+          <div id="analysis" className="rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)]">
+            <h2
+              className="mb-5 text-3xl font-black tracking-wide"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 2px 0 #000, 0 0 6px rgba(0,0,0,0.55)',
+              }}
+            >
+              🧠 طلب تحليل عملة
+            </h2>
+
             <input
               value={analysisCoin}
               onChange={(e) => setAnalysisCoin(e.target.value)}
               placeholder="اسم العملة مثل BTCUSDT"
               className="input"
-            />{" "}
+            />
+
             <div className="space-y-3">
-              {" "}
               <input
                 value={analysisFrame}
                 onChange={(e) => setAnalysisFrame(e.target.value)}
                 placeholder="اكتب الفريم بالعربي أو الإنجليزي: 12 hours / 12 ساعة / شهرين / سنة"
                 className="input"
                 list="analysis-frame-suggestions"
-              />{" "}
+              />
+
               <datalist id="analysis-frame-suggestions">
-                {" "}
                 {ANALYSIS_FRAME_SUGGESTIONS.map((item) => (
                   <option key={item.value} value={item.value}>
-                    {" "}
-                    {item.hint}{" "}
+                    {item.hint}
                   </option>
-                ))}{" "}
-              </datalist>{" "}
+                ))}
+              </datalist>
+
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {" "}
                 {ANALYSIS_FRAME_SUGGESTIONS.map((item) => (
                   <button
                     key={item.value}
                     type="button"
                     onClick={() => setAnalysisFrame(item.value)}
-                    className={
+                    className={`rounded-2xl border px-3 py-2 text-sm font-black transition ${
                       analysisFrame === item.value
-                        ? ui.homeFormChipActive
-                        : ui.homeFormChip
-                    }
+                        ? "border-white bg-white text-blue-700"
+                        : "border-white/25 bg-white/15 text-white hover:bg-white/25"
+                    }`}
                     title={item.hint}
                   >
-                    {" "}
-                    {item.label}{" "}
+                    {item.label}
                   </button>
-                ))}{" "}
-              </div>{" "}
-              <p className={ui.homeFormHint}>
-                {" "}
-                يمكنك كتابة الفريم بأي صيغة: 12h أو 12 hours أو 12 ساعة أو شهرين
-                أو سنة.{" "}
-              </p>{" "}
-            </div>{" "}
+                ))}
+              </div>
+
+              <p
+                className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold leading-7"
+                style={{
+                  color: "#ffffff",
+                  WebkitTextFillColor: "#ffffff",
+                  textShadow: "0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)",
+                }}
+              >
+                يمكنك كتابة الفريم بأي صيغة: 12h أو 12 hours أو 12 ساعة أو شهرين أو سنة.
+              </p>
+            </div>
+
             <button
               onClick={submitAnalysis}
               disabled={!canRequestAnalysis || analysisSubmitting}
               className={`blueBtn ${!canRequestAnalysis || analysisSubmitting ? "cursor-not-allowed opacity-50" : ""}`}
             >
-              {" "}
               {analysisSubmitting
                 ? "جاري إرسال الطلب..."
                 : canRequestAnalysis
-                  ? "إرسال طلب التحليل"
-                  : "طلب التحليل متاح كل 24 ساعة"}{" "}
-            </button>{" "}
+                ? "إرسال طلب التحليل"
+                : "طلب التحليل متاح كل 24 ساعة"}
+            </button>
+
             {analysisCooldownText && (
-              <div className={ui.homeFormCooldown}>
+              <div
+                className="mt-4 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center text-sm font-bold leading-7"
+                style={{
+                  color: '#ffffff',
+                  WebkitTextFillColor: '#ffffff',
+                  textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)',
+                }}
+              >
                 ⏳ {analysisCooldownText}
               </div>
-            )}{" "}
-            <a href="/my-analysis" className={ui.homeFormLink}>
-              {" "}
-              عرض طلباتي وردود الإدارة{" "}
-            </a>{" "}
-          </div>{" "}
-          <div id="alerts" className={ui.homeFormPanel}>
-            {" "}
-            <h2 className={ui.homeFormTitle}>🔔 تنبيه سعر</h2>{" "}
+            )}
+
+            <a
+              href="/my-analysis"
+              className="block text-center mt-3 underline"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)',
+              }}
+            >
+              عرض طلباتي وردود الإدارة
+            </a>
+          </div>
+
+          <div id="alerts" className="rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)]">
+            <h2
+              className="mb-5 text-3xl font-black tracking-wide"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 2px 0 #000, 0 0 6px rgba(0,0,0,0.55)',
+              }}
+            >
+              🔔 تنبيه سعر
+            </h2>
+
             <input
               value={alertCoin}
               onChange={(e) => setAlertCoin(e.target.value)}
               placeholder="اسم العملة مثل BTCUSDT"
               className="input"
-            />{" "}
+            />
+
             <input
               value={alertPrice}
               onChange={(e) => setAlertPrice(e.target.value)}
               placeholder="السعر المطلوب"
               className="input"
-            />{" "}
-            <div className={`${ui.homeFormHint} text-center`}>
-              {" "}
-              اكتب السعر فقط، وسيتم تفعيل التنبيه تلقائيًا عند ملامسة السعر
-              المحدد.{" "}
-            </div>{" "}
+            />
+
+            <div
+              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center text-sm font-bold leading-7"
+              style={{
+                color: '#ffffff',
+                WebkitTextFillColor: '#ffffff',
+                textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)',
+              }}
+            >
+              اكتب السعر فقط، وسيتم تفعيل التنبيه تلقائيًا عند ملامسة السعر المحدد.
+            </div>
+
             <button
               type="button"
               onClick={submitAlert}
               disabled={!authResolved || !user?.email || alertSubmitting}
               className={`greenBtn ${!authResolved || !user?.email || alertSubmitting ? "cursor-not-allowed opacity-60" : ""}`}
             >
-              {" "}
-              {alertSubmitting ? "جاري تفعيل التنبيه..." : "تفعيل التنبيه"}{" "}
-            </button>{" "}
-          </div>{" "}
-        </section>{" "}
-      </div>{" "}
+              {alertSubmitting ? "جاري تفعيل التنبيه..." : "تفعيل التنبيه"}
+            </button>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
-const Service = memo(function Service({
-  title,
-  text,
-  href,
-  publicLink = false,
-  onRequireLogin,
-}) {
+
+const Service = memo(function Service({ title, text, href, publicLink = false, onRequireLogin }) {
   return (
     <button
       type="button"
       onClick={() => {
         if (!href) return;
+
         if (!publicLink && onRequireLogin) {
           const user = onRequireLogin();
           if (!user) return;
         }
+
         window.location.href = href;
       }}
-      className={ui.homeServiceCard}
+      className="w-full rounded-[28px] border border-blue-300/70 bg-gradient-to-br from-sky-400/85 via-blue-400/85 to-cyan-400/80 p-6 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_34px_rgba(37,99,235,0.22)] transition hover:scale-[1.02] hover:border-blue-200/90"
     >
-      {" "}
-      <h3 className={ui.homeServiceTitle}>{title}</h3>{" "}
-      <p className={ui.homeServiceText}>{text}</p>{" "}
-      <span className={ui.homeServiceCta}>اطلب الخدمة</span>{" "}
+      <h3
+        className="mb-3 text-xl font-black tracking-wide"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 2px 0 #000, 0 0 6px rgba(0,0,0,0.55)",
+        }}
+      >
+        {title}
+      </h3>
+      <p
+        className="leading-7 font-bold"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)",
+        }}
+      >
+        {text}
+      </p>
+      <span
+        className="mt-5 inline-block rounded-2xl border border-white/20 bg-white/15 px-4 py-2 text-sm font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+        style={{
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          textShadow: "0 1px 0 #000, 0 0 4px rgba(0,0,0,0.55)",
+        }}
+      >
+        اطلب الخدمة
+      </span>
     </button>
   );
 });

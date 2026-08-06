@@ -27,17 +27,7 @@ export const usdjpyAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: [
-      "usdjpy",
-      "usd/jpy",
-      "jpy",
-      "yen",
-      "boj",
-      "ين",
-      "اليابان",
-      "forex",
-      "فوركس",
-    ],
+    keywords: ["usdjpy", "usd/jpy", "jpy", "yen", "boj", "ين", "اليابان", "forex", "فوركس"],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -67,30 +57,10 @@ export const usdjpyAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "EUR",
-      name: "اليورو دولار",
-      description: "زوج EUR/USD — مرجع الفوركس.",
-      href: "/eurusd",
-    },
-    {
-      symbol: "GBP",
-      name: "الجنيه دولار",
-      description: "زوج GBP/USD — الكابل.",
-      href: "/gbpusd",
-    },
-    {
-      symbol: "XAU",
-      name: "الذهب",
-      description: "ملاذ آمن مرتبط بالدولار.",
-      href: "/xau",
-    },
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "أصل رقمي يتأثر بمعنويات المخاطرة.",
-      href: "/btc",
-    },
+    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — مرجع الفوركس.", href: "/eurusd" },
+    { symbol: "GBP", name: "الجنيه دولار", description: "زوج GBP/USD — الكابل.", href: "/gbpusd" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالدولار.", href: "/xau" },
+    { symbol: "BTC", name: "البيتكوين", description: "أصل رقمي يتأثر بمعنويات المخاطرة.", href: "/btc" },
   ],
   links: {
     internal: [
@@ -122,8 +92,7 @@ export const usdjpyAssetConfig = {
     {
       icon: "📊",
       title: "إشارات الفوركس",
-      description:
-        "تحليلات وإشارات احترافية لزوج USD/JPY وأزواج الفوركس الرئيسية.",
+      description: "تحليلات وإشارات احترافية لزوج USD/JPY وأزواج الفوركس الرئيسية.",
       href: "/forex-signals",
       cta: "إشارات الفوركس",
     },

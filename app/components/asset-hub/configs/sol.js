@@ -31,7 +31,9 @@ export const solAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["sol", "solana", "سولانا", "solusdt"] },
+  analysis: {
+    keywords: ["sol", "solana", "سولانا", "solusdt"],
+  },
   faq: [
     {
       q: "ما هي سولانا (SOL)؟",
@@ -55,30 +57,10 @@ export const solAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "المرجع الرئيسي لسوق الكريبتو.",
-      href: "/btc",
-    },
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "منصة العقود الذكية الرائدة.",
-      href: "/crypto",
-    },
-    {
-      symbol: "BNB",
-      name: "BNB",
-      description: "عملة منصة Binance ونظامها البيئي.",
-      href: "/crypto",
-    },
-    {
-      symbol: "XAU",
-      name: "الذهب",
-      description: "ملاذ آمن مرتبط بمعنويات المخاطرة.",
-      href: "/gold",
-    },
+    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
+    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية الرائدة.", href: "/crypto" },
+    { symbol: "BNB", name: "BNB", description: "عملة منصة Binance ونظامها البيئي.", href: "/crypto" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/gold" },
   ],
   links: {
     internal: [
@@ -129,14 +111,7 @@ export const solAssetConfig = {
     title: "HasaN CharT World | سولانا SOL — مركز المعلومات",
     description:
       "مركز معلومات سولانا: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات SOL، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "سولانا",
-      "SOL",
-      "Solana",
-      "سعر سولانا",
-      "تحليل SOL",
-    ],
+    keywords: ["HasaN CharT World", "سولانا", "SOL", "Solana", "سعر سولانا", "تحليل SOL"],
   },
   jsonLd: {
     productName: "Solana",

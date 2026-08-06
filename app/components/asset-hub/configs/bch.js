@@ -31,7 +31,9 @@ export const bchAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["bch", "bitcoin cash", "بيتكوين كاش", "bchusdt"] },
+  analysis: {
+    keywords: ["bch", "bitcoin cash", "بيتكوين كاش", "bchusdt"],
+  },
   faq: [
     {
       q: "ما هو بيتكوين كاش (BCH)؟",
@@ -55,30 +57,10 @@ export const bchAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "المرجع الرئيسي لسوق الكريبتو.",
-      href: "/btc",
-    },
-    {
-      symbol: "LTC",
-      name: "لايتكوين",
-      description: "عملة دفع سريعة مشابهة.",
-      href: "/ltc",
-    },
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "منصة العقود الذكية.",
-      href: "/eth",
-    },
-    {
-      symbol: "XRP",
-      name: "ريبل",
-      description: "عملة رقمية للمدفوعات.",
-      href: "/xrp",
-    },
+    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
+    { symbol: "LTC", name: "لايتكوين", description: "عملة دفع سريعة مشابهة.", href: "/ltc" },
+    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية.", href: "/eth" },
+    { symbol: "XRP", name: "ريبل", description: "عملة رقمية للمدفوعات.", href: "/xrp" },
   ],
   links: {
     internal: [
@@ -129,13 +111,7 @@ export const bchAssetConfig = {
     title: "HasaN CharT World | بيتكوين كاش BCH — مركز المعلومات",
     description:
       "مركز معلومات بيتكوين كاش: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات BCH، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "بيتكوين كاش",
-      "BCH",
-      "Bitcoin Cash",
-      "سعر BCH",
-    ],
+    keywords: ["HasaN CharT World", "بيتكوين كاش", "BCH", "Bitcoin Cash", "سعر BCH"],
   },
   jsonLd: {
     productName: "Bitcoin Cash",

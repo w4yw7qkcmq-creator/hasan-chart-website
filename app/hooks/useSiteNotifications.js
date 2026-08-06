@@ -1,4 +1,5 @@
 "use client";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { devLog } from "../../lib/dev-log";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
@@ -24,18 +25,12 @@ import {
   unregisterNotificationCenterBridge,
 } from "../../lib/notification-center";
 import { parseNotificationRow } from "../../lib/notification-center-shared";
-import {
-  NOTIFICATION_SOUND_KEYS,
-  normalizeNotificationKey,
-} from "../../lib/notification-sound-keys";
+import { NOTIFICATION_SOUND_KEYS, normalizeNotificationKey } from "../../lib/notification-sound-keys";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
-import {
-  normalizeNotification,
-  countUnreadNotifications,
-  isNotificationUnread,
-} from "../../lib/notifications-shared";
+import { normalizeNotification, countUnreadNotifications, isNotificationUnread } from "../../lib/notifications-shared";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../components/AuthProvider";
+
 const FALLBACK_POLL_MS = 60000;
 const TOAST_TTL_MS = 5000;
 const TOAST_EXIT_MS = 280;
@@ -45,35 +40,45 @@ const LIST_ENTER_MS = 650;
 const INITIAL_SYNC_DELAY_MS = 0;
 const FETCH_TIMEOUT_MS = 5000;
 const REALTIME_SESSION_WAIT_MS = 2500;
+
 function createToastId() {
   return `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
 async function waitForSupabaseSession(maxWaitMs = REALTIME_SESSION_WAIT_MS) {
   const started = Date.now();
+
   while (Date.now() - started < maxWaitMs) {
     const {
       data: { session },
     } = await supabase.auth.getSession();
+
     if (session?.access_token) {
       return true;
     }
+
     await new Promise((resolve) => {
       window.setTimeout(resolve, 150);
     });
   }
+
   return false;
 }
+
 function logNotificationMetrics(label, list) {
   if (process.env.NODE_ENV === "production") {
     return;
   }
+
   console.log("notifications:count", { label, count: list.length });
   console.log("notifications:unread-count", {
     label,
     unreadCount: countUnreadNotifications(list),
   });
 }
+
 const BELL_FEED_LIMIT = 50;
+
 function buildBellFeedUrl() {
   const params = new URLSearchParams({
     limit: String(BELL_FEED_LIMIT),
@@ -81,14 +86,15 @@ function buildBellFeedUrl() {
     read: "all",
     _: String(Date.now()),
   });
+
   return `/api/notification-hub/feed?${params.toString()}`;
 }
+
 export function useSiteNotifications() {
   const { authResolved, user } = useAuth();
-  const userEmail = String(user?.email || "")
-    .trim()
-    .toLowerCase();
+  const userEmail = String(user?.email || "").trim().toLowerCase();
   const canSyncNotifications = Boolean(userEmail);
+
   const [notifications, setNotifications] = useState([]);
   const [trackedUnreadCount, setTrackedUnreadCount] = useState(0);
   const [activeToast, setActiveToast] = useState(null);
@@ -96,6 +102,7 @@ export function useSiteNotifications() {
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recentlyAddedIds, setRecentlyAddedIds] = useState([]);
+
   const knownIdsRef = useRef(new Set());
   const initializedRef = useRef(false);
   const initialSyncCompleteRef = useRef(false);
@@ -119,95 +126,92 @@ export function useSiteNotifications() {
   const sessionStartedAtRef = useRef(Date.now());
   const notificationsRef = useRef([]);
   const trackedUnreadCountRef = useRef(0);
-  const logBellNotificationsCleared = useCallback(
-    (reason, mutationEpoch = mutationEpochRef.current) => {
-      console.log("BELL_NOTIFICATIONS_CLEARED", {
-        reason,
-        previousLength: notificationsRef.current?.length || 0,
-        mutationEpoch,
-        clearedAll: clearedAllNotificationsRef.current,
-      });
-    },
-    [],
-  );
-  const logSetNotifications = useCallback(
-    (reason, beforeLength, newNotifications) => {
-      const afterLength = Array.isArray(newNotifications)
-        ? newNotifications.length
-        : -1;
-      console.log("SET_NOTIFICATIONS", {
-        beforeLength,
-        afterLength,
-        reason,
-        stack: new Error().stack,
-      });
-    },
-    [],
-  );
+
+  const logBellNotificationsCleared = useCallback((reason, mutationEpoch = mutationEpochRef.current) => {
+    console.log("BELL_NOTIFICATIONS_CLEARED", {
+      reason,
+      previousLength: notificationsRef.current?.length || 0,
+      mutationEpoch,
+      clearedAll: clearedAllNotificationsRef.current,
+    });
+  }, []);
+
+  const logSetNotifications = useCallback((reason, beforeLength, newNotifications) => {
+    const afterLength = Array.isArray(newNotifications) ? newNotifications.length : -1;
+    console.log("SET_NOTIFICATIONS", {
+      beforeLength,
+      afterLength,
+      reason,
+      stack: new Error().stack,
+    });
+  }, []);
+
   useEffect(() => {
     notificationsRef.current = notifications;
   }, [notifications]);
+
   useEffect(() => {
     trackedUnreadCountRef.current = trackedUnreadCount;
   }, [trackedUnreadCount]);
-  const applyServerSnapshot = useCallback(
-    (serverNotifications) => {
-      let list = (serverNotifications || []).filter(Boolean);
-      const incomingCount = list.length;
-      let filteredReason = null;
-      if (clearedAllNotificationsRef.current && list.length > 0) {
-        clearedAllNotificationsRef.current = false;
-        filteredReason = "cleared-all-reset-by-new-incoming";
-      }
-      if (clearedAllNotificationsRef.current && list.length === 0) {
-        clearedAllNotificationsRef.current = false;
-      }
-      if (Date.now() - markedAllReadAtRef.current < 8000) {
-        filteredReason = "marked-all-read-recently";
-        list = list.map((item) => ({ ...item, isRead: true }));
-      }
-      knownIdsRef.current = new Set(
-        list.map((item) => item.id).filter(Boolean),
-      );
-      console.log("BELL_ITEMS_BEFORE_SET", {
-        listLength: Array.isArray(list) ? list.length : -1,
-        ids: Array.isArray(list) ? list.map((item) => item.id) : [],
-        readStates: Array.isArray(list)
-          ? list.map((item) => item.isRead ?? item.is_read)
-          : [],
+
+  const applyServerSnapshot = useCallback((serverNotifications) => {
+    let list = (serverNotifications || []).filter(Boolean);
+    const incomingCount = list.length;
+    let filteredReason = null;
+
+    if (clearedAllNotificationsRef.current && list.length > 0) {
+      clearedAllNotificationsRef.current = false;
+      filteredReason = "cleared-all-reset-by-new-incoming";
+    }
+
+    if (clearedAllNotificationsRef.current && list.length === 0) {
+      clearedAllNotificationsRef.current = false;
+    }
+
+    if (Date.now() - markedAllReadAtRef.current < 8000) {
+      filteredReason = "marked-all-read-recently";
+      list = list.map((item) => ({ ...item, isRead: true }));
+    }
+
+    knownIdsRef.current = new Set(list.map((item) => item.id).filter(Boolean));
+    console.log("BELL_ITEMS_BEFORE_SET", {
+      listLength: Array.isArray(list) ? list.length : -1,
+      ids: Array.isArray(list) ? list.map((item) => item.id) : [],
+      readStates: Array.isArray(list) ? list.map((item) => item.isRead ?? item.is_read) : [],
+      trackedUnreadCount: trackedUnreadCountRef.current,
+      clearedAll: clearedAllNotificationsRef.current,
+    });
+    const beforeLength = notificationsRef.current?.length || 0;
+    notificationsRef.current = list;
+    logSetNotifications("applyServerSnapshot", beforeLength, list);
+    setNotifications(list);
+    queueMicrotask(() => {
+      const current = notificationsRef.current || [];
+      const localUnread = countUnreadNotifications(current);
+      console.log("BELL_ITEMS_AFTER_SET", {
+        notificationsLength: current.length,
+        ids: current.map((item) => item.id),
         trackedUnreadCount: trackedUnreadCountRef.current,
-        clearedAll: clearedAllNotificationsRef.current,
+        localUnread,
+        unreadCount: Math.max(trackedUnreadCountRef.current, localUnread),
       });
-      const beforeLength = notificationsRef.current?.length || 0;
-      notificationsRef.current = list;
-      logSetNotifications("applyServerSnapshot", beforeLength, list);
-      setNotifications(list);
-      queueMicrotask(() => {
-        const current = notificationsRef.current || [];
-        const localUnread = countUnreadNotifications(current);
-        console.log("BELL_ITEMS_AFTER_SET", {
-          notificationsLength: current.length,
-          ids: current.map((item) => item.id),
-          trackedUnreadCount: trackedUnreadCountRef.current,
-          localUnread,
-          unreadCount: Math.max(trackedUnreadCountRef.current, localUnread),
-        });
-      });
-      console.log("BELL_NOTIFICATIONS_FILTERED", {
-        reason: filteredReason || "none",
-        incomingCount,
-        renderedCount: list.length,
-      });
-      return list;
-    },
-    [logSetNotifications],
-  );
+    });
+    console.log("BELL_NOTIFICATIONS_FILTERED", {
+      reason: filteredReason || "none",
+      incomingCount,
+      renderedCount: list.length,
+    });
+    return list;
+  }, [logSetNotifications]);
+
   const setNotificationPanelOpen = useCallback((open) => {
     notificationPanelOpenRef.current = Boolean(open);
   }, []);
+
   useEffect(() => {
     activeToastRef.current = activeToast;
   }, [activeToast]);
+
   const clearToastTimers = useCallback(() => {
     if (toastHideTimerRef.current) {
       window.clearTimeout(toastHideTimerRef.current);
@@ -222,69 +226,77 @@ export function useSiteNotifications() {
       dismissToastTimerRef.current = null;
     }
   }, []);
+
   const markNotificationAsRecentlyAdded = useCallback((notificationId) => {
     if (!notificationId) return;
+
     setRecentlyAddedIds((current) =>
-      current.includes(notificationId) ? current : [...current, notificationId],
+      current.includes(notificationId) ? current : [...current, notificationId]
     );
+
     const existingTimer = listEnterTimersRef.current.get(notificationId);
     if (existingTimer) {
       window.clearTimeout(existingTimer);
     }
+
     const timerId = window.setTimeout(() => {
       listEnterTimersRef.current.delete(notificationId);
-      setRecentlyAddedIds((current) =>
-        current.filter((item) => item !== notificationId),
-      );
+      setRecentlyAddedIds((current) => current.filter((item) => item !== notificationId));
     }, LIST_ENTER_MS);
+
     listEnterTimersRef.current.set(notificationId, timerId);
   }, []);
-  const finalizeDismissToast = useCallback((toastId) => {
-    if (activeToastRef.current?.id !== toastId) return;
-    toastShowingRef.current = false;
-    setActiveToast(null);
-    if (deferredToastBatchRef.current.length > 0) {
-      pendingToastBatchRef.current = [...deferredToastBatchRef.current];
-      deferredToastBatchRef.current = [];
-      toastBatchTimerRef.current = window.setTimeout(() => {
-        toastBatchTimerRef.current = null;
-        flushToastBatchRef.current?.();
-      }, TOAST_SINGLE_DELAY_MS);
-    }
-  }, []);
+
+  const finalizeDismissToast = useCallback(
+    (toastId) => {
+      if (activeToastRef.current?.id !== toastId) return;
+
+      toastShowingRef.current = false;
+      setActiveToast(null);
+
+      if (deferredToastBatchRef.current.length > 0) {
+        pendingToastBatchRef.current = [...deferredToastBatchRef.current];
+        deferredToastBatchRef.current = [];
+
+        toastBatchTimerRef.current = window.setTimeout(() => {
+          toastBatchTimerRef.current = null;
+          flushToastBatchRef.current?.();
+        }, TOAST_SINGLE_DELAY_MS);
+      }
+    },
+    []
+  );
+
   const beginDismissToast = useCallback(
     (toastId) => {
-      if (
-        activeToastRef.current?.id !== toastId ||
-        activeToastRef.current?.exiting
-      )
-        return;
+      if (activeToastRef.current?.id !== toastId || activeToastRef.current?.exiting) return;
+
       clearToastTimers();
-      setActiveToast((current) =>
-        current?.id === toastId ? { ...current, exiting: true } : current,
-      );
+      setActiveToast((current) => (current?.id === toastId ? { ...current, exiting: true } : current));
+
       dismissToastTimerRef.current = window.setTimeout(() => {
         dismissToastTimerRef.current = null;
         finalizeDismissToast(toastId);
       }, TOAST_EXIT_MS);
     },
-    [clearToastTimers, finalizeDismissToast],
+    [clearToastTimers, finalizeDismissToast]
   );
+
   const flushToastBatchRef = useRef(null);
+
   const flushToastBatch = useCallback(() => {
     toastBatchTimerRef.current = null;
+
     const batch = pendingToastBatchRef.current;
     pendingToastBatchRef.current = [];
-    if (
-      !batch.length ||
-      notificationPanelOpenRef.current ||
-      toastShowingRef.current
-    ) {
+
+    if (!batch.length || notificationPanelOpenRef.current || toastShowingRef.current) {
       if (batch.length) {
         deferredToastBatchRef.current.push(...batch);
       }
       return;
     }
+
     const toastPayload =
       batch.length > 1
         ? {
@@ -299,93 +311,107 @@ export function useSiteNotifications() {
             notification: batch[0],
             exiting: false,
           };
+
     toastShowingRef.current = true;
     setActiveToast(toastPayload);
+
     toastHideTimerRef.current = window.setTimeout(() => {
       toastHideTimerRef.current = null;
       beginDismissToast(toastPayload.id);
     }, TOAST_TTL_MS);
   }, [beginDismissToast]);
+
   flushToastBatchRef.current = flushToastBatch;
+
   const scheduleToastForNotification = useCallback(
     (notification) => {
       if (notificationPanelOpenRef.current) return;
+
       if (toastShowingRef.current) {
         deferredToastBatchRef.current.push(notification);
         return;
       }
+
       pendingToastBatchRef.current.push(notification);
+
       if (toastBatchTimerRef.current) {
         window.clearTimeout(toastBatchTimerRef.current);
       }
+
       const delay =
         pendingToastBatchRef.current.length > 1
           ? TOAST_GROUP_WINDOW_MS
           : TOAST_SINGLE_DELAY_MS;
+
       toastBatchTimerRef.current = window.setTimeout(() => {
         flushToastBatch();
       }, delay);
     },
-    [flushToastBatch],
+    [flushToastBatch]
   );
+
   const dismissToast = useCallback(
     (toastId) => {
       beginDismissToast(toastId);
     },
-    [beginDismissToast],
+    [beginDismissToast]
   );
+
   const stopFallbackPolling = useCallback(() => {
     if (pollTimerRef.current) {
       window.clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
     }
   }, []);
+
   const pushToast = scheduleToastForNotification;
+
   const registerIncomingNotification = useCallback(
     (rawNotification, { bumpUnread = false, animateList = false } = {}) => {
       if (mutationInFlightRef.current) {
         return null;
       }
+
       const normalized = normalizeNotification(rawNotification);
       if (!normalized?.id) return null;
+
       if (clearedAllNotificationsRef.current) {
         clearedAllNotificationsRef.current = false;
       }
+
       const alreadyKnown = knownIdsRef.current.has(normalized.id);
+
       if (!alreadyKnown) {
         knownIdsRef.current.add(normalized.id);
+
         setNotifications((current) => {
-          const withoutDuplicate = current.filter(
-            (item) => item.id !== normalized.id,
-          );
-          const next = [normalized, ...withoutDuplicate].slice(
-            0,
-            BELL_FEED_LIMIT,
-          );
-          logSetNotifications(
-            "registerIncomingNotification",
-            current.length,
-            next,
-          );
+          const withoutDuplicate = current.filter((item) => item.id !== normalized.id);
+          const next = [normalized, ...withoutDuplicate].slice(0, BELL_FEED_LIMIT);
+          logSetNotifications("registerIncomingNotification", current.length, next);
           return next;
         });
+
         if ((animateList || bumpUnread) && isNotificationUnread(normalized)) {
           setTrackedUnreadCount((count) => count + 1);
         }
+
         if (animateList || bumpUnread) {
           markNotificationAsRecentlyAdded(normalized.id);
         }
       }
+
       return normalized;
     },
-    [logSetNotifications, markNotificationAsRecentlyAdded],
+    [logSetNotifications, markNotificationAsRecentlyAdded]
   );
+
   const processNotificationCenterEvent = useCallback(
     (rawRow, { source = "realtime" } = {}) => {
       const parsedEvent = parseNotificationRow(rawRow);
       const isPriceAlert =
         normalizeNotificationKey(parsedEvent.notificationKey) ===
         NOTIFICATION_SOUND_KEYS.PRICE_ALERT;
+
       if (mutationInFlightRef.current) {
         if (isPriceAlert) {
           devLog("PRICE_ALERT_DUPLICATE_SKIPPED", {
@@ -396,48 +422,55 @@ export function useSiteNotifications() {
         }
         return null;
       }
+
       const normalized = registerIncomingNotification(rawRow, {
         bumpUnread: true,
         animateList: true,
       });
+
       if (normalized) {
-        emitNotificationHubUpsert(rawRow, {
-          source: source || "site-notifications",
-        });
+        emitNotificationHubUpsert(rawRow, { source: source || "site-notifications" });
       }
+
       void handleNotificationCenterRealtimeEvent(rawRow, { source });
       return rawRow;
     },
-    [registerIncomingNotification],
+    [registerIncomingNotification]
   );
+
   const syncFromServer = useCallback(
-    async ({
-      announceNew = false,
-      generation = 0,
-      mutationEpoch = 0,
-      fresh = false,
-    } = {}) => {
+    async ({ announceNew = false, generation = 0, mutationEpoch = 0, fresh = false } = {}) => {
       if (!canSyncNotifications) return null;
+
       if (mutationInFlightRef.current && !mutationEpoch) {
         return null;
       }
+
       if (mutationEpoch && mutationEpoch !== mutationEpochRef.current) {
         return null;
       }
+
       try {
         console.log("BELL_NOTIFICATIONS_FETCH_START", {
           endpoint: buildBellFeedUrl(),
         });
+
         const response = await fetchWithTimeout(
           buildBellFeedUrl(),
-          { method: "GET", cache: "no-store", credentials: "include" },
-          FETCH_TIMEOUT_MS,
+          {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          },
+          FETCH_TIMEOUT_MS
         );
+
         const result = await response.json().catch(() => null);
+
         if (!response.ok || !result?.success) return null;
         if (generation && generation !== syncGenerationRef.current) return null;
-        if (mutationEpoch && mutationEpoch !== mutationEpochRef.current)
-          return null;
+        if (mutationEpoch && mutationEpoch !== mutationEpochRef.current) return null;
+
         const serverNotifications = (result.items || []).filter(Boolean);
         console.log("BELL_FETCH_RESPONSE", {
           itemCount: serverNotifications.length,
@@ -446,14 +479,17 @@ export function useSiteNotifications() {
           readStates: serverNotifications.map((item) => Boolean(item.isRead)),
         });
         const previousKnownIds = new Set(knownIdsRef.current);
+
         if (!initializedRef.current) {
           const sessionStartedAt = sessionStartedAtRef.current;
+
           serverNotifications.forEach((item) => {
             if (!item?.id) return;
+
             const createdAtMs = new Date(item.createdAt || 0).getTime();
             const isHistorical =
-              !Number.isFinite(createdAtMs) ||
-              createdAtMs < sessionStartedAt - 5000;
+              !Number.isFinite(createdAtMs) || createdAtMs < sessionStartedAt - 5000;
+
             if (isHistorical) {
               markNotificationCenterRendered(item.id);
             }
@@ -468,16 +504,18 @@ export function useSiteNotifications() {
           initialSyncCompleteRef.current = true;
           return serverNotifications;
         }
+
         applyServerSnapshot(serverNotifications);
         setTrackedUnreadCount(Number(result.unreadCount || 0));
         console.log("BELL_NOTIFICATIONS_FETCH_RESULT", {
           itemCount: serverNotifications.length,
           unreadCount: Number(result.unreadCount || 0),
         });
+
         if (initialSyncCompleteRef.current) {
           serverNotifications.forEach((item) => {
-            if (!item?.id || item.isRead || previousKnownIds.has(item.id))
-              return;
+            if (!item?.id || item.isRead || previousKnownIds.has(item.id)) return;
+
             processNotificationCenterEvent(
               {
                 id: item.id,
@@ -491,79 +529,81 @@ export function useSiteNotifications() {
                 is_read: item.isRead,
                 created_at: item.createdAt,
               },
-              { source: announceNew ? "polling" : "sync-discovery" },
+              { source: announceNew ? "polling" : "sync-discovery" }
             );
           });
         }
+
         return serverNotifications;
       } catch (err) {
         console.warn("Notification sync skipped:", err?.message || err);
         return null;
       }
     },
-    [applyServerSnapshot, canSyncNotifications, processNotificationCenterEvent],
+    [applyServerSnapshot, canSyncNotifications, processNotificationCenterEvent]
   );
+
   const refetchNotifications = useCallback(async () => {
     return syncFromServer({ fresh: true });
   }, [syncFromServer]);
+
   const startFallbackPolling = useCallback(() => {
-    if (pollTimerRef.current || !canSyncNotifications || document.hidden)
-      return;
+    if (pollTimerRef.current || !canSyncNotifications || document.hidden) return;
+
     pollTimerRef.current = window.setInterval(() => {
-      if (
-        document.hidden ||
-        !canSyncNotifications ||
-        mutationInFlightRef.current
-      )
-        return;
+      if (document.hidden || !canSyncNotifications || mutationInFlightRef.current) return;
       void syncFromServer({ announceNew: true });
     }, FALLBACK_POLL_MS);
   }, [canSyncNotifications, syncFromServer]);
-  const handleRealtimeUpdate = useCallback(
-    (payload) => {
-      if (!initialSyncCompleteRef.current || mutationInFlightRef.current) {
-        return;
+
+  const handleRealtimeUpdate = useCallback((payload) => {
+    if (!initialSyncCompleteRef.current || mutationInFlightRef.current) {
+      return;
+    }
+
+    const updated = normalizeNotification(payload.new);
+    if (!updated?.id) return;
+
+    if (clearedAllNotificationsRef.current) {
+      clearedAllNotificationsRef.current = false;
+    }
+
+    knownIdsRef.current.add(updated.id);
+
+    setNotifications((current) => {
+      const exists = current.some((item) => item.id === updated.id);
+      const next = !exists
+        ? [updated, ...current].slice(0, 50)
+        : current.map((item) => (item.id === updated.id ? updated : item));
+      logSetNotifications("handleRealtimeUpdate", current.length, next);
+      return next;
+    });
+  }, [logSetNotifications]);
+
+  const handleRealtimeDelete = useCallback((payload) => {
+    if (!initialSyncCompleteRef.current || clearedAllNotificationsRef.current) return;
+
+    const deletedId = payload.old?.id;
+    if (!deletedId) return;
+
+    knownIdsRef.current.delete(deletedId);
+
+    setNotifications((current) => {
+      const next = current.filter((item) => item.id !== deletedId);
+      if (current.length > 0 && next.length === 0) {
+        logBellNotificationsCleared("realtime-delete");
       }
-      const updated = normalizeNotification(payload.new);
-      if (!updated?.id) return;
-      if (clearedAllNotificationsRef.current) {
-        clearedAllNotificationsRef.current = false;
-      }
-      knownIdsRef.current.add(updated.id);
-      setNotifications((current) => {
-        const exists = current.some((item) => item.id === updated.id);
-        const next = !exists
-          ? [updated, ...current].slice(0, 50)
-          : current.map((item) => (item.id === updated.id ? updated : item));
-        logSetNotifications("handleRealtimeUpdate", current.length, next);
-        return next;
-      });
-    },
-    [logSetNotifications],
-  );
-  const handleRealtimeDelete = useCallback(
-    (payload) => {
-      if (!initialSyncCompleteRef.current || clearedAllNotificationsRef.current)
-        return;
-      const deletedId = payload.old?.id;
-      if (!deletedId) return;
-      knownIdsRef.current.delete(deletedId);
-      setNotifications((current) => {
-        const next = current.filter((item) => item.id !== deletedId);
-        if (current.length > 0 && next.length === 0) {
-          logBellNotificationsCleared("realtime-delete");
-        }
-        logSetNotifications("handleRealtimeDelete", current.length, next);
-        return next;
-      });
-    },
-    [logBellNotificationsCleared, logSetNotifications],
-  );
+      logSetNotifications("handleRealtimeDelete", current.length, next);
+      return next;
+    });
+  }, [logBellNotificationsCleared, logSetNotifications]);
+
   const runNotificationMutation = useCallback(
     async (mutator) => {
       const epoch = mutationEpochRef.current + 1;
       mutationEpochRef.current = epoch;
       mutationInFlightRef.current = true;
+
       try {
         await mutator(epoch);
       } finally {
@@ -571,12 +611,15 @@ export function useSiteNotifications() {
         await syncFromServer({ mutationEpoch: epoch, fresh: true });
       }
     },
-    [syncFromServer],
+    [syncFromServer]
   );
+
   const markAsRead = useCallback(
     async (notificationId) => {
       if (!notificationId) return;
+
       let wasUnread = false;
+
       setNotifications((current) => {
         const next = current.map((item) => {
           if (item.id !== notificationId) return item;
@@ -586,14 +629,13 @@ export function useSiteNotifications() {
         logSetNotifications("markAsRead", current.length, next);
         return next;
       });
+
       if (wasUnread) {
         setTrackedUnreadCount((count) => Math.max(0, count - 1));
       }
-      emitNotificationHubPatch(
-        notificationId,
-        { isRead: true },
-        { source: "notification-bell" },
-      );
+
+      emitNotificationHubPatch(notificationId, { isRead: true }, { source: "notification-bell" });
+
       await runNotificationMutation(async () => {
         try {
           const response = await fetch("/api/mark-notifications-read", {
@@ -602,6 +644,7 @@ export function useSiteNotifications() {
             credentials: "include",
             body: JSON.stringify({ ids: [notificationId] }),
           });
+
           if (!response.ok) {
             console.warn("Mark notification read failed:", response.status);
           }
@@ -610,11 +653,13 @@ export function useSiteNotifications() {
         }
       });
     },
-    [logSetNotifications, runNotificationMutation],
+    [logSetNotifications, runNotificationMutation]
   );
+
   const markAllAsRead = useCallback(() => {
     markedAllReadAtRef.current = Date.now();
     setTrackedUnreadCount(0);
+
     setNotifications((current) => {
       const next = current.map((item) => ({ ...item, isRead: true }));
       logSetNotifications("markAllAsRead", current.length, next);
@@ -622,7 +667,9 @@ export function useSiteNotifications() {
       devLog("notifications:after-mark-read");
       return next;
     });
+
     emitNotificationHubBulkRead({ source: "notification-bell" });
+
     void (async () => {
       try {
         const response = await fetch("/api/mark-notifications-read", {
@@ -631,23 +678,25 @@ export function useSiteNotifications() {
           credentials: "include",
           body: JSON.stringify({ all: true }),
         });
+
         if (!response.ok) {
           console.warn("Mark all notifications read failed:", response.status);
           return;
         }
+
         void syncFromServer({ fresh: true });
       } catch (err) {
-        console.warn(
-          "Mark all notifications read skipped:",
-          err?.message || err,
-        );
+        console.warn("Mark all notifications read skipped:", err?.message || err);
       }
     })();
   }, [logSetNotifications, syncFromServer]);
+
   const deleteNotification = useCallback(
     async (notificationId) => {
       if (!notificationId) return;
+
       let wasUnread = false;
+
       setNotifications((current) => {
         const target = current.find((item) => item.id === notificationId);
         wasUnread = isNotificationUnread(target);
@@ -659,12 +708,13 @@ export function useSiteNotifications() {
         return next;
       });
       knownIdsRef.current.delete(notificationId);
+
       if (wasUnread) {
         setTrackedUnreadCount((count) => Math.max(0, count - 1));
       }
-      emitNotificationHubRemove(notificationId, {
-        source: "notification-bell",
-      });
+
+      emitNotificationHubRemove(notificationId, { source: "notification-bell" });
+
       await runNotificationMutation(async () => {
         try {
           const response = await fetch("/api/delete-notifications", {
@@ -673,6 +723,7 @@ export function useSiteNotifications() {
             credentials: "include",
             body: JSON.stringify({ ids: [notificationId] }),
           });
+
           if (!response.ok) {
             console.warn("Delete notification failed:", response.status);
           }
@@ -681,15 +732,16 @@ export function useSiteNotifications() {
         }
       });
     },
-    [logBellNotificationsCleared, logSetNotifications, runNotificationMutation],
+    [logBellNotificationsCleared, logSetNotifications, runNotificationMutation]
   );
+
   const deleteAllNotifications = useCallback(async () => {
     clearedAllNotificationsRef.current = true;
     logBellNotificationsCleared("delete-all-notifications");
     logSetNotifications(
       "deleteAllNotifications",
       notificationsRef.current?.length || 0,
-      [],
+      []
     );
     setNotifications([]);
     setTrackedUnreadCount(0);
@@ -698,6 +750,7 @@ export function useSiteNotifications() {
     emitNotificationHubClear({ source: "notification-bell" });
     logNotificationMetrics("after-delete-all-local", []);
     devLog("notifications:after-delete-all");
+
     await runNotificationMutation(async () => {
       try {
         const response = await fetch("/api/delete-notifications", {
@@ -706,6 +759,7 @@ export function useSiteNotifications() {
           credentials: "include",
           body: JSON.stringify({ all: true }),
         });
+
         if (!response.ok) {
           console.warn("Delete all notifications failed:", response.status);
         }
@@ -713,11 +767,8 @@ export function useSiteNotifications() {
         console.warn("Delete all notifications skipped:", err?.message || err);
       }
     });
-  }, [
-    logBellNotificationsCleared,
-    logSetNotifications,
-    runNotificationMutation,
-  ]);
+  }, [logBellNotificationsCleared, logSetNotifications, runNotificationMutation]);
+
   useEffect(() => {
     registerNotificationCenterBridge({
       showToast: (notification) => {
@@ -731,21 +782,20 @@ export function useSiteNotifications() {
       shouldSkipToast: () => notificationPanelOpenRef.current,
       bumpBell: () => setBellShakeKey((value) => value + 1),
     });
+
     const removeCenterTestHook = installNotificationCenterTestHook();
+
     return () => {
       unregisterNotificationCenterBridge();
       removeCenterTestHook();
     };
   }, [canSyncNotifications, pushToast, registerIncomingNotification]);
+
   useEffect(() => {
     if (!authResolved) {
       syncGenerationRef.current += 1;
       logBellNotificationsCleared("auth-not-resolved");
-      logSetNotifications(
-        "auth-not-resolved",
-        notificationsRef.current?.length || 0,
-        [],
-      );
+      logSetNotifications("auth-not-resolved", notificationsRef.current?.length || 0, []);
       setNotifications([]);
       setTrackedUnreadCount(0);
       setActiveToast(null);
@@ -753,9 +803,7 @@ export function useSiteNotifications() {
       deferredToastBatchRef.current = [];
       toastShowingRef.current = false;
       clearToastTimers();
-      listEnterTimersRef.current.forEach((timerId) =>
-        window.clearTimeout(timerId),
-      );
+      listEnterTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
       listEnterTimersRef.current.clear();
       setRecentlyAddedIds([]);
       knownIdsRef.current = new Set();
@@ -768,33 +816,39 @@ export function useSiteNotifications() {
       stopFallbackPolling();
       return;
     }
+
     if (!canSyncNotifications) {
       setLoading(false);
       setTrackedUnreadCount(0);
       stopFallbackPolling();
       return;
     }
+
     setupBrowserSoundUnlock();
     const removeSoundListener = installNotificationSoundListener();
     const removeSoundTestHook = installNotificationSoundTestHook();
+
     let active = true;
     const generation = syncGenerationRef.current + 1;
     syncGenerationRef.current = generation;
     setLoading(true);
+
     const cancelDeferred = scheduleAfterPaint(() => {
       if (!active) return;
+
       void syncFromServer({ generation }).finally(() => {
         if (active) setLoading(false);
       });
+
       void (async () => {
         const sessionReady = await waitForSupabaseSession();
         if (!active) return;
+
         if (!sessionReady) {
-          console.warn(
-            "Notification realtime waiting for Supabase session; using fallback polling.",
-          );
+          console.warn("Notification realtime waiting for Supabase session; using fallback polling.");
           startFallbackPolling();
         }
+
         channelRef.current = supabase
           .channel(`site-notifications-${userEmail}`)
           .on(
@@ -806,10 +860,8 @@ export function useSiteNotifications() {
               filter: `user_email=eq.${userEmail}`,
             },
             (payload) => {
-              processNotificationCenterEvent(payload.new, {
-                source: "realtime",
-              });
-            },
+              processNotificationCenterEvent(payload.new, { source: "realtime" });
+            }
           )
           .on(
             "postgres_changes",
@@ -819,7 +871,7 @@ export function useSiteNotifications() {
               table: "notifications",
               filter: `user_email=eq.${userEmail}`,
             },
-            handleRealtimeUpdate,
+            handleRealtimeUpdate
           )
           .on(
             "postgres_changes",
@@ -829,16 +881,18 @@ export function useSiteNotifications() {
               table: "notifications",
               filter: `user_email=eq.${userEmail}`,
             },
-            handleRealtimeDelete,
+            handleRealtimeDelete
           )
           .subscribe((status) => {
             if (!active) return;
+
             if (status === "SUBSCRIBED") {
               realtimeConnectedRef.current = true;
               setRealtimeConnected(true);
               stopFallbackPolling();
               return;
             }
+
             if (
               status === "CLOSED" ||
               status === "CHANNEL_ERROR" ||
@@ -853,21 +907,27 @@ export function useSiteNotifications() {
           });
       })();
     }, INITIAL_SYNC_DELAY_MS);
+
     const handleVisibilityChange = () => {
       if (document.hidden) {
         stopFallbackPolling();
         return;
       }
+
       if (mutationInFlightRef.current) return;
+
       void syncFromServer({
         generation: syncGenerationRef.current,
         announceNew: true,
       });
+
       if (!realtimeConnectedRef.current) {
         startFallbackPolling();
       }
     };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       active = false;
       cancelDeferred();
@@ -878,9 +938,7 @@ export function useSiteNotifications() {
       pendingToastBatchRef.current = [];
       deferredToastBatchRef.current = [];
       toastShowingRef.current = false;
-      listEnterTimersRef.current.forEach((timerId) =>
-        window.clearTimeout(timerId),
-      );
+      listEnterTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
       listEnterTimersRef.current.clear();
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -905,8 +963,10 @@ export function useSiteNotifications() {
     syncFromServer,
     userEmail,
   ]);
+
   useEffect(() => {
     if (!canSyncNotifications) return undefined;
+
     return subscribeNotificationHub((event) => {
       if (event.type === "upsert" && event.notification) {
         registerIncomingNotification(event.notification, {
@@ -915,16 +975,18 @@ export function useSiteNotifications() {
         });
         return;
       }
+
       if (event.type === "patch" && event.id) {
         setNotifications((current) => {
           const next = current.map((item) =>
-            item.id === event.id ? { ...item, ...event.patch } : item,
+            item.id === event.id ? { ...item, ...event.patch } : item
           );
           logSetNotifications("hub-patch", current.length, next);
           return next;
         });
         return;
       }
+
       if (event.type === "remove" && event.id) {
         knownIdsRef.current.delete(event.id);
         setNotifications((current) => {
@@ -937,6 +999,7 @@ export function useSiteNotifications() {
         });
         return;
       }
+
       if (event.type === "bulk-read") {
         markedAllReadAtRef.current = Date.now();
         setTrackedUnreadCount(0);
@@ -947,42 +1010,37 @@ export function useSiteNotifications() {
         });
         return;
       }
+
       if (event.type === "clear") {
         clearedAllNotificationsRef.current = true;
         setTrackedUnreadCount(0);
         logBellNotificationsCleared("hub-clear-event");
-        logSetNotifications(
-          "hub-clear",
-          notificationsRef.current?.length || 0,
-          [],
-        );
+        logSetNotifications("hub-clear", notificationsRef.current?.length || 0, []);
         setNotifications([]);
         knownIdsRef.current = new Set();
       }
     });
-  }, [
-    canSyncNotifications,
-    logBellNotificationsCleared,
-    logSetNotifications,
-    registerIncomingNotification,
-  ]);
+  }, [canSyncNotifications, logBellNotificationsCleared, logSetNotifications, registerIncomingNotification]);
+
   const sortedNotifications = useMemo(
     () =>
       [...notifications].sort(
         (left, right) =>
-          new Date(right.createdAt || 0).getTime() -
-          new Date(left.createdAt || 0).getTime(),
+          new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
       ),
-    [notifications],
+    [notifications]
   );
+
   const unreadCount = useMemo(() => {
     const localUnread = countUnreadNotifications(sortedNotifications);
     return Math.max(trackedUnreadCount, localUnread);
   }, [sortedNotifications, trackedUnreadCount]);
+
   const localUnread = useMemo(
     () => countUnreadNotifications(sortedNotifications),
-    [sortedNotifications],
+    [sortedNotifications]
   );
+
   useEffect(() => {
     console.log("BELL_NOTIFICATIONS_STATE_CHANGED", {
       length: notifications.length,
@@ -994,18 +1052,21 @@ export function useSiteNotifications() {
       clearedAll: clearedAllNotificationsRef.current,
     });
   }, [notifications, trackedUnreadCount, localUnread, unreadCount]);
+
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
       logNotificationMetrics("state", notifications);
     }
   }, [notifications]);
+
   const unreadAnalysisCount = useMemo(
     () =>
       sortedNotifications.filter(
-        (item) => isNotificationUnread(item) && item.type === "analysis-reply",
+        (item) => isNotificationUnread(item) && item.type === "analysis-reply"
       ).length,
-    [sortedNotifications],
+    [sortedNotifications]
   );
+
   return {
     notifications: sortedNotifications,
     unreadCount,

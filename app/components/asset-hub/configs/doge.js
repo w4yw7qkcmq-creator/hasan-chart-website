@@ -31,7 +31,9 @@ export const dogeAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["doge", "dogecoin", "دوج", "دوجكوين", "dogeusdt"] },
+  analysis: {
+    keywords: ["doge", "dogecoin", "دوج", "دوجكوين", "dogeusdt"],
+  },
   faq: [
     {
       q: "ما هو دوجكوين (DOGE)؟",
@@ -55,30 +57,10 @@ export const dogeAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "المرجع الرئيسي لسوق الكريبتو.",
-      href: "/btc",
-    },
-    {
-      symbol: "SOL",
-      name: "سولانا",
-      description: "عملة بديلة عالية الزخم.",
-      href: "/crypto",
-    },
-    {
-      symbol: "BNB",
-      name: "BNB",
-      description: "عملة منصة Binance.",
-      href: "/crypto",
-    },
-    {
-      symbol: "XAU",
-      name: "الذهب",
-      description: "ملاذ آمن عالمي.",
-      href: "/gold",
-    },
+    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
+    { symbol: "SOL", name: "سولانا", description: "عملة بديلة عالية الزخم.", href: "/crypto" },
+    { symbol: "BNB", name: "BNB", description: "عملة منصة Binance.", href: "/crypto" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/gold" },
   ],
   links: {
     internal: [
@@ -128,13 +110,7 @@ export const dogeAssetConfig = {
     title: "HasaN CharT World | دوجكوين DOGE — مركز المعلومات",
     description:
       "مركز معلومات دوجكوين: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات DOGE، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "دوجكوين",
-      "DOGE",
-      "Dogecoin",
-      "سعر دوجكوين",
-    ],
+    keywords: ["HasaN CharT World", "دوجكوين", "DOGE", "Dogecoin", "سعر دوجكوين"],
   },
   jsonLd: {
     productName: "Dogecoin",

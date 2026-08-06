@@ -31,7 +31,9 @@ export const maticAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["matic", "polygon", "بوليجون", "maticusdt"] },
+  analysis: {
+    keywords: ["matic", "polygon", "بوليجون", "maticusdt"],
+  },
   faq: [
     {
       q: "ما هو بوليجون (MATIC)؟",
@@ -55,30 +57,10 @@ export const maticAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "الشبكة الأساسية لبوليجون.",
-      href: "/eth",
-    },
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "المرجع الرئيسي لسوق الكريبتو.",
-      href: "/btc",
-    },
-    {
-      symbol: "SOL",
-      name: "سولانا",
-      description: "بلوكتشين عالي الأداء.",
-      href: "/sol",
-    },
-    {
-      symbol: "AVAX",
-      name: "أفالانش",
-      description: "منصة بلوكتشين متعددة السلاسل.",
-      href: "/avax",
-    },
+    { symbol: "ETH", name: "الإيثيريوم", description: "الشبكة الأساسية لبوليجون.", href: "/eth" },
+    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
+    { symbol: "SOL", name: "سولانا", description: "بلوكتشين عالي الأداء.", href: "/sol" },
+    { symbol: "AVAX", name: "أفالانش", description: "منصة بلوكتشين متعددة السلاسل.", href: "/avax" },
   ],
   links: {
     internal: [
@@ -129,14 +111,7 @@ export const maticAssetConfig = {
     title: "HasaN CharT World | بوليجون MATIC — مركز المعلومات",
     description:
       "مركز معلومات بوليجون: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات MATIC، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "بوليجون",
-      "MATIC",
-      "Polygon",
-      "سعر MATIC",
-      "تحليل Polygon",
-    ],
+    keywords: ["HasaN CharT World", "بوليجون", "MATIC", "Polygon", "سعر MATIC", "تحليل Polygon"],
   },
   jsonLd: {
     productName: "Polygon",

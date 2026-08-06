@@ -3,17 +3,20 @@ import { pepeAssetConfig } from "../../components/asset-hub/configs/pepe";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_ASSET_HUB } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_ASSET_HUB;
+
+
 export const metadata = buildPublicPageMetadata({
   path: pepeAssetConfig.path,
   title: pepeAssetConfig.metadata.title,
   description: pepeAssetConfig.metadata.description,
   keywords: pepeAssetConfig.metadata.keywords,
 });
+
 export default function PepeLayout({ children }) {
   return (
     <>
-      
-      <AssetPageJsonLd config={pepeAssetConfig} /> {children}
+      <AssetPageJsonLd config={pepeAssetConfig} />
+      {children}
     </>
   );
 }

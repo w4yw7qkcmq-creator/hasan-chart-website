@@ -2,6 +2,8 @@ import TechnicalAnalysisPageJsonLd from "../../components/technical-analysis/Tec
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/technical-analysis",
   title: "HasaN CharT World | التحليل الفني",
@@ -19,11 +21,12 @@ export const metadata = buildPublicPageMetadata({
     "التحليلات اليومية",
   ],
 });
+
 export default function TechnicalAnalysisLayout({ children }) {
   return (
     <>
-      
-      <TechnicalAnalysisPageJsonLd /> {children}
+      <TechnicalAnalysisPageJsonLd />
+      {children}
     </>
   );
 }

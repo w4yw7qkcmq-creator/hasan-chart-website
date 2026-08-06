@@ -31,7 +31,9 @@ export const linkAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["link", "chainlink", "تشين لينك", "linkusdt"] },
+  analysis: {
+    keywords: ["link", "chainlink", "تشين لينك", "linkusdt"],
+  },
   faq: [
     {
       q: "ما هو تشين لينك (LINK)؟",
@@ -55,30 +57,10 @@ export const linkAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "المرجع الرئيسي لسوق الكريبتو.",
-      href: "/btc",
-    },
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "منصة العقود الذكية الرائدة.",
-      href: "/eth",
-    },
-    {
-      symbol: "ADA",
-      name: "كاردانو",
-      description: "بلوكتشين للعقود الذكية.",
-      href: "/ada",
-    },
-    {
-      symbol: "DOT",
-      name: "بولكادوت",
-      description: "شبكة متعددة السلاسل.",
-      href: "/dot",
-    },
+    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
+    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية الرائدة.", href: "/eth" },
+    { symbol: "ADA", name: "كاردانو", description: "بلوكتشين للعقود الذكية.", href: "/ada" },
+    { symbol: "DOT", name: "بولكادوت", description: "شبكة متعددة السلاسل.", href: "/dot" },
   ],
   links: {
     internal: [
@@ -129,14 +111,7 @@ export const linkAssetConfig = {
     title: "HasaN CharT World | تشين لينك LINK — مركز المعلومات",
     description:
       "مركز معلومات تشين لينك: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات LINK، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "تشين لينك",
-      "LINK",
-      "Chainlink",
-      "سعر LINK",
-      "تحليل Chainlink",
-    ],
+    keywords: ["HasaN CharT World", "تشين لينك", "LINK", "Chainlink", "سعر LINK", "تحليل Chainlink"],
   },
   jsonLd: {
     productName: "Chainlink",

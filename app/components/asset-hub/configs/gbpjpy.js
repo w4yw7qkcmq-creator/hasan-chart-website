@@ -27,17 +27,7 @@ export const gbpjpyAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: [
-      "gbpjpy",
-      "gbp/jpy",
-      "pound yen",
-      "boe",
-      "boj",
-      "الجنيه",
-      "ين",
-      "forex",
-      "فوركس",
-    ],
+    keywords: ["gbpjpy", "gbp/jpy", "pound yen", "boe", "boj", "الجنيه", "ين", "forex", "فوركس"],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -67,30 +57,10 @@ export const gbpjpyAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "GBP",
-      name: "الجنيه دولار",
-      description: "زوج GBP/USD — الكابل.",
-      href: "/gbpusd",
-    },
-    {
-      symbol: "JPY",
-      name: "الدولار ين",
-      description: "زوج USD/JPY — الجانب الياباني.",
-      href: "/usdjpy",
-    },
-    {
-      symbol: "EUR",
-      name: "اليورو ين",
-      description: "زوج EUR/JPY — متقاطع مشابه.",
-      href: "/eurjpy",
-    },
-    {
-      symbol: "EUR",
-      name: "اليورو جنيه",
-      description: "زوج EUR/GBP — مرتبط بالجنيه.",
-      href: "/eurgbp",
-    },
+    { symbol: "GBP", name: "الجنيه دولار", description: "زوج GBP/USD — الكابل.", href: "/gbpusd" },
+    { symbol: "JPY", name: "الدولار ين", description: "زوج USD/JPY — الجانب الياباني.", href: "/usdjpy" },
+    { symbol: "EUR", name: "اليورو ين", description: "زوج EUR/JPY — متقاطع مشابه.", href: "/eurjpy" },
+    { symbol: "EUR", name: "اليورو جنيه", description: "زوج EUR/GBP — مرتبط بالجنيه.", href: "/eurgbp" },
   ],
   links: {
     internal: [
@@ -144,14 +114,7 @@ export const gbpjpyAssetConfig = {
     title: "HasaN CharT World | GBP/JPY — مركز معلومات الفوركس",
     description:
       "مركز معلومات GBP/JPY: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات الجنيه ين، التنبيهات السعرية.",
-    keywords: [
-      "HasaN CharT World",
-      "GBP/JPY",
-      "GBPJPY",
-      "الجنيه ين",
-      "الفوركس",
-      "Forex",
-    ],
+    keywords: ["HasaN CharT World", "GBP/JPY", "GBPJPY", "الجنيه ين", "الفوركس", "Forex"],
   },
   jsonLd: {
     productName: "GBP/JPY",

@@ -1,7 +1,9 @@
 import { buildMarketsPageJsonLd, serializeJsonLd } from "../../../lib/seo";
+
 const MARKETS_TITLE = "HasaN CharT World | الأسواق المالية";
 const MARKETS_DESCRIPTION =
   "تعرف على جميع الأسواق التي تغطيها منصة HasaN CharT World، بما في ذلك العملات الرقمية، الفوركس، الذهب، الأسهم، المؤشرات، النفط، الأخبار الاقتصادية، والتحليلات الاحترافية.";
+
 export const MARKETS_ITEM_LIST = [
   { name: "العملات الرقمية", url: "/crypto-analysis" },
   { name: "الفوركس", url: "/forex-signals" },
@@ -17,6 +19,7 @@ export const MARKETS_ITEM_LIST = [
   { name: "إدارة الحسابات", url: "/account-management-service" },
   { name: "خدمات المستثمرين", url: "/subscriptions" },
 ];
+
 const MARKETS_FAQ = [
   {
     q: "ما الأسواق التي تغطيها HasaN CharT World؟",
@@ -39,6 +42,7 @@ const MARKETS_FAQ = [
     a: "أنشئ حساباً واستكشف صفحة الخدمة المناسبة مثل تحليل الكريبتو أو إشارات الفوركس أو الاشتراكات.",
   },
 ];
+
 export default function MarketsPageJsonLd() {
   const jsonLd = buildMarketsPageJsonLd({
     path: "/markets",
@@ -47,6 +51,7 @@ export default function MarketsPageJsonLd() {
     items: MARKETS_ITEM_LIST,
     faq: MARKETS_FAQ,
   });
+
   return (
     <script
       type="application/ld+json"

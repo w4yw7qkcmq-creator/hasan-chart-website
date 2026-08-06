@@ -27,20 +27,13 @@ export const sp500AssetConfig = {
     platform: "TradingView",
   },
   news: {
-    keywords: [
-      "s&p",
-      "s&p 500",
-      "sp500",
-      "spx",
-      "أسهم",
-      "stocks",
-      "earnings",
-      "أرباح",
-    ],
+    keywords: ["s&p", "s&p 500", "sp500", "spx", "أسهم", "stocks", "earnings", "أرباح"],
     tagHref: "/news/tag/stocks",
     archiveLabel: "أرشيف أخبار الأسهم",
   },
-  analysis: { keywords: ["s&p", "sp500", "spx", "s&p 500", "اس اند بي"] },
+  analysis: {
+    keywords: ["s&p", "sp500", "spx", "s&p 500", "اس اند بي"],
+  },
   faq: [
     {
       q: "ما هو مؤشر S&P 500؟",
@@ -64,30 +57,10 @@ export const sp500AssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "NDX",
-      name: "ناسداك",
-      description: "مؤشر التكنولوجيا الأمريكية.",
-      href: "/nasdaq",
-    },
-    {
-      symbol: "DJI",
-      name: "داو جونز",
-      description: "مؤشر 30 شركة أمريكية.",
-      href: "/dowjones",
-    },
-    {
-      symbol: "DAX",
-      name: "داكس",
-      description: "المؤشر الألماني.",
-      href: "/dax",
-    },
-    {
-      symbol: "XAU",
-      name: "الذهب",
-      description: "ملاذ آمن مرتبط بمعنويات المخاطرة.",
-      href: "/xauusd",
-    },
+    { symbol: "NDX", name: "ناسداك", description: "مؤشر التكنولوجيا الأمريكية.", href: "/nasdaq" },
+    { symbol: "DJI", name: "داو جونز", description: "مؤشر 30 شركة أمريكية.", href: "/dowjones" },
+    { symbol: "DAX", name: "داكس", description: "المؤشر الألماني.", href: "/dax" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/xauusd" },
   ],
   links: {
     internal: [
@@ -140,15 +113,7 @@ export const sp500AssetConfig = {
     title: "HasaN CharT World | S&P 500 — مركز المؤشرات",
     description:
       "مركز معلومات S&P 500: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات إس آند بي 500، التنبيهات السعرية.",
-    keywords: [
-      "HasaN CharT World",
-      "S&P 500",
-      "SPX",
-      "SP500",
-      "إس آند بي",
-      "المؤشرات",
-      "الأسهم",
-    ],
+    keywords: ["HasaN CharT World", "S&P 500", "SPX", "SP500", "إس آند بي", "المؤشرات", "الأسهم"],
   },
   jsonLd: {
     productName: "S&P 500",

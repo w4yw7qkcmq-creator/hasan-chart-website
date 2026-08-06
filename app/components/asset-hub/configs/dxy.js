@@ -43,14 +43,7 @@ export const dxyAssetConfig = {
     archiveLabel: "أرشيف أخبار الفيدرالي والدولار",
   },
   analysis: {
-    keywords: [
-      "dxy",
-      "dollar index",
-      "usdx",
-      "usd index",
-      "مؤشر الدولار",
-      "الدولار",
-    ],
+    keywords: ["dxy", "dollar index", "usdx", "usd index", "مؤشر الدولار", "الدولار"],
   },
   faq: [
     {
@@ -75,30 +68,10 @@ export const dxyAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "EUR",
-      name: "اليورو دولار",
-      description: "أكثر أزواج الفوركس تأثراً بـ DXY.",
-      href: "/eurusd",
-    },
-    {
-      symbol: "XAU",
-      name: "الذهب دولار",
-      description: "XAU/USD — عكسي غالباً مع الدولار.",
-      href: "/xauusd",
-    },
-    {
-      symbol: "XAG",
-      name: "الفضة",
-      description: "معدن ثمين مرتبط بقوة الدولار.",
-      href: "/xag",
-    },
-    {
-      symbol: "OIL",
-      name: "النفط",
-      description: "USOIL — يتأثر بالدولار والطاقة.",
-      href: "/usoil",
-    },
+    { symbol: "EUR", name: "اليورو دولار", description: "أكثر أزواج الفوركس تأثراً بـ DXY.", href: "/eurusd" },
+    { symbol: "XAU", name: "الذهب دولار", description: "XAU/USD — عكسي غالباً مع الدولار.", href: "/xauusd" },
+    { symbol: "XAG", name: "الفضة", description: "معدن ثمين مرتبط بقوة الدولار.", href: "/xag" },
+    { symbol: "OIL", name: "النفط", description: "USOIL — يتأثر بالدولار والطاقة.", href: "/usoil" },
   ],
   links: {
     internal: [

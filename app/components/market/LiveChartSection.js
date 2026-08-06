@@ -1,8 +1,10 @@
 "use client";
+
 import { memo, useEffect, useState } from "react";
 import { warmupBybitNetwork } from "../../../lib/bybit-network";
 import { warmupTradingViewNetwork } from "../../../lib/trading-view-network";
 import { useLazyInView } from "../../hooks/useLazyInView";
+
 function LiveChartSectionComponent({
   chartSearch,
   setChartSearch,
@@ -14,15 +16,18 @@ function LiveChartSectionComponent({
 }) {
   const { ref, isInView } = useLazyInView({ rootMargin: "240px 0px" });
   const [chartLoading, setChartLoading] = useState(true);
+
   useEffect(() => {
     setChartLoading(true);
   }, [chartSymbol, chartInterval]);
+
   useEffect(() => {
     if (isInView) {
       warmupTradingViewNetwork();
       warmupBybitNetwork();
     }
   }, [isInView]);
+
   const chartIntervals = [
     { value: "1", label: "1 دقيقة" },
     { value: "5", label: "5 دقائق" },
@@ -32,25 +37,19 @@ function LiveChartSectionComponent({
     { value: "D", label: "يومي" },
     { value: "W", label: "أسبوعي" },
   ];
+
   return (
     <section id="chart" className="site-live-chart-section w-full">
-      {" "}
       <div className="site-live-chart-panel glassPanel">
-        {" "}
         <header className="site-live-chart-header">
-          {" "}
-          <h2 className="sectionTitle site-live-chart-title">
-            الشارت الحي
-          </h2>{" "}
+          <h2 className="sectionTitle site-live-chart-title">الشارت الحي</h2>
           <p className="site-live-chart-desc">
-            {" "}
-            اختر العملة والفريم الزمني لمتابعة الرسم البياني المباشر.{" "}
-          </p>{" "}
-        </header>{" "}
+            اختر العملة والفريم الزمني لمتابعة الرسم البياني المباشر.
+          </p>
+        </header>
+
         <div className="site-live-chart-controls">
-          {" "}
           <div className="site-live-chart-symbol-row">
-            {" "}
             <input
               value={chartSearch}
               onChange={(e) => setChartSearch(e.target.value)}
@@ -61,70 +60,58 @@ function LiveChartSectionComponent({
               placeholder="ابحث عن أي عملة مثل BTC أو PEPE أو BTCUSDT"
               className="site-live-chart-input"
               aria-label="رمز العملة"
-            />{" "}
-            <button
-              type="button"
-              onClick={onApplySearch}
-              className="site-live-chart-btn"
-            >
-              {" "}
-              عرض الشارت{" "}
-            </button>{" "}
-          </div>{" "}
-          <div
-            className="site-live-chart-intervals"
-            role="group"
-            aria-label="الفريم الزمني"
-          >
-            {" "}
-            <span className="site-live-chart-intervals-label">
-              الفريم الزمني
-            </span>{" "}
+            />
+
+            <button type="button" onClick={onApplySearch} className="site-live-chart-btn">
+              عرض الشارت
+            </button>
+          </div>
+
+          <div className="site-live-chart-intervals" role="group" aria-label="الفريم الزمني">
+            <span className="site-live-chart-intervals-label">الفريم الزمني</span>
             <div className="site-live-chart-intervals-list">
-              {" "}
               {chartIntervals.map((item) => (
                 <button
                   key={item.value}
                   type="button"
                   onClick={() => setChartInterval(item.value)}
-                  className={`site-live-chart-interval-btn${chartInterval === item.value ? " is-active" : ""}`}
+                  className={`site-live-chart-interval-btn${
+                    chartInterval === item.value ? " is-active" : ""
+                  }`}
                   aria-pressed={chartInterval === item.value}
                 >
-                  {" "}
-                  {item.label}{" "}
+                  {item.label}
                 </button>
-              ))}{" "}
-            </div>{" "}
-          </div>{" "}
+              ))}
+            </div>
+          </div>
+
           {chartSearchError ? (
             <div className="site-live-chart-error" role="alert">
-              {" "}
-              {chartSearchError}{" "}
+              {chartSearchError}
             </div>
-          ) : null}{" "}
-        </div>{" "}
-        <div
-          ref={ref}
-          className="site-live-chart-frame"
-          aria-busy={chartLoading || !isInView}
-        >
-          {" "}
+          ) : null}
+        </div>
+
+        <div ref={ref} className="site-live-chart-frame" aria-busy={chartLoading || !isInView}>
           {!isInView || chartLoading ? (
             <div className="site-live-chart-skeleton" aria-live="polite">
-              {" "}
               <div className="site-live-chart-skeleton-bars">
-                {" "}
-                <span /> <span /> <span /> <span /> <span /> <span /> <span />{" "}
-                <span />{" "}
-              </div>{" "}
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
               <p className="site-live-chart-skeleton-text">
-                {" "}
-                {isInView
-                  ? "جاري تحميل الشارت..."
-                  : "سيُحمّل الشارت عند الظهور..."}{" "}
-              </p>{" "}
+                {isInView ? "جاري تحميل الشارت..." : "سيُحمّل الشارت عند الظهور..."}
+              </p>
             </div>
-          ) : null}{" "}
+          ) : null}
+
           {isInView ? (
             <iframe
               key={`${chartSymbol}-${chartInterval}`}
@@ -136,10 +123,11 @@ function LiveChartSectionComponent({
               fetchPriority="low"
               onLoad={() => setChartLoading(false)}
             />
-          ) : null}{" "}
-        </div>{" "}
-      </div>{" "}
+          ) : null}
+        </div>
+      </div>
     </section>
   );
 }
+
 export const LiveChartSection = memo(LiveChartSectionComponent);

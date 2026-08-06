@@ -1,5 +1,5 @@
 "use client";
-import { UiPageShell } from "../../components/ui";
+
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,21 +10,22 @@ import {
   validateAnalysisRequest,
 } from "../../../lib/instant-analysis-request";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
+
 const RealCandlestickChart = dynamic(() => import("./RealCandlestickChart"), {
   ssr: false,
   loading: () => null,
 });
-const InstantAnalysisV3Panel = dynamic(
-  () => import("./InstantAnalysisV3Panel"),
-  { ssr: false, loading: () => null },
-);
+
+const InstantAnalysisV3Panel = dynamic(() => import("./InstantAnalysisV3Panel"), {
+  ssr: false,
+  loading: () => null,
+});
+
 const InstantAnalysisV3Skeleton = dynamic(
-  () =>
-    import("./InstantAnalysisV3Panel").then((mod) => ({
-      default: mod.InstantAnalysisV3Skeleton,
-    })),
-  { ssr: false, loading: () => null },
+  () => import("./InstantAnalysisV3Panel").then((mod) => ({ default: mod.InstantAnalysisV3Skeleton })),
+  { ssr: false, loading: () => null }
 );
+
 const AI_LOADING_STAGES = [
   "جمع البيانات...",
   "تحليل البنية...",
@@ -34,11 +35,14 @@ const AI_LOADING_STAGES = [
   "كتابة التقرير...",
   "رسم الشارت...",
 ];
+
 let dashboardBootstrapInflight = null;
+
 async function fetchDashboardBootstrap(signal) {
   if (dashboardBootstrapInflight) {
     return dashboardBootstrapInflight;
   }
+
   const request = Promise.all([
     fetch("/api/alerts?summary=1", {
       method: "GET",
@@ -55,53 +59,50 @@ async function fetchDashboardBootstrap(signal) {
   ]).finally(() => {
     dashboardBootstrapInflight = null;
   });
+
   dashboardBootstrapInflight = request;
   return request;
 }
+
 function StatusBadge({ status, variant = "dashboard" }) {
   if (variant !== "dashboard") {
     return <span className="user-dashboard-badge">{status || "غير محدد"}</span>;
   }
+
   const isDone = status === "triggered" || status === "مكتمل";
   const isActive = status === "active";
   const label =
     status === "triggered"
       ? "تم الوصول"
       : status === "active"
-        ? "نشط"
-        : status === "مكتمل"
-          ? "مكتمل"
-          : status || "غير محدد";
+      ? "نشط"
+      : status === "مكتمل"
+      ? "مكتمل"
+      : status || "غير محدد";
+
   const badgeClass = isDone
     ? "user-dashboard-badge--done"
     : isActive
-      ? "user-dashboard-badge--active"
-      : "user-dashboard-badge--new";
+    ? "user-dashboard-badge--active"
+    : "user-dashboard-badge--new";
+
   return <span className={`user-dashboard-badge ${badgeClass}`}>{label}</span>;
 }
-function DashboardMetricCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  tone = "blue",
-  href,
-}) {
+
+function DashboardMetricCard({ title, value, subtitle, icon, tone = "blue", href }) {
   const content = (
     <>
-      {" "}
       <div className="user-dashboard-metric__icon" aria-hidden="true">
-        {" "}
-        {icon}{" "}
-      </div>{" "}
+        {icon}
+      </div>
       <div>
-        {" "}
-        <p className="user-dashboard-metric__title">{title}</p>{" "}
-        <p className="user-dashboard-metric__value">{value}</p>{" "}
-        <p className="user-dashboard-metric__subtitle">{subtitle}</p>{" "}
-      </div>{" "}
+        <p className="user-dashboard-metric__title">{title}</p>
+        <p className="user-dashboard-metric__value">{value}</p>
+        <p className="user-dashboard-metric__subtitle">{subtitle}</p>
+      </div>
     </>
   );
+
   if (href) {
     return (
       <Link
@@ -109,95 +110,74 @@ function DashboardMetricCard({
         className={`user-dashboard-metric user-dashboard-metric--${tone} user-dashboard-metric--clickable`}
         aria-label={`${title} - عرض جميع التنبيهات`}
       >
-        {" "}
-        {content}{" "}
+        {content}
       </Link>
     );
   }
-  return (
-    <div className={`user-dashboard-metric user-dashboard-metric--${tone}`}>
-      {content}
-    </div>
-  );
+
+  return <div className={`user-dashboard-metric user-dashboard-metric--${tone}`}>{content}</div>;
 }
+
 function DashboardPanel({ title, subtitle, action, children }) {
   return (
     <section className="user-dashboard-panel">
-      {" "}
       <div className="user-dashboard-panel__header">
-        {" "}
         <div>
-          {" "}
-          <h2 className="user-dashboard-panel__title">{title}</h2>{" "}
-          {subtitle ? (
-            <p className="user-dashboard-panel__subtitle">{subtitle}</p>
-          ) : null}{" "}
-        </div>{" "}
-        {action || null}{" "}
-      </div>{" "}
-      <div className="user-dashboard-panel__body">{children}</div>{" "}
+          <h2 className="user-dashboard-panel__title">{title}</h2>
+          {subtitle ? <p className="user-dashboard-panel__subtitle">{subtitle}</p> : null}
+        </div>
+        {action || null}
+      </div>
+      <div className="user-dashboard-panel__body">{children}</div>
     </section>
   );
 }
+
 function DashboardEmptyState({ message, icon = "📭" }) {
   return (
     <div className="user-dashboard-empty">
-      {" "}
       <span className="user-dashboard-empty__icon" aria-hidden="true">
-        {" "}
-        {icon}{" "}
-      </span>{" "}
-      <p>{message}</p>{" "}
+        {icon}
+      </span>
+      <p>{message}</p>
     </div>
   );
 }
+
 function QuickAction({ href, icon, title, text }) {
   return (
     <Link href={href} className="user-dashboard-action">
-      {" "}
       <span className="user-dashboard-action__icon" aria-hidden="true">
-        {" "}
-        {icon}{" "}
-      </span>{" "}
+        {icon}
+      </span>
       <div>
-        {" "}
-        <h3 className="user-dashboard-action__title">{title}</h3>{" "}
-        <p className="user-dashboard-action__text">{text}</p>{" "}
-      </div>{" "}
+        <h3 className="user-dashboard-action__title">{title}</h3>
+        <p className="user-dashboard-action__text">{text}</p>
+      </div>
     </Link>
   );
 }
+
+
 function DashboardListItem({ title, meta, badge, children, actions }) {
   return (
     <article className="user-dashboard-list-item">
-      {" "}
       <div className="user-dashboard-list-item__head">
-        {" "}
         <div className="user-dashboard-list-item__main">
-          {" "}
-          <h3 className="user-dashboard-list-item__title">{title}</h3>{" "}
-          {meta ? (
-            <p className="user-dashboard-list-item__meta">{meta}</p>
-          ) : null}{" "}
-        </div>{" "}
-        {badge || null}{" "}
-      </div>{" "}
-      {children ? (
-        <div className="user-dashboard-list-item__body">{children}</div>
-      ) : null}{" "}
-      {actions ? (
-        <div className="user-dashboard-list-item__actions">{actions}</div>
-      ) : null}{" "}
+          <h3 className="user-dashboard-list-item__title">{title}</h3>
+          {meta ? <p className="user-dashboard-list-item__meta">{meta}</p> : null}
+        </div>
+        {badge || null}
+      </div>
+      {children ? <div className="user-dashboard-list-item__body">{children}</div> : null}
+      {actions ? <div className="user-dashboard-list-item__actions">{actions}</div> : null}
     </article>
   );
 }
+
 export default function MyDashboard() {
   const { user, sessionPending, shouldShowLogin } = useRequireAuth();
-  const [alertCounts, setAlertCounts] = useState({
-    active: 0,
-    triggered: 0,
-    cancelled: 0,
-  });
+  const [alertCounts, setAlertCounts] = useState({ active: 0, triggered: 0, cancelled: 0 });
   const [myAnalysis, setMyAnalysis] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -217,63 +197,74 @@ export default function MyDashboard() {
   });
   const [aiCountdownSeconds, setAiCountdownSeconds] = useState(0);
   const aiAbortRef = useRef(null);
-  const UNAVAILABLE_MESSAGE =
-    "خدمة التحليل اللحظي غير متاحة مؤقتاً. يرجى المحاولة بعد قليل.";
+
+  const UNAVAILABLE_MESSAGE = "خدمة التحليل اللحظي غير متاحة مؤقتاً. يرجى المحاولة بعد قليل.";
+
   const applyAvailabilityPayload = (payload) => {
     if (!payload || payload.success !== true) {
       return;
     }
+
     const allowed = payload.allowed !== false;
-    const retryAfterSeconds = Math.max(
-      0,
-      Number(payload.retryAfterSeconds) || 0,
-    );
+    const retryAfterSeconds = Math.max(0, Number(payload.retryAfterSeconds) || 0);
+
     setAiAvailability({
       allowed,
       retryAfterSeconds: allowed ? 0 : retryAfterSeconds,
       nextAllowedAt: allowed ? null : payload.nextAllowedAt || null,
       fetchedAt: Date.now(),
     });
+
     if (!allowed) {
       setAiCountdownSeconds(retryAfterSeconds);
     } else {
       setAiCountdownSeconds(0);
     }
   };
+
   const formatInstantAnalysisCountdown = (totalSeconds) => {
     const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
     const minutes = Math.floor(safe / 60);
     const seconds = safe % 60;
+
     if (minutes > 0) {
       return `${minutes} دقيقة و${seconds} ثانية`;
     }
+
     return `${seconds} ثانية`;
   };
+
   useEffect(() => {
     return () => {
       aiAbortRef.current?.abort();
     };
   }, []);
+
   useEffect(() => {
     if (sessionPending || shouldShowLogin || !user?.email) return;
-    const allAnalysis = JSON.parse(
-      localStorage.getItem("analysisRequests") || "[]",
-    );
+
+    const allAnalysis = JSON.parse(localStorage.getItem("analysisRequests") || "[]");
     setMyAnalysis(allAnalysis.filter((a) => a.userEmail === user.email));
   }, [sessionPending, shouldShowLogin, user?.email]);
+
   useEffect(() => {
     if (sessionPending || shouldShowLogin || !user?.email) return undefined;
+
     const controller = new AbortController();
     let cancelled = false;
     setNotificationsLoading(true);
+
     void fetchDashboardBootstrap(controller.signal)
       .then(async ([alertsResponse, notificationsResponse]) => {
         if (cancelled) return;
+
         const [alertsResult, notificationsResult] = await Promise.all([
           alertsResponse.json().catch(() => null),
           notificationsResponse.json().catch(() => null),
         ]);
+
         if (cancelled) return;
+
         if (alertsResult?.success && alertsResult.counts) {
           setAlertCounts({
             active: Number(alertsResult.counts.active) || 0,
@@ -283,10 +274,8 @@ export default function MyDashboard() {
         } else {
           setAlertCounts({ active: 0, triggered: 0, cancelled: 0 });
         }
-        if (
-          notificationsResult?.success &&
-          Array.isArray(notificationsResult.notifications)
-        ) {
+
+        if (notificationsResult?.success && Array.isArray(notificationsResult.notifications)) {
           setNotifications(notificationsResult.notifications);
         }
       })
@@ -297,16 +286,20 @@ export default function MyDashboard() {
       .finally(() => {
         if (!cancelled) setNotificationsLoading(false);
       });
+
     return () => {
       cancelled = true;
       controller.abort();
     };
   }, [sessionPending, shouldShowLogin, user?.email]);
+
   useEffect(() => {
     if (sessionPending || shouldShowLogin || !user?.email) {
       return undefined;
     }
+
     let cancelled = false;
+
     void fetch("/api/instant-analysis/availability", {
       credentials: "include",
       cache: "no-store",
@@ -319,24 +312,23 @@ export default function MyDashboard() {
       .catch(() => {
         if (cancelled) return;
       });
+
     return () => {
       cancelled = true;
     };
   }, [sessionPending, shouldShowLogin, user?.email]);
+
   useEffect(() => {
     if (aiAvailability.allowed) {
       setAiCountdownSeconds(0);
       return undefined;
     }
+
     const tick = () => {
-      const elapsed = Math.floor(
-        (Date.now() - (aiAvailability.fetchedAt || Date.now())) / 1000,
-      );
-      const remaining = Math.max(
-        0,
-        (aiAvailability.retryAfterSeconds || 0) - elapsed,
-      );
+      const elapsed = Math.floor((Date.now() - (aiAvailability.fetchedAt || Date.now())) / 1000);
+      const remaining = Math.max(0, (aiAvailability.retryAfterSeconds || 0) - elapsed);
       setAiCountdownSeconds(remaining);
+
       if (remaining <= 0) {
         setAiAvailability((prev) => ({
           ...prev,
@@ -346,75 +338,82 @@ export default function MyDashboard() {
         }));
       }
     };
+
     tick();
     const timerId = setInterval(tick, 1000);
+
     return () => clearInterval(timerId);
-  }, [
-    aiAvailability.allowed,
-    aiAvailability.retryAfterSeconds,
-    aiAvailability.fetchedAt,
-  ]);
+  }, [aiAvailability.allowed, aiAvailability.retryAfterSeconds, aiAvailability.fetchedAt]);
+
   const stats = useMemo(() => {
     const activeAlerts = alertCounts.active;
     const triggeredAlerts = alertCounts.triggered;
     const cancelledAlerts = alertCounts.cancelled;
-    const pendingAnalysis = myAnalysis.filter(
-      (item) => item.status !== "مكتمل",
-    ).length;
+    const pendingAnalysis = myAnalysis.filter((item) => item.status !== "مكتمل").length;
+
     return { activeAlerts, triggeredAlerts, cancelledAlerts, pendingAnalysis };
   }, [alertCounts, myAnalysis]);
+
   const latestAnalysis = useMemo(() => myAnalysis.slice(0, 4), [myAnalysis]);
+
   const adminReplies = useMemo(
     () => myAnalysis.filter((item) => item.reply).slice(0, 4),
-    [myAnalysis],
+    [myAnalysis]
   );
+
   const subscriptionLabel = user?.subscription_plan || "لا يوجد اشتراك";
   const subscriptionStatus = user?.subscription_status || "غير مفعل";
+
   const analyzeCoinWithAI = async () => {
     if (aiLoading || !aiAvailability.allowed) {
       return;
     }
+
     const validation = validateAnalysisRequest({
       symbol: aiSymbol,
       timeframe: aiTimeframe,
     });
+
     if (!validation.ok) {
       setAiError(validation.message);
       return;
     }
+
     const requestSnapshot = {
       symbol: validation.symbol,
       timeframe: validation.timeframe,
     };
+
     aiAbortRef.current?.abort();
     const analysisController = new AbortController();
     aiAbortRef.current = analysisController;
+
     setAiRequestSnapshot(requestSnapshot);
     setAiLoading(true);
     setAiLoadingText(buildLoadingMessage(requestSnapshot));
     setAiError("");
     setAiResult(null);
     setShowAiAnalysis(true);
+
     let loadingStageIndex = 0;
     const loadingStageTimer = setInterval(() => {
-      loadingStageIndex = Math.min(
-        loadingStageIndex + 1,
-        AI_LOADING_STAGES.length - 1,
-      );
+      loadingStageIndex = Math.min(loadingStageIndex + 1, AI_LOADING_STAGES.length - 1);
       if (loadingStageIndex === 0) {
         setAiLoadingText(buildLoadingMessage(requestSnapshot));
       } else {
         setAiLoadingText(AI_LOADING_STAGES[loadingStageIndex]);
       }
     }, 2200);
+
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
     const fetchWithTimeout = async (url, options = {}, timeoutMs = 20000) => {
       const timeoutController = new AbortController();
       const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
       const abortFetch = () => timeoutController.abort();
-      analysisController.signal.addEventListener("abort", abortFetch, {
-        once: true,
-      });
+
+      analysisController.signal.addEventListener("abort", abortFetch, { once: true });
+
       try {
         return await fetch(url, {
           ...options,
@@ -425,14 +424,11 @@ export default function MyDashboard() {
         analysisController.signal.removeEventListener("abort", abortFetch);
       }
     };
+
     const normalizeResult = (raw) => {
       const data = raw?.result || raw || {};
-      const v2Payload =
-        data.v2 && data.v2.version === "2.0"
-          ? data.v2
-          : data.version === "2.0"
-            ? data
-            : null;
+      const v2Payload = data.v2 && data.v2.version === "2.0" ? data.v2 : data.version === "2.0" ? data : null;
+
       if (v2Payload) {
         return {
           version: "2.0",
@@ -444,38 +440,23 @@ export default function MyDashboard() {
           chartData: v2Payload.chart?.candles || [],
         };
       }
-      const trend =
-        data.marketBias || data.trend || data.direction || "neutral";
-      const confidence = data.confidence
-        ? `\n\nنسبة الثقة: ${data.confidence}%`
-        : "";
+
+      const trend = data.marketBias || data.trend || data.direction || "neutral";
+      const confidence = data.confidence ? `\n\nنسبة الثقة: ${data.confidence}%` : "";
       const levels = [
-        data.entry
-          ? `الدخول المحتمل: ${Number(data.entry).toLocaleString()}`
-          : "",
-        data.stopLoss
-          ? `وقف الخسارة: ${Number(data.stopLoss).toLocaleString()}`
-          : "",
-        data.target1
-          ? `الهدف الأول: ${Number(data.target1).toLocaleString()}`
-          : "",
-        data.target2
-          ? `الهدف الثاني: ${Number(data.target2).toLocaleString()}`
-          : "",
+        data.entry ? `الدخول المحتمل: ${Number(data.entry).toLocaleString()}` : "",
+        data.stopLoss ? `وقف الخسارة: ${Number(data.stopLoss).toLocaleString()}` : "",
+        data.target1 ? `الهدف الأول: ${Number(data.target1).toLocaleString()}` : "",
+        data.target2 ? `الهدف الثاني: ${Number(data.target2).toLocaleString()}` : "",
       ]
         .filter(Boolean)
         .join("\n");
+
       return {
         ...data,
         symbol: data.symbol || requestSnapshot.symbol,
         marketBias: trend,
-        bos:
-          data.bos ||
-          (String(trend).toLowerCase().includes("bull")
-            ? "Bullish BOS"
-            : String(trend).toLowerCase().includes("bear")
-              ? "Bearish BOS"
-              : "بانتظار تأكيد"),
+        bos: data.bos || (String(trend).toLowerCase().includes("bull") ? "Bullish BOS" : String(trend).toLowerCase().includes("bear") ? "Bearish BOS" : "بانتظار تأكيد"),
         choch: data.choch || "راقب تغير السلوك السعري",
         premiumZone: Boolean(data.premiumZone),
         currentPrice: data.currentPrice,
@@ -498,22 +479,28 @@ export default function MyDashboard() {
             .join("\n\n") + confidence,
       };
     };
+
     try {
       const requestBody = buildAnalysisRequestBody({
         symbol: requestSnapshot.symbol,
         timeframe: requestSnapshot.timeframe,
       });
+
       const response = await fetchWithTimeout(
         "/api/instant-analysis",
         {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify(requestBody),
         },
-        20000,
+        20000
       );
+
       const data = await response.json().catch(() => null);
+
       if (!response.ok || !data?.success) {
         if (response.status === 429) {
           applyAvailabilityPayload({
@@ -523,60 +510,75 @@ export default function MyDashboard() {
             nextAllowedAt: data?.nextAllowedAt,
           });
         }
+
         throw new Error(data?.message || UNAVAILABLE_MESSAGE);
       }
+
       if (data?.availability) {
         applyAvailabilityPayload(data.availability);
       }
+
       if (!data.jobId && data.result) {
         setAiResult(normalizeResult(data.result));
         setAiLoadingText("تم تجهيز التحليل بنجاح");
         return;
       }
+
       if (!data.jobId) {
         setAiResult(normalizeResult(data));
         setAiLoadingText("تم تجهيز التحليل بنجاح");
         return;
       }
       setAiLoadingText("جاري التحليل اللحظي...");
+
       for (let attempt = 1; attempt <= 45; attempt += 1) {
         if (analysisController.signal.aborted) {
           return;
         }
+
         await sleep(2000);
+
         if (analysisController.signal.aborted) {
           return;
         }
+
         setAiLoadingText("جاري التحليل اللحظي...");
+
         const statusResponse = await fetchWithTimeout(
           `/api/instant-analysis/${encodeURIComponent(data.jobId)}`,
           {
             method: "GET",
             credentials: "include",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-          12000,
+          12000
         );
+
         const statusData = await statusResponse.json().catch(() => null);
+
         if (!statusResponse.ok || !statusData?.success) {
           throw new Error(statusData?.message || "تعذر قراءة نتيجة التحليل.");
         }
+
         if (statusData.status === "completed" || statusData.result) {
           setAiResult(normalizeResult(statusData.result || statusData));
           setAiLoadingText("تم تجهيز التحليل بنجاح");
           return;
         }
+
         if (statusData.status === "failed") {
           throw new Error(statusData.error || "فشل توليد التحليل على السيرفر");
         }
       }
-      setAiError(
-        "التحليل ما زال قيد المعالجة على السيرفر. جرّب مرة ثانية بعد قليل.",
-      );
+
+      setAiError("التحليل ما زال قيد المعالجة على السيرفر. جرّب مرة ثانية بعد قليل.");
     } catch (err) {
       if (analysisController.signal.aborted) {
         return;
       }
+
       if (err?.name === "AbortError") {
         setAiError("انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى بعد لحظات.");
       } else {
@@ -591,130 +593,88 @@ export default function MyDashboard() {
       }
     }
   };
+
   if (sessionPending) {
     return (
       <main className="user-dashboard-page user-dashboard-page--gate">
-        {" "}
-        <div className="user-dashboard-page__bg" aria-hidden="true" />{" "}
+        <div className="user-dashboard-page__bg" aria-hidden="true" />
         <div className="user-dashboard-gate">
-          {" "}
-          <div className="user-dashboard-gate__icon" aria-hidden="true">
-            ⏳
-          </div>{" "}
-          <h1 className="user-dashboard-gate__title">جاري التحقق من الجلسة</h1>{" "}
-          <p className="user-dashboard-gate__text">
-            يرجى الانتظار حتى اكتمال فحص الجلسة...
-          </p>{" "}
-        </div>{" "}
+          <div className="user-dashboard-gate__icon" aria-hidden="true">⏳</div>
+          <h1 className="user-dashboard-gate__title">جاري التحقق من الجلسة</h1>
+          <p className="user-dashboard-gate__text">يرجى الانتظار حتى اكتمال فحص الجلسة...</p>
+        </div>
       </main>
     );
   }
+
   if (shouldShowLogin) {
     return (
       <main className="user-dashboard-page user-dashboard-page--gate">
-        {" "}
-        <div className="user-dashboard-page__bg" aria-hidden="true" />{" "}
+        <div className="user-dashboard-page__bg" aria-hidden="true" />
         <div className="user-dashboard-gate">
-          {" "}
-          <div className="user-dashboard-gate__icon" aria-hidden="true">
-            🔐
-          </div>{" "}
-          <h1 className="user-dashboard-gate__title">سجّل الدخول أولاً</h1>{" "}
-          <p className="user-dashboard-gate__text">
-            ادخل إلى حسابك لعرض لوحة المستخدم والتنبيهات وطلبات التحليل.
-          </p>{" "}
+          <div className="user-dashboard-gate__icon" aria-hidden="true">🔐</div>
+          <h1 className="user-dashboard-gate__title">سجّل الدخول أولاً</h1>
+          <p className="user-dashboard-gate__text">ادخل إلى حسابك لعرض لوحة المستخدم والتنبيهات وطلبات التحليل.</p>
           <Link href="/login" className="user-dashboard-gate__btn">
-            {" "}
-            الدخول للحساب{" "}
-          </Link>{" "}
-        </div>{" "}
+            الدخول للحساب
+          </Link>
+        </div>
       </main>
     );
   }
+
   return (
     <main className="user-dashboard-page">
-      {" "}
-      <div className="user-dashboard-page__bg" aria-hidden="true" />{" "}
+      <div className="user-dashboard-page__bg" aria-hidden="true" />
+
       <div className="user-dashboard-page__inner">
-        {" "}
         <header className="user-dashboard-hero">
-          {" "}
           <div className="user-dashboard-hero__content">
-            {" "}
-            <span className="user-dashboard-hero__eyebrow">
-              لوحة المستخدم
-            </span>{" "}
-            <h1 className="user-dashboard-hero__title">
-              مرحباً، {user.username || "متداول محترف"}
-            </h1>{" "}
+            <span className="user-dashboard-hero__eyebrow">لوحة المستخدم</span>
+            <h1 className="user-dashboard-hero__title">مرحباً، {user.username || "متداول محترف"}</h1>
             <p className="user-dashboard-hero__text">
-              {" "}
-              من هنا تتابع طلبات التحليل، التنبيهات السعرية، وردود الإدارة داخل
-              لوحة واحدة منظمة.{" "}
-            </p>{" "}
+              من هنا تتابع طلبات التحليل، التنبيهات السعرية، وردود الإدارة داخل لوحة واحدة منظمة.
+            </p>
             <div className="user-dashboard-hero__stats">
-              {" "}
               <div className="user-dashboard-hero__stat">
-                {" "}
-                <span className="user-dashboard-hero__stat-value">
-                  {myAnalysis.length}
-                </span>{" "}
-                <span className="user-dashboard-hero__stat-label">
-                  طلبات التحليل
-                </span>{" "}
-              </div>{" "}
+                <span className="user-dashboard-hero__stat-value">{myAnalysis.length}</span>
+                <span className="user-dashboard-hero__stat-label">طلبات التحليل</span>
+              </div>
               <div className="user-dashboard-hero__stat">
-                {" "}
-                <span className="user-dashboard-hero__stat-value">
-                  {stats.activeAlerts}
-                </span>{" "}
-                <span className="user-dashboard-hero__stat-label">
-                  تنبيهات نشطة
-                </span>{" "}
-              </div>{" "}
+                <span className="user-dashboard-hero__stat-value">{stats.activeAlerts}</span>
+                <span className="user-dashboard-hero__stat-label">تنبيهات نشطة</span>
+              </div>
               <div className="user-dashboard-hero__stat">
-                {" "}
-                <span className="user-dashboard-hero__stat-value">
-                  {stats.pendingAnalysis}
-                </span>{" "}
-                <span className="user-dashboard-hero__stat-label">
-                  قيد المتابعة
-                </span>{" "}
-              </div>{" "}
-            </div>{" "}
-          </div>{" "}
+                <span className="user-dashboard-hero__stat-value">{stats.pendingAnalysis}</span>
+                <span className="user-dashboard-hero__stat-label">قيد المتابعة</span>
+              </div>
+            </div>
+          </div>
+
           <div className="user-dashboard-hero__profile">
-            {" "}
             <div className="user-dashboard-hero__avatar" aria-hidden="true">
-              {" "}
-              {(user.username || user.email || "HC")
-                .slice(0, 2)
-                .toUpperCase()}{" "}
-            </div>{" "}
-            <p className="user-dashboard-hero__name">
-              {user.username || "حسابي"}
-            </p>{" "}
-            <p className="user-dashboard-hero__email">{user.email}</p>{" "}
-          </div>{" "}
-        </header>{" "}
+              {(user.username || user.email || "HC").slice(0, 2).toUpperCase()}
+            </div>
+            <p className="user-dashboard-hero__name">{user.username || "حسابي"}</p>
+            <p className="user-dashboard-hero__email">{user.email}</p>
+          </div>
+        </header>
+
         <section className="user-dashboard-metrics" aria-label="ملخص سريع">
-          {" "}
           <DashboardMetricCard
             title="حالة الحساب"
             value={user.role === "admin" ? "إدارة" : "نشط"}
-            subtitle={
-              user.loggedAt ? `آخر دخول: ${user.loggedAt}` : "مسجل الدخول الآن"
-            }
+            subtitle={user.loggedAt ? `آخر دخول: ${user.loggedAt}` : "مسجل الدخول الآن"}
             icon="👤"
             tone="blue"
-          />{" "}
+          />
           <DashboardMetricCard
             title="نوع الاشتراك"
             value={subscriptionLabel}
             subtitle={`الحالة: ${subscriptionStatus}`}
             icon="⭐"
             tone="green"
-          />{" "}
+          />
           <DashboardMetricCard
             title="تنبيهات نشطة"
             value={stats.activeAlerts}
@@ -722,219 +682,161 @@ export default function MyDashboard() {
             icon="🔔"
             tone="cyan"
             href="/my-dashboard/alerts"
-          />{" "}
+          />
           <DashboardMetricCard
             title="طلبات التحليل"
             value={myAnalysis.length}
             subtitle={`${stats.pendingAnalysis} بانتظار الرد`}
             icon="🧠"
             tone="orange"
-          />{" "}
-        </section>{" "}
+          />
+        </section>
+
         <section className="user-dashboard-actions" aria-label="إجراءات سريعة">
-          {" "}
-          <QuickAction
-            href="#instant-analysis"
-            icon="📈"
-            title="تحليل لحظي"
-            text="SMC و ICT لحظياً"
-          />{" "}
-          <QuickAction
-            href="/alerts?tab=create"
-            icon="🔔"
-            title="تنبيه سعر"
-            text="حدد العملة والسعر المطلوب"
-          />{" "}
-          <QuickAction
-            href="/my-analysis"
-            icon="📩"
-            title="ردود الإدارة"
-            text="تابع ردود الإدارة على طلباتك"
-          />{" "}
-          <QuickAction
-            href="/notifications"
-            icon="🔔"
-            title="الإشعارات"
-            text="عرض كل الإشعارات"
-          />{" "}
+          <QuickAction href="#instant-analysis" icon="📈" title="تحليل لحظي" text="SMC و ICT لحظياً" />
+          <QuickAction href="/alerts?tab=create" icon="🔔" title="تنبيه سعر" text="حدد العملة والسعر المطلوب" />
+          <QuickAction href="/my-analysis" icon="📩" title="ردود الإدارة" text="تابع ردود الإدارة على طلباتك" />
+          <QuickAction href="/notifications" icon="🔔" title="الإشعارات" text="عرض كل الإشعارات" />
           <QuickAction
             href="/notification-settings"
             icon="🔊"
             title="إعدادات الإشعارات"
             text="تحكم في الإشعارات والصوت والبريد"
-          />{" "}
-        </section>{" "}
+          />
+        </section>
+
         <section className="user-dashboard-grid">
-          {" "}
-          <DashboardPanel title="حالة الحساب" subtitle="معلومات حسابك الأساسية">
-            {" "}
+          <DashboardPanel
+            title="حالة الحساب"
+            subtitle="معلومات حسابك الأساسية"
+          >
             <div className="user-dashboard-info-rows">
-              {" "}
               <div className="user-dashboard-info-row">
-                {" "}
-                <span>نوع الحساب</span>{" "}
-                <strong>
-                  {user.role === "admin" ? "إدارة" : "مستخدم"}
-                </strong>{" "}
-              </div>{" "}
+                <span>نوع الحساب</span>
+                <strong>{user.role === "admin" ? "إدارة" : "مستخدم"}</strong>
+              </div>
               <div className="user-dashboard-info-row">
-                {" "}
-                <span>التليجرام</span>{" "}
-                <strong>{user.telegram || "غير مضاف"}</strong>{" "}
-              </div>{" "}
+                <span>التليجرام</span>
+                <strong>{user.telegram || "غير مضاف"}</strong>
+              </div>
               <div className="user-dashboard-info-row">
-                {" "}
-                <span>آخر دخول</span>{" "}
-                <strong>{user.loggedAt || "الآن"}</strong>{" "}
-              </div>{" "}
-            </div>{" "}
-          </DashboardPanel>{" "}
-          <DashboardPanel title="نوع الاشتراك" subtitle="تفاصيل خطتك الحالية">
-            {" "}
+                <span>آخر دخول</span>
+                <strong>{user.loggedAt || "الآن"}</strong>
+              </div>
+            </div>
+          </DashboardPanel>
+
+          <DashboardPanel
+            title="نوع الاشتراك"
+            subtitle="تفاصيل خطتك الحالية"
+          >
             <div className="user-dashboard-info-rows">
-              {" "}
               <div className="user-dashboard-info-row">
-                {" "}
-                <span>الخطة</span> <strong>{subscriptionLabel}</strong>{" "}
-              </div>{" "}
+                <span>الخطة</span>
+                <strong>{subscriptionLabel}</strong>
+              </div>
               <div className="user-dashboard-info-row">
-                {" "}
-                <span>الحالة</span> <strong>{subscriptionStatus}</strong>{" "}
-              </div>{" "}
+                <span>الحالة</span>
+                <strong>{subscriptionStatus}</strong>
+              </div>
               <div className="user-dashboard-info-row">
-                {" "}
-                <span>البريد</span>{" "}
-                <strong className="user-dashboard-info-row__truncate">
-                  {user.email}
-                </strong>{" "}
-              </div>{" "}
-            </div>{" "}
-          </DashboardPanel>{" "}
+                <span>البريد</span>
+                <strong className="user-dashboard-info-row__truncate">{user.email}</strong>
+              </div>
+            </div>
+          </DashboardPanel>
+
           <DashboardPanel
             title="آخر طلبات التحليل"
             subtitle="أحدث الطلبات المرسلة"
             action={
               <Link href="/my-analysis" className="user-dashboard-panel__link">
-                {" "}
-                عرض الكل{" "}
+                عرض الكل
               </Link>
             }
           >
-            {" "}
             {latestAnalysis.length > 0 ? (
               <div className="user-dashboard-list">
-                {" "}
                 {latestAnalysis.map((req) => (
                   <DashboardListItem
                     key={req.id}
                     title={req.coin}
                     meta={`${req.frame || "—"} · ${req.createdAt || ""}`}
-                    badge={
-                      <StatusBadge status={req.status} variant="dashboard" />
-                    }
+                    badge={<StatusBadge status={req.status} variant="dashboard" />}
                   />
-                ))}{" "}
+                ))}
               </div>
             ) : (
               <DashboardEmptyState message="لا توجد طلبات حالياً" icon="📭" />
-            )}{" "}
-          </DashboardPanel>{" "}
-          <Link
-            href="/my-dashboard/alerts"
-            className="user-dashboard-panel user-dashboard-panel--clickable"
-          >
-            {" "}
+            )}
+          </DashboardPanel>
+
+          <Link href="/my-dashboard/alerts" className="user-dashboard-panel user-dashboard-panel--clickable">
             <div className="user-dashboard-panel__header">
-              {" "}
               <div>
-                {" "}
-                <h2 className="user-dashboard-panel__title">
-                  إدارة التنبيهات
-                </h2>{" "}
-                <p className="user-dashboard-panel__subtitle">
-                  متابعة التنبيهات قيد الانتظار والمنفذة والملغاة
-                </p>{" "}
-              </div>{" "}
-              <span className="user-dashboard-panel__link">فتح</span>{" "}
-            </div>{" "}
+                <h2 className="user-dashboard-panel__title">إدارة التنبيهات</h2>
+                <p className="user-dashboard-panel__subtitle">متابعة التنبيهات قيد الانتظار والمنفذة والملغاة</p>
+              </div>
+              <span className="user-dashboard-panel__link">فتح</span>
+            </div>
             <div className="user-dashboard-panel__body">
-              {" "}
               <div className="user-dashboard-info-rows">
-                {" "}
                 <div className="user-dashboard-info-row">
-                  {" "}
-                  <span>قيد الانتظار</span>{" "}
-                  <strong>{stats.activeAlerts}</strong>{" "}
-                </div>{" "}
+                  <span>قيد الانتظار</span>
+                  <strong>{stats.activeAlerts}</strong>
+                </div>
                 <div className="user-dashboard-info-row">
-                  {" "}
-                  <span>تم التنفيذ</span>{" "}
-                  <strong>{stats.triggeredAlerts}</strong>{" "}
-                </div>{" "}
+                  <span>تم التنفيذ</span>
+                  <strong>{stats.triggeredAlerts}</strong>
+                </div>
                 <div className="user-dashboard-info-row">
-                  {" "}
-                  <span>ملغاة</span>{" "}
-                  <strong>{stats.cancelledAlerts}</strong>{" "}
-                </div>{" "}
-              </div>{" "}
-            </div>{" "}
-          </Link>{" "}
+                  <span>ملغاة</span>
+                  <strong>{stats.cancelledAlerts}</strong>
+                </div>
+              </div>
+            </div>
+          </Link>
+
           <DashboardPanel
             title="رسائل الإدارة / الردود"
             subtitle="آخر ردود الإدارة على طلباتك"
             action={
               <Link href="/my-analysis" className="user-dashboard-panel__link">
-                {" "}
-                عرض الكل{" "}
+                عرض الكل
               </Link>
             }
           >
-            {" "}
             {adminReplies.length > 0 ? (
               <div className="user-dashboard-list">
-                {" "}
                 {adminReplies.map((req) => (
                   <DashboardListItem
                     key={`reply-${req.id}`}
                     title={req.coin}
                     meta={req.createdAt || ""}
-                    badge={
-                      <StatusBadge status={req.status} variant="dashboard" />
-                    }
+                    badge={<StatusBadge status={req.status} variant="dashboard" />}
                   >
-                    {" "}
-                    <p className="user-dashboard-reply">{req.reply}</p>{" "}
+                    <p className="user-dashboard-reply">{req.reply}</p>
                   </DashboardListItem>
-                ))}{" "}
+                ))}
               </div>
             ) : (
-              <DashboardEmptyState
-                message="لا توجد ردود من الإدارة حالياً"
-                icon="💬"
-              />
-            )}{" "}
-          </DashboardPanel>{" "}
+              <DashboardEmptyState message="لا توجد ردود من الإدارة حالياً" icon="💬" />
+            )}
+          </DashboardPanel>
+
           <DashboardPanel
             title="آخر الإشعارات"
             subtitle="أحدث التحديثات على حسابك"
             action={
-              <Link
-                href="/notifications"
-                className="user-dashboard-panel__link"
-              >
-                {" "}
-                عرض الكل{" "}
+              <Link href="/notifications" className="user-dashboard-panel__link">
+                عرض الكل
               </Link>
             }
           >
-            {" "}
             {notificationsLoading ? (
-              <div className="user-dashboard-loading">
-                جاري تحميل الإشعارات...
-              </div>
+              <div className="user-dashboard-loading">جاري تحميل الإشعارات...</div>
             ) : notifications.length > 0 ? (
               <div className="user-dashboard-list">
-                {" "}
                 {notifications.map((notification) => (
                   <DashboardListItem
                     key={notification.id}
@@ -942,60 +844,46 @@ export default function MyDashboard() {
                     meta={formatNotificationTime(notification.createdAt)}
                     badge={
                       !notification.isRead ? (
-                        <span className="user-dashboard-badge user-dashboard-badge--new">
-                          جديد
-                        </span>
+                        <span className="user-dashboard-badge user-dashboard-badge--new">جديد</span>
                       ) : null
                     }
                   >
-                    {" "}
                     {notification.message ? (
-                      <p className="user-dashboard-notification-msg">
-                        {notification.message}
-                      </p>
-                    ) : null}{" "}
+                      <p className="user-dashboard-notification-msg">{notification.message}</p>
+                    ) : null}
                   </DashboardListItem>
-                ))}{" "}
+                ))}
               </div>
             ) : (
               <DashboardEmptyState message="لا توجد إشعارات حالياً" icon="🔔" />
-            )}{" "}
-          </DashboardPanel>{" "}
-        </section>{" "}
+            )}
+          </DashboardPanel>
+        </section>
+
         <section id="instant-analysis" className="user-dashboard-ai">
-          {" "}
           <div className="user-dashboard-ai__header">
-            {" "}
             <div>
-              {" "}
-              <span className="user-dashboard-ai__eyebrow">
-                التحليل اللحظي المؤسسي
-              </span>{" "}
-              <h2 className="user-dashboard-ai__title">تحليل العملات لحظياً</h2>{" "}
+              <span className="user-dashboard-ai__eyebrow">التحليل اللحظي المؤسسي</span>
+              <h2 className="user-dashboard-ai__title">تحليل العملات لحظياً</h2>
               <p className="user-dashboard-ai__text">
-                {" "}
-                تحليل احترافي متعدد الأطر يجمع بين SMC و ICT والمدرسة الكلاسيكية
-                مع قراءة السيولة وهيكل السوق.{" "}
-              </p>{" "}
-            </div>{" "}
+                تحليل احترافي متعدد الأطر يجمع بين SMC و ICT والمدرسة الكلاسيكية مع قراءة السيولة وهيكل السوق.
+              </p>
+            </div>
+
             {aiAvailability.allowed ? (
               <p className="user-dashboard-ai__availability user-dashboard-ai__availability--ready">
-                {" "}
-                متاح الآن — يمكنك إنشاء تحليل لحظي جديد.{" "}
+                متاح الآن — يمكنك إنشاء تحليل لحظي جديد.
               </p>
             ) : (
               <div className="user-dashboard-ai__availability user-dashboard-ai__availability--wait">
-                {" "}
-                <p>يمكنك طلب تحليل لحظي واحد كل ساعة.</p>{" "}
+                <p>يمكنك طلب تحليل لحظي واحد كل ساعة.</p>
                 <p>
-                  {" "}
-                  الطلب التالي متاح بعد:{" "}
-                  {formatInstantAnalysisCountdown(aiCountdownSeconds)}.{" "}
-                </p>{" "}
+                  الطلب التالي متاح بعد: {formatInstantAnalysisCountdown(aiCountdownSeconds)}.
+                </p>
               </div>
-            )}{" "}
+            )}
+
             <div className="user-dashboard-ai__form">
-              {" "}
               <input
                 value={aiSymbol}
                 onChange={(e) => setAiSymbol(e.target.value)}
@@ -1006,165 +894,120 @@ export default function MyDashboard() {
                 className="user-dashboard-ai__input"
                 disabled={aiLoading}
                 aria-label="رمز العملة"
-              />{" "}
-              <UiSelect
+              />
+              <select
                 value={aiTimeframe}
                 onChange={(e) => setAiTimeframe(e.target.value)}
                 className="user-dashboard-ai__input user-dashboard-ai__timeframe"
                 aria-label="الإطار الزمني"
                 disabled={aiLoading}
               >
-                {" "}
-                <option value="">اختر الفريم</option>{" "}
-                <option value="1m">1 دقيقة</option>{" "}
-                <option value="3m">3 دقائق</option>{" "}
-                <option value="5m">5 دقائق</option>{" "}
-                <option value="15m">15 دقيقة</option>{" "}
-                <option value="30m">30 دقيقة</option>{" "}
-                <option value="1h">1 ساعة</option>{" "}
-                <option value="4h">4 ساعات</option>{" "}
-                <option value="1d">1 يوم</option>{" "}
-                <option value="1w">1 أسبوع</option>{" "}
-              </UiSelect>{" "}
+                <option value="">اختر الفريم</option>
+                <option value="1m">1 دقيقة</option>
+                <option value="3m">3 دقائق</option>
+                <option value="5m">5 دقائق</option>
+                <option value="15m">15 دقيقة</option>
+                <option value="30m">30 دقيقة</option>
+                <option value="1h">1 ساعة</option>
+                <option value="4h">4 ساعات</option>
+                <option value="1d">1 يوم</option>
+                <option value="1w">1 أسبوع</option>
+              </select>
               <button
                 type="button"
                 onClick={analyzeCoinWithAI}
                 disabled={aiLoading || !aiAvailability.allowed}
                 className="user-dashboard-ai__submit"
               >
-                {" "}
-                {aiLoading ? "جارٍ التحليل..." : "طلب التحليل اللحظي"}{" "}
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
+                {aiLoading ? "جارٍ التحليل..." : "طلب التحليل اللحظي"}
+              </button>
+            </div>
+          </div>
+
           {aiLoading ? (
             <div className="user-dashboard-ai__loading">
-              {" "}
-              <div
-                className="user-dashboard-ai__spinner"
-                aria-hidden="true"
-              />{" "}
-              <span>
-                {aiLoadingText ||
-                  (aiRequestSnapshot
-                    ? buildLoadingMessage(aiRequestSnapshot)
-                    : "جارٍ التحليل...")}
-              </span>{" "}
+              <div className="user-dashboard-ai__spinner" aria-hidden="true" />
+              <span>{aiLoadingText || (aiRequestSnapshot ? buildLoadingMessage(aiRequestSnapshot) : "جارٍ التحليل...")}</span>
             </div>
-          ) : null}{" "}
-          {aiLoading ? <InstantAnalysisV3Skeleton /> : null}{" "}
+          ) : null}
+
+          {aiLoading ? <InstantAnalysisV3Skeleton /> : null}
+
           {aiError ? (
             <div className="user-dashboard-ai__error">
-              {" "}
-              <p>{aiError}</p>{" "}
+              <p>{aiError}</p>
               <button
                 type="button"
                 onClick={analyzeCoinWithAI}
                 disabled={aiLoading}
                 className="user-dashboard-btn user-dashboard-btn--ghost user-dashboard-ai__retry"
               >
-                {" "}
-                إعادة المحاولة{" "}
-              </button>{" "}
+                إعادة المحاولة
+              </button>
             </div>
-          ) : null}{" "}
+          ) : null}
+
           {aiResult ? (
             <div className="user-dashboard-ai__result">
-              {" "}
               <div className="user-dashboard-ai__toggle-row">
-                {" "}
                 <div>
-                  {" "}
-                  <p className="user-dashboard-ai__toggle-title">
-                    إخفاء / إظهار التحليل
-                  </p>{" "}
-                  <p className="user-dashboard-ai__toggle-text">
-                    يمكنك إخفاء التحليل من الشاشة وإظهاره بأي وقت.
-                  </p>{" "}
-                </div>{" "}
+                  <p className="user-dashboard-ai__toggle-title">إخفاء / إظهار التحليل</p>
+                  <p className="user-dashboard-ai__toggle-text">يمكنك إخفاء التحليل من الشاشة وإظهاره بأي وقت.</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowAiAnalysis(!showAiAnalysis)}
                   className="user-dashboard-btn user-dashboard-btn--ghost"
                 >
-                  {" "}
-                  {showAiAnalysis ? "🙈 إخفاء" : "👁️ إظهار"}{" "}
-                </button>{" "}
-              </div>{" "}
+                  {showAiAnalysis ? "🙈 إخفاء" : "👁️ إظهار"}
+                </button>
+              </div>
+
               {showAiAnalysis ? (
                 aiResult?.version === "2.0" && aiResult?.v2 ? (
-                  <InstantAnalysisV3Panel
-                    result={aiResult}
-                    key={aiResult.v2.analysisId || aiResult.symbol}
-                  />
+                  <InstantAnalysisV3Panel result={aiResult} key={aiResult.v2.analysisId || aiResult.symbol} />
                 ) : (
-                  <>
-                    {" "}
-                    <div className="user-dashboard-ai__result-head">
-                      {" "}
-                      <h3 className="user-dashboard-ai__symbol">
-                        {aiResult.symbol}
-                      </h3>{" "}
-                      <span className="user-dashboard-badge user-dashboard-badge--active">
-                        {aiResult.marketBias}
-                      </span>{" "}
-                    </div>{" "}
-                    <div className="user-dashboard-ai__result-grid">
-                      {" "}
-                      <div className="user-dashboard-ai__result-card">
-                        {" "}
-                        <p className="user-dashboard-ai__result-label">
-                          السعر الحالي
-                        </p>{" "}
-                        <p className="user-dashboard-ai__result-value">
-                          {" "}
-                          $
-                          {Number(
-                            aiResult.currentPrice || 0,
-                          ).toLocaleString()}{" "}
-                        </p>{" "}
-                      </div>{" "}
-                      <div className="user-dashboard-ai__result-card">
-                        {" "}
-                        <p className="user-dashboard-ai__result-label">
-                          BOS
-                        </p>{" "}
-                        <p className="user-dashboard-ai__result-value user-dashboard-ai__result-value--sm">
-                          {aiResult.bos}
-                        </p>{" "}
-                      </div>{" "}
-                      <div className="user-dashboard-ai__result-card">
-                        {" "}
-                        <p className="user-dashboard-ai__result-label">
-                          CHOCH
-                        </p>{" "}
-                        <p className="user-dashboard-ai__result-value user-dashboard-ai__result-value--sm">
-                          {aiResult.choch}
-                        </p>{" "}
-                      </div>{" "}
-                      <div className="user-dashboard-ai__result-card">
-                        {" "}
-                        <p className="user-dashboard-ai__result-label">
-                          Premium Zone
-                        </p>{" "}
-                        <p className="user-dashboard-ai__result-value user-dashboard-ai__result-value--sm">
-                          {" "}
-                          {aiResult.premiumZone ? "YES" : "NO"}{" "}
-                        </p>{" "}
-                      </div>{" "}
-                    </div>{" "}
-                    <RealCandlestickChart result={aiResult} />{" "}
-                    <div dir="rtl" className="user-dashboard-ai__analysis-text">
-                      {" "}
-                      {aiResult.analysis}{" "}
-                    </div>{" "}
-                  </>
+                <>
+                  <div className="user-dashboard-ai__result-head">
+                    <h3 className="user-dashboard-ai__symbol">{aiResult.symbol}</h3>
+                    <span className="user-dashboard-badge user-dashboard-badge--active">{aiResult.marketBias}</span>
+                  </div>
+
+                  <div className="user-dashboard-ai__result-grid">
+                    <div className="user-dashboard-ai__result-card">
+                      <p className="user-dashboard-ai__result-label">السعر الحالي</p>
+                      <p className="user-dashboard-ai__result-value">
+                        ${Number(aiResult.currentPrice || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="user-dashboard-ai__result-card">
+                      <p className="user-dashboard-ai__result-label">BOS</p>
+                      <p className="user-dashboard-ai__result-value user-dashboard-ai__result-value--sm">{aiResult.bos}</p>
+                    </div>
+                    <div className="user-dashboard-ai__result-card">
+                      <p className="user-dashboard-ai__result-label">CHOCH</p>
+                      <p className="user-dashboard-ai__result-value user-dashboard-ai__result-value--sm">{aiResult.choch}</p>
+                    </div>
+                    <div className="user-dashboard-ai__result-card">
+                      <p className="user-dashboard-ai__result-label">Premium Zone</p>
+                      <p className="user-dashboard-ai__result-value user-dashboard-ai__result-value--sm">
+                        {aiResult.premiumZone ? "YES" : "NO"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <RealCandlestickChart result={aiResult} />
+
+                  <div dir="rtl" className="user-dashboard-ai__analysis-text">
+                    {aiResult.analysis}
+                  </div>
+                </>
                 )
-              ) : null}{" "}
+              ) : null}
             </div>
-          ) : null}{" "}
-        </section>{" "}
-      </div>{" "}
+          ) : null}
+        </section>
+      </div>
     </main>
   );
 }

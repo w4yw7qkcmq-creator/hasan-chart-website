@@ -1,4 +1,5 @@
 import { ASSET_CONFIGS } from "../asset-hub/configs";
+
 export const DAILY_ANALYSIS_FILTERS = [
   { key: "all", label: "الكل" },
   { key: "crypto", label: "العملات الرقمية" },
@@ -6,6 +7,7 @@ export const DAILY_ANALYSIS_FILTERS = [
   { key: "gold-commodities", label: "الذهب والسلع" },
   { key: "stocks", label: "الأسهم والمؤشرات" },
 ];
+
 export const TRENDING_MARKET_LINKS = [
   { label: "البيتكوين", symbol: "BTC", href: "/btc" },
   { label: "الإيثريوم", symbol: "ETH", href: "/eth" },
@@ -14,6 +16,7 @@ export const TRENDING_MARKET_LINKS = [
   { label: "ناسداك", symbol: "NASDAQ", href: "/nasdaq" },
   { label: "جميع الأصول", symbol: "ASSETS", href: "/assets" },
 ];
+
 export const DAILY_ANALYSIS_HUB_LINKS = [
   { label: "التحليل الفني", href: "/technical-analysis" },
   { label: "الأسواق", href: "/markets" },
@@ -22,6 +25,7 @@ export const DAILY_ANALYSIS_HUB_LINKS = [
   { label: "VIP Spot", href: "/vip-spot" },
   { label: "VIP Futures", href: "/vip-futures" },
 ];
+
 const MARKET_CATEGORY_LABELS = {
   crypto: "العملات الرقمية",
   forex: "الفوركس",
@@ -30,17 +34,19 @@ const MARKET_CATEGORY_LABELS = {
   indices: "الأسهم والمؤشرات",
   global: "الأسواق العالمية",
 };
+
 const SYMBOL_LOOKUP = buildSymbolLookup();
+
 function buildSymbolLookup() {
-  /** @type {Map<string, import("../asset-hub/configs/types").AssetHubConfig>} */ const lookup =
-    new Map();
+  /** @type {Map<string, import("../asset-hub/configs/types").AssetHubConfig>} */
+  const lookup = new Map();
+
   const register = (token, config) => {
-    const normalized = String(token || "")
-      .trim()
-      .toUpperCase();
+    const normalized = String(token || "").trim().toUpperCase();
     if (!normalized || lookup.has(normalized)) return;
     lookup.set(normalized, config);
   };
+
   for (const config of Object.values(ASSET_CONFIGS)) {
     register(config.symbol, config);
     register(config.slug, config);
@@ -50,6 +56,7 @@ function buildSymbolLookup() {
     register(`${config.symbol}USDT`, config);
     register(`${config.chartSymbol}`, config);
   }
+
   register("GOLD", ASSET_CONFIGS.gold);
   register("XAU", ASSET_CONFIGS.gold);
   register("XAUUSD", ASSET_CONFIGS.xauusd);
@@ -60,34 +67,43 @@ function buildSymbolLookup() {
   register("NDX", ASSET_CONFIGS.nasdaq);
   register("SPX", ASSET_CONFIGS.sp500);
   register("DOW", ASSET_CONFIGS.dowjones);
+
   return lookup;
-} /** * @param {string} symbol * @param {string} [title] */
+}
+
+/**
+ * @param {string} symbol
+ * @param {string} [title]
+ */
 export function resolveAnalysisAsset(symbol = "", title = "") {
-  const normalizedSymbol = String(symbol || "")
-    .trim()
-    .toUpperCase();
+  const normalizedSymbol = String(symbol || "").trim().toUpperCase();
   const compactSymbol = normalizedSymbol.replace(/[^A-Z0-9]/g, "");
   const text = `${symbol} ${title}`.toUpperCase();
+
   const candidates = [
     normalizedSymbol,
     compactSymbol,
     compactSymbol.replace(/USDT$/, ""),
     compactSymbol.replace(/USD$/, ""),
   ].filter(Boolean);
+
   for (const candidate of candidates) {
     const config = SYMBOL_LOOKUP.get(candidate);
     if (config) return config;
   }
+
   for (const config of Object.values(ASSET_CONFIGS)) {
-    if (
-      text.includes(config.symbol) ||
-      text.includes(config.slug.toUpperCase())
-    ) {
+    if (text.includes(config.symbol) || text.includes(config.slug.toUpperCase())) {
       return config;
     }
   }
+
   return null;
-} /** * @param {{ symbol?: string, title?: string, content?: string }} item */
+}
+
+/**
+ * @param {{ symbol?: string, title?: string, content?: string }} item
+ */
 export function getAnalysisMarketCategory(item = {}) {
   const asset = resolveAnalysisAsset(item.symbol, item.title);
   if (asset?.category) {
@@ -96,40 +112,55 @@ export function getAnalysisMarketCategory(item = {}) {
     if (asset.category === "indices") return "stocks";
     return asset.category;
   }
-  const text =
-    `${item.symbol || ""} ${item.title || ""} ${item.content || ""}`.toLowerCase();
-  if (/btc|eth|crypto|usdt|bnb|sol|xrp|كريبتو|بيتكوين/.test(text))
-    return "crypto";
+
+  const text = `${item.symbol || ""} ${item.title || ""} ${item.content || ""}`.toLowerCase();
+
+  if (/btc|eth|crypto|usdt|bnb|sol|xrp|كريبتو|بيتكوين/.test(text)) return "crypto";
   if (/eurusd|gbpusd|usdjpy|forex|فوركس|eur\/usd/.test(text)) return "forex";
-  if (/gold|xau|silver|xag|oil|usoil|نفط|ذهب|سلع/.test(text))
-    return "gold-commodities";
+  if (/gold|xau|silver|xag|oil|usoil|نفط|ذهب|سلع/.test(text)) return "gold-commodities";
   if (/nasdaq|sp500|dow|stocks|indices|أسهم|مؤشر/.test(text)) return "stocks";
+
   return "crypto";
-} /** * @param {{ symbol?: string, title?: string, content?: string }} item */
+}
+
+/**
+ * @param {{ symbol?: string, title?: string, content?: string }} item
+ */
 export function getAnalysisMarketLabel(item = {}) {
   const asset = resolveAnalysisAsset(item.symbol, item.title);
   if (asset) {
-    return (
-      MARKET_CATEGORY_LABELS[asset.category] ||
-      asset.categoryLabel ||
-      "الأسواق المالية"
-    );
+    return MARKET_CATEGORY_LABELS[asset.category] || asset.categoryLabel || "الأسواق المالية";
   }
+
   const category = getAnalysisMarketCategory(item);
   if (category === "gold-commodities") return "الذهب والسلع";
   if (category === "stocks") return "الأسهم والمؤشرات";
   return MARKET_CATEGORY_LABELS[category] || "الأسواق المالية";
-} /** * @param {{ symbol?: string, title?: string, content?: string }} item */
+}
+
+/**
+ * @param {{ symbol?: string, title?: string, content?: string }} item
+ */
 export function getAnalysisAssetName(item = {}) {
   const asset = resolveAnalysisAsset(item.symbol, item.title);
   if (asset) return asset.name;
+
   const symbol = String(item.symbol || "").trim();
   return symbol || "سوق مالي";
-} /** * @param {{ symbol?: string, title?: string, content?: string }} item * @param {string} filterKey */
+}
+
+/**
+ * @param {{ symbol?: string, title?: string, content?: string }} item
+ * @param {string} filterKey
+ */
 export function matchesDailyAnalysisFilter(item, filterKey) {
   if (filterKey === "all") return true;
   return getAnalysisMarketCategory(item) === filterKey;
-} /** * @param {string | number} id */
+}
+
+/**
+ * @param {string | number} id
+ */
 export function getAnalysisAnchorId(id) {
   return `analysis-${id}`;
 }

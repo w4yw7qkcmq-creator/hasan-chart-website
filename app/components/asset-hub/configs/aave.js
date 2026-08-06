@@ -31,7 +31,9 @@ export const aaveAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["aave", "أيف", "aaveusdt"] },
+  analysis: {
+    keywords: ["aave", "أيف", "aaveusdt"],
+  },
   faq: [
     {
       q: "ما هو أيف (AAVE)؟",
@@ -55,30 +57,10 @@ export const aaveAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "الشبكة الأساسية لأيف.",
-      href: "/eth",
-    },
-    {
-      symbol: "UNI",
-      name: "يونيسواب",
-      description: "بروتوكول DEX لامركزي.",
-      href: "/uni",
-    },
-    {
-      symbol: "LINK",
-      name: "تشين لينك",
-      description: "أوراكل لـ DeFi.",
-      href: "/link",
-    },
-    {
-      symbol: "MATIC",
-      name: "بوليجون",
-      description: "Layer 2 لإيثيريوم.",
-      href: "/matic",
-    },
+    { symbol: "ETH", name: "الإيثيريوم", description: "الشبكة الأساسية لأيف.", href: "/eth" },
+    { symbol: "UNI", name: "يونيسواب", description: "بروتوكول DEX لامركزي.", href: "/uni" },
+    { symbol: "LINK", name: "تشين لينك", description: "أوراكل لـ DeFi.", href: "/link" },
+    { symbol: "MATIC", name: "بوليجون", description: "Layer 2 لإيثيريوم.", href: "/matic" },
   ],
   links: {
     internal: [

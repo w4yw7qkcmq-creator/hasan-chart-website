@@ -1,4 +1,5 @@
 const MIN_DEPTH_WIDTH = 8;
+
 export function computeDepthBarWidthPercent(notional, maxNotional) {
   const value = Number(notional) || 0;
   const max = Number(maxNotional) || 0;

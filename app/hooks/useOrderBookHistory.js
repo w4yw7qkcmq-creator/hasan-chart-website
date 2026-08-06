@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout.js";
 import {
@@ -7,18 +8,23 @@ import {
   LIVE_FLOW_WINDOWS,
   LIVE_LARGE_TRADE_WINDOWS,
 } from "../../lib/market-data/constants.js";
+
 export function isHistoricalFlowWindow(window) {
   return HISTORICAL_FLOW_WINDOWS.includes(window);
 }
+
 export function isHistoricalLargeTradeWindow(window) {
   return HISTORICAL_LARGE_TRADE_WINDOWS.includes(window);
 }
+
 export function isLiveFlowWindow(window) {
   return LIVE_FLOW_WINDOWS.has(window);
 }
+
 export function isLiveLargeTradeWindow(window) {
   return LIVE_LARGE_TRADE_WINDOWS.has(window);
 }
+
 function buildFlowQuery({ symbol, window, scope }) {
   const params = new URLSearchParams();
   params.set("symbol", symbol);
@@ -26,6 +32,7 @@ function buildFlowQuery({ symbol, window, scope }) {
   params.set("scope", scope);
   return params.toString();
 }
+
 function buildLargeTradesQuery({ symbol, window, minNotional, exchange }) {
   const params = new URLSearchParams();
   params.set("symbol", symbol);
@@ -37,9 +44,11 @@ function buildLargeTradesQuery({ symbol, window, minNotional, exchange }) {
   }
   return params.toString();
 }
+
 export function buildFlowCacheKey({ symbol, mode, window }) {
   return `${symbol}|${mode}|${window}`;
 }
+
 export function useOrderBookHistory({ prefs, hydrated }) {
   const flowCacheRef = useRef(new Map());
   const dominanceCacheRef = useRef(new Map());
@@ -50,11 +59,11 @@ export function useOrderBookHistory({ prefs, hydrated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
+
   const needsFlowHistory = isHistoricalFlowWindow(prefs.flowWindow);
   const needsDominanceHistory = isHistoricalFlowWindow(prefs.dominanceWindow);
-  const needsLargeTradeHistory = isHistoricalLargeTradeWindow(
-    prefs.largeTradeWindow,
-  );
+  const needsLargeTradeHistory = isHistoricalLargeTradeWindow(prefs.largeTradeWindow);
+
   const flowCacheKey = buildFlowCacheKey({
     symbol: prefs.symbol,
     mode: prefs.mode,
@@ -71,6 +80,7 @@ export function useOrderBookHistory({ prefs, hydrated }) {
     prefs.largeTradeWindow,
     prefs.largeTradeThreshold,
   ].join("|");
+
   const historyKey = useMemo(
     () =>
       [
@@ -83,13 +93,10 @@ export function useOrderBookHistory({ prefs, hydrated }) {
       ].join("|"),
     [prefs],
   );
+
   useEffect(() => {
     if (!hydrated) return undefined;
-    if (
-      !needsFlowHistory &&
-      !needsDominanceHistory &&
-      !needsLargeTradeHistory
-    ) {
+    if (!needsFlowHistory && !needsDominanceHistory && !needsLargeTradeHistory) {
       setFlowHistory(null);
       setDominanceHistory(null);
       setLargeTradeHistory(null);
@@ -97,35 +104,41 @@ export function useOrderBookHistory({ prefs, hydrated }) {
       setError(null);
       return undefined;
     }
+
     const requestId = ++requestIdRef.current;
     let cancelled = false;
     setLoading(true);
     setError(null);
+
     if (needsFlowHistory) {
       setFlowHistory(flowCacheRef.current.get(flowCacheKey) ?? null);
     } else {
       setFlowHistory(null);
     }
+
     if (needsDominanceHistory) {
-      setDominanceHistory(
-        dominanceCacheRef.current.get(dominanceCacheKey) ?? null,
-      );
+      setDominanceHistory(dominanceCacheRef.current.get(dominanceCacheKey) ?? null);
     } else {
       setDominanceHistory(null);
     }
+
     if (needsLargeTradeHistory) {
-      setLargeTradeHistory(
-        largeTradeCacheRef.current.get(largeTradeCacheKey) ?? null,
-      );
+      setLargeTradeHistory(largeTradeCacheRef.current.get(largeTradeCacheKey) ?? null);
     } else {
       setLargeTradeHistory(null);
     }
+
     const scope = prefs.mode === "aggregated" ? "aggregated" : prefs.mode;
     const tasks = [];
+
     if (needsFlowHistory) {
       tasks.push(
         fetchWithTimeout(
-          `/api/market-depth/history/flow?${buildFlowQuery({ symbol: prefs.symbol, window: prefs.flowWindow, scope })}`,
+          `/api/market-depth/history/flow?${buildFlowQuery({
+            symbol: prefs.symbol,
+            window: prefs.flowWindow,
+            scope,
+          })}`,
           {},
           10_000,
         ).then((response) => response.json()),
@@ -133,10 +146,15 @@ export function useOrderBookHistory({ prefs, hydrated }) {
     } else {
       tasks.push(Promise.resolve(null));
     }
+
     if (needsDominanceHistory) {
       tasks.push(
         fetchWithTimeout(
-          `/api/market-depth/history/flow?${buildFlowQuery({ symbol: prefs.symbol, window: prefs.dominanceWindow, scope })}`,
+          `/api/market-depth/history/flow?${buildFlowQuery({
+            symbol: prefs.symbol,
+            window: prefs.dominanceWindow,
+            scope,
+          })}`,
           {},
           10_000,
         ).then((response) => response.json()),
@@ -144,10 +162,16 @@ export function useOrderBookHistory({ prefs, hydrated }) {
     } else {
       tasks.push(Promise.resolve(null));
     }
+
     if (needsLargeTradeHistory) {
       tasks.push(
         fetchWithTimeout(
-          `/api/market-depth/history/large-trades?${buildLargeTradesQuery({ symbol: prefs.symbol, window: prefs.largeTradeWindow, minNotional: prefs.largeTradeThreshold, exchange: scope })}`,
+          `/api/market-depth/history/large-trades?${buildLargeTradesQuery({
+            symbol: prefs.symbol,
+            window: prefs.largeTradeWindow,
+            minNotional: prefs.largeTradeThreshold,
+            exchange: scope,
+          })}`,
           {},
           10_000,
         ).then((response) => response.json()),
@@ -155,50 +179,51 @@ export function useOrderBookHistory({ prefs, hydrated }) {
     } else {
       tasks.push(Promise.resolve(null));
     }
+
     void Promise.all(tasks)
       .then(([flowPayload, dominancePayload, largePayload]) => {
         if (cancelled || requestId !== requestIdRef.current) return;
+
         const failed =
           (needsFlowHistory && !flowPayload?.success) ||
           (needsDominanceHistory && !dominancePayload?.success) ||
           (needsLargeTradeHistory && !largePayload?.success);
+
         if (failed) {
           setError("HISTORY_FETCH_FAILED");
           if (needsFlowHistory && !flowCacheRef.current.has(flowCacheKey)) {
             setFlowHistory(null);
           }
-          if (
-            needsDominanceHistory &&
-            !dominanceCacheRef.current.has(dominanceCacheKey)
-          ) {
+          if (needsDominanceHistory && !dominanceCacheRef.current.has(dominanceCacheKey)) {
             setDominanceHistory(null);
           }
-          if (
-            needsLargeTradeHistory &&
-            !largeTradeCacheRef.current.has(largeTradeCacheKey)
-          ) {
+          if (needsLargeTradeHistory && !largeTradeCacheRef.current.has(largeTradeCacheKey)) {
             setLargeTradeHistory(null);
           }
           return;
         }
+
         if (needsFlowHistory && flowPayload) {
           flowCacheRef.current.set(flowCacheKey, flowPayload);
           setFlowHistory(flowPayload);
         } else {
           setFlowHistory(null);
         }
+
         if (needsDominanceHistory && dominancePayload) {
           dominanceCacheRef.current.set(dominanceCacheKey, dominancePayload);
           setDominanceHistory(dominancePayload);
         } else {
           setDominanceHistory(null);
         }
+
         if (needsLargeTradeHistory && largePayload) {
           largeTradeCacheRef.current.set(largeTradeCacheKey, largePayload);
           setLargeTradeHistory(largePayload);
         } else {
           setLargeTradeHistory(null);
         }
+
         setError(null);
       })
       .catch(() => {
@@ -207,16 +232,10 @@ export function useOrderBookHistory({ prefs, hydrated }) {
         if (needsFlowHistory && !flowCacheRef.current.has(flowCacheKey)) {
           setFlowHistory(null);
         }
-        if (
-          needsDominanceHistory &&
-          !dominanceCacheRef.current.has(dominanceCacheKey)
-        ) {
+        if (needsDominanceHistory && !dominanceCacheRef.current.has(dominanceCacheKey)) {
           setDominanceHistory(null);
         }
-        if (
-          needsLargeTradeHistory &&
-          !largeTradeCacheRef.current.has(largeTradeCacheKey)
-        ) {
+        if (needsLargeTradeHistory && !largeTradeCacheRef.current.has(largeTradeCacheKey)) {
           setLargeTradeHistory(null);
         }
       })
@@ -225,6 +244,7 @@ export function useOrderBookHistory({ prefs, hydrated }) {
           setLoading(false);
         }
       });
+
     return () => {
       cancelled = true;
     };
@@ -244,6 +264,7 @@ export function useOrderBookHistory({ prefs, hydrated }) {
     prefs.mode,
     prefs.symbol,
   ]);
+
   return {
     flowHistory,
     dominanceHistory,

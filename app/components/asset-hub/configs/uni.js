@@ -31,7 +31,9 @@ export const uniAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["uni", "uniswap", "يونيسواب", "uniusdt"] },
+  analysis: {
+    keywords: ["uni", "uniswap", "يونيسواب", "uniusdt"],
+  },
   faq: [
     {
       q: "ما هو يونيسواب (UNI)؟",
@@ -55,30 +57,10 @@ export const uniAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "الشبكة الأساسية ليونيسواب.",
-      href: "/eth",
-    },
-    {
-      symbol: "AAVE",
-      name: "أيف",
-      description: "بروتوكول إقراض DeFi.",
-      href: "/aave",
-    },
-    {
-      symbol: "LINK",
-      name: "تشين لينك",
-      description: "شبكة أوراكل لـ DeFi.",
-      href: "/link",
-    },
-    {
-      symbol: "MATIC",
-      name: "بوليجون",
-      description: "Layer 2 لإيثيريوم.",
-      href: "/matic",
-    },
+    { symbol: "ETH", name: "الإيثيريوم", description: "الشبكة الأساسية ليونيسواب.", href: "/eth" },
+    { symbol: "AAVE", name: "أيف", description: "بروتوكول إقراض DeFi.", href: "/aave" },
+    { symbol: "LINK", name: "تشين لينك", description: "شبكة أوراكل لـ DeFi.", href: "/link" },
+    { symbol: "MATIC", name: "بوليجون", description: "Layer 2 لإيثيريوم.", href: "/matic" },
   ],
   links: {
     internal: [
@@ -129,14 +111,7 @@ export const uniAssetConfig = {
     title: "HasaN CharT World | يونيسواب UNI — مركز المعلومات",
     description:
       "مركز معلومات يونيسواب: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات UNI، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "يونيسواب",
-      "UNI",
-      "Uniswap",
-      "DeFi",
-      "سعر UNI",
-    ],
+    keywords: ["HasaN CharT World", "يونيسواب", "UNI", "Uniswap", "DeFi", "سعر UNI"],
   },
   jsonLd: {
     productName: "Uniswap",

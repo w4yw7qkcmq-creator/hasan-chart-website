@@ -31,7 +31,9 @@ export const nearAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["near", "near protocol", "نير", "nearusdt"] },
+  analysis: {
+    keywords: ["near", "near protocol", "نير", "nearusdt"],
+  },
   faq: [
     {
       q: "ما هو NEAR Protocol؟",
@@ -55,30 +57,10 @@ export const nearAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "منصة العقود الذكية الرائدة.",
-      href: "/eth",
-    },
-    {
-      symbol: "SOL",
-      name: "سولانا",
-      description: "بلوكتشين عالي الأداء.",
-      href: "/sol",
-    },
-    {
-      symbol: "AVAX",
-      name: "أفالانش",
-      description: "بلوكتشين متعدد السلاسل.",
-      href: "/avax",
-    },
-    {
-      symbol: "ARB",
-      name: "أربيتروم",
-      description: "Layer 2 لإيثيريوم.",
-      href: "/arb",
-    },
+    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية الرائدة.", href: "/eth" },
+    { symbol: "SOL", name: "سولانا", description: "بلوكتشين عالي الأداء.", href: "/sol" },
+    { symbol: "AVAX", name: "أفالانش", description: "بلوكتشين متعدد السلاسل.", href: "/avax" },
+    { symbol: "ARB", name: "أربيتروم", description: "Layer 2 لإيثيريوم.", href: "/arb" },
   ],
   links: {
     internal: [

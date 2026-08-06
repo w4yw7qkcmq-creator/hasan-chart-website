@@ -7,6 +7,7 @@ export const SUBSCRIPTIONS_HUB_LINKS = [
   { label: "الأصول", href: "/assets" },
   { label: "برنامج الشركاء", href: "/partner-center" },
 ];
+
 export const SUBSCRIPTION_PLANS = [
   {
     category: "باقات السبوت",
@@ -14,7 +15,7 @@ export const SUBSCRIPTION_PLANS = [
     price: "$50",
     period: "/شهر",
     icon: "⚡",
-    glow: "subscription-card-glow--cyan",
+    glow: "from-cyan-400/20 to-blue-500/10",
     badge: "Spot",
     features: [
       "توصيات سبوت لمدة شهر",
@@ -29,7 +30,7 @@ export const SUBSCRIPTION_PLANS = [
     price: "$125",
     period: "/ثلاثة أشهر",
     icon: "📈",
-    glow: "subscription-card-glow--blue",
+    glow: "from-blue-500/25 to-cyan-400/10",
     badge: "Spot Plus",
     featured: true,
     features: [
@@ -45,7 +46,7 @@ export const SUBSCRIPTION_PLANS = [
     price: "$500",
     period: "/سنة",
     icon: "💎",
-    glow: "subscription-card-glow--indigo",
+    glow: "from-indigo-500/25 to-cyan-400/10",
     badge: "Spot VIP",
     features: [
       "توصيات سبوت لمدة سنة كاملة",
@@ -60,7 +61,7 @@ export const SUBSCRIPTION_PLANS = [
     price: "$99",
     period: "/شهر",
     icon: "🚀",
-    glow: "subscription-card-glow--cyan",
+    glow: "from-cyan-400/20 to-blue-500/10",
     badge: "Futures",
     features: [
       "توصيات فيوتشر لمدة شهر",
@@ -75,7 +76,7 @@ export const SUBSCRIPTION_PLANS = [
     price: "$250",
     period: "/ثلاثة أشهر",
     icon: "🔥",
-    glow: "subscription-card-glow--blue",
+    glow: "from-blue-500/30 to-cyan-400/10",
     badge: "Futures Plus",
     featured: true,
     features: [
@@ -91,7 +92,7 @@ export const SUBSCRIPTION_PLANS = [
     price: "$800",
     period: "/سنة",
     icon: "👑",
-    glow: "subscription-card-glow--indigo",
+    glow: "from-indigo-500/30 to-cyan-400/10",
     badge: "Futures VIP",
     features: [
       "توصيات فيوتشر لمدة سنة كاملة",
@@ -101,20 +102,26 @@ export const SUBSCRIPTION_PLANS = [
     ],
   },
 ];
+
 export function formatSubscriptionDate(value) {
   if (!value) return "غير محدد";
+
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "غير محدد";
+
   return date.toLocaleDateString("ar-SY-u-nu-latn", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
 }
+
 export function getRemainingDays(expiresAt) {
   if (!expiresAt) return null;
+
   const expiresTime = new Date(expiresAt).getTime();
   if (!Number.isFinite(expiresTime)) return null;
+
   const diff = expiresTime - Date.now();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }

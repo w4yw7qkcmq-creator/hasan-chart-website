@@ -1,10 +1,9 @@
 "use client";
+
 import { useCallback, useRef, useState } from "react";
 import { adminFetch } from "../../../lib/admin-fetch";
-export function useIamListFeed(
-  basePath,
-  { legacyKey = "items", defaultLimit = 50 } = {},
-) {
+
+export function useIamListFeed(basePath, { legacyKey = "items", defaultLimit = 50 } = {}) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -12,23 +11,21 @@ export function useIamListFeed(
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState(null);
   const filtersRef = useRef({});
+
   const buildUrl = useCallback(
     (cursor, filters = {}) => {
       const params = new URLSearchParams({ limit: String(defaultLimit) });
       if (cursor) params.set("cursor", cursor);
       Object.entries(filters).forEach(([key, value]) => {
-        if (
-          value !== undefined &&
-          value !== null &&
-          String(value).trim() !== ""
-        ) {
+        if (value !== undefined && value !== null && String(value).trim() !== "") {
           params.set(key, String(value));
         }
       });
       return `${basePath}?${params.toString()}`;
     },
-    [basePath, defaultLimit],
+    [basePath, defaultLimit]
   );
+
   const load = useCallback(
     async (filters = {}, { append = false, cursor = null } = {}) => {
       if (append) {
@@ -38,19 +35,18 @@ export function useIamListFeed(
         filtersRef.current = filters;
       }
       setError("");
+
       try {
-        const res = await adminFetch(
-          buildUrl(cursor, append ? filtersRef.current : filters),
-        );
+        const res = await adminFetch(buildUrl(cursor, append ? filtersRef.current : filters));
         const json = await res.json();
         if (!json.success) {
           throw new Error(json.error || "تعذر تحميل البيانات");
         }
+
         const pageItems = json.items || json[legacyKey] || [];
         const pagination = json.pagination || {};
-        setItems((current) =>
-          append ? [...current, ...pageItems] : pageItems,
-        );
+
+        setItems((current) => (append ? [...current, ...pageItems] : pageItems));
         setHasMore(Boolean(pagination.hasMore));
         setNextCursor(pagination.nextCursor || null);
         return pageItems;
@@ -63,17 +59,19 @@ export function useIamListFeed(
         setLoadingMore(false);
       }
     },
-    [buildUrl, legacyKey],
+    [buildUrl, legacyKey]
   );
+
   const loadMore = useCallback(() => {
     if (!hasMore || loadingMore || !nextCursor) return Promise.resolve([]);
     return load(filtersRef.current, { append: true, cursor: nextCursor });
   }, [hasMore, loadingMore, load, nextCursor]);
+
   const fetchDetail = useCallback(
     async (id) => {
       if (!id) return null;
       const res = await adminFetch(
-        `${basePath}?id=${encodeURIComponent(id)}&includeMetadata=true`,
+        `${basePath}?id=${encodeURIComponent(id)}&includeMetadata=true`
       );
       const json = await res.json();
       if (!json.success) {
@@ -81,8 +79,9 @@ export function useIamListFeed(
       }
       return json.item || null;
     },
-    [basePath],
+    [basePath]
   );
+
   return {
     items,
     loading,

@@ -2,6 +2,8 @@ import PriceAlertsPageJsonLd from "../../components/price-alerts/PriceAlertsPage
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/price-alerts",
   title: "HasaN CharT World | التنبيهات السعرية",
@@ -18,11 +20,12 @@ export const metadata = buildPublicPageMetadata({
     "إدارة المخاطر",
   ],
 });
+
 export default function PriceAlertsLayout({ children }) {
   return (
     <>
-      
-      <PriceAlertsPageJsonLd /> {children}
+      <PriceAlertsPageJsonLd />
+      {children}
     </>
   );
 }

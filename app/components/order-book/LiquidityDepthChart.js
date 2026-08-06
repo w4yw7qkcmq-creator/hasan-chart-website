@@ -1,4 +1,5 @@
 "use client";
+
 import { useCallback, useMemo, useState } from "react";
 import { EXCHANGE_LABELS } from "../../../lib/market-data/symbols";
 import {
@@ -9,39 +10,31 @@ import {
   formatUsd,
 } from "./formatters";
 import { ob } from "./order-book-theme";
-import {
-  ChartPlaceholder,
-  DepthHistoryState,
-  NumericValue,
-} from "./order-book-ui";
+import { ChartPlaceholder, DepthHistoryState, NumericValue } from "./order-book-ui";
+
 export const DEPTH_CHART_MIN_ROWS = 1;
+
 const VIEW_WIDTH = 640;
 const VIEW_HEIGHT = 220;
 const MARGIN = { top: 18, right: 14, bottom: 34, left: 52 };
 const PLOT_WIDTH = VIEW_WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_HEIGHT = VIEW_HEIGHT - MARGIN.top - MARGIN.bottom;
 const BASELINE_Y = MARGIN.top + PLOT_HEIGHT;
+
 const CHART_SHELL_MIN = "min-h-[14rem]";
 const FALLBACK_MIN = "h-48 sm:h-56";
+
 function sqrtScale(value, max) {
-  if (
-    !Number.isFinite(value) ||
-    value <= 0 ||
-    !Number.isFinite(max) ||
-    max <= 0
-  )
-    return 0;
+  if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(max) || max <= 0) return 0;
   return Math.sqrt(value / max);
 }
+
 function buildPriceTicks(minPrice, maxPrice, midPrice, mobile = false) {
   const count = mobile ? 3 : 5;
-  if (
-    !Number.isFinite(minPrice) ||
-    !Number.isFinite(maxPrice) ||
-    minPrice >= maxPrice
-  ) {
+  if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice) || minPrice >= maxPrice) {
     return Number.isFinite(midPrice) ? [midPrice] : [];
   }
+
   const ticks = new Set();
   for (let index = 0; index < count; index += 1) {
     const ratio = count === 1 ? 0.5 : index / (count - 1);
@@ -50,6 +43,7 @@ function buildPriceTicks(minPrice, maxPrice, midPrice, mobile = false) {
   if (Number.isFinite(midPrice)) ticks.add(midPrice);
   return [...ticks].sort((a, b) => a - b);
 }
+
 function buildValueTicks(maxNotional, mobile = false) {
   const steps = mobile ? 3 : 4;
   if (!Number.isFinite(maxNotional) || maxNotional <= 0) return [0];
@@ -60,6 +54,7 @@ function buildValueTicks(maxNotional, mobile = false) {
   }
   return ticks;
 }
+
 function formatExchangeLabel(point, mode) {
   if (mode === "historical") {
     if (point.exchangeCount > 1) return `${point.exchangeCount} منصات`;
@@ -75,12 +70,14 @@ function formatExchangeLabel(point, mode) {
   }
   return "مجمّع";
 }
+
 function buildTooltipLines(point, mode, midPrice) {
   const sideLabel = point.side === "bid" ? "شراء" : "بيع";
   const distance =
     Number.isFinite(midPrice) && midPrice !== 0
       ? formatSpreadPercent(((point.price - midPrice) / midPrice) * 100)
       : "—";
+
   const lines = [
     `${sideLabel}`,
     `السعر: ${formatPrice(point.price)}`,
@@ -89,6 +86,7 @@ function buildTooltipLines(point, mode, midPrice) {
     `البعد عن السعر: ${distance}`,
     `المنصة: ${formatExchangeLabel(point, mode)}`,
   ];
+
   if (mode === "historical") {
     if (Number.isFinite(point.persistenceScore)) {
       lines.push(`الثبات: ${Math.round(point.persistenceScore)}%`);
@@ -97,20 +95,23 @@ function buildTooltipLines(point, mode, midPrice) {
       lines.push(`آخر ظهور: ${formatMinutesAgoAr(point.lastSeen)}`);
     }
   }
+
   return lines;
 }
+
 function ChartFrame({ fillContainer, children, className = "" }) {
   const shell = fillContainer
     ? `flex ${CHART_SHELL_MIN} flex-1 flex-col overflow-hidden ${ob.chartShell}`
     : `min-w-0 overflow-hidden ${ob.chartShell}`;
   const inner = fillContainer ? "relative min-h-0 flex-1" : "relative";
+
   return (
     <div className={`${shell} ${className}`}>
-      {" "}
-      <div className={inner}>{children}</div>{" "}
+      <div className={inner}>{children}</div>
     </div>
   );
 }
+
 export default function LiquidityDepthChart({
   mode = "live",
   points = [],
@@ -124,33 +125,27 @@ export default function LiquidityDepthChart({
 }) {
   const [hovered, setHovered] = useState(null);
   const mobile =
-    typeof window !== "undefined"
-      ? window.matchMedia("(max-width: 639px)").matches
-      : false;
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 639px)").matches : false;
   const clearHover = useCallback(() => setHovered(null), []);
+
   const chartModel = useMemo(() => {
     const bids = points.filter((point) => point.side === "bid");
     const asks = points.filter((point) => point.side === "ask");
-    const maxNotional = Math.max(
-      ...points.map((point) => Number(point.notional) || 0),
-      1,
-    );
+    const maxNotional = Math.max(...points.map((point) => Number(point.notional) || 0), 1);
     const prices = points.map((point) => point.price).filter(Number.isFinite);
     const minPrice = prices.length ? Math.min(...prices) : midPrice;
     const maxPrice = prices.length ? Math.max(...prices) : midPrice;
-    const priceRange = Math.max(
-      maxPrice - minPrice,
-      Number(midPrice) * 0.002 || 1,
-    );
+    const priceRange = Math.max(maxPrice - minPrice, Number(midPrice) * 0.002 || 1);
     const barWidth = Math.max(
       4,
       Math.min(12, PLOT_WIDTH / Math.max(points.length, 8) - 1),
     );
+
     const xForPrice = (price) =>
       MARGIN.left + ((price - minPrice) / priceRange) * PLOT_WIDTH;
+
     const bars = points.map((point) => {
-      const height =
-        sqrtScale(Number(point.notional) || 0, maxNotional) * PLOT_HEIGHT;
+      const height = sqrtScale(Number(point.notional) || 0, maxNotional) * PLOT_HEIGHT;
       const xCenter = xForPrice(point.price);
       return {
         point,
@@ -160,6 +155,7 @@ export default function LiquidityDepthChart({
         height: Math.max(height, point.notional > 0 ? 2 : 0),
       };
     });
+
     return {
       bids,
       asks,
@@ -170,14 +166,12 @@ export default function LiquidityDepthChart({
       bars,
       priceTicks: buildPriceTicks(minPrice, maxPrice, midPrice, mobile),
       valueTicks: buildValueTicks(maxNotional, mobile),
-      midX: Number.isFinite(midPrice)
-        ? xForPrice(midPrice)
-        : MARGIN.left + PLOT_WIDTH / 2,
+      midX: Number.isFinite(midPrice) ? xForPrice(midPrice) : MARGIN.left + PLOT_WIDTH / 2,
     };
   }, [points, midPrice, mobile]);
-  const placeholderClass = fillContainer
-    ? `${CHART_SHELL_MIN} flex-1`
-    : FALLBACK_MIN;
+
+  const placeholderClass = fillContainer ? `${CHART_SHELL_MIN} flex-1` : FALLBACK_MIN;
+
   if (mode === "historical") {
     if (loading) {
       return (
@@ -191,6 +185,7 @@ export default function LiquidityDepthChart({
         />
       );
     }
+
     if (error) {
       return (
         <DepthHistoryState
@@ -203,11 +198,9 @@ export default function LiquidityDepthChart({
         />
       );
     }
+
     if (!points.length || !midPrice) {
-      if (
-        collecting &&
-        (!Number.isFinite(coveragePercent) || coveragePercent <= 0)
-      ) {
+      if (collecting && (!Number.isFinite(coveragePercent) || coveragePercent <= 0)) {
         return (
           <DepthHistoryState
             loading={false}
@@ -228,25 +221,17 @@ export default function LiquidityDepthChart({
     }
   } else if (!points.length || !midPrice) {
     return (
-      <ChartPlaceholder
-        minHeight={placeholderClass}
-        message="بانتظار بيانات السيولة..."
-      />
+      <ChartPlaceholder minHeight={placeholderClass} message="بانتظار بيانات السيولة..." />
     );
   }
+
   const chartLabel =
-    mode === "historical"
-      ? "خريطة جدران السيولة التاريخية"
-      : "خريطة عمق السيولة";
-  const shellClass = fillContainer
-    ? `flex ${CHART_SHELL_MIN} min-h-0 flex-1 flex-col`
-    : "min-w-0";
-  const svgClass = fillContainer
-    ? "h-full min-h-[14rem] w-full flex-1"
-    : `${FALLBACK_MIN} w-full`;
+    mode === "historical" ? "خريطة جدران السيولة التاريخية" : "خريطة عمق السيولة";
+  const shellClass = fillContainer ? `flex ${CHART_SHELL_MIN} min-h-0 flex-1 flex-col` : "min-w-0";
+  const svgClass = fillContainer ? "h-full min-h-[14rem] w-full flex-1" : `${FALLBACK_MIN} w-full`;
+
   return (
     <div className={shellClass} onMouseLeave={clearHover}>
-      {" "}
       {mode === "historical" ? (
         <DepthHistoryState
           loading={false}
@@ -255,48 +240,34 @@ export default function LiquidityDepthChart({
           coveragePercent={coveragePercent}
           collecting={collecting && partial}
         />
-      ) : null}{" "}
-      <div
-        className={`mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 text-xs ${ob.textNormal}`}
-      >
-        {" "}
+      ) : null}
+
+      <div className={`mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 text-xs ${ob.textNormal}`}>
         <div className="flex flex-wrap items-center gap-3">
-          {" "}
           <span className="inline-flex items-center gap-1.5">
-            {" "}
-            <span
-              className="h-2.5 w-2.5 rounded-sm bg-[var(--ob-chart-buy)]"
-              aria-hidden="true"
-            />{" "}
-            شراء{" "}
-          </span>{" "}
+            <span className="h-2.5 w-2.5 rounded-sm bg-[var(--ob-chart-buy)]" aria-hidden="true" />
+            شراء
+          </span>
           <span className="inline-flex items-center gap-1.5">
-            {" "}
-            <span
-              className="h-2.5 w-2.5 rounded-sm bg-[var(--ob-chart-sell)]"
-              aria-hidden="true"
-            />{" "}
-            بيع{" "}
-          </span>{" "}
+            <span className="h-2.5 w-2.5 rounded-sm bg-[var(--ob-chart-sell)]" aria-hidden="true" />
+            بيع
+          </span>
           <span className={`inline-flex items-center gap-1.5 ${ob.textMuted}`}>
-            {" "}
             <span
               className="h-px w-3 border-t border-dashed border-[var(--ob-chart-axis)]"
               aria-hidden="true"
-            />{" "}
-            السعر الحالي{" "}
-          </span>{" "}
-        </div>{" "}
+            />
+            السعر الحالي
+          </span>
+        </div>
         <span className={`rounded-lg px-2 py-1 ${ob.surfaceMuted}`}>
-          {" "}
           <NumericValue className={`font-semibold ${ob.textStrong}`}>
-            {" "}
-            {formatPrice(midPrice)}{" "}
-          </NumericValue>{" "}
-        </span>{" "}
-      </div>{" "}
+            {formatPrice(midPrice)}
+          </NumericValue>
+        </span>
+      </div>
+
       <ChartFrame fillContainer={fillContainer} className="px-1 py-1 sm:px-2">
-        {" "}
         <svg
           viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
           className={svgClass}
@@ -304,14 +275,10 @@ export default function LiquidityDepthChart({
           role="img"
           aria-label={chartLabel}
         >
-          {" "}
           {chartModel.valueTicks.map((tickValue) => {
-            const y =
-              BASELINE_Y -
-              sqrtScale(tickValue, chartModel.maxNotional) * PLOT_HEIGHT;
+            const y = BASELINE_Y - sqrtScale(tickValue, chartModel.maxNotional) * PLOT_HEIGHT;
             return (
               <g key={`grid-${tickValue}`}>
-                {" "}
                 <line
                   x1={MARGIN.left}
                   y1={y}
@@ -319,7 +286,7 @@ export default function LiquidityDepthChart({
                   y2={y}
                   stroke="var(--ob-chart-grid)"
                   strokeDasharray="3 4"
-                />{" "}
+                />
                 <text
                   x={MARGIN.left - 6}
                   y={y + 3}
@@ -327,19 +294,20 @@ export default function LiquidityDepthChart({
                   fill="var(--ob-chart-axis)"
                   className="text-[9px]"
                 >
-                  {" "}
-                  {formatUsd(tickValue, { compact: true })}{" "}
-                </text>{" "}
+                  {formatUsd(tickValue, { compact: true })}
+                </text>
               </g>
             );
-          })}{" "}
+          })}
+
           <line
             x1={MARGIN.left}
             y1={BASELINE_Y}
             x2={VIEW_WIDTH - MARGIN.right}
             y2={BASELINE_Y}
             stroke="var(--ob-chart-axis)"
-          />{" "}
+          />
+
           <line
             x1={chartModel.midX}
             y1={MARGIN.top - 4}
@@ -347,17 +315,15 @@ export default function LiquidityDepthChart({
             y2={BASELINE_Y + 4}
             stroke="var(--ob-chart-axis)"
             strokeDasharray="4 3"
-          />{" "}
+          />
+
           {chartModel.bars.map((bar) => {
             const isBid = bar.point.side === "bid";
             const fill = isBid ? "var(--ob-chart-buy)" : "var(--ob-chart-sell)";
             const opacity =
               0.35 +
-              sqrtScale(
-                Number(bar.point.notional) || 0,
-                chartModel.maxNotional,
-              ) *
-                0.6;
+              sqrtScale(Number(bar.point.notional) || 0, chartModel.maxNotional) * 0.6;
+
             return (
               <rect
                 key={`${bar.point.side}-${bar.point.price}`}
@@ -373,12 +339,12 @@ export default function LiquidityDepthChart({
                 onMouseLeave={clearHover}
               />
             );
-          })}{" "}
+          })}
+
           {chartModel.priceTicks.map((tickPrice) => {
             const x =
               MARGIN.left +
-              ((tickPrice - chartModel.minPrice) / chartModel.priceRange) *
-                PLOT_WIDTH;
+              ((tickPrice - chartModel.minPrice) / chartModel.priceRange) * PLOT_WIDTH;
             return (
               <text
                 key={`price-${tickPrice}`}
@@ -388,32 +354,29 @@ export default function LiquidityDepthChart({
                 fill="var(--ob-chart-axis)"
                 className="text-[9px]"
               >
-                {" "}
-                {formatPrice(tickPrice, tickPrice >= 1000 ? 0 : 2)}{" "}
+                {formatPrice(tickPrice, tickPrice >= 1000 ? 0 : 2)}
               </text>
             );
-          })}{" "}
-        </svg>{" "}
+          })}
+        </svg>
+
         {hovered ? (
           <div
             className={`pointer-events-none absolute bottom-2 left-2 z-10 max-w-[min(100%,16rem)] ${ob.chartTooltip}`}
             dir="rtl"
           >
-            {" "}
             {buildTooltipLines(hovered, mode, midPrice).map((line) => (
               <div key={line} dir="auto">
-                {" "}
-                {line}{" "}
+                {line}
               </div>
-            ))}{" "}
+            ))}
           </div>
-        ) : null}{" "}
-      </ChartFrame>{" "}
+        ) : null}
+      </ChartFrame>
+
       <p className={`mt-1 shrink-0 text-[10px] ${ob.textSubtle}`}>
-        {" "}
-        {chartModel.bids.length} مستوى شراء · {chartModel.asks.length} مستوى بيع
-        · مقياس sqrt{" "}
-      </p>{" "}
+        {chartModel.bids.length} مستوى شراء · {chartModel.asks.length} مستوى بيع · مقياس sqrt
+      </p>
     </div>
   );
 }

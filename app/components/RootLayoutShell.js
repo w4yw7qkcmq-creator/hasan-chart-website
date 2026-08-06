@@ -1,4 +1,5 @@
 "use client";
+
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useState } from "react";
@@ -12,22 +13,20 @@ import { useBootstrapLoadingOverlay } from "../hooks/useBootstrapLoadingOverlay"
 import { useClientMounted } from "../hooks/useClientMounted";
 import { useNotifications } from "./notifications/NotificationProvider";
 import { useTheme } from "./ThemeProvider";
-import { ui } from "./ui/ui-theme";
+
 const NotificationBell = dynamic(
-  () =>
-    import("./notifications/NotificationBell").then(
-      (mod) => mod.NotificationBell,
-    ),
+  () => import("./notifications/NotificationBell").then((mod) => mod.NotificationBell),
   {
     ssr: false,
     loading: () => (
       <span
-        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl site-shell-skeleton"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
         aria-hidden="true"
       />
     ),
-  },
+  }
 );
+
 const menuGroups = [
   {
     id: "markets",
@@ -54,20 +53,8 @@ const menuGroups = [
       { href: "/#analysis", icon: "🧠", label: "طلب تحليل عملة" },
       { href: "/#alerts", icon: "🔔", label: "تنبيه سعر" },
       { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
-      {
-        href: "/vip-spot",
-        icon: "⭐",
-        label: "توصيات VIP سبوت",
-        auth: true,
-        plan: "spot",
-      },
-      {
-        href: "/vip-futures",
-        icon: "🔥",
-        label: "توصيات VIP فيوتشر",
-        auth: true,
-        plan: "futures",
-      },
+      { href: "/vip-spot", icon: "⭐", label: "توصيات VIP سبوت", auth: true, plan: "spot" },
+      { href: "/vip-futures", icon: "🔥", label: "توصيات VIP فيوتشر", auth: true, plan: "futures" },
       { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
       { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء" },
     ],
@@ -79,24 +66,9 @@ const menuGroups = [
     defaultOpen: true,
     items: [
       { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
-      {
-        href: "/my-dashboard#instant-analysis",
-        icon: "📈",
-        label: "تحليل لحظي",
-        auth: true,
-      },
-      {
-        href: "/my-analysis",
-        icon: "📩",
-        label: "طلباتي وردود الإدارة",
-        auth: true,
-      },
-      {
-        href: "/notification-settings",
-        icon: "🔔",
-        label: "إعدادات الإشعارات",
-        auth: true,
-      },
+      { href: "/my-dashboard#instant-analysis", icon: "📈", label: "تحليل لحظي", auth: true },
+      { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
+      { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات", auth: true },
     ],
   },
   {
@@ -105,11 +77,10 @@ const menuGroups = [
     icon: "🛠",
     adminOnly: true,
     defaultOpen: false,
-    items: [
-      { href: "/admin", icon: "🛠", label: "لوحة الإدارة", adminOnly: true },
-    ],
+    items: [{ href: "/admin", icon: "🛠", label: "لوحة الإدارة", adminOnly: true }],
   },
 ];
+
 const HEAVY_PREFETCH_ROUTES = new Set([
   "/partner-center",
   "/subscriptions",
@@ -123,43 +94,24 @@ const HEAVY_PREFETCH_ROUTES = new Set([
   "/news",
   "/assets",
 ]);
+
 function shouldPrefetchSidebarHref(href) {
   const path = String(href || "").split("#")[0];
   return !HEAVY_PREFETCH_ROUTES.has(path);
 }
+
 const socialLinks = [
-  {
-    label: "الدعم الفني",
-    badge: "تليجرام",
-    icon: "🛟",
-    href: "https://t.me/HasaNCharTSupport",
-  },
-  {
-    label: "القناة الرسمية",
-    badge: "تليجرام",
-    icon: "📢",
-    href: "https://t.me/HsaNCharT",
-  },
-  {
-    label: "د. حسن",
-    badge: "تليجرام",
-    icon: "👨‍🏫",
-    href: "https://t.me/CEOHasaNCharT",
-  },
-  {
-    label: "منصة إكس",
-    badge: "إكس",
-    icon: "𝕏",
-    href: "https://x.com/HasanChart",
-  },
+  { label: "الدعم الفني", badge: "تليجرام", icon: "🛟", href: "https://t.me/HasaNCharTSupport" },
+  { label: "القناة الرسمية", badge: "تليجرام", icon: "📢", href: "https://t.me/HsaNCharT" },
+  { label: "د. حسن", badge: "تليجرام", icon: "👨‍🏫", href: "https://t.me/CEOHasaNCharT" },
+  { label: "منصة إكس", badge: "إكس", icon: "𝕏", href: "https://x.com/HasanChart" },
 ];
+
 function getPlanAccess(subscriptionPlan) {
   const text = String(subscriptionPlan || "").toLowerCase();
+
   return {
-    hasSpot:
-      text.includes("spot") ||
-      text.includes("سبوت") ||
-      text.includes("vip spot"),
+    hasSpot: text.includes("spot") || text.includes("سبوت") || text.includes("vip spot"),
     hasFutures:
       text.includes("future") ||
       text.includes("futures") ||
@@ -167,126 +119,96 @@ function getPlanAccess(subscriptionPlan) {
       text.includes("vip futures"),
   };
 }
+
 function getUserPlanAccess(user) {
-  if (
-    typeof user?.hasSpot === "boolean" &&
-    typeof user?.hasFutures === "boolean"
-  ) {
+  if (typeof user?.hasSpot === "boolean" && typeof user?.hasFutures === "boolean") {
     return { hasSpot: user.hasSpot, hasFutures: user.hasFutures };
   }
+
   return getPlanAccess(user?.subscription_plan);
 }
+
 function hasActiveSubscriptionStatus(status) {
   const normalized = String(status || "").toLowerCase();
-  return (
-    normalized === "نشط" || normalized === "active" || normalized === "مفعل"
-  );
+  return normalized === "نشط" || normalized === "active" || normalized === "مفعل";
 }
+
 function AuthAccountSkeleton({ compact = false }) {
   if (compact) {
     return (
       <div className="hidden sm:flex items-center gap-3" aria-hidden="true">
-        
-        <div className={`${ui.shellSkeleton} h-10 w-24 rounded-2xl`} />
-        <div className={`${ui.shellSkeleton} h-10 w-24 rounded-2xl`} />
+        <div className="h-10 w-24 animate-pulse rounded-2xl bg-white/10" />
+        <div className="h-10 w-24 animate-pulse rounded-2xl bg-white/10" />
       </div>
     );
   }
+
   return (
     <div className="space-y-3" aria-hidden="true">
-      
       <div className="flex items-center gap-3">
-        
-        <div className={`${ui.shellSkeleton} h-11 w-11 rounded-2xl`} />
+        <div className="h-11 w-11 animate-pulse rounded-2xl bg-white/10" />
         <div className="min-w-0 flex-1 space-y-2">
-          
-          <div className={`${ui.shellSkeleton} h-4 w-28 rounded`} />
-          <div className={`${ui.shellSkeleton} h-3 w-36 rounded`} />
+          <div className="h-4 w-28 animate-pulse rounded bg-white/10" />
+          <div className="h-3 w-36 animate-pulse rounded bg-white/10" />
         </div>
       </div>
-      <div className={`${ui.shellSkeleton} h-11 w-full rounded-2xl`} />
+      <div className="h-11 w-full animate-pulse rounded-2xl bg-white/10" />
     </div>
   );
 }
-function GlobalNoticeBanner({ notice, href, onDismiss }) {
-  if (!notice) return null;
-  return (
-    <div role="status" aria-live="polite" className={ui.shellNotice}>
-      
-      <div className="flex items-start justify-between gap-4">
-        
-        <div>
-          
-          <p className={ui.shellNoticeTitle}>{notice}</p>
-          <p className={ui.shellNoticeBody}>
-            إذا لم يظهر إشعار المتصفح، فعّل الإشعارات من الزر بالأعلى.
-          </p>
-          {href ? (
-            <Link href={href} onClick={onDismiss} className={ui.shellNoticeBtn}>
-              
-              فتح الآن
-            </Link>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          aria-label="إغلاق الإشعار"
-          onClick={onDismiss}
-          className={ui.shellNoticeClose}
-        >
-          
-          <span aria-hidden="true">✕</span>
-        </button>
-      </div>
-      <div className={ui.shellNoticeProgressTrack}>
-        
-        <div className={ui.shellNoticeProgressValue} />
-      </div>
-    </div>
-  );
-}
+
 function AuthLoginLink({ className, onClick, compact = false }) {
   return (
     <Link href="/login" onClick={onClick} className={className}>
-      
       {compact ? "الدخول للحساب" : "الدخول للحساب"}
     </Link>
   );
 }
+
 function resolveSidebarHref(item, authResolved, currentUser) {
   if (!item.loginGate) {
     return item.href;
   }
+
   if (authResolved && currentUser) {
     return item.href;
   }
+
   return `/login?next=${encodeURIComponent(item.href)}`;
 }
+
 function resolveMenuItemState(item, authResolved, currentUser) {
   if (!item.auth && !item.plan) {
     return "visible";
   }
+
   if (!authResolved) {
     return "pending";
   }
+
   if (item.auth && !currentUser) {
     return "hidden";
   }
-  const hasActiveSubscription = hasActiveSubscriptionStatus(
-    currentUser?.subscription_status,
-  );
-  const { hasSpot: hasSpotPlan, hasFutures: hasFuturesPlan } =
-    getUserPlanAccess(currentUser);
+
+  const hasActiveSubscription = hasActiveSubscriptionStatus(currentUser?.subscription_status);
+  const { hasSpot: hasSpotPlan, hasFutures: hasFuturesPlan } = getUserPlanAccess(currentUser);
+
   if (item.plan === "spot" && (!hasActiveSubscription || !hasSpotPlan)) {
     return "hidden";
   }
+
   if (item.plan === "futures" && (!hasActiveSubscription || !hasFuturesPlan)) {
     return "hidden";
   }
+
   return "visible";
 }
-const sidebarMenuItemClass = ui.shellMenuItem;
-const sidebarMenuItemDesktopClass = ui.shellMenuItemDesktop;
+
+const sidebarMenuItemClass =
+  "group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-cyan-300/15 bg-white/[0.045] px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10";
+
+const sidebarMenuItemDesktopClass = `${sidebarMenuItemClass} hover:-translate-x-1 hover:shadow-[0_16px_38px_rgba(0,102,255,0.28)]`;
+
 function SidebarMenuItem({
   item,
   state,
@@ -296,24 +218,27 @@ function SidebarMenuItem({
   onNavigate,
   variant = "desktop",
 }) {
-  const itemClass =
-    variant === "desktop" ? sidebarMenuItemDesktopClass : sidebarMenuItemClass;
+  const itemClass = variant === "desktop" ? sidebarMenuItemDesktopClass : sidebarMenuItemClass;
   const href = resolveSidebarHref(item, authResolved, currentUser);
+
   if (state === "hidden") {
     return null;
   }
+
   if (state === "pending") {
     return (
       <div
         className={`${itemClass} pointer-events-none cursor-wait opacity-60`}
         aria-hidden="true"
       >
-        
-        <span className={ui.shellMenuIcon}> {item.icon} </span>
-        <span className={ui.shellMenuLabel}>{item.label}</span>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">
+          {item.icon}
+        </span>
+        <span className="font-bold leading-none">{item.label}</span>
       </div>
     );
   }
+
   return (
     <Link
       key={item.href}
@@ -322,56 +247,52 @@ function SidebarMenuItem({
       onClick={onNavigate}
       className={itemClass}
     >
-      
-      <span className={ui.shellMenuIcon}> {item.icon} </span>
-      <span className={ui.shellMenuLabel}>{item.label}</span>
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">
+        {item.icon}
+      </span>
+      <span className="font-bold leading-none">{item.label}</span>
       {item.href === "/my-analysis" && unreadAnalysisCount > 0 && (
-        <span className={ui.shellBadgeCount}>
-          
+        <span className="mr-auto grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-2 text-xs font-black text-white shadow-[0_0_18px_rgba(239,68,68,0.55)]">
           {unreadAnalysisCount > 9 ? "9+" : unreadAnalysisCount}
         </span>
       )}
     </Link>
   );
 }
-function SidebarMenuGroup({
-  group,
-  isOpen,
-  onToggle,
-  children,
-  variant = "desktop",
-}) {
+
+function SidebarMenuGroup({ group, isOpen, onToggle, children, variant = "desktop" }) {
   const hasVisibleChildren = Array.isArray(children)
     ? children.some(Boolean)
     : Boolean(children);
+
   if (!hasVisibleChildren) {
     return null;
   }
-  const summaryClass = ui.shellMenuGroup;
+
+  const summaryClass =
+    variant === "desktop"
+      ? "flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] border border-cyan-300/10 bg-white/[0.03] px-3 py-2.5 text-white transition hover:border-cyan-300/30 hover:bg-white/[0.06]"
+      : "flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] border border-cyan-300/10 bg-white/[0.03] px-3 py-2.5 text-white transition hover:border-cyan-300/30 hover:bg-white/[0.06]";
+
   return (
     <div className="space-y-2">
-      
       <button
         type="button"
         onClick={() => onToggle(group.id)}
         className={`${summaryClass} w-full text-right`}
         aria-expanded={isOpen}
       >
-        
-        <span className={ui.shellMenuGroupIcon}> {group.icon} </span>
-        <span className="font-black leading-none">{group.label}</span>
-        <span
-          className={
-            isOpen ? ui.shellMenuGroupChevronOpen : ui.shellMenuGroupChevron
-          }
-        >
-          ⌄
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-sm">
+          {group.icon}
         </span>
+        <span className="font-black leading-none">{group.label}</span>
+        <span className={`mr-auto text-cyan-100/60 transition ${isOpen ? "rotate-180" : ""}`}>⌄</span>
       </button>
       {isOpen ? <div className="space-y-2 pr-1">{children}</div> : null}
     </div>
   );
 }
+
 function renderSidebarGroups({
   authResolved,
   currentUser,
@@ -386,13 +307,17 @@ function renderSidebarGroups({
     if (group.adminOnly && authResolved && !isAdmin) {
       return null;
     }
+
     const isOpen = collapsedGroups[group.id] ?? group.defaultOpen;
+
     const items = group.items
       .map((item) => {
         const state = resolveMenuItemState(item, authResolved, currentUser);
+
         if (item.adminOnly && authResolved && !isAdmin) {
           return null;
         }
+
         return (
           <SidebarMenuItem
             key={item.href}
@@ -407,6 +332,7 @@ function renderSidebarGroups({
         );
       })
       .filter(Boolean);
+
     return (
       <SidebarMenuGroup
         key={group.id}
@@ -415,80 +341,77 @@ function renderSidebarGroups({
         onToggle={onToggleGroup}
         variant={variant}
       >
-        
         {items}
       </SidebarMenuGroup>
     );
   });
 }
-function AdminMenuSection({
-  authResolved,
-  isAdmin,
-  onNavigate,
-  variant = "desktop",
-}) {
+
+function AdminMenuSection({ authResolved, isAdmin, onNavigate, variant = "desktop" }) {
   const sessionPending = !authResolved;
+
   if (!sessionPending && !isAdmin) {
     return null;
   }
+
   const adminLinkClass =
-    variant === "desktop" ? ui.shellAdminLink : ui.shellAdminLinkMobile;
+    variant === "desktop"
+      ? "group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:-translate-x-1 hover:border-emerald-300/45 hover:bg-gradient-to-l hover:from-emerald-500/65 hover:to-cyan-400/20"
+      : "group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-emerald-300/45 hover:bg-gradient-to-l hover:from-emerald-500/65 hover:to-cyan-400/20";
+
   return (
     <>
-      
-      <div className={ui.shellDivider} />
+      <div className="my-3 border-t border-cyan-300/15" />
       {sessionPending ? (
         <div
           className={`${adminLinkClass} pointer-events-none cursor-wait opacity-60`}
           aria-hidden="true"
         >
-          
-          <span className={ui.shellMenuIcon + " animate-pulse"}> 🛠 </span>
-          <span className={ui.shellSkeleton + " h-4 w-28 rounded"} />
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 animate-pulse">
+            🛠
+          </span>
+          <span className="h-4 w-28 animate-pulse rounded bg-white/20" />
         </div>
       ) : (
         <Link href="/admin" onClick={onNavigate} className={adminLinkClass}>
-          
-          <span className={ui.shellMenuIcon}> 🛠 </span>
-          <span className={ui.shellMenuLabel}>لوحة الإدارة</span>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-300/10">
+            🛠
+          </span>
+          <span className="font-bold leading-none">لوحة الإدارة</span>
         </Link>
       )}
     </>
   );
 }
-function resolveThemeToggleLabel(
-  theme,
-  { compact = false, mobile = false } = {},
-) {
+
+function resolveThemeToggleLabel(theme, { compact = false, mobile = false } = {}) {
   const isLight = theme === "light";
+
   if (mobile) {
     return isLight ? "🌙 تفعيل الوضع الليلي" : "☀️ تفعيل الوضع النهاري";
   }
+
   if (compact) {
     return isLight ? "🌙 ليلي" : "☀️ نهاري";
   }
+
   return isLight ? "🌙 الوضع الليلي" : "☀️ الوضع النهاري";
 }
+
 function LayoutPageSlot({ children }) {
   return <main className="w-full p-3 pt-3 md:p-4 md:pt-4">{children}</main>;
 }
+
 const MemoizedLayoutPageSlot = memo(LayoutPageSlot);
+
 function RootLayoutShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const { showAppModal } = useAppModal();
-  const {
-    user: currentUser,
-    status: authStatus,
-    authResolved,
-    isAdmin,
-    logout,
-    updateUser,
-  } = useAuth();
+  const { user: currentUser, status: authStatus, authResolved, isAdmin, logout, updateUser } = useAuth();
   const [globalNotice, setGlobalNotice] = useState("");
   const [globalNoticeHref, setGlobalNoticeHref] = useState("");
-  const [notificationPermission, setNotificationPermission] =
-    useState("default");
+  const [notificationPermission, setNotificationPermission] = useState("default");
   const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
@@ -503,20 +426,14 @@ function RootLayoutShell({ children }) {
   const shellUser = mounted ? currentUser : null;
   const shellAuthResolved = mounted ? authResolved : false;
   const authLoading = !mounted || !authResolved;
-  const shellNotificationPermission = mounted
-    ? notificationPermission
-    : "default";
+  const shellNotificationPermission = mounted ? notificationPermission : "default";
   const shellWebPushEnabled = mounted ? webPushEnabled : false;
   const shellIsAdmin = mounted ? isAdmin : false;
   const shellUnreadAnalysisCount = mounted ? unreadAnalysisCount : 0;
   const shellThemeLabelSource = mounted ? theme : initialTheme;
-  const mobileThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, {
-    mobile: true,
-  });
+  const mobileThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { mobile: true });
   const sidebarThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource);
-  const headerThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, {
-    compact: true,
-  });
+  const headerThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { compact: true });
   const browserNotificationsActive =
     shellNotificationPermission === "granted" && shellWebPushEnabled;
   const browserNotificationLabel = browserNotificationsActive
@@ -532,94 +449,105 @@ function RootLayoutShell({ children }) {
       [groupId]: !current[groupId],
     }));
   }, []);
+
   const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
     useBootstrapLoadingOverlay(authResolved, { enabled: !isAuthPage });
+
   useEffect(() => {
     if (!mobileMenuOpen || typeof document === "undefined") return undefined;
+
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
         setMobileMenuOpen(false);
       }
     };
+
     document.addEventListener("keydown", onKeyDown);
+
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [mobileMenuOpen]);
+
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
+
     let active = true;
+
     const cancelDeferred = scheduleAfterPaint(() => {
-      void import("../../lib/push-client").then(
-        ({ resolveBrowserPushState, setStoredPushEndpoint }) => {
-          void (async () => {
-            const browserState = await resolveBrowserPushState();
-            if (!active) return;
-            setNotificationPermission(browserState.permission);
-            if (
-              browserState.permission === "granted" &&
-              browserState.hasSubscription
-            ) {
-              setWebPushEnabled(true);
-              const endpoint = browserState.subscription?.endpoint;
-              if (endpoint) {
-                setStoredPushEndpoint(endpoint);
-              }
-              console.log(
-                "push:ui:enabled",
-                JSON.stringify({
-                  source: "browser_subscription",
-                  hasEndpoint: Boolean(endpoint),
-                }),
-              );
+      void import("../../lib/push-client").then(({ resolveBrowserPushState, setStoredPushEndpoint }) => {
+        void (async () => {
+          const browserState = await resolveBrowserPushState();
+          if (!active) return;
+
+          setNotificationPermission(browserState.permission);
+
+          if (browserState.permission === "granted" && browserState.hasSubscription) {
+            setWebPushEnabled(true);
+
+            const endpoint = browserState.subscription?.endpoint;
+            if (endpoint) {
+              setStoredPushEndpoint(endpoint);
             }
-          })();
-        },
-      );
+
+            console.log(
+              "push:ui:enabled",
+              JSON.stringify({
+                source: "browser_subscription",
+                hasEndpoint: Boolean(endpoint),
+              })
+            );
+          }
+        })();
+      });
     }, 2000);
+
     return () => {
       active = false;
       cancelDeferred();
     };
   }, []);
+
   useEffect(() => {
     const cancelDeferred = scheduleAfterPaint(() => {
-      void import("../../lib/notification-sound-manager").then(
-        ({ setupBrowserSoundUnlock }) => {
-          setupBrowserSoundUnlock();
-        },
-      );
+      void import("../../lib/notification-sound-manager").then(({ setupBrowserSoundUnlock }) => {
+        setupBrowserSoundUnlock();
+      });
     }, 1800);
+
     return cancelDeferred;
   }, []);
+
   useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator))
-      return undefined;
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return undefined;
+
     const cancelDeferred = scheduleAfterPaint(() => {
-      void import("../../lib/push-client").then(
-        ({ ensureServiceWorkerRegistration }) => {
-          ensureServiceWorkerRegistration().catch((err) => {
-            console.warn(
-              "Service worker registration skipped:",
-              err?.message || err,
-            );
-          });
-        },
-      );
+      void import("../../lib/push-client").then(({ ensureServiceWorkerRegistration }) => {
+        ensureServiceWorkerRegistration().catch((err) => {
+          console.warn("Service worker registration skipped:", err?.message || err);
+        });
+      });
     }, 2500);
+
     return cancelDeferred;
   }, []);
+
   const savePushSubscription = async ({ existingSubscription = null } = {}) => {
     const pushClient = await import("../../lib/push-client");
+
     console.log(
       "push:client:start",
-      JSON.stringify({ phase: "savePushSubscription" }),
+      JSON.stringify({
+        phase: "savePushSubscription",
+      })
     );
-    const { user: authUser, error: authError } =
-      await resolveSupabaseAuthUser();
+
+    const { user: authUser, error: authError } = await resolveSupabaseAuthUser();
+
     if (authError || !authUser?.id || !authUser?.email) {
       console.error(
         "push:api:error",
@@ -627,14 +555,17 @@ function RootLayoutShell({ children }) {
           phase: "client",
           reason: "MISSING_AUTH_USER",
           authError: authError?.message || null,
-        }),
+        })
       );
       throw new Error("يجب تسجيل الدخول قبل حفظ اشتراك الإشعارات");
     }
+
     let subscription = existingSubscription;
+
     if (!subscription) {
       subscription = await pushClient.getExistingPushSubscription();
     }
+
     if (!subscription) {
       try {
         subscription = await pushClient.subscribeToWebPush();
@@ -644,17 +575,20 @@ function RootLayoutShell({ children }) {
           JSON.stringify({
             phase: "web_push_subscribe",
             message: error?.message || String(error),
-          }),
+          })
         );
         throw new Error(
-          error?.message || "تعذر إنشاء اشتراك Web Push من المتصفح",
+          error?.message || "تعذر إنشاء اشتراك Web Push من المتصفح"
         );
       }
     }
+
     const payload = pushClient.serializePushSubscription(subscription);
+
     if (!payload?.endpoint || !payload?.keys?.p256dh || !payload?.keys?.auth) {
       throw new Error("تعذر قراءة بيانات اشتراك Push من المتصفح");
     }
+
     const anonymousId = pushClient.getAnonymousPushId();
     const result = await pushClient.savePushSubscriptionViaApi({
       subscription: payload,
@@ -662,24 +596,37 @@ function RootLayoutShell({ children }) {
       userEmail: String(authUser.email).trim().toLowerCase(),
       userId: String(authUser.id).trim(),
     });
+
     pushClient.setStoredPushEndpoint(payload.endpoint);
     setWebPushEnabled(true);
-    return { apiCalled: true, subscription: result.subscription };
+
+    return {
+      apiCalled: true,
+      subscription: result.subscription,
+    };
   };
+
   useEffect(() => {
     if (!globalNotice) return;
+
     const timer = setTimeout(() => {
       setGlobalNotice("");
       setGlobalNoticeHref("");
     }, 9000);
+
     return () => clearTimeout(timer);
   }, [globalNotice]);
+
   const enableBrowserNotifications = async () => {
     console.log(
       "push:client:start",
-      JSON.stringify({ phase: "enableBrowserNotifications" }),
+      JSON.stringify({
+        phase: "enableBrowserNotifications",
+      })
     );
+
     if (typeof window === "undefined") return;
+
     if (!authResolved || !currentUser?.email || !currentUser?.id) {
       showAppModal({
         type: "warning",
@@ -688,6 +635,7 @@ function RootLayoutShell({ children }) {
       });
       return;
     }
+
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
       showAppModal({
         type: "warning",
@@ -696,6 +644,7 @@ function RootLayoutShell({ children }) {
       });
       return;
     }
+
     if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
       showAppModal({
         type: "warning",
@@ -704,23 +653,26 @@ function RootLayoutShell({ children }) {
       });
       return;
     }
+
     try {
-      const { resolveBrowserPushState, setStoredPushEndpoint } =
-        await import("../../lib/push-client");
+      const { resolveBrowserPushState, setStoredPushEndpoint } = await import("../../lib/push-client");
       const browserState = await resolveBrowserPushState();
       setNotificationPermission(browserState.permission);
-      if (
-        browserState.permission === "granted" &&
-        browserState.hasSubscription
-      ) {
+
+      if (browserState.permission === "granted" && browserState.hasSubscription) {
         setWebPushEnabled(true);
+
         if (browserState.subscription?.endpoint) {
           setStoredPushEndpoint(browserState.subscription.endpoint);
         }
+
         console.log(
           "push:ui:enabled",
-          JSON.stringify({ source: "button_existing_subscription" }),
+          JSON.stringify({
+            source: "button_existing_subscription",
+          })
         );
+
         if (authResolved && currentUser?.email && currentUser?.id) {
           try {
             await savePushSubscription({
@@ -729,10 +681,11 @@ function RootLayoutShell({ children }) {
           } catch (syncError) {
             console.warn(
               "Push subscription sync skipped:",
-              syncError?.message || syncError,
+              syncError?.message || syncError
             );
           }
         }
+
         showAppModal({
           type: "success",
           title: "إشعارات المتصفح",
@@ -740,38 +693,47 @@ function RootLayoutShell({ children }) {
         });
         return;
       }
+
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
+
       if (permission !== "granted") {
         showAppModal({
           type: "warning",
           title: "تم رفض الإشعارات",
-          message:
-            "تم رفض إشعارات المتصفح. يمكنك تفعيلها لاحقاً من إعدادات المتصفح.",
+          message: "تم رفض إشعارات المتصفح. يمكنك تفعيلها لاحقاً من إعدادات المتصفح.",
         });
         return;
       }
+
       const saveResult = await savePushSubscription();
+
       if (!saveResult?.apiCalled || !saveResult?.subscription?.id) {
         throw new Error("لم يتم استدعاء /api/push/subscribe بنجاح");
       }
+
       showAppModal({
         type: "success",
         title: "تم تفعيل إشعارات المتصفح",
         message:
           "تم حفظ اشتراك الإشعارات في قاعدة البيانات. ستصلك تنبيهات الأسعار حتى لو كان الموقع مغلقاً.",
       });
+
       setGlobalNotice("🔔 تم حفظ اشتراك إشعارات المتصفح بنجاح");
       setGlobalNoticeHref("");
+
       console.log(
         "push:ui:enabled",
-        JSON.stringify({ source: "button_new_subscription" }),
+        JSON.stringify({
+          source: "button_new_subscription",
+        })
       );
     } catch (error) {
       setWebPushEnabled(false);
       void import("../../lib/push-client").then(({ setStoredPushEndpoint }) => {
         setStoredPushEndpoint("");
       });
+
       showAppModal({
         type: "warning",
         title: "تعذر تفعيل الإشعارات",
@@ -779,94 +741,107 @@ function RootLayoutShell({ children }) {
       });
     }
   };
+
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    if (!authResolved || !currentUser?.email || !currentUser?.id)
-      return undefined;
+    if (!authResolved || !currentUser?.email || !currentUser?.id) return undefined;
+
     let active = true;
+
     const cancelDeferred = scheduleAfterPaint(() => {
       if (!active) return;
-      void import("../../lib/push-client").then(
-        ({ resolveBrowserPushState, setStoredPushEndpoint }) => {
-          void (async () => {
-            const browserState = await resolveBrowserPushState();
+
+      void import("../../lib/push-client").then(({ resolveBrowserPushState, setStoredPushEndpoint }) => {
+        void (async () => {
+          const browserState = await resolveBrowserPushState();
+          if (!active) return;
+
+          setNotificationPermission(browserState.permission);
+
+          if (browserState.permission !== "granted" || !browserState.hasSubscription) {
+            return;
+          }
+
+          setWebPushEnabled(true);
+
+          if (browserState.subscription?.endpoint) {
+            setStoredPushEndpoint(browserState.subscription.endpoint);
+          }
+
+          console.log(
+            "push:ui:enabled",
+            JSON.stringify({
+              source: "login_sync",
+              email: currentUser.email,
+              userId: currentUser.id,
+            })
+          );
+
+          try {
+            const saved = await savePushSubscription({
+              existingSubscription: browserState.subscription,
+            });
+
             if (!active) return;
-            setNotificationPermission(browserState.permission);
-            if (
-              browserState.permission !== "granted" ||
-              !browserState.hasSubscription
-            ) {
-              return;
-            }
-            setWebPushEnabled(true);
-            if (browserState.subscription?.endpoint) {
-              setStoredPushEndpoint(browserState.subscription.endpoint);
-            }
-            console.log(
-              "push:ui:enabled",
-              JSON.stringify({
-                source: "login_sync",
-                email: currentUser.email,
-                userId: currentUser.id,
-              }),
-            );
-            try {
-              const saved = await savePushSubscription({
-                existingSubscription: browserState.subscription,
+
+            if (saved?.apiCalled && saved?.subscription?.id) {
+              console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN_DONE", {
+                subscriptionId: saved.subscription.id,
+                email: saved.subscription.email || currentUser.email,
+                userId: saved.subscription.user_id || currentUser.id,
               });
-              if (!active) return;
-              if (saved?.apiCalled && saved?.subscription?.id) {
-                console.log("PUSH_SUBSCRIPTION_LINK_ON_LOGIN_DONE", {
-                  subscriptionId: saved.subscription.id,
-                  email: saved.subscription.email || currentUser.email,
-                  userId: saved.subscription.user_id || currentUser.id,
-                });
-              }
-            } catch (err) {
-              if (!active) return;
-              console.warn(
-                "Push subscription sync skipped:",
-                err?.message || err,
-              );
             }
-          })();
-        },
-      );
+          } catch (err) {
+            if (!active) return;
+            console.warn("Push subscription sync skipped:", err?.message || err);
+          }
+        })();
+      });
     }, 3000);
+
     return () => {
       active = false;
       cancelDeferred();
     };
   }, [authResolved, currentUser?.email, currentUser?.id]);
+
   const refreshCurrentUserSubscription = useCallback(async () => {
-    if (
-      !currentUser?.email ||
-      (typeof document !== "undefined" && document.hidden)
-    ) {
+    if (!currentUser?.email || (typeof document !== "undefined" && document.hidden)) {
       return;
     }
+
     try {
       const response = await fetchWithTimeout(
         "/api/my-subscription-status",
-        { method: "GET", cache: "no-store", credentials: "include" },
-        5000,
+        {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+        },
+        5000
       );
+
       const result = await response.json().catch(() => null);
+
       if (!response.ok || !result?.success || !result?.active) {
         return;
       }
+
       const activePlanText = result.subscription_plan || "اشتراكك";
       const activationNoticeKey = `subscriptionActivationNotice-${currentUser.email}-${activePlanText}`;
-      const alreadyNotified =
-        localStorage.getItem(activationNoticeKey) === "yes";
+      const alreadyNotified = localStorage.getItem(activationNoticeKey) === "yes";
+
       updateUser((prev) => {
         if (!prev) return prev;
+
         const wasInactive = !["نشط", "active", "مفعل"].includes(
-          String(prev.subscription_status || "").toLowerCase(),
+          String(prev.subscription_status || "").toLowerCase()
         );
+
         if ((wasInactive || !alreadyNotified) && !alreadyNotified) {
           localStorage.setItem(activationNoticeKey, "yes");
         }
+
         return {
           ...prev,
           subscription_plan: activePlanText,
@@ -1046,22 +1021,22 @@ function RootLayoutShell({ children }) {
             </div>
           </div>
         )}
-        <div className="site-shell-root lg:flex lg:flex-row pt-0">
+        <div className="min-h-screen lg:flex lg:flex-row bg-[radial-gradient(circle_at_18%_8%,rgba(11,99,255,0.28),transparent_28%),radial-gradient(circle_at_82%_24%,rgba(34,211,238,0.12),transparent_28%),linear-gradient(135deg,#020617,#06112b)] pt-0">
           {mobileMenuOpen && (
             <div className="fixed inset-0 z-[9998] lg:hidden">
               <button
                 aria-label="إغلاق القائمة"
                 onClick={() => setMobileMenuOpen(false)}
-                className="site-shell-drawer-scrim absolute inset-0"
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
               />
 
               <aside
                 role="dialog"
                 aria-modal="true"
                 aria-label="قائمة التنقل"
-                className="site-mobile-drawer-panel absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l p-4"
+                className="absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l border-cyan-300/20 bg-[#020817] p-4 shadow-[0_0_80px_rgba(0,102,255,0.30)]"
               >
-                <div className="site-mobile-drawer-panel__overlay pointer-events-none absolute inset-0" />
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
                 <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
                 <div className="site-sidebar-brand-card relative z-10 mb-4 flex items-center justify-between gap-3 p-3">
@@ -1098,10 +1073,10 @@ function RootLayoutShell({ children }) {
                   })}
                 </nav>
 
-                <div className="site-shell-user-card relative z-10 mt-4 space-y-3 p-4">
+                <div className="relative z-10 mt-4 space-y-3 rounded-[24px] border border-cyan-300/10 bg-white/[0.035] p-4 backdrop-blur-xl">
                   <button
                     onClick={toggleTheme}
-                    className="site-shell-theme-btn"
+                    className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
                   >
                     {mobileThemeLabel}
                   </button>
@@ -1143,8 +1118,8 @@ function RootLayoutShell({ children }) {
               </aside>
             </div>
           )}
-          <aside className="site-sidebar-panel relative z-[110] hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden border-l backdrop-blur-2xl p-4 flex-col">
-            <div className="site-sidebar-panel__overlay pointer-events-none absolute inset-0" />
+          <aside className="relative z-[110] hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden bg-[#020817] border-l border-cyan-300/20 shadow-[0_0_80px_rgba(0,102,255,0.24)] backdrop-blur-2xl p-4 flex-col">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
             <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
             <Link href="/" className="site-sidebar-brand-card relative z-10 mb-6 flex items-center gap-3 p-3 group">
@@ -1211,10 +1186,10 @@ function RootLayoutShell({ children }) {
               </details>
             </nav>
 
-            <div className="site-shell-user-card relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4">
+            <div className="relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4 border border-cyan-300/10 bg-white/[0.035] backdrop-blur-xl">
               <button
                 onClick={toggleTheme}
-                className="site-shell-theme-btn mb-3"
+                className="mb-3 w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
               >
                 {sidebarThemeLabel}
               </button>
@@ -1240,7 +1215,7 @@ function RootLayoutShell({ children }) {
             </div>
           </aside>
 
-          <div className="site-main-shell">
+          <div className="min-w-0 flex-1 overflow-x-hidden">
             <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl">
               <div className="site-top-header__gradient pointer-events-none absolute inset-0" />
               <div className="relative z-10 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
