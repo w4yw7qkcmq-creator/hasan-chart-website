@@ -1,0 +1,17 @@
+# Email queue worker — Root Directory MUST be `worker`.
+# Config: worker/railway.email-queue.toml
+
+[variables]
+NODE_VERSION = "22"
+
+[phases.setup]
+aptPkgs = []
+
+[phases.install]
+cmds = ["npm ci --omit=dev"]
+
+[phases.build]
+cmds = ["node -e \"require('@supabase/supabase-js'); console.log('email queue worker deps ok')\""]
+
+[start]
+cmd = "npm run email-queue-worker"

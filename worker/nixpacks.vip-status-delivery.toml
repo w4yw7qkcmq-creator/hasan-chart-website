@@ -1,0 +1,17 @@
+# VIP status delivery worker — Root Directory MUST be `worker`.
+# Config: worker/railway.vip-status-delivery.toml
+
+[variables]
+NODE_VERSION = "22"
+
+[phases.setup]
+aptPkgs = []
+
+[phases.install]
+cmds = ["npm ci --omit=dev"]
+
+[phases.build]
+cmds = ["node -e \"require('@supabase/supabase-js'); console.log('vip status delivery worker deps ok')\""]
+
+[start]
+cmd = "npm run vip-status-delivery-worker"
