@@ -36,6 +36,14 @@ const {
   isAiWorkerPrimaryMode,
   validateAiWorkerEnvironment,
 } = require("./ai/ai-worker-env");
+const {
+  createJob,
+  getJob,
+  jobRowToStatusPayload,
+  recoverStaleJobs,
+  getRecoveryMetrics,
+} = require("./lib/instant-analysis-job-store");
+const { processInstantAnalysisJob } = require("./lib/instant-analysis-processor");
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1464,12 +1472,6 @@ app.post(
   }
 
   const { markJobQueued, markJobCompleted, markJobFailed } = require("./lib/ai-worker-metrics");
-  const {
-    createJob,
-    getJob,
-    jobRowToStatusPayload,
-  } = require("./lib/instant-analysis-job-store");
-  const { processInstantAnalysisJob } = require("./lib/instant-analysis-processor");
   const { getInstanceId } = require("./lib/price-alert-distributed-lock");
 
   try {
@@ -1690,11 +1692,6 @@ app.listen(PORT, () => {
       deploymentId: processMetadata.deploymentId,
     });
   } else {
-    const {
-      recoverStaleJobs,
-      getRecoveryMetrics,
-    } = require("./lib/instant-analysis-job-store");
-
     recoverStaleJobs(getSupabaseClient())
       .then((result) => {
         console.log(
