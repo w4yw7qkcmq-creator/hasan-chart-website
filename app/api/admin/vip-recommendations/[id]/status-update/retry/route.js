@@ -72,12 +72,17 @@ export async function POST(request, { params }) {
       );
     }
 
-    return Response.json({
-      success: true,
-      noOp: Boolean(result.noOp),
-      partialFailure: result.partialFailure,
-      summary: result.summary,
-    });
+    return Response.json(
+      {
+        success: true,
+        accepted: result.accepted ?? !result.noOp,
+        status: result.deliveryStatus || (result.noOp ? "noop" : "processing"),
+        noOp: Boolean(result.noOp),
+        partialFailure: result.partialFailure ?? false,
+        summary: result.summary,
+      },
+      { status: result.status || 200 }
+    );
   } catch (error) {
     return Response.json(
       { success: false, error: error?.message || "Internal error" },

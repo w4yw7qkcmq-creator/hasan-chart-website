@@ -65,6 +65,8 @@
     "test:vip-recommendation-rls": "node --test scripts/test-vip-recommendation-rls-static.js",
     "test:vip-recommendation-rpc-grants": "node --test scripts/test-vip-recommendation-rpc-grants-static.js",
     "test:vip-recommendation-active-queue": "node --test scripts/test-vip-recommendation-active-queue.js",
+    "test:vip-notification-delivery-architecture": "node --test scripts/test-vip-notification-delivery-architecture.js",
+    "test:vip-status-delivery-worker": "node --test scripts/test-vip-status-delivery-worker.js",
     "test:vip-recommendation-browser": "node scripts/test-vip-recommendation-browser-matrix.mjs",
     "test:vip-recommendation": "npm run test:vip-recommendation-status && npm run test:vip-recommendation-routes && npm run test:vip-recommendation-rls && npm run test:vip-recommendation-rpc-grants && npm run test:vip-recommendation-active-queue && npm run test:vip-recommendation-browser"
   },

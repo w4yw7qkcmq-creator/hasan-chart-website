@@ -99,6 +99,23 @@ function buildSignalMockSupabase({ rpcResult, rpcError, deliveryRows = [] } = {}
               },
             };
           },
+          upsert(rows, { ignoreDuplicates } = {}) {
+            const created = [];
+            for (const row of rows) {
+              if (deliveryStore.has(row.idempotency_key)) {
+                if (!ignoreDuplicates) {
+                  return { select: () => Promise.resolve({ data: null, error: { code: "23505" } }) };
+                }
+                continue;
+              }
+              const id = `d-${deliveryStore.size + 1}`;
+              deliveryStore.set(row.idempotency_key, { ...row, id });
+              created.push({ id });
+            }
+            return {
+              select: () => Promise.resolve({ data: created, error: null }),
+            };
+          },
           update(patch) {
             return {
               eq(_c, id) {
@@ -125,8 +142,8 @@ function buildSignalMockSupabase({ rpcResult, rpcError, deliveryRows = [] } = {}
           order() {
             return this;
           },
-          range: async () => ({
-            data: [
+          range: async (from = 0, to = 999) => {
+            const slice = [
               {
                 id: "s1",
                 user_email: "spot@example.com",
@@ -136,9 +153,9 @@ function buildSignalMockSupabase({ rpcResult, rpcError, deliveryRows = [] } = {}
                 expires_at: new Date(Date.now() + 86400000).toISOString(),
                 created_at: new Date().toISOString(),
               },
-            ],
-            error: null,
-          }),
+            ].slice(from, to + 1);
+            return { data: slice, error: null };
+          },
         };
       }
 
@@ -263,13 +280,13 @@ test("sendVipRecommendationStatusUpdate dispatches with atomic RPC success", asy
     eventType: "target_1_hit",
     adminUser: { email: "admin@example.com", id: "admin-1" },
     deps: {
-      dispatchUnifiedSiteAlerts: async () => {
+      dispatchSiteNotification: async () => {
         dispatchCalls.push("site");
-        return { notificationCreated: true };
+        return { data: { id: "notif-1" } };
       },
       dispatchTemplateTransactionalEmail: async () => {
         dispatchCalls.push("email");
-        return { sent: true };
+        return { success: true, mode: "direct", id: "resend-1" };
       },
       sendTargetedPushNotification: async () => {
         dispatchCalls.push("push");
@@ -279,34 +296,69 @@ test("sendVipRecommendationStatusUpdate dispatches with atomic RPC success", asy
   });
 
   assert.equal(result.ok, true);
+  assert.equal(result.accepted, true);
+  assert.equal(result.deliveryStatus, "processing");
   assert.equal(result.summary.eligibleRecipients, 1);
-  assert.ok(dispatchCalls.includes("site"));
-  assert.ok(dispatchCalls.includes("email"));
-  assert.ok(dispatchCalls.includes("push"));
+  assert.equal(result.summary.deliveryJobsRequested, 3);
+  assert.ok(dispatchCalls.length === 0 || result.status === 202);
 });
 
-test("retry skips delivered channels and respects max attempts constant", async () => {
+test("retry requeues failed deliveries for async worker", async () => {
   assert.equal(MAX_VIP_STATUS_DELIVERY_ATTEMPTS, 3);
 
-  const supabase = buildSignalMockSupabase({
-    rpcResult: null,
+  const deliveryStore = new Map();
+  deliveryStore.set("k1", {
+    id: "d1",
+    idempotency_key: "k1",
+    signal_id: "sig-1",
+    event_type: "target_1_hit",
+    status: "failed",
+    attempt_count: 1,
   });
 
+  const supabase = buildSignalMockSupabase({ rpcResult: null });
   supabase.from = (table) => {
     const base = buildSignalMockSupabase().from(table);
     if (table === "vip_signal_status_deliveries") {
       return {
-        ...base,
         select() {
           return this;
         },
-        eq() {
+        eq(col, val) {
+          this._filters = this._filters || [];
+          this._filters.push([col, val]);
           return this;
         },
-        lt: async () => ({
-          data: [{ user_email: "fail@example.com" }],
-          error: null,
-        }),
+        lt(col, val) {
+          this._lt = [col, val];
+          return this;
+        },
+        update(patch) {
+          const filters = [];
+          const chain = {
+            eq(col, val) {
+              filters.push([col, val]);
+              return chain;
+            },
+            lt(col, val) {
+              filters.push(["__lt__", col, val]);
+              return chain;
+            },
+            select() {
+              const matched = [...deliveryStore.values()].filter((row) =>
+                filters.every((entry) => {
+                  if (entry[0] === "__lt__") return row[entry[1]] < entry[2];
+                  return row[entry[0]] == entry[1] || row[entry[0]] === entry[1];
+                })
+              );
+              for (const row of matched) {
+                deliveryStore.set(row.idempotency_key, { ...row, ...patch });
+              }
+              return Promise.resolve({ data: matched.map((r) => ({ id: r.id })), error: null });
+            },
+          };
+          return chain;
+        },
       };
     }
     return base;
@@ -316,15 +368,11 @@ test("retry skips delivered channels and respects max attempts constant", async 
     recommendationId: "sig-1",
     eventType: "target_1_hit",
     adminUser: { email: "admin@example.com", id: "admin-1" },
-    deps: {
-      dispatchUnifiedSiteAlerts: async () => ({ notificationCreated: true }),
-      dispatchTemplateTransactionalEmail: async () => ({ sent: true }),
-      sendTargetedPushNotification: async () => ({ sent: 0, skipped: 1 }),
-    },
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.summary.retriedRecipients, 1);
+  assert.equal(result.summary.requeued, 1);
+  assert.equal(deliveryStore.get("k1").status, "pending");
 });
 
 test("concurrent duplicate RPC: only one success path", async () => {
@@ -367,8 +415,12 @@ test("concurrent duplicate RPC: only one success path", async () => {
       eventType: "target_1_hit",
       adminUser: { email: "a@example.com", id: "1" },
       deps: {
-        dispatchUnifiedSiteAlerts: async () => ({ notificationCreated: false }),
-        dispatchTemplateTransactionalEmail: async () => ({ sent: false }),
+        dispatchSiteNotification: async () => ({ data: { id: "notif-1" } }),
+        dispatchTemplateTransactionalEmail: async () => ({
+          success: true,
+          mode: "direct",
+          id: "resend-1",
+        }),
         sendTargetedPushNotification: async () => ({ sent: 0 }),
       },
     }),
@@ -377,8 +429,12 @@ test("concurrent duplicate RPC: only one success path", async () => {
       eventType: "target_1_hit",
       adminUser: { email: "a@example.com", id: "1" },
       deps: {
-        dispatchUnifiedSiteAlerts: async () => ({ notificationCreated: false }),
-        dispatchTemplateTransactionalEmail: async () => ({ sent: false }),
+        dispatchSiteNotification: async () => ({ data: { id: "notif-2" } }),
+        dispatchTemplateTransactionalEmail: async () => ({
+          success: true,
+          mode: "direct",
+          id: "resend-2",
+        }),
         sendTargetedPushNotification: async () => ({ sent: 0 }),
       },
     }),
