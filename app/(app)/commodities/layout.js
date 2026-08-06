@@ -2,8 +2,6 @@ import CommoditiesPageJsonLd from "../../components/commodities/CommoditiesPageJ
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
-
-
 export const metadata = buildPublicPageMetadata({
   path: "/commodities",
   title: "HasaN CharT World | السلع العالمية",
@@ -21,12 +19,11 @@ export const metadata = buildPublicPageMetadata({
     "تحليل السلع",
   ],
 });
-
 export default function CommoditiesLayout({ children }) {
   return (
     <>
-      <CommoditiesPageJsonLd />
-      {children}
+      
+      <CommoditiesPageJsonLd /> {children}
     </>
   );
 }

@@ -2,8 +2,6 @@ import CryptoPageJsonLd from "../../components/crypto/CryptoPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
-
-
 export const metadata = buildPublicPageMetadata({
   path: "/crypto",
   title: "HasaN CharT World | العملات الرقمية",
@@ -21,12 +19,11 @@ export const metadata = buildPublicPageMetadata({
     "VIP Crypto",
   ],
 });
-
 export default function CryptoLayout({ children }) {
   return (
     <>
-      <CryptoPageJsonLd />
-      {children}
+      
+      <CryptoPageJsonLd /> {children}
     </>
   );
 }

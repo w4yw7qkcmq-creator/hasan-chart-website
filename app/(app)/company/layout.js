@@ -2,8 +2,6 @@ import CompanyPageJsonLd from "../../components/company/CompanyPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
-
-
 export const metadata = buildPublicPageMetadata({
   path: "/company",
   title: "HasaN CharT World | الشركة",
@@ -19,12 +17,11 @@ export const metadata = buildPublicPageMetadata({
     "توصيات التداول",
   ],
 });
-
 export default function CompanyLayout({ children }) {
   return (
     <>
-      <CompanyPageJsonLd />
-      {children}
+      
+      <CompanyPageJsonLd /> {children}
     </>
   );
 }

@@ -3,20 +3,17 @@ import { dogeAssetConfig } from "../../components/asset-hub/configs/doge";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_ASSET_HUB } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_ASSET_HUB;
-
-
 export const metadata = buildPublicPageMetadata({
   path: dogeAssetConfig.path,
   title: dogeAssetConfig.metadata.title,
   description: dogeAssetConfig.metadata.description,
   keywords: dogeAssetConfig.metadata.keywords,
 });
-
 export default function DogeLayout({ children }) {
   return (
     <>
-      <AssetPageJsonLd config={dogeAssetConfig} />
-      {children}
+      
+      <AssetPageJsonLd config={dogeAssetConfig} /> {children}
     </>
   );
 }

@@ -1,8 +1,6 @@
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
-
 export const revalidate = REVALIDATE_STATIC_MARKETING;
-
 export const metadata = buildPublicPageMetadata({
   path: "/order-book",
   title: "دفتر الأوامر والسيولة المباشر | HasaN CharT World",
@@ -21,9 +19,7 @@ export const metadata = buildPublicPageMetadata({
     "مؤشر الخوف والطمع",
   ],
 });
-
 import "./order-book-theme.css";
-
 export default function OrderBookLayout({ children }) {
   return children;
 }
