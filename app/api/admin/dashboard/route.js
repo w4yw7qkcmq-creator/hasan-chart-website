@@ -28,6 +28,7 @@ import {
   normalizeVipSignalType,
   notifyVipSubscribers,
 } from "../../../../lib/vip-subscriber-notify.js";
+import { countEligibleVipRecipients } from "../../../../lib/vip-recommendation-eligibility.js";
 
 export const dynamic = "force-dynamic";
 
@@ -407,6 +408,13 @@ export async function POST(request) {
         );
       }
 
+      let publishRecipientCount = 0;
+      try {
+        publishRecipientCount = await countEligibleVipRecipients(supabase, signalType);
+      } catch {
+        publishRecipientCount = 0;
+      }
+
       const { data, error } = await supabase
         .from("vip_signals")
         .insert({
@@ -417,6 +425,10 @@ export async function POST(request) {
           stop_loss: stopLoss,
           notes,
           status: "نشطة",
+          trade_status: "active",
+          publish_recipient_count: publishRecipientCount,
+          published_by_email: adminUser?.email || null,
+          published_by: adminUser?.id || null,
         })
         .select("id")
         .single();

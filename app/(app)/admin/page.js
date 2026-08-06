@@ -48,6 +48,7 @@ import {
   subscribeAdminSubscriptionUpdated,
 } from "../../../lib/admin-subscription-updated-client";
 import StatusBadge from "./components/StatusBadge";
+import VipRecentRecommendationsPanel from "./components/VipRecentRecommendationsPanel";
 import AdminProofPreviewModal from "./components/AdminProofPreviewModal";
 import SubscriptionRejectModal from "./components/SubscriptionRejectModal";
 import SubscriptionRemoveModal from "./components/SubscriptionRemoveModal";
@@ -2189,6 +2190,8 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+
+          <VipRecentRecommendationsPanel />
         </section>
         )}
 
