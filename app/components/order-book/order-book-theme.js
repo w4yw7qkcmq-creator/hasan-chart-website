@@ -43,7 +43,7 @@ export const ob = {
     "flex h-full min-h-[7.75rem] min-w-0 flex-col rounded-xl border p-3 transition-colors motion-reduce:transition-none ob-surface-muted hover:border-[var(--ob-border-strong)]",
   tableHeader: "ob-table-header sticky top-0 z-10 border-b backdrop-blur-sm",
   rowHover: "ob-row-hover transition-colors motion-reduce:transition-none",
-  midPrice: "ob-mid-price sticky z-[2] border-y px-3 py-1.5 text-center text-xs font-medium",
+  midPrice: "ob-mid-row sticky z-[2] border-y px-3 py-1.5 text-center text-xs font-medium",
   badgeConnected:
     "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold border-[var(--ob-positive-border)] bg-[var(--ob-positive-soft)] ob-positive",
   badgePartial:

@@ -1039,9 +1039,11 @@ function RootLayoutShell({ children }) {
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
                 <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
-                <div className="relative z-10 mb-4 flex items-center justify-between gap-3 rounded-[24px] border border-cyan-300/15 bg-white/[0.05] p-3">
+                <div className="site-sidebar-brand-card relative z-10 mb-4 flex items-center justify-between gap-3 p-3">
                   <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
-                    <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/30 bg-gradient-to-br from-blue-600/35 via-cyan-400/15 to-black/40 font-black text-white">HC</div>
+                    <div className="site-sidebar-brand-badge grid h-11 w-11 place-items-center rounded-2xl">
+                      <span className="site-sidebar-brand-badge__text font-black">HC</span>
+                    </div>
                     <div>
                       <h2 className="site-sidebar-brand-title font-black leading-5">HasaN CharT World</h2>
                       <p className="site-sidebar-brand-subtitle text-xs">منصة التداول الذكية</p>
@@ -1120,9 +1122,9 @@ function RootLayoutShell({ children }) {
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
             <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
-            <Link href="/" className="relative z-10 mb-6 flex items-center gap-3 rounded-[26px] border border-cyan-300/15 bg-white/[0.05] p-3 shadow-[0_18px_45px_rgba(0,102,255,0.15)] group">
-              <div className="h-12 w-12 relative grid place-items-center overflow-hidden rounded-2xl border border-cyan-300/30 bg-gradient-to-br from-blue-600/35 via-cyan-400/15 to-black/40 shadow-[0_0_35px_rgba(0,163,255,0.30)]">
-                <span className="font-black text-white text-lg">HC</span>
+            <Link href="/" className="site-sidebar-brand-card relative z-10 mb-6 flex items-center gap-3 p-3 group">
+              <div className="site-sidebar-brand-badge h-12 w-12 relative grid place-items-center overflow-hidden rounded-2xl">
+                <span className="site-sidebar-brand-badge__text font-black text-lg">HC</span>
               </div>
               <div>
                 <h2 className="site-sidebar-brand-title font-black text-base leading-5 tracking-tight">HasaN CharT World</h2>

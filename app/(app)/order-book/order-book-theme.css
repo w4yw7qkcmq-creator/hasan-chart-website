@@ -100,7 +100,10 @@ html[data-theme="light"] {
   --ob-neutral-soft: rgba(167, 139, 250, 0.14);
   --ob-table-header: rgba(2, 6, 23, 0.92);
   --ob-table-row-hover: rgba(255, 255, 255, 0.05);
-  --ob-mid-price: rgba(255, 255, 255, 0.06);
+  --ob-mid-row-bg: rgba(255, 255, 255, 0.04);
+  --ob-mid-row-text: #f8fafc;
+  --ob-mid-row-border: rgba(148, 163, 184, 0.18);
+  --ob-mid-price: var(--ob-mid-row-bg);
   --ob-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
   --ob-buy-depth: rgba(16, 185, 129, 0.22);
   --ob-sell-depth: rgba(244, 63, 94, 0.22);
@@ -137,7 +140,10 @@ html[data-theme="light"] .ob-page {
   --ob-warning-text: #92400e;
   --ob-table-header: rgba(241, 248, 255, 0.98);
   --ob-table-row-hover: rgba(37, 99, 235, 0.05);
-  --ob-mid-price: rgba(37, 99, 235, 0.06);
+  --ob-mid-row-bg: #ffffff;
+  --ob-mid-row-text: #0f172a;
+  --ob-mid-row-border: rgba(148, 163, 184, 0.22);
+  --ob-mid-price: var(--ob-mid-row-bg);
   --ob-shadow: 0 16px 40px rgba(37, 99, 235, 0.1);
   --ob-buy-depth: rgba(16, 185, 129, 0.14);
   --ob-sell-depth: rgba(244, 63, 94, 0.14);
@@ -216,10 +222,10 @@ html[data-theme="light"] .ob-page {
   background: var(--ob-table-row-hover);
 }
 
-.ob-page .ob-mid-price {
-  background: var(--ob-mid-price);
-  border-color: var(--ob-border);
-  color: var(--ob-text);
+.ob-page .ob-mid-row {
+  background: var(--ob-mid-row-bg, var(--ob-mid-price));
+  border-color: var(--ob-mid-row-border, var(--ob-border));
+  color: var(--ob-mid-row-text, var(--ob-text));
 }
 
 .ob-page .ob-chart-shell {
