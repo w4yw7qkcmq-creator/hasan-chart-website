@@ -133,15 +133,29 @@ assert.match(ui, /export function OrderBookListbox/);
 assert.match(ui, /role="listbox"/);
 assert.match(ui, /createPortal/);
 assert.match(ui, /ob\.listboxMenu/);
-assert.doesNotMatch(ui, /<select\b/);
+assert.match(ui, /ob\.listboxOptionPrimary/);
+assert.match(ui, /ob\.listboxOptionSelected/);
+assert.match(ui, /ob\.portalStatusText/);
+assert.doesNotMatch(ui, /listboxOption[^\n]*text-black/);
+assert.doesNotMatch(ui, /listboxMenu[^\n]*text-slate-900/);
 assert.doesNotMatch(page, /<select\b/);
 assert.match(page, /OrderBookListbox/);
-assert.match(css, /\.ob-listbox-menu/);
+assert.match(css, /\.ob-portal-menu/);
+assert.match(css, /\.ob-portal-option-primary/);
+assert.match(css, /\.ob-portal-option-muted/);
+assert.match(css, /\.ob-portal-option-check/);
+assert.match(css, /--ob-menu-bg/);
+assert.match(css, /--ob-menu-text/);
+assert.match(css, /--ob-menu-check/);
+assert.match(css, /:root[\s\S]*--ob-menu-bg/);
+assert.match(css, /html\[data-theme="light"\][\s\S]*--ob-menu-bg/);
+assert.match(css, /\.ob-portal-menu[\s\S]*color:\s*var\(--ob-menu-text\)/);
+assert.match(css, /rgba\(7,\s*18,\s*40,\s*0\.96\)/);
 assert.match(css, /html\[data-theme="light"\] \.ob-page/);
 assert.match(css, /--ob-text-strong/);
 assert.match(css, /--ob-chart-buy/);
 assert.match(ob.page, /ob-page/);
-passed += 14;
+passed += 24;
 
 console.log(
   `test-order-book-theme: PASS (${passed} checks, ${runtimeFiles.length} runtime files)`,

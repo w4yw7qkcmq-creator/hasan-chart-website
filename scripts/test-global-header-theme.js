@@ -14,6 +14,8 @@ const requiredTokens = [
   "--header-border",
   "--header-text",
   "--header-text-muted",
+  "--header-brand-text",
+  "--header-brand-muted",
   "--header-surface",
   "--header-danger-text",
   "--header-logo-text",
@@ -27,6 +29,8 @@ for (const token of requiredTokens) {
 const requiredClasses = [
   ".site-top-header",
   ".site-header-brand__text",
+  ".site-sidebar-brand-title",
+  ".site-sidebar-brand-subtitle",
   ".site-header-logo-badge",
   ".topUserChip",
   ".topLogoutBtn",
@@ -42,21 +46,28 @@ for (const cls of requiredClasses) {
 
 assert.match(shell, /site-top-header/);
 assert.match(shell, /site-header-brand__text/);
+assert.match(shell, /site-sidebar-brand-title/);
+assert.match(shell, /site-sidebar-brand-subtitle/);
 assert.match(shell, /site-header-logo-badge/);
 assert.match(shell, /topUserChip/);
 assert.match(shell, /topLogoutBtn/);
 assert.match(shell, /site-header-theme-btn/);
-passed += 6;
+passed += 8;
 
 assert.doesNotMatch(shell, /site-header-brand[^\n]*text-black/);
 assert.doesNotMatch(shell, /site-header-brand[^\n]*text-gray-900/);
 assert.doesNotMatch(shell, /site-header-brand[^\n]*text-slate-900/);
+assert.doesNotMatch(shell, /site-sidebar-brand-title[^\n]*text-black/);
 assert.doesNotMatch(shell, /topUserChip[^\n]*text-black/);
 assert.doesNotMatch(shell, /topLogoutBtn[^\n]*text-black/);
-passed += 5;
+passed += 6;
 
-assert.match(globals, /html\[data-theme="light"\][\s\S]*--header-text/);
-assert.match(globals, /\.site-header-brand__text[\s\S]*color:\s*var\(--header-text\)/);
-passed += 2;
+assert.match(globals, /html\[data-theme="light"\][\s\S]*--header-brand-text/);
+assert.match(globals, /:root[\s\S]*--header-brand-text/);
+assert.match(globals, /\.site-header-brand__text[\s\S]*color:\s*var\(--header-brand-text/);
+assert.match(globals, /\.site-sidebar-brand-title[\s\S]*color:\s*var\(--header-brand-text/);
+assert.match(globals, /\.site-sidebar-brand-subtitle[\s\S]*color:\s*var\(--header-brand-muted/);
+assert.match(globals, /\.site-header-logo-badge[\s\S]*color:\s*var\(--header-logo-text\)/);
+passed += 6;
 
 console.log(`test-global-header-theme: PASS (${passed} checks)`);

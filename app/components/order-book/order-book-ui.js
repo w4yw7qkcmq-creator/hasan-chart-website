@@ -271,11 +271,14 @@ export function OrderBookListbox({
                   type="button"
                   role="option"
                   aria-selected={isSelected}
-                  className={`${ob.listboxOption} ${active ? ob.listboxOptionActive : ob.listboxOptionIdle}`}
+                  className={`${ob.listboxOption} ${isSelected ? ob.listboxOptionSelected : ""} ${active ? ob.listboxOptionActive : ob.listboxOptionIdle}`}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => selectOption(option)}
                 >
-                  <span dir={optionValueDir} className={`min-w-0 flex-1 text-right ${optionValueDir === "ltr" ? "tabular-nums" : ""}`}>
+                  <span
+                    dir={optionValueDir}
+                    className={`${ob.listboxOptionPrimary} ${optionValueDir === "ltr" ? "tabular-nums" : ""}`}
+                  >
                     {option.label}
                   </span>
                   {isSelected ? (
@@ -537,12 +540,12 @@ export function SymbolSearchCombobox({
           className={`${ob.listboxMenu} ${ob.focusRing}`}
         >
           {listLoading && !filtered.length ? (
-            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
+            <li className={ob.portalStatusText} role="status" aria-live="polite">
               جاري البحث...
             </li>
           ) : null}
           {listUnavailable && !filtered.length ? (
-            <li className={`px-3 py-2 text-sm ${ob.textMuted}`} role="status" aria-live="polite">
+            <li className={ob.portalStatusText} role="status" aria-live="polite">
               قائمة العملات غير متاحة مؤقتًا
             </li>
           ) : null}
@@ -562,18 +565,18 @@ export function SymbolSearchCombobox({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className={`${ob.listboxOption} ${active ? ob.listboxOptionActive : ob.listboxOptionIdle}`}
+                    className={`${ob.listboxOption} ${isSelected ? ob.listboxOptionSelected : ""} ${active ? ob.listboxOptionActive : ob.listboxOptionIdle}`}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => selectEntry(entry)}
                   >
                     <span className="min-w-0 text-right">
-                      <span className="block font-medium">{entry.label}</span>
+                      <span className={ob.listboxOptionPrimary}>{entry.label}</span>
                       {entry.displayName ? (
-                        <span className={`block text-xs ${ob.textMuted}`}>{entry.displayName}</span>
+                        <span className={ob.listboxOptionMuted}>{entry.displayName}</span>
                       ) : null}
                     </span>
                     <span className="inline-flex shrink-0 items-center gap-2">
-                      <span dir="ltr" className={`text-left tabular-nums text-xs ${ob.textMuted}`}>
+                      <span dir="ltr" className={ob.listboxOptionMeta}>
                         {exchangeLabel || entry.value}
                       </span>
                       {isSelected ? (
@@ -587,7 +590,7 @@ export function SymbolSearchCombobox({
               );
             })
           ) : !listLoading ? (
-            <li className={`px-3 py-2 text-sm ${ob.textMuted}`}>لا توجد نتائج</li>
+            <li className={ob.portalStatusText}>لا توجد نتائج</li>
           ) : null}
         </ul>,
         document.body,

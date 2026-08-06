@@ -23,12 +23,17 @@ export const ob = {
   listboxTrigger:
     "ob-input flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-xl border py-2 pl-3 pr-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ob-focus-ring)]",
   listboxMenu:
-    "ob-listbox-menu max-h-56 overflow-y-auto overscroll-contain rounded-xl border py-1 shadow-lg backdrop-blur-sm",
+    "ob-portal-menu max-h-56 overflow-y-auto overscroll-contain rounded-xl py-1 [scrollbar-width:thin]",
   listboxOption:
     "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-right text-sm transition motion-reduce:transition-none",
-  listboxOptionActive: "bg-[var(--ob-accent-soft)] ob-text-strong",
-  listboxOptionIdle: "ob-text-normal hover:bg-[var(--ob-table-row-hover)]",
-  listboxSelectedMark: "shrink-0 text-xs ob-positive",
+  listboxOptionActive: "ob-portal-option--active",
+  listboxOptionIdle: "ob-portal-option--idle",
+  listboxOptionSelected: "ob-portal-option--selected",
+  listboxOptionPrimary: "ob-portal-option-primary min-w-0 flex-1 text-right font-medium",
+  listboxOptionMuted: "ob-portal-option-muted block text-xs",
+  listboxOptionMeta: "ob-portal-option-muted shrink-0 text-left tabular-nums text-xs",
+  listboxSelectedMark: "ob-portal-option-check shrink-0 text-xs font-bold",
+  portalStatusText: "ob-portal-option-muted px-3 py-2 text-sm",
   focusRing:
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ob-focus-ring)]",
   positive: "ob-positive",

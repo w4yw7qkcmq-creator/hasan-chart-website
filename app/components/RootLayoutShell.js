@@ -1043,8 +1043,8 @@ function RootLayoutShell({ children }) {
                   <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
                     <div className="grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/30 bg-gradient-to-br from-blue-600/35 via-cyan-400/15 to-black/40 font-black text-white">HC</div>
                     <div>
-                      <h2 className="font-black leading-5">HasaN CharT World</h2>
-                      <p className="text-xs text-cyan-100/60">منصة التداول الذكية</p>
+                      <h2 className="site-sidebar-brand-title font-black leading-5">HasaN CharT World</h2>
+                      <p className="site-sidebar-brand-subtitle text-xs">منصة التداول الذكية</p>
                     </div>
                   </Link>
 
@@ -1125,8 +1125,8 @@ function RootLayoutShell({ children }) {
                 <span className="font-black text-white text-lg">HC</span>
               </div>
               <div>
-                <h2 className="font-black text-base leading-5 tracking-tight">HasaN CharT World</h2>
-                <p className="text-xs text-cyan-100/60">Trading Intelligence</p>
+                <h2 className="site-sidebar-brand-title font-black text-base leading-5 tracking-tight">HasaN CharT World</h2>
+                <p className="site-sidebar-brand-subtitle text-xs">Trading Intelligence</p>
               </div>
             </Link>
 

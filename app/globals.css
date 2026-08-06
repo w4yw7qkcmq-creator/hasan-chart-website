@@ -30,6 +30,8 @@ html.theme-ready #site-root {
   --header-border: rgba(34, 211, 238, 0.15);
   --header-text: #f8fafc;
   --header-text-muted: #cbd5e1;
+  --header-brand-text: #f8fafc;
+  --header-brand-muted: #cbd5e1;
   --header-surface: rgba(34, 211, 238, 0.1);
   --header-surface-hover: rgba(34, 211, 238, 0.2);
   --header-accent: #a5f3fc;
@@ -58,6 +60,8 @@ html[data-theme="light"] {
   --header-border: rgba(47, 150, 255, 0.2);
   --header-text: #0f172a;
   --header-text-muted: #475569;
+  --header-brand-text: #0f172a;
+  --header-brand-muted: #475569;
   --header-surface: rgba(47, 150, 255, 0.08);
   --header-surface-hover: rgba(47, 150, 255, 0.14);
   --header-accent: #1d4ed8;
@@ -844,14 +848,32 @@ select:focus:not(:focus-visible) {
   min-width: 0;
   flex: 1;
   justify-content: center;
-  color: var(--header-text);
+  color: var(--header-brand-text, var(--header-text));
+}
+
+.site-header-brand:visited {
+  color: var(--header-brand-text, var(--header-text));
 }
 
 .site-header-brand__text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--header-text);
+  color: var(--header-brand-text, var(--header-text));
+}
+
+.site-sidebar-brand-title {
+  color: var(--header-brand-text, var(--header-text));
+}
+
+.site-sidebar-brand-subtitle {
+  color: var(--header-brand-muted, var(--header-text-muted));
+}
+
+.site-top-header .site-header-brand,
+.site-top-header .site-header-brand:visited,
+.site-top-header .site-header-brand__text {
+  color: var(--header-brand-text, var(--header-text));
 }
 
 .site-top-header {
