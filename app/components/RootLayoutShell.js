@@ -878,6 +878,449 @@ function RootLayoutShell({ children }) {
     } catch (err) {
       console.warn("Subscription refresh skipped:", err?.message || err);
     }
-  }, [currentUser?.email, updateUser]); // Refresh subscription on login, tab focus, or realtime admin activation — no fast polling loop. useEffect(() => { if (!authResolved || !currentUser?.email) return undefined; let active = true; let channel = null; const runRefresh = () => { if (!active || document.hidden) return; void refreshCurrentUserSubscription(); }; const cancelDeferred = scheduleAfterPaint(() => { if (!active) return; runRefresh(); void import("../../lib/supabase").then(({ supabase }) => { if (!active) return; channel = supabase .channel(`global-subscription-refresh-${currentUser.email}`) .on( "postgres_changes", { event: "UPDATE", schema: "public", table: "subscription_requests", filter: `user_email=eq.${currentUser.email}`, }, (payload) => { if (payload?.new?.status === "مفعل") { runRefresh(); } } ) .subscribe(); }); }, 0); const handleVisibilityChange = () => { if (document.visibilityState === "visible") { runRefresh(); } }; document.addEventListener("visibilitychange", handleVisibilityChange); return () => { active = false; cancelDeferred(); document.removeEventListener("visibilitychange", handleVisibilityChange); const channelToRemove = channel; channel = null; if (channelToRemove) { void import("../../lib/supabase").then(({ supabase }) => { supabase.removeChannel(channelToRemove); }); } }; }, [authResolved, currentUser?.email, refreshCurrentUserSubscription]); const logoutAndRedirect = async () => { await logout(); window.location.href = "/login"; }; const dismissGlobalNotice = useCallback(() => { setGlobalNotice(""); setGlobalNoticeHref(""); }, []); if (isAuthPage) { return ( <> <GlobalNoticeBanner notice={globalNotice} href={globalNoticeHref} onDismiss={dismissGlobalNotice} /> {children} {bootstrapOverlay} {bootstrapStallBanner} </> ); } return ( <> <GlobalNoticeBanner notice={globalNotice} href={globalNoticeHref} onDismiss={dismissGlobalNotice} /> <div className="site-shell-root lg:flex lg:flex-row pt-0"> {mobileMenuOpen && ( <div className="fixed inset-0 z-[9998] lg:hidden"> <button aria-label="إغلاق القائمة" onClick={() => setMobileMenuOpen(false)} className="site-shell-drawer-scrim absolute inset-0" /> <aside role="dialog" aria-modal="true" aria-label="قائمة التنقل" className="site-mobile-drawer-panel absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l p-4" > <div className="site-mobile-drawer-panel__overlay pointer-events-none absolute inset-0" /> <div className={ui.shellGridOverlay} /> <div className="site-sidebar-brand-card relative z-10 mb-4 flex items-center justify-between gap-3 p-3"> <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3"> <div className="site-sidebar-brand-badge grid h-11 w-11 place-items-center rounded-2xl"> <span className="site-sidebar-brand-badge__text font-black">HC</span> </div> <div> <h2 className="site-sidebar-brand-title font-black leading-5">HasaN CharT World</h2> <p className="site-sidebar-brand-subtitle text-xs">منصة التداول الذكية</p> </div> </Link> <button type="button" aria-label="إغلاق القائمة" onClick={() => setMobileMenuOpen(false)} className={ui.shellHeaderMenuBtn} > <span aria-hidden="true">✕</span> </button> </div> <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll"> {renderSidebarGroups({ authResolved: shellAuthResolved, currentUser: shellUser, unreadAnalysisCount: shellUnreadAnalysisCount, isAdmin: shellIsAdmin, collapsedGroups, onToggleGroup: toggleMenuGroup, onNavigate: () => setMobileMenuOpen(false), variant: "mobile", })} </nav> <div className="site-shell-user-card relative z-10 mt-4 space-y-3 p-4"> <button onClick={toggleTheme} className="site-shell-theme-btn" > {mobileThemeLabel} </button> <button type="button" onClick={() => { void enableBrowserNotifications(); }} className={`browserPushBtn w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${ browserNotificationsActive ? "browserPushBtn--active" : "" }`} > {browserNotificationLabel} </button> {authLoading ? ( <AuthAccountSkeleton /> ) : shellUser ? ( <> <Link href="/my-dashboard" onClick={() => setMobileMenuOpen(false)} className="mb-4 flex items-center gap-3"> <div className={ui.shellAvatar}> {(shellUser.username || shellUser.email || "U").slice(0, 2).toUpperCase()} </div> <div className="min-w-0"> <p className="truncate font-bold">{shellUser.username || "حسابي"}</p> <p className={`truncate text-xs ${ui.shellUserEmail}`}>{shellUser.email}</p> </div> </Link> <button onClick={logoutAndRedirect} className={ui.shellLogoutBtn}>تسجيل الخروج</button> </> ) : ( <AuthLoginLink onClick={() => setMobileMenuOpen(false)} className={ui.shellLoginBtn} /> )} </div> </aside> </div> )} <aside className="site-sidebar-panel relative z-[110] hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden border-l backdrop-blur-2xl p-4 flex-col"> <div className="site-sidebar-panel__overlay pointer-events-none absolute inset-0" /> <div className={ui.shellGridOverlay} /> <Link href="/" className="site-sidebar-brand-card relative z-10 mb-6 flex items-center gap-3 p-3 group"> <div className="site-sidebar-brand-badge h-12 w-12 relative grid place-items-center overflow-hidden rounded-2xl"> <span className="site-sidebar-brand-badge__text font-black text-lg">HC</span> </div> <div> <h2 className="site-sidebar-brand-title font-black text-base leading-5 tracking-tight">HasaN CharT World</h2> <p className="site-sidebar-brand-subtitle text-xs">Trading Intelligence</p> </div> </Link> <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll"> {renderSidebarGroups({ authResolved: shellAuthResolved, currentUser: shellUser, unreadAnalysisCount: shellUnreadAnalysisCount, isAdmin: shellIsAdmin, collapsedGroups, onToggleGroup: toggleMenuGroup, onNavigate: undefined, variant: "desktop", })} <details className={`group/contact ${ui.shellContactPanel}`}> <summary> <span className={ui.shellMenuIcon}>☎️</span> <span className={ui.shellMenuLabel}>تواصل معنا</span> <span className={`mr-auto ${ui.shellMenuGroupChevron} group-open/contact:rotate-180`}>⌄</span> </summary> <div className="space-y-2 px-3 pb-3 pt-1"> <Link href="/about" className={ui.shellContactLink} > <div className="flex items-center gap-2"> <span className={ui.shellMenuIcon}> ℹ️ </span> <div> <p className={`font-bold ${ui.shellMenuLabel}`}>من نحن</p> <p className={`text-[11px] ${ui.shellContactMuted}`}>تعرف على المنصة</p> </div> </div> <span className={ui.shellContactBadge}> فتح </span> </Link> {socialLinks.map((link) => ( <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className={ui.shellContactLink}> <div className="flex items-center gap-2"> <span className={ui.shellMenuIcon}>{link.icon}</span> <div> <p className={`font-bold ${ui.shellMenuLabel}`}>{link.label}</p> <p className={`text-[11px] ${ui.shellContactMuted}`}>{link.badge}</p> </div> </div> <span className={ui.shellContactBadge}>فتح</span> </a> ))} </div> </details> </nav> <div className="site-shell-user-card relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4"> <button onClick={toggleTheme} className="site-shell-theme-btn mb-3" > {sidebarThemeLabel} </button> {authLoading ? ( <AuthAccountSkeleton /> ) : shellUser ? ( <> <Link href="/my-dashboard" className="flex items-center gap-3 mb-4"> <div className={ui.shellAvatar}> {(shellUser.username || shellUser.email || "U").slice(0, 2).toUpperCase()} </div> <div className="min-w-0"> <p className="font-bold truncate">{shellUser.username || "حسابي"}</p> <p className={`text-xs truncate ${ui.shellUserEmail}`}>{shellUser.email}</p> </div> </Link> <button onClick={logoutAndRedirect} className={ui.shellLogoutBtn}>تسجيل الخروج</button> </> ) : ( <AuthLoginLink className={ui.shellLoginBtn} /> )} </div> </aside> <div className="site-main-shell"> <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl"> <div className="site-top-header__gradient pointer-events-none absolute inset-0" /> <div className="relative z-10 flex min-w-0 items-center justify-between gap-2 sm:gap-3"> <button type="button" onClick={() => setMobileMenuOpen(true)} className={`${ui.shellHeaderMenuBtn} lg:hidden`} aria-label="فتح القائمة" > <span aria-hidden="true">⋮</span> </button> <Link href="/" className="site-header-brand font-black text-lg flex items-center gap-2 min-w-0"> <span aria-hidden="true" className="site-header-logo-badge font-black"> HC </span> <span className="site-header-brand__text">HasaN CharT</span> </Link> <button type="button" aria-label={browserNotificationAriaLabel} onClick={() => { void enableBrowserNotifications(); }} className={`browserPushBtn inline-flex shrink-0 items-center justify-center rounded-2xl px-3 py-2 text-sm font-black transition sm:px-4 ${ browserNotificationsActive ? "browserPushBtn--active" : "" }`} > <span className="sm:hidden" aria-hidden="true"> 🔔 </span> <span className="hidden sm:inline">{browserNotificationLabel}</span> </button> {authLoading ? ( <div className={`${ui.shellSkeleton} hidden h-11 w-11 shrink-0 rounded-2xl sm:grid`} aria-hidden="true" /> ) : shellUser ? ( <NotificationBell className="relative shrink-0" /> ) : null} <button type="button" onClick={toggleTheme} aria-label={headerThemeLabel} className="site-header-theme-btn hidden md:inline-flex" > {headerThemeLabel} </button> {authLoading ? ( <AuthAccountSkeleton compact /> ) : shellUser ? ( <div className="hidden sm:flex items-center gap-3 min-w-0"> <Link href="/my-dashboard" className="topUserChip" title={shellUser.username || shellUser.email || "حسابي"} > {shellUser.username || shellUser.email || "حسابي"} </Link> <button type="button" onClick={logoutAndRedirect} className="topLogoutBtn" aria-label="تسجيل الخروج"> تسجيل الخروج </button> </div> ) : ( <AuthLoginLink className="topLoginBtn hidden sm:inline-flex" compact /> )} </div> </header> <MemoizedLayoutPageSlot>{children}</MemoizedLayoutPageSlot> </div> </div> {bootstrapOverlay} {bootstrapStallBanner} </> );
+  }, [currentUser?.email, updateUser]);
+
+  // Refresh subscription on login, tab focus, or realtime admin activation — no fast polling loop.
+  useEffect(() => {
+    if (!authResolved || !currentUser?.email) return undefined;
+
+    let active = true;
+    let channel = null;
+
+    const runRefresh = () => {
+      if (!active || document.hidden) return;
+      void refreshCurrentUserSubscription();
+    };
+
+    const cancelDeferred = scheduleAfterPaint(() => {
+      if (!active) return;
+
+      runRefresh();
+
+      void import("../../lib/supabase").then(({ supabase }) => {
+        if (!active) return;
+
+        channel = supabase
+          .channel(`global-subscription-refresh-${currentUser.email}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "subscription_requests",
+              filter: `user_email=eq.${currentUser.email}`,
+            },
+            (payload) => {
+              if (payload?.new?.status === "مفعل") {
+                runRefresh();
+              }
+            }
+          )
+          .subscribe();
+      });
+    }, 0);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        runRefresh();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      active = false;
+      cancelDeferred();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      const channelToRemove = channel;
+      channel = null;
+
+      if (channelToRemove) {
+        void import("../../lib/supabase").then(({ supabase }) => {
+          supabase.removeChannel(channelToRemove);
+        });
+      }
+    };
+  }, [authResolved, currentUser?.email, refreshCurrentUserSubscription]);
+
+  const logoutAndRedirect = async () => {
+    await logout();
+    window.location.href = "/login";
+  };
+
+  if (isAuthPage) {
+    return (
+      <>
+        {globalNotice && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">{globalNotice}</p>
+                <p className="mt-1 text-sm font-bold text-white/90">
+                  إذا لم يظهر إشعار المتصفح، فعّل الإشعارات من الزر بالأعلى.
+                </p>
+
+                {globalNoticeHref && (
+                  <Link
+                    href={globalNoticeHref}
+                    onClick={() => {
+                      setGlobalNotice("");
+                      setGlobalNoticeHref("");
+                    }}
+                    className="mt-3 inline-flex rounded-2xl bg-white/20 px-4 py-2 text-sm font-black text-white transition hover:bg-white/30"
+                  >
+                    فتح الآن
+                  </Link>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="إغلاق الإشعار"
+                onClick={() => {
+                  setGlobalNotice("");
+                  setGlobalNoticeHref("");
+                }}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+            <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
+              <div className="h-full animate-pulse bg-white" />
+            </div>
+          </div>
+        )}
+        {children}
+        {bootstrapOverlay}
+        {bootstrapStallBanner}
+      </>
+    );
+  }
+
+  return (
+    <>
+        {globalNotice && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed left-5 top-5 z-[9999] max-w-md overflow-hidden rounded-[28px] border border-cyan-200/40 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 p-5 text-white shadow-[0_24px_80px_rgba(0,132,255,0.38)] backdrop-blur-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">{globalNotice}</p>
+                <p className="mt-1 text-sm font-bold text-white/90">
+                  إذا لم يظهر إشعار المتصفح، فعّل الإشعارات من الزر بالأعلى.
+                </p>
+
+                {globalNoticeHref && (
+                  <Link
+                    href={globalNoticeHref}
+                    onClick={() => {
+                      setGlobalNotice("");
+                      setGlobalNoticeHref("");
+                    }}
+                    className="mt-3 inline-flex rounded-2xl bg-white/20 px-4 py-2 text-sm font-black text-white transition hover:bg-white/30"
+                  >
+                    فتح الآن
+                  </Link>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="إغلاق الإشعار"
+                onClick={() => {
+                  setGlobalNotice("");
+                  setGlobalNoticeHref("");
+                }}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 font-black text-white transition hover:bg-white/30"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+            <div className="absolute bottom-0 left-0 h-1 w-full bg-white/30">
+              <div className="h-full animate-pulse bg-white" />
+            </div>
+          </div>
+        )}
+        <div className="site-shell-root lg:flex lg:flex-row pt-0">
+          {mobileMenuOpen && (
+            <div className="fixed inset-0 z-[9998] lg:hidden">
+              <button
+                aria-label="إغلاق القائمة"
+                onClick={() => setMobileMenuOpen(false)}
+                className="site-shell-drawer-scrim absolute inset-0"
+              />
+
+              <aside
+                role="dialog"
+                aria-modal="true"
+                aria-label="قائمة التنقل"
+                className="site-mobile-drawer-panel absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l p-4"
+              >
+                <div className="site-mobile-drawer-panel__overlay pointer-events-none absolute inset-0" />
+                <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
+
+                <div className="site-sidebar-brand-card relative z-10 mb-4 flex items-center justify-between gap-3 p-3">
+                  <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
+                    <div className="site-sidebar-brand-badge grid h-11 w-11 place-items-center rounded-2xl">
+                      <span className="site-sidebar-brand-badge__text font-black">HC</span>
+                    </div>
+                    <div>
+                      <h2 className="site-sidebar-brand-title font-black leading-5">HasaN CharT World</h2>
+                      <p className="site-sidebar-brand-subtitle text-xs">منصة التداول الذكية</p>
+                    </div>
+                  </Link>
+
+                  <button
+                    type="button"
+                    aria-label="إغلاق القائمة"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/10 text-xl font-black text-white"
+                  >
+                    <span aria-hidden="true">✕</span>
+                  </button>
+                </div>
+
+                <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll">
+                  {renderSidebarGroups({
+                    authResolved: shellAuthResolved,
+                    currentUser: shellUser,
+                    unreadAnalysisCount: shellUnreadAnalysisCount,
+                    isAdmin: shellIsAdmin,
+                    collapsedGroups,
+                    onToggleGroup: toggleMenuGroup,
+                    onNavigate: () => setMobileMenuOpen(false),
+                    variant: "mobile",
+                  })}
+                </nav>
+
+                <div className="site-shell-user-card relative z-10 mt-4 space-y-3 p-4">
+                  <button
+                    onClick={toggleTheme}
+                    className="site-shell-theme-btn"
+                  >
+                    {mobileThemeLabel}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void enableBrowserNotifications();
+                    }}
+                    className={`browserPushBtn w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                      browserNotificationsActive ? "browserPushBtn--active" : ""
+                    }`}
+                  >
+                    {browserNotificationLabel}
+                  </button>
+
+                  {authLoading ? (
+                    <AuthAccountSkeleton />
+                  ) : shellUser ? (
+                    <>
+                      <Link href="/my-dashboard" onClick={() => setMobileMenuOpen(false)} className="mb-4 flex items-center gap-3">
+                        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-300 font-black shadow-[0_0_25px_rgba(0,163,255,0.35)]">
+                          {(shellUser.username || shellUser.email || "U").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-bold">{shellUser.username || "حسابي"}</p>
+                          <p className="truncate text-xs text-cyan-100/50">{shellUser.email}</p>
+                        </div>
+                      </Link>
+                      <button onClick={logoutAndRedirect} className="w-full rounded-2xl border border-red-400/20 bg-red-500/15 px-4 py-3 font-black text-red-100 transition hover:bg-red-500/25">تسجيل الخروج</button>
+                    </>
+                  ) : (
+                    <AuthLoginLink
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block w-full rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-4 py-3 text-center font-black shadow-[0_16px_40px_rgba(37,99,235,0.30)]"
+                    />
+                  )}
+                </div>
+              </aside>
+            </div>
+          )}
+          <aside className="site-sidebar-panel relative z-[110] hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden border-l backdrop-blur-2xl p-4 flex-col">
+            <div className="site-sidebar-panel__overlay pointer-events-none absolute inset-0" />
+            <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
+
+            <Link href="/" className="site-sidebar-brand-card relative z-10 mb-6 flex items-center gap-3 p-3 group">
+              <div className="site-sidebar-brand-badge h-12 w-12 relative grid place-items-center overflow-hidden rounded-2xl">
+                <span className="site-sidebar-brand-badge__text font-black text-lg">HC</span>
+              </div>
+              <div>
+                <h2 className="site-sidebar-brand-title font-black text-base leading-5 tracking-tight">HasaN CharT World</h2>
+                <p className="site-sidebar-brand-subtitle text-xs">Trading Intelligence</p>
+              </div>
+            </Link>
+
+            <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll">
+              {renderSidebarGroups({
+                authResolved: shellAuthResolved,
+                currentUser: shellUser,
+                unreadAnalysisCount: shellUnreadAnalysisCount,
+                isAdmin: shellIsAdmin,
+                collapsedGroups,
+                onToggleGroup: toggleMenuGroup,
+                onNavigate: undefined,
+                variant: "desktop",
+              })}
+
+              <details className="group/contact rounded-[18px] border border-cyan-300/15 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <summary className="flex min-h-[54px] cursor-pointer list-none items-center gap-3 rounded-[18px] px-4 py-3 text-white transition hover:-translate-x-1 hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">☎️</span>
+                  <span className="font-bold leading-none">تواصل معنا</span>
+                  <span className="mr-auto text-cyan-100/60 transition group-open/contact:rotate-180">⌄</span>
+                </summary>
+
+                <div className="space-y-2 px-3 pb-3 pt-1">
+                  <Link
+                    href="/about"
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#07142f]/70 px-3 py-2.5 text-sm no-underline transition hover:border-cyan-300/35 hover:bg-cyan-400/10"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10">
+                        ℹ️
+                      </span>
+                      <div>
+                        <p className="font-bold text-white">من نحن</p>
+                        <p className="text-[11px] text-cyan-100/55">تعرف على المنصة</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-cyan-300/15 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold text-cyan-100">
+                      فتح
+                    </span>
+                  </Link>
+
+                  {socialLinks.map((link) => (
+                    <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#07142f]/70 px-3 py-2.5 text-sm transition hover:border-cyan-300/35 hover:bg-cyan-400/10">
+                      <div className="flex items-center gap-2">
+                        <span className="grid h-8 w-8 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10">{link.icon}</span>
+                        <div>
+                          <p className="font-bold text-white">{link.label}</p>
+                          <p className="text-[11px] text-cyan-100/55">{link.badge}</p>
+                        </div>
+                      </div>
+                      <span className="rounded-full border border-cyan-300/15 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold text-cyan-100">فتح</span>
+                    </a>
+                  ))}
+                </div>
+              </details>
+            </nav>
+
+            <div className="site-shell-user-card relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4">
+              <button
+                onClick={toggleTheme}
+                className="site-shell-theme-btn mb-3"
+              >
+                {sidebarThemeLabel}
+              </button>
+
+              {authLoading ? (
+                <AuthAccountSkeleton />
+              ) : shellUser ? (
+                <>
+                  <Link href="/my-dashboard" className="flex items-center gap-3 mb-4">
+                    <div className="h-11 w-11 rounded-2xl grid place-items-center bg-gradient-to-br from-blue-600 to-cyan-300 font-black shadow-[0_0_25px_rgba(0,163,255,0.35)]">
+                      {(shellUser.username || shellUser.email || "U").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold truncate">{shellUser.username || "حسابي"}</p>
+                      <p className="text-xs text-cyan-100/50 truncate">{shellUser.email}</p>
+                    </div>
+                  </Link>
+                  <button onClick={logoutAndRedirect} className="w-full rounded-2xl bg-red-500/15 border border-red-400/20 px-4 py-3 text-red-100 font-black hover:bg-red-500/25 transition">تسجيل الخروج</button>
+                </>
+              ) : (
+                <AuthLoginLink className="block w-full rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-4 py-3 text-center font-black shadow-[0_16px_40px_rgba(37,99,235,0.30)]" />
+              )}
+            </div>
+          </aside>
+
+          <div className="site-main-shell">
+            <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl">
+              <div className="site-top-header__gradient pointer-events-none absolute inset-0" />
+              <div className="relative z-10 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="site-header-menu-btn lg:hidden"
+                  aria-label="فتح القائمة"
+                >
+                  <span aria-hidden="true">⋮</span>
+                </button>
+                <Link href="/" className="site-header-brand font-black text-lg flex items-center gap-2 min-w-0">
+                  <span aria-hidden="true" className="site-header-logo-badge font-black">
+                    HC
+                  </span>
+                  <span className="site-header-brand__text">HasaN CharT</span>
+                </Link>
+
+                <button
+                  type="button"
+                  aria-label={browserNotificationAriaLabel}
+                  onClick={() => {
+                    void enableBrowserNotifications();
+                  }}
+                  className={`browserPushBtn inline-flex shrink-0 items-center justify-center rounded-2xl px-3 py-2 text-sm font-black transition sm:px-4 ${
+                    browserNotificationsActive ? "browserPushBtn--active" : ""
+                  }`}
+                >
+                  <span className="sm:hidden" aria-hidden="true">
+                    🔔
+                  </span>
+                  <span className="hidden sm:inline">{browserNotificationLabel}</span>
+                </button>
+
+                {authLoading ? (
+                  <div
+                    className="hidden h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-white/10 sm:grid"
+                    aria-hidden="true"
+                  />
+                ) : shellUser ? (
+                  <NotificationBell className="relative shrink-0" />
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label={headerThemeLabel}
+                  className="site-header-theme-btn hidden md:inline-flex"
+                >
+                  {headerThemeLabel}
+                </button>
+
+                {authLoading ? (
+                  <AuthAccountSkeleton compact />
+                ) : shellUser ? (
+                  <div className="hidden sm:flex items-center gap-3 min-w-0">
+                    <Link
+                      href="/my-dashboard"
+                      className="topUserChip"
+                      title={shellUser.username || shellUser.email || "حسابي"}
+                    >
+                      {shellUser.username || shellUser.email || "حسابي"}
+                    </Link>
+                    <button type="button" onClick={logoutAndRedirect} className="topLogoutBtn" aria-label="تسجيل الخروج">
+                      تسجيل الخروج
+                    </button>
+                  </div>
+                ) : (
+                  <AuthLoginLink className="topLoginBtn hidden sm:inline-flex" compact />
+                )}
+              </div>
+            </header>
+
+            <MemoizedLayoutPageSlot>{children}</MemoizedLayoutPageSlot>
+          </div>
+        </div>
+        {bootstrapOverlay}
+        {bootstrapStallBanner}
+    </>
+  );
 }
+
 export default RootLayoutShell;
