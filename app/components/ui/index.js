@@ -1,4 +1,9 @@
-export { ui, UNSAFE_UI_PATTERNS, FINANCIAL_CHART_ALLOWLIST, LEGACY_UI_PATH_PREFIXES } from "./ui-theme";
+export {
+  ui,
+  UNSAFE_UI_PATTERNS,
+  FINANCIAL_CHART_ALLOWLIST,
+  LEGACY_UI_PATH_PREFIXES,
+} from "./ui-theme";
 export { UiButton } from "./UiButton";
 export { UiInput } from "./UiInput";
 export { UiSelect } from "./UiSelect";

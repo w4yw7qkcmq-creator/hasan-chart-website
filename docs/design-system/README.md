@@ -27,7 +27,9 @@ Generated pages use `UiPageShell`, `UiPageHeader`, `UiCard` only.
 npm run test:design-system
 ```
 
-Legacy paths are listed in `scripts/design-system-legacy-allowlist.json`.
+Legacy exceptions are structured in `scripts/design-system-legacy-allowlist.json` (reason + owner + removeWhen).
+
+See [legacy-closure.md](./legacy-closure.md) for removed selectors and migration rules.
 
 ## Crystal sidebar brand
 

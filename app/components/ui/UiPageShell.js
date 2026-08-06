@@ -1,13 +1,11 @@
 "use client";
-
 import { ui } from "./ui-theme";
-
 export function UiPageShell({ className = "", children, ...props }) {
   return (
     <div className={`${ui.pageShell} ${className}`.trim()} {...props}>
-      {children}
+      {" "}
+      {children}{" "}
     </div>
   );
 }
-
 export default UiPageShell;

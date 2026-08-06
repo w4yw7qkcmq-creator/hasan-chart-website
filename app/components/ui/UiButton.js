@@ -1,14 +1,11 @@
 "use client";
-
 import { ui } from "./ui-theme";
-
 const VARIANTS = {
   primary: ui.btnPrimary,
   secondary: ui.btnSecondary,
   ghost: ui.btnGhost,
   danger: ui.btnDanger,
 };
-
 export function UiButton({
   variant = "primary",
   className = "",
@@ -25,9 +22,9 @@ export function UiButton({
       className={`${variantClass} ${ui.focusRing} disabled:cursor-not-allowed disabled:opacity-60 ${className}`.trim()}
       {...props}
     >
-      {children}
+      {" "}
+      {children}{" "}
     </button>
   );
 }
-
 export default UiButton;
