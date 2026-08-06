@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "./design-system/design-system-theme.css";
+
 html.theme-pending body {
   overflow: hidden;
 }

@@ -1021,22 +1021,22 @@ function RootLayoutShell({ children }) {
             </div>
           </div>
         )}
-        <div className="min-h-screen lg:flex lg:flex-row bg-[radial-gradient(circle_at_18%_8%,rgba(11,99,255,0.28),transparent_28%),radial-gradient(circle_at_82%_24%,rgba(34,211,238,0.12),transparent_28%),linear-gradient(135deg,#020617,#06112b)] pt-0">
+        <div className="site-shell-root lg:flex lg:flex-row pt-0">
           {mobileMenuOpen && (
             <div className="fixed inset-0 z-[9998] lg:hidden">
               <button
                 aria-label="إغلاق القائمة"
                 onClick={() => setMobileMenuOpen(false)}
-                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                className="site-shell-drawer-scrim absolute inset-0"
               />
 
               <aside
                 role="dialog"
                 aria-modal="true"
                 aria-label="قائمة التنقل"
-                className="absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l border-cyan-300/20 bg-[#020817] p-4 shadow-[0_0_80px_rgba(0,102,255,0.30)]"
+                className="site-mobile-drawer-panel absolute right-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col overflow-hidden border-l p-4"
               >
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
+                <div className="site-mobile-drawer-panel__overlay pointer-events-none absolute inset-0" />
                 <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
                 <div className="site-sidebar-brand-card relative z-10 mb-4 flex items-center justify-between gap-3 p-3">
@@ -1073,10 +1073,10 @@ function RootLayoutShell({ children }) {
                   })}
                 </nav>
 
-                <div className="relative z-10 mt-4 space-y-3 rounded-[24px] border border-cyan-300/10 bg-white/[0.035] p-4 backdrop-blur-xl">
+                <div className="site-shell-user-card relative z-10 mt-4 space-y-3 p-4">
                   <button
                     onClick={toggleTheme}
-                    className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                    className="site-shell-theme-btn"
                   >
                     {mobileThemeLabel}
                   </button>
@@ -1118,8 +1118,8 @@ function RootLayoutShell({ children }) {
               </aside>
             </div>
           )}
-          <aside className="relative z-[110] hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden bg-[#020817] border-l border-cyan-300/20 shadow-[0_0_80px_rgba(0,102,255,0.24)] backdrop-blur-2xl p-4 flex-col">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
+          <aside className="site-sidebar-panel relative z-[110] hidden lg:flex w-[292px] shrink-0 h-screen sticky top-0 overflow-hidden border-l backdrop-blur-2xl p-4 flex-col">
+            <div className="site-sidebar-panel__overlay pointer-events-none absolute inset-0" />
             <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
             <Link href="/" className="site-sidebar-brand-card relative z-10 mb-6 flex items-center gap-3 p-3 group">
@@ -1186,10 +1186,10 @@ function RootLayoutShell({ children }) {
               </details>
             </nav>
 
-            <div className="relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4 border border-cyan-300/10 bg-white/[0.035] backdrop-blur-xl">
+            <div className="site-shell-user-card relative z-10 mt-4 sidebarUserCard rounded-[24px] p-4">
               <button
                 onClick={toggleTheme}
-                className="mb-3 w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-400/20"
+                className="site-shell-theme-btn mb-3"
               >
                 {sidebarThemeLabel}
               </button>
@@ -1215,7 +1215,7 @@ function RootLayoutShell({ children }) {
             </div>
           </aside>
 
-          <div className="min-w-0 flex-1 overflow-x-hidden">
+          <div className="site-main-shell">
             <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl">
               <div className="site-top-header__gradient pointer-events-none absolute inset-0" />
               <div className="relative z-10 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
