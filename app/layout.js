@@ -14,14 +14,15 @@ import {
   serializeJsonLd,
 } from "../lib/seo";
 import { getSupabaseOrigin } from "../lib/external-origin-hints";
-const ROOT_TITLE =
-  "HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول";
+
+const ROOT_TITLE = "HasaN CharT World | تحليلات الأسواق المالية وتوصيات التداول";
 const ROOT_DESCRIPTION =
   "HasaN CharT World منصة احترافية لمتابعة أسواق المال، تشمل تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، تنبيهات سعرية، أخبار اقتصادية، وطلبات تحليل العملات.";
 const ROOT_OG_DESCRIPTION =
   "منصة HasaN CharT World تقدم تحليلات للأسواق المالية، توصيات Spot و Futures، أخبار اقتصادية، تنبيهات سعرية، وخدمات احترافية للمتداولين.";
 const ROOT_TWITTER_DESCRIPTION =
   "تابع تحليلات العملات الرقمية والفوركس، توصيات Spot و Futures، الأخبار الاقتصادية، والتنبيهات السعرية عبر منصة HasaN CharT World.";
+
 export const metadata = {
   ...buildPublicMetadata({
     path: "/",
@@ -40,11 +41,19 @@ export const metadata = {
       "تنبيهات سعرية",
       "إدارة حسابات التداول",
     ],
-    openGraph: { title: ROOT_TITLE, description: ROOT_OG_DESCRIPTION },
-    twitter: { title: ROOT_TITLE, description: ROOT_TWITTER_DESCRIPTION },
+    openGraph: {
+      title: ROOT_TITLE,
+      description: ROOT_OG_DESCRIPTION,
+    },
+    twitter: {
+      title: ROOT_TITLE,
+      description: ROOT_TWITTER_DESCRIPTION,
+    },
   }),
   applicationName: SITE_ORGANIZATION_NAME,
-  appleWebApp: { title: SITE_ORGANIZATION_NAME },
+  appleWebApp: {
+    title: SITE_ORGANIZATION_NAME,
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -56,13 +65,19 @@ export const metadata = {
     apple: [{ url: "/favicon-192.png", sizes: "192x192", type: "image/png" }],
   },
 };
+
 export async function generateViewport() {
   const initialTheme = await readThemeFromRequestCookies();
-  return { themeColor: resolveThemeColor(initialTheme) };
+
+  return {
+    themeColor: resolveThemeColor(initialTheme),
+  };
 }
+
 export default async function RootLayout({ children }) {
   const supabaseOrigin = getSupabaseOrigin();
   const initialTheme = await readThemeFromRequestCookies();
+
   return (
     <html
       lang="ar"
@@ -71,25 +86,14 @@ export default async function RootLayout({ children }) {
       className="theme-pending"
       suppressHydrationWarning
     >
-      
       <head>
-        
-        <script
-          dangerouslySetInnerHTML={{ __html: THEME_COOKIE_BOOT_SCRIPT }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: THEME_COOKIE_BOOT_SCRIPT }} />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link
-          rel="icon"
-          href="/favicon-32.png"
-          type="image/png"
-          sizes="32x32"
-        />
+        <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/favicon-192.png" sizes="192x192" />
         <link rel="dns-prefetch" href="https://s3.tradingview.com" />
         <link rel="dns-prefetch" href="https://s.tradingview.com" />
-        {supabaseOrigin ? (
-          <link rel="dns-prefetch" href={supabaseOrigin} />
-        ) : null}
+        {supabaseOrigin ? <link rel="dns-prefetch" href={supabaseOrigin} /> : null}
         <style dangerouslySetInnerHTML={{ __html: THEME_CRITICAL_CSS }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <script
@@ -100,7 +104,6 @@ export default async function RootLayout({ children }) {
         />
       </head>
       <body className="site-body min-h-screen antialiased theme-pending-body">
-        
         <div
           id="theme-boot-loader"
           aria-live="polite"
@@ -108,14 +111,12 @@ export default async function RootLayout({ children }) {
           aria-label="جاري تحميل منصة HasaN CharT World"
           suppressHydrationWarning
         >
-          
           <div className="theme-boot-logo">HC</div>
           <div className="theme-boot-spinner" aria-hidden="true" />
           <p className="theme-boot-title">HasaN CharT World</p>
           <p className="theme-boot-subtitle">جاري تجهيز الواجهة...</p>
         </div>
         <ThemeProvider initialTheme={initialTheme}>
-          
           <div id="site-root">{children}</div>
         </ThemeProvider>
       </body>

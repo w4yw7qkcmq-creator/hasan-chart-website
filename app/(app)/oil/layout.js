@@ -2,6 +2,8 @@ import OilPageJsonLd from "../../components/oil/OilPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/oil",
   title: "HasaN CharT World | النفط والطاقة",
@@ -19,11 +21,12 @@ export const metadata = buildPublicPageMetadata({
     "أخبار النفط",
   ],
 });
+
 export default function OilLayout({ children }) {
   return (
     <>
-      
-      <OilPageJsonLd /> {children}
+      <OilPageJsonLd />
+      {children}
     </>
   );
 }

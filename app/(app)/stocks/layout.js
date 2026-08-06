@@ -2,6 +2,8 @@ import StocksPageJsonLd from "../../components/stocks/StocksPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/stocks",
   title: "HasaN CharT World | الأسهم والمؤشرات",
@@ -20,11 +22,12 @@ export const metadata = buildPublicPageMetadata({
     "أسهم التكنولوجيا",
   ],
 });
+
 export default function StocksLayout({ children }) {
   return (
     <>
-      
-      <StocksPageJsonLd /> {children}
+      <StocksPageJsonLd />
+      {children}
     </>
   );
 }

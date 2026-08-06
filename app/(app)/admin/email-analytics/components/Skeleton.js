@@ -1,6 +1,8 @@
 export function SkeletonBlock({ className = "" }) {
   return (
-    <div className={`admin-skeleton-block animate-pulse rounded-2xl admin-panel ${className}`} />
+    <div
+      className={`animate-pulse rounded-2xl bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-white/10 dark:via-white/5 dark:to-white/10 ${className}`}
+    />
   );
 }
 

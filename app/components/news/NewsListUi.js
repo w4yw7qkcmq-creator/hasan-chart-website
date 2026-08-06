@@ -1,4 +1,5 @@
 "use client";
+
 import Link from "next/link";
 import {
   detectNewsCategory,
@@ -20,33 +21,32 @@ import {
   makeExcerpt,
   SOURCE_LABEL,
 } from "./newsListFormatting";
+
 export function NewsSkeletonGrid() {
   return (
     <div className="news-page-grid" aria-hidden="true">
-      {" "}
       {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className="news-card news-card--skeleton">
-          {" "}
-          <div className="news-card__media news-card__media--skeleton" />{" "}
+          <div className="news-card__media news-card__media--skeleton" />
           <div className="news-card__body">
-            {" "}
-            <div className="news-skeleton-line news-skeleton-line--sm" />{" "}
-            <div className="news-skeleton-line news-skeleton-line--lg" />{" "}
-            <div className="news-skeleton-line news-skeleton-line--md" />{" "}
-            <div className="news-skeleton-line news-skeleton-line--full" />{" "}
-            <div className="news-skeleton-line news-skeleton-line--btn" />{" "}
-          </div>{" "}
+            <div className="news-skeleton-line news-skeleton-line--sm" />
+            <div className="news-skeleton-line news-skeleton-line--lg" />
+            <div className="news-skeleton-line news-skeleton-line--md" />
+            <div className="news-skeleton-line news-skeleton-line--full" />
+            <div className="news-skeleton-line news-skeleton-line--btn" />
+          </div>
         </div>
-      ))}{" "}
+      ))}
     </div>
   );
 }
+
 export function NewsCategoryNav({ selectedCategory, onSelectCategory }) {
   return (
     <nav className="news-page-categories" aria-label="تصنيفات الأخبار">
-      {" "}
       {NEWS_LIST_FILTERS.map((category) => {
         const isActive = selectedCategory === category.key;
+
         return (
           <button
             key={category.key}
@@ -55,65 +55,44 @@ export function NewsCategoryNav({ selectedCategory, onSelectCategory }) {
             className={`news-page-category ${isActive ? "news-page-category--active" : ""}`}
             aria-pressed={isActive}
           >
-            {" "}
-            {category.label}{" "}
+            {category.label}
           </button>
         );
-      })}{" "}
+      })}
     </nav>
   );
 }
+
 export function NewsHubLinks() {
   return (
     <nav className="news-page-hub-links" aria-label="روابط الأسواق والأخبار">
-      {" "}
       {NEWS_HUB_LINKS.map((link) => (
         <Link key={link.href} href={link.href} className="news-page-hub-link">
-          {" "}
-          {link.label}{" "}
+          {link.label}
         </Link>
-      ))}{" "}
+      ))}
     </nav>
   );
 }
-export function NewsSearchPanel({
-  value,
-  onChange,
-  selectedCategory,
-  onSelectCategory,
-}) {
+
+export function NewsSearchPanel({ value, onChange, selectedCategory, onSelectCategory }) {
   return (
     <section className="news-search-panel" aria-label="بحث وتصفية الأخبار">
-      {" "}
       <div className="news-search-heading">
-        {" "}
-        <span className="news-search-heading__title">ابحث في الأخبار</span>{" "}
-        <small className="news-search-heading__hint">
-          ابحث بعنوان الخبر أو الكلمات المفتاحية
-        </small>{" "}
-      </div>{" "}
+        <span className="news-search-heading__title">ابحث في الأخبار</span>
+        <small className="news-search-heading__hint">ابحث بعنوان الخبر أو الكلمات المفتاحية</small>
+      </div>
+
       <div className="news-search-input-wrapper" role="search">
-        {" "}
-        <label
-          className="news-search-input-wrapper__label"
-          htmlFor="news-page-search-input"
-        >
-          {" "}
-          ابحث في الأخبار{" "}
-        </label>{" "}
+        <label className="news-search-input-wrapper__label" htmlFor="news-page-search-input">
+          ابحث في الأخبار
+        </label>
         <span className="news-search-input-wrapper__icon" aria-hidden="true">
-          {" "}
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.25"
-          >
-            {" "}
-            <circle cx="11" cy="11" r="7" />{" "}
-            <path d="M20 20l-3.5-3.5" strokeLinecap="round" />{" "}
-          </svg>{" "}
-        </span>{" "}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+          </svg>
+        </span>
         <input
           id="news-page-search-input"
           type="search"
@@ -123,7 +102,7 @@ export function NewsSearchPanel({
           className="news-search-input-wrapper__input"
           dir="rtl"
           enterKeyHint="search"
-        />{" "}
+        />
         {value ? (
           <button
             type="button"
@@ -131,26 +110,28 @@ export function NewsSearchPanel({
             onClick={() => onChange("")}
             aria-label="مسح البحث"
           >
-            {" "}
-            ×{" "}
+            ×
           </button>
-        ) : null}{" "}
-      </div>{" "}
+        ) : null}
+      </div>
+
       <div className="news-category-filters">
-        {" "}
         <NewsCategoryNav
           selectedCategory={selectedCategory}
           onSelectCategory={onSelectCategory}
-        />{" "}
-      </div>{" "}
+        />
+      </div>
     </section>
   );
 }
+
 export function NewsCard({ item, index, compact = false, priority = false }) {
   const newsImpact = item.impact_level || "MEDIUM";
   const isHighImpact = newsImpact === "HIGH";
   const newsTitle = extractArabicTitle(item);
-  const newsContent = makeExcerpt(item.content || item.title);
+  const newsContent = makeExcerpt(
+    item.content || item.title
+  );
   const newsImage = resolveNewsImageUrl(item);
   const category = detectNewsCategory(item);
   const visual = getNewsCategoryVisual(category);
@@ -158,11 +139,10 @@ export function NewsCard({ item, index, compact = false, priority = false }) {
   const relatedAssetSymbols = getNewsCardAssets(item);
   const categoryLabel =
     category === "commodities" && isMetalsNews(item) ? "المعادن" : visual.label;
+
   return (
     <article className={`news-card ${compact ? "news-card--compact" : ""}`}>
-      {" "}
       <div className={`news-card__media news-card__media--${category}`}>
-        {" "}
         <NewsCoverImage
           src={newsImage}
           alt={newsTitle}
@@ -170,97 +150,77 @@ export function NewsCard({ item, index, compact = false, priority = false }) {
           category={category}
           item={item}
           priority={priority}
-        />{" "}
-        <div className="news-card__media-overlay" aria-hidden="true" />{" "}
+        />
+        <div className="news-card__media-overlay" aria-hidden="true" />
         <div className="news-card__badges">
-          {" "}
-          <span className="news-card__badge news-card__badge--source">
-            {SOURCE_LABEL}
-          </span>{" "}
+          <span className="news-card__badge news-card__badge--source">{SOURCE_LABEL}</span>
           <span
-            className={`news-card__badge ${isHighImpact ? "news-card__badge--urgent" : "news-card__badge--important"}`}
+            className={`news-card__badge ${
+              isHighImpact ? "news-card__badge--urgent" : "news-card__badge--important"
+            }`}
           >
-            {" "}
-            {isHighImpact ? "عاجل" : "مهم"}{" "}
-          </span>{" "}
-        </div>{" "}
-      </div>{" "}
+            {isHighImpact ? "عاجل" : "مهم"}
+          </span>
+        </div>
+      </div>
+
       <div className="news-card__body">
-        {" "}
         <div className="news-card__meta">
-          {" "}
-          <time
-            className="news-card__date"
-            dateTime={item.created_at || undefined}
-          >
-            {" "}
-            {formatNewsDate(item.created_at)}{" "}
-          </time>{" "}
-          <span className="news-card__category">{categoryLabel}</span>{" "}
-          <span className="news-card__market">{marketLabel}</span>{" "}
-        </div>{" "}
+          <time className="news-card__date" dateTime={item.created_at || undefined}>
+            {formatNewsDate(item.created_at)}
+          </time>
+          <span className="news-card__category">{categoryLabel}</span>
+          <span className="news-card__market">{marketLabel}</span>
+        </div>
+
         {relatedAssetSymbols.length > 0 ? (
           <div className="news-card__assets" aria-label="الأصول المرتبطة">
-            {" "}
             {relatedAssetSymbols.map((symbol) => (
               <span key={symbol} className="news-card__asset-chip">
-                {" "}
-                {symbol}{" "}
+                {symbol}
               </span>
-            ))}{" "}
+            ))}
           </div>
-        ) : null}{" "}
-        <h2 className="news-card__title">{newsTitle}</h2>{" "}
-        {!compact ? <p className="news-card__excerpt">{newsContent}</p> : null}{" "}
+        ) : null}
+
+        <h2 className="news-card__title">{newsTitle}</h2>
+
+        {!compact ? <p className="news-card__excerpt">{newsContent}</p> : null}
+
         <Link href={getNewsHref(item)} className="news-card__cta">
-          {" "}
-          اقرأ التفاصيل{" "}
-        </Link>{" "}
-      </div>{" "}
+          اقرأ التفاصيل
+        </Link>
+      </div>
     </article>
   );
 }
+
 export function NewsHighImpactSection({ items = [] }) {
   if (!items.length) {
     return null;
   }
+
   return (
-    <section
-      className="news-page-high-impact"
-      aria-label="الأخبار الأكثر تأثيراً"
-    >
-      {" "}
+    <section className="news-page-high-impact" aria-label="الأخبار الأكثر تأثيراً">
       <div className="news-page-high-impact__header">
-        {" "}
         <div>
-          {" "}
-          <span className="news-page-high-impact__eyebrow">
-            تغطية مباشرة
-          </span>{" "}
-          <h2 className="news-page-high-impact__title">
-            الأخبار الأكثر تأثيراً
-          </h2>{" "}
-        </div>{" "}
+          <span className="news-page-high-impact__eyebrow">تغطية مباشرة</span>
+          <h2 className="news-page-high-impact__title">الأخبار الأكثر تأثيراً</h2>
+        </div>
         <p className="news-page-high-impact__text">
-          {" "}
-          آخر الأخبار عالية التأثير أو الأكثر أهمية للأسواق الآن{" "}
-        </p>{" "}
-      </div>{" "}
+          آخر الأخبار عالية التأثير أو الأكثر أهمية للأسواق الآن
+        </p>
+      </div>
+
       <div className="news-page-high-impact__grid">
-        {" "}
         {items.map((item, index) => (
-          <NewsCard
-            key={item.id}
-            item={item}
-            index={index}
-            compact
-            priority={index === 0}
-          />
-        ))}{" "}
-      </div>{" "}
+          <NewsCard key={item.id} item={item} index={index} compact priority={index === 0} />
+        ))}
+      </div>
     </section>
   );
 }
+
 export function NewsEmptyState({
   selectedCategory,
   searchQuery,
@@ -268,58 +228,36 @@ export function NewsEmptyState({
   onRefresh,
 }) {
   const hasFilters = selectedCategory !== "all" || Boolean(searchQuery.trim());
+
   return (
     <div className="news-page-state">
-      {" "}
       <span className="news-page-state__icon" aria-hidden="true">
-        {" "}
-        📰{" "}
-      </span>{" "}
-      <h2 className="news-page-state__title">
-        لا توجد أخبار مطابقة حالياً
-      </h2>{" "}
+        📰
+      </span>
+      <h2 className="news-page-state__title">لا توجد أخبار مطابقة حالياً</h2>
       <p className="news-page-state__text">
-        {" "}
         {hasFilters
           ? "جرّب تغيير الفلتر أو البحث، أو عد لاحقاً عند نشر أخبار جديدة."
-          : "لم يتم نشر أخبار جديدة بعد. يمكنك العودة لاحقاً أو استكشاف صفحات الأسواق."}{" "}
-      </p>{" "}
+          : "لم يتم نشر أخبار جديدة بعد. يمكنك العودة لاحقاً أو استكشاف صفحات الأسواق."}
+      </p>
+
       <div className="news-page-state__actions">
-        {" "}
         {hasFilters ? (
-          <button
-            type="button"
-            onClick={onResetFilters}
-            className="news-page-state__action"
-          >
-            {" "}
-            إعادة ضبط الفلاتر{" "}
+          <button type="button" onClick={onResetFilters} className="news-page-state__action">
+            إعادة ضبط الفلاتر
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="news-page-state__action"
-          >
-            {" "}
-            تحديث الأخبار{" "}
+          <button type="button" onClick={onRefresh} className="news-page-state__action">
+            تحديث الأخبار
           </button>
-        )}{" "}
-        <Link
-          href="/"
-          className="news-page-state__action news-page-state__action--link"
-        >
-          {" "}
-          العودة للرئيسية{" "}
-        </Link>{" "}
-        <Link
-          href="/markets"
-          className="news-page-state__action news-page-state__action--link"
-        >
-          {" "}
-          استكشاف الأسواق{" "}
-        </Link>{" "}
-      </div>{" "}
+        )}
+        <Link href="/" className="news-page-state__action news-page-state__action--link">
+          العودة للرئيسية
+        </Link>
+        <Link href="/markets" className="news-page-state__action news-page-state__action--link">
+          استكشاف الأسواق
+        </Link>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,9 @@
 import { buildForexPageJsonLd, serializeJsonLd } from "../../../lib/seo";
+
 const FOREX_TITLE = "HasaN CharT World | الفوركس";
 const FOREX_DESCRIPTION =
   "تعرف على سوق الفوركس مع HasaN CharT World، من أزواج العملات والتحليل الفني والأساسي إلى الأخبار الاقتصادية، إدارة المخاطر، وإشارات التداول الاحترافية.";
+
 export const FOREX_ITEM_LIST = [
   { name: "أزواج العملات", url: "/forex-signals" },
   { name: "الدولار الأمريكي", url: "/news/tag/forex" },
@@ -14,6 +16,7 @@ export const FOREX_ITEM_LIST = [
   { name: "إدارة الحسابات", url: "/account-management" },
   { name: "الأسواق المالية", url: "/markets" },
 ];
+
 const FOREX_FAQ = [
   {
     q: "ما هو سوق الفوركس؟",
@@ -36,6 +39,7 @@ const FOREX_FAQ = [
     a: "أنشئ حساباً واستكشف إشارات الفوركس أو التحليلات اليومية أو الاشتراكات وخدمات VIP.",
   },
 ];
+
 export default function ForexPageJsonLd() {
   const jsonLd = buildForexPageJsonLd({
     path: "/forex",
@@ -44,6 +48,7 @@ export default function ForexPageJsonLd() {
     items: FOREX_ITEM_LIST,
     faq: FOREX_FAQ,
   });
+
   return (
     <script
       type="application/ld+json"

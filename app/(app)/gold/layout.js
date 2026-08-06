@@ -2,6 +2,8 @@ import GoldPageJsonLd from "../../components/gold/GoldPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/gold",
   title: "HasaN CharT World | الذهب",
@@ -19,11 +21,12 @@ export const metadata = buildPublicPageMetadata({
     "إشارات الذهب",
   ],
 });
+
 export default function GoldLayout({ children }) {
   return (
     <>
-      
-      <GoldPageJsonLd /> {children}
+      <GoldPageJsonLd />
+      {children}
     </>
   );
 }

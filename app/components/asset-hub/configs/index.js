@@ -44,6 +44,7 @@ import { usdchfAssetConfig } from "./usdchf";
 import { usdjpyAssetConfig } from "./usdjpy";
 import { xauusdAssetConfig } from "./xauusd";
 import { xrpAssetConfig } from "./xrp";
+
 /** @type {Record<string, import("./types").AssetHubConfig>} */
 export const ASSET_CONFIGS = {
   btc: btcAssetConfig,
@@ -92,10 +93,16 @@ export const ASSET_CONFIGS = {
   nikkei: nikkeiAssetConfig,
   ftse: ftseAssetConfig,
   cac40: cac40AssetConfig,
-}; /** * @param {string} id * @returns {import("./types").AssetHubConfig | null} */
+};
+
+/**
+ * @param {string} id
+ * @returns {import("./types").AssetHubConfig | null}
+ */
 export function getAssetConfig(id) {
   return ASSET_CONFIGS[id] || null;
 }
+
 export {
   adaAssetConfig,
   bnbAssetConfig,

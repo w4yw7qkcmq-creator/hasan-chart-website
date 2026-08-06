@@ -2,6 +2,8 @@ import MarketsPageJsonLd from "../../components/markets/MarketsPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/markets",
   title: "HasaN CharT World | الأسواق المالية",
@@ -20,11 +22,12 @@ export const metadata = buildPublicPageMetadata({
     "تحليلات مالية",
   ],
 });
+
 export default function MarketsLayout({ children }) {
   return (
     <>
-      
-      <MarketsPageJsonLd /> {children}
+      <MarketsPageJsonLd />
+      {children}
     </>
   );
 }

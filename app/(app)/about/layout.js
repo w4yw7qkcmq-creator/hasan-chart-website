@@ -2,6 +2,8 @@ import AboutPageJsonLd from "../../components/about/AboutPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/about",
   title: "من نحن | HasaN CharT World",
@@ -18,11 +20,12 @@ export const metadata = buildPublicPageMetadata({
     "التنبيهات السعرية",
   ],
 });
+
 export default function AboutLayout({ children }) {
   return (
     <>
-      
-      <AboutPageJsonLd /> {children}
+      <AboutPageJsonLd />
+      {children}
     </>
   );
 }

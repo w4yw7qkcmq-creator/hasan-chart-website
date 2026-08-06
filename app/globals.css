@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "./design-system/design-system-theme.css";
-
 html.theme-pending body {
   overflow: hidden;
 }
@@ -114,9 +112,671 @@ html[data-theme="light"] body {
   color: var(--text-main);
 }
 
+html[data-theme="light"] .bg-\[\#020617\],
+html[data-theme="light"] .bg-\[\#020817\],
+html[data-theme="light"] .bg-\[\#07142f\] {
+  background-color: transparent !important;
+}
 
-/* Legacy light-mode utility rewrite removed — use design-system tokens (design-system-theme.css) */
+html[data-theme="light"] .text-white,
+html[data-theme="light"] .text-slate-100,
+html[data-theme="light"] .text-slate-200,
+html[data-theme="light"] .text-cyan-100,
+html[data-theme="light"] .text-cyan-200 {
+  color: #0f172a !important;
+}
 
+html[data-theme="light"] .text-slate-300,
+html[data-theme="light"] .text-slate-400,
+html[data-theme="light"] .text-slate-500 {
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .bg-white\/\[0\.045\],
+html[data-theme="light"] .bg-white\/\[0\.05\],
+html[data-theme="light"] .bg-white\/\[0\.055\],
+html[data-theme="light"] .bg-white\/\[0\.035\],
+html[data-theme="light"] .bg-white\/5,
+html[data-theme="light"] .bg-black\/20,
+html[data-theme="light"] .bg-black\/25 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+html[data-theme="light"] .border-white\/10,
+html[data-theme="light"] .border-cyan-300\/10,
+html[data-theme="light"] .border-cyan-300\/15,
+html[data-theme="light"] .border-cyan-300\/20,
+html[data-theme="light"] .border-cyan-300\/25 {
+  border-color: rgba(37, 99, 235, 0.16) !important;
+}
+
+html[data-theme="light"] .from-\[\#07142f\]\/85,
+html[data-theme="light"] .from-\[\#07142f\],
+html[data-theme="light"] .via-\[\#040b1c\]\/90,
+html[data-theme="light"] .to-\[\#020617\]\/95,
+html[data-theme="light"] .to-\[\#030712\] {
+  --tw-gradient-from: #ffffff var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: #ffffff, #eff8ff, #f8fbff !important;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.65);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.55);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.85);
+}
+
+.navBtn {
+  @apply px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 transition font-bold;
+}
+
+.card,
+.box {
+  @apply rounded-3xl border backdrop-blur-xl p-6 shadow-2xl transition;
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+  color: var(--text-main);
+  box-shadow: 0 24px 80px var(--shadow-main);
+}
+
+.card:hover,
+.box:hover {
+  border-color: rgba(59, 130, 246, 0.42);
+  transform: translateY(-2px);
+}
+
+.sectionTitle {
+  @apply text-4xl font-black mb-6 tracking-tight;
+}
+
+.input {
+  @apply w-full p-4 rounded-2xl border mb-3 outline-none transition;
+  background: var(--bg-input);
+  border-color: var(--border-soft);
+  color: var(--text-main);
+}
+
+.input:focus {
+  border-color: rgba(59, 130, 246, 0.85);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
+}
+
+.input::placeholder {
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.blueBtn {
+  @apply w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-bold transition;
+  box-shadow: 0 12px 35px rgba(37, 99, 235, 0.28);
+}
+
+.greenBtn {
+  @apply w-full bg-emerald-400 hover:bg-emerald-300 text-black py-4 rounded-2xl font-bold transition;
+  box-shadow: 0 12px 35px rgba(52, 211, 153, 0.22);
+}
+
+.blueBtn:hover,
+.greenBtn:hover {
+  transform: translateY(-1px);
+}
+
+.menuItem {
+  @apply block w-full rounded-2xl px-4 py-3 border hover:bg-blue-600/30 hover:border-blue-500/50 transition font-bold;
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+  color: var(--text-main);
+}
+
+.menuItem:hover {
+  transform: translateX(-3px);
+}
+
+.glassPanel {
+  @apply rounded-[36px] border backdrop-blur-2xl shadow-2xl;
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+}
+
+.badgeBlue {
+  @apply inline-flex items-center rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-blue-300 text-sm font-bold;
+}
+
+.badgeGreen {
+  @apply inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-emerald-300 text-sm font-bold;
+}
+
+@media (max-width: 1023px) {
+  .sectionTitle {
+    @apply text-3xl;
+  }
+}
+
+/* ===== FINAL LIGHT MODE: soft background + blue panels ===== */
+
+html[data-theme="light"] body,
+html[data-theme="light"] main,
+html[data-theme="light"] .min-h-screen,
+html[data-theme="light"] .lg\:flex {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(88, 184, 255, 0.14), transparent 32%),
+    radial-gradient(circle at 88% 18%, rgba(47, 150, 255, 0.10), transparent 30%),
+    linear-gradient(135deg, #f8fbff 0%, #eef7ff 42%, #e4f3ff 100%) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] header,
+html[data-theme="light"] .site-top-header {
+  background: var(--header-bg) !important;
+  border-color: var(--header-border) !important;
+  color: var(--header-text) !important;
+  box-shadow: var(--header-shadow) !important;
+}
+
+html[data-theme="light"] aside {
+  background: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 18px 60px rgba(41, 151, 242, 0.24) !important;
+}
+
+html[data-theme="light"] aside .menuItem,
+html[data-theme="light"] aside .sidebarUserCard,
+html[data-theme="light"] aside .topLoginBtn,
+html[data-theme="light"] aside .topUserChip,
+html[data-theme="light"] aside .bg-white\/\[0\.035\],
+html[data-theme="light"] aside .bg-white\/\[0\.045\],
+html[data-theme="light"] aside .bg-white\/5 {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 10px 28px rgba(0, 68, 145, 0.12) !important;
+}
+
+html[data-theme="light"] aside,
+html[data-theme="light"] aside *,
+html[data-theme="light"] aside .text-white,
+html[data-theme="light"] aside .text-slate-100,
+html[data-theme="light"] aside .text-slate-200,
+html[data-theme="light"] aside .text-slate-300,
+html[data-theme="light"] aside .text-slate-400,
+html[data-theme="light"] aside .text-cyan-100,
+html[data-theme="light"] aside .text-cyan-200 {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .card,
+html[data-theme="light"] .box,
+html[data-theme="light"] .glassPanel,
+html[data-theme="light"] .bg-white\/\[0\.045\],
+html[data-theme="light"] .bg-white\/\[0\.05\],
+html[data-theme="light"] .bg-white\/\[0\.055\],
+html[data-theme="light"] .bg-white\/\[0\.035\],
+html[data-theme="light"] .bg-white\/5,
+html[data-theme="light"] .bg-black\/20,
+html[data-theme="light"] .bg-black\/25,
+html[data-theme="light"] .bg-\[\#020617\],
+html[data-theme="light"] .bg-\[\#020817\],
+html[data-theme="light"] .bg-\[\#07142f\],
+html[data-theme="light"] .bg-\[\#07142f\]\/70 {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(47, 150, 255, 0.18) !important;
+  color: #0f172a !important;
+  box-shadow: 0 16px 45px rgba(47, 150, 255, 0.10) !important;
+}
+
+html[data-theme="light"] .card *,
+html[data-theme="light"] .box *,
+html[data-theme="light"] .glassPanel *,
+html[data-theme="light"] .text-white,
+html[data-theme="light"] .text-slate-100,
+html[data-theme="light"] .text-slate-200,
+html[data-theme="light"] .text-cyan-100,
+html[data-theme="light"] .text-cyan-200 {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .text-slate-300,
+html[data-theme="light"] .text-slate-400,
+html[data-theme="light"] .text-slate-500,
+html[data-theme="light"] .text-cyan-100\/50,
+html[data-theme="light"] .text-cyan-100\/55,
+html[data-theme="light"] .text-cyan-100\/60 {
+  color: #475569 !important;
+}
+
+/* Price/market windows stay full blue */
+html[data-theme="light"] [class*="market"],
+html[data-theme="light"] [class*="Market"],
+html[data-theme="light"] [class*="price"],
+html[data-theme="light"] [class*="Price"],
+html[data-theme="light"] .card:has(.tradingview-widget-container),
+html[data-theme="light"] .box:has(.tradingview-widget-container),
+html[data-theme="light"] div:has(> .tradingview-widget-container) {
+  background: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 12px 36px rgba(41, 151, 242, 0.25), inset 0 1px 0 rgba(255,255,255,0.18) !important;
+}
+
+html[data-theme="light"] .tradingview-widget-container,
+html[data-theme="light"] .tradingview-widget-container__widget,
+html[data-theme="light"] iframe {
+  background: transparent !important;
+  border-radius: 22px !important;
+}
+
+/* Keep original price-number colors as much as possible */
+html[data-theme="light"] [class*="market"] *,
+html[data-theme="light"] [class*="Market"] *,
+html[data-theme="light"] [class*="price"] *,
+html[data-theme="light"] [class*="Price"] *,
+html[data-theme="light"] .card:has(.tradingview-widget-container) *,
+html[data-theme="light"] .box:has(.tradingview-widget-container) * {
+  color: inherit;
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html[data-theme="light"] .input {
+  background: #ffffff !important;
+  border-color: rgba(47, 150, 255, 0.22) !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 10px 28px rgba(47,150,255,0.08) !important;
+}
+
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder {
+  color: #64748b !important;
+}
+
+html[data-theme="light"] .topLogoutBtn,
+html[data-theme="light"] .bg-red-500\/15 {
+  background: #fee2e2 !important;
+  border-color: rgba(239, 68, 68, 0.24) !important;
+  color: #991b1b !important;
+}
+
+html[data-theme="light"] .border-cyan-300\/10,
+html[data-theme="light"] .border-cyan-300\/15,
+html[data-theme="light"] .border-cyan-300\/20,
+html[data-theme="light"] .border-cyan-300\/25,
+html[data-theme="light"] .border-white\/10 {
+  border-color: rgba(47, 150, 255, 0.20) !important;
+}
+
+html[data-theme="light"] .pointer-events-none.absolute.inset-0 {
+  opacity: 0.12 !important;
+}
+
+html[data-theme="light"] .badgeBlue,
+html[data-theme="light"] .badgeGreen {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  color: #0f172a !important;
+}
+
+/* ===== LIGHT MODE FINAL OVERRIDES: blue sidebar, blue hero, blue price cards ===== */
+
+html[data-theme="light"] {
+  --light-blue-panel: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%);
+}
+
+html[data-theme="light"] body,
+html[data-theme="light"] main,
+html[data-theme="light"] .min-h-screen,
+html[data-theme="light"] .lg\:flex {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(88, 184, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 88% 12%, rgba(47, 150, 255, 0.12), transparent 30%),
+    linear-gradient(135deg, #f8fbff 0%, #eef7ff 45%, #e1f1ff 100%) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] aside,
+html[data-theme="light"] .lg\:fixed.lg\:right-0,
+html[data-theme="light"] .fixed.right-0 {
+  background: var(--light-blue-panel) !important;
+  border-color: rgba(255, 255, 255, 0.30) !important;
+  box-shadow: 0 18px 65px rgba(41, 151, 242, 0.24) !important;
+}
+
+html[data-theme="light"] aside .menuItem,
+html[data-theme="light"] aside a:not(.site-sidebar-brand-card),
+html[data-theme="light"] aside button:not(.topLogoutBtn),
+html[data-theme="light"] aside .sidebarUserCard,
+html[data-theme="light"] aside .topUserChip,
+html[data-theme="light"] aside .topLoginBtn {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px rgba(0, 68, 145, 0.12) !important;
+}
+
+html[data-theme="light"] aside * {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .topLogoutBtn,
+html[data-theme="light"] aside .topLogoutBtn,
+html[data-theme="light"] .bg-red-500\/15 {
+  background: #fee2e2 !important;
+  border-color: rgba(239, 68, 68, 0.28) !important;
+  color: #991b1b !important;
+}
+
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeBlue),
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeGreen),
+html[data-theme="light"] section:has(.badgeBlue),
+html[data-theme="light"] section:has(.badgeGreen) {
+  background: var(--light-blue-panel) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 18px 60px rgba(41, 151, 242, 0.24) !important;
+}
+
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeBlue) *,
+html[data-theme="light"] .rounded-\[36px\]:has(.badgeGreen) *,
+html[data-theme="light"] section:has(.badgeBlue) *,
+html[data-theme="light"] section:has(.badgeGreen) * {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .badgeBlue,
+html[data-theme="light"] .badgeGreen {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.42) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] [class*="market"],
+html[data-theme="light"] [class*="Market"],
+html[data-theme="light"] [class*="price"],
+html[data-theme="light"] [class*="Price"],
+html[data-theme="light"] .site-price-card--tv,
+html[data-theme="light"] .site-market-pulse-panel,
+html[data-theme="light"] .card:has(.tradingview-widget-container),
+html[data-theme="light"] .box:has(.tradingview-widget-container),
+html[data-theme="light"] div:has(> .tradingview-widget-container) {
+  background: var(--light-blue-panel) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 12px 36px rgba(41, 151, 242, 0.25), inset 0 1px 0 rgba(255,255,255,0.18) !important;
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html[data-theme="light"] .input {
+  background: rgba(255,255,255,0.92) !important;
+  color: #0f172a !important;
+  border-color: rgba(47, 150, 255, 0.22) !important;
+}
+
+/* ===== FORCE LIGHT SIDEBAR BLUE ===== */
+html[data-theme="light"] body > div > aside,
+html[data-theme="light"] aside:has(.menuItem),
+html[data-theme="light"] aside:has(.sidebarUserCard),
+html[data-theme="light"] div:has(> .sidebarUserCard),
+html[data-theme="light"] div:has(> nav .menuItem),
+html[data-theme="light"] .fixed:has(.sidebarUserCard),
+html[data-theme="light"] .fixed:has(.menuItem) {
+  background: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  box-shadow: 0 18px 65px rgba(41, 151, 242, 0.28) !important;
+}
+
+html[data-theme="light"] aside:has(.menuItem) .menuItem,
+html[data-theme="light"] aside:has(.sidebarUserCard) .menuItem,
+html[data-theme="light"] div:has(> .sidebarUserCard) .menuItem,
+html[data-theme="light"] div:has(> nav .menuItem) .menuItem,
+html[data-theme="light"] .fixed:has(.menuItem) .menuItem,
+html[data-theme="light"] .fixed:has(.sidebarUserCard) .menuItem {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] aside:has(.menuItem) .sidebarUserCard,
+html[data-theme="light"] aside:has(.sidebarUserCard) .sidebarUserCard,
+html[data-theme="light"] div:has(> .sidebarUserCard) .sidebarUserCard,
+html[data-theme="light"] .fixed:has(.sidebarUserCard) .sidebarUserCard {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+}
+
+/* ===== Bootstrap loading screen ===== */
+
+@keyframes bootstrapFadeScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes bootstrapRingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bootstrapGlowPulse {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 0.72;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes bootstrapDotPulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.82);
+  }
+
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bootstrapLogoPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 50px rgba(0, 163, 255, 0.35);
+  }
+
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 62px rgba(0, 163, 255, 0.48);
+  }
+}
+
+.bootstrapScreen {
+  color: var(--text-main);
+}
+
+.bootstrapScreen__content {
+  animation: bootstrapFadeScale 0.55s ease-out both;
+}
+
+.bootstrapScreen--exit {
+  animation: bootstrapFadeOut 0.32s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes bootstrapFadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.bootstrapScreen__bg {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(11, 99, 255, 0.28), transparent 28%),
+    radial-gradient(circle at 82% 24%, rgba(34, 211, 238, 0.12), transparent 28%),
+    radial-gradient(circle at 20% 10%, rgba(0, 102, 255, 0.32), transparent 30%),
+    linear-gradient(135deg, #020617 0%, #06112b 45%, #07142f 100%);
+}
+
+.bootstrapScreen__grid {
+  opacity: 0.13;
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.bootstrapScreen__orb {
+  border-radius: 9999px;
+  filter: blur(42px);
+  animation: bootstrapGlowPulse 4.2s ease-in-out infinite;
+}
+
+.bootstrapScreen__orb--one {
+  top: 10%;
+  right: 7%;
+  width: 18rem;
+  height: 18rem;
+  background: rgba(37, 99, 235, 0.34);
+}
+
+.bootstrapScreen__orb--two {
+  bottom: 8%;
+  left: 5%;
+  width: 14rem;
+  height: 14rem;
+  background: rgba(34, 211, 238, 0.22);
+  animation-delay: 1.3s;
+}
+
+.bootstrapScreen__card {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.bootstrapScreen__title {
+  color: var(--text-main);
+}
+
+.bootstrapScreen__subtitle,
+.bootstrapScreen__tagline {
+  color: var(--text-muted);
+}
+
+.bootstrapScreen__ring {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 28deg,
+    #22d3ee 28deg 120deg,
+    #2563eb 120deg 220deg,
+    #00a3ff 220deg 310deg,
+    transparent 310deg 360deg
+  );
+  animation: bootstrapRingSpin 1.35s linear infinite;
+}
+
+.bootstrapScreen__ringInner {
+  background: var(--bg-page);
+}
+
+.bootstrapScreen__ringGlow {
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.28), transparent 70%);
+  animation: bootstrapGlowPulse 2.4s ease-in-out infinite;
+}
+
+.bootstrapScreen__logo {
+  animation: bootstrapLogoPulse 2.2s ease-in-out infinite;
+}
+
+.bootstrapScreen__dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.45);
+  animation: bootstrapDotPulse 1.2s ease-in-out infinite;
+}
+
+.bootstrapScreen__dot--delay-1 {
+  animation-delay: 0.18s;
+}
+
+.bootstrapScreen__dot--delay-2 {
+  animation-delay: 0.36s;
+}
+
+html[data-theme="light"] .bootstrapScreen__bg {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(88, 184, 255, 0.14), transparent 32%),
+    radial-gradient(circle at 88% 18%, rgba(47, 150, 255, 0.1), transparent 30%),
+    linear-gradient(135deg, #f8fbff 0%, #eef7ff 42%, #e4f3ff 100%);
+}
+
+html[data-theme="light"] .bootstrapScreen__grid {
+  opacity: 0.18;
+  background-image:
+    linear-gradient(90deg, rgba(37, 99, 235, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(37, 99, 235, 0.05) 1px, transparent 1px);
+}
+
+html[data-theme="light"] .bootstrapScreen__orb--one {
+  background: rgba(47, 150, 255, 0.22);
+}
+
+html[data-theme="light"] .bootstrapScreen__orb--two {
+  background: rgba(125, 211, 252, 0.28);
+}
+
+html[data-theme="light"] .bootstrapScreen__card {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-color: rgba(47, 150, 255, 0.18) !important;
+  box-shadow: 0 22px 70px rgba(47, 150, 255, 0.14) !important;
+}
+
+html[data-theme="light"] .bootstrapScreen__logo {
+  border-color: rgba(47, 150, 255, 0.28) !important;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.88), rgba(14, 165, 233, 0.72), rgba(2, 6, 23, 0.92)) !important;
+  box-shadow: 0 0 46px rgba(47, 150, 255, 0.32) !important;
+}
+
+html[data-theme="light"] .bootstrapScreen__title {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .bootstrapScreen__subtitle,
+html[data-theme="light"] .bootstrapScreen__tagline {
+  color: #475569 !important;
+}
 
 @keyframes notificationBellShake {
   0%,
@@ -227,6 +887,53 @@ select:focus:not(:focus-visible) {
 
 .site-sidebar-brand-badge__text {
   color: #f8fafc;
+}
+
+html[data-theme="light"] aside .site-sidebar-brand-card {
+  background: linear-gradient(
+    135deg,
+    rgba(230, 244, 255, 0.95),
+    rgba(203, 228, 248, 0.88)
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.72) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 10px 28px rgba(15, 23, 42, 0.07) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+html[data-theme="light"] aside .site-sidebar-brand-title {
+  color: #0f172a !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] aside .site-sidebar-brand-badge {
+  border-color: rgba(255, 255, 255, 0.78) !important;
+  background: linear-gradient(
+    145deg,
+    rgba(220, 239, 250, 0.96),
+    rgba(175, 198, 214, 0.88)
+  ) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+html[data-theme="light"] aside .site-sidebar-brand-badge__text {
+  color: #0f172a !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] aside .site-sidebar-brand-subtitle {
+  color: #64748b !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
 }
 
 .site-top-header .site-header-brand,
@@ -1457,6 +2164,270 @@ html[data-theme="light"] .bootstrapStallBanner {
 
 html[data-theme="light"] .bootstrapStallBanner p {
   color: #92400e;
+}
+
+/* ===== Protected price cards (immune to theme-pending/light overrides) ===== */
+
+:root {
+  --site-sidebar-blue-solid: #38a8f2;
+}
+
+.site-price-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
+}
+
+.site-price-card--pulse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: var(--site-sidebar-blue-solid);
+  box-shadow: 0 6px 16px rgba(56, 168, 242, 0.18);
+  padding: 0.9375rem 1rem;
+  border-radius: 18px;
+}
+
+.site-price-card--tv {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: var(--site-sidebar-blue-solid);
+  box-shadow: 0 8px 24px rgba(56, 168, 242, 0.2);
+  padding: 1.25rem;
+  min-height: 230px;
+}
+
+#market-windows,
+#market-windows .market-windows-grid {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="light"] #market-windows,
+html[data-theme="light"] #market-windows .market-windows-grid {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+#market-windows .market-windows-grid {
+  width: 100%;
+}
+
+#market-windows .market-windows-grid > .site-price-card--tv {
+  min-width: 0;
+}
+
+#market-windows .site-price-card__eyebrow {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.35;
+  max-width: 100%;
+}
+
+#market-windows .site-price-card__title {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+#market-windows .site-price-card--tv:hover,
+#prices .site-price-card--tv:hover,
+.site-market-pulse-panel .site-price-card--pulse:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(56, 168, 242, 0.24);
+}
+
+/* Flat card surface — no inner gradient layers on text or wrappers */
+#market-windows .site-price-card--tv .site-price-card__eyebrow,
+#market-windows .site-price-card--tv .site-price-card__title,
+#market-windows .site-price-card--tv .site-price-card__status,
+#prices .site-price-card--tv .site-price-card__eyebrow,
+#prices .site-price-card--tv .site-price-card__title,
+#prices .site-price-card--tv .site-price-card__status,
+.site-market-pulse-panel .site-price-card--pulse .site-price-card__title,
+.site-market-pulse-panel .site-price-card--pulse .site-price-card__value,
+#market-windows .site-price-card--tv > div,
+#prices .site-price-card--tv > div,
+#market-windows .site-price-card--tv .relative,
+#prices .site-price-card--tv .relative {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.site-price-card__eyebrow,
+.site-price-card__title,
+.site-price-card__value,
+.site-price-card__status,
+.site-market-pulse-panel .site-price-card__eyebrow,
+.site-market-pulse-panel .site-price-card__title,
+.site-market-pulse-panel .site-price-card__value,
+.site-market-pulse-badge {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: transparent !important;
+}
+
+.site-price-card__eyebrow,
+.site-price-card__title,
+.site-price-card__value {
+  text-shadow: none;
+}
+
+.site-price-card__eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+
+.site-price-card__title {
+  margin-top: 0.375rem;
+  margin-bottom: 0.625rem;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.site-price-card__status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.625rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.site-market-pulse-panel {
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: var(--site-sidebar-blue-solid);
+  box-shadow: 0 12px 32px rgba(56, 168, 242, 0.2);
+  padding: 1.375rem 1.5rem;
+}
+
+.site-market-pulse-header {
+  min-height: 2.75rem;
+}
+
+.site-market-pulse-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.site-market-pulse-panel .site-price-card--pulse .site-price-card__title {
+  font-size: 1rem;
+  font-weight: 900;
+  margin-top: 0;
+  margin-bottom: 0;
+  text-shadow: none;
+}
+
+.site-market-pulse-panel .site-price-card--pulse .site-price-card__value {
+  font-size: 1.625rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+#market-windows .site-price-card--tv .tradingview-widget-container,
+#prices .site-price-card--tv .tradingview-widget-container {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: var(--site-sidebar-blue-solid) !important;
+  box-shadow: none !important;
+}
+
+#market-windows .site-price-card--tv .tradingview-widget-container__widget,
+#market-windows .site-price-card--tv .tradingview-widget-container iframe {
+  height: 100% !important;
+  min-height: 136px !important;
+}
+
+#market-windows .site-price-card--tv .tradingview-widget-container__widget,
+#prices .site-price-card--tv .tradingview-widget-container__widget {
+  background: transparent !important;
+}
+
+#market-windows .site-price-card--tv .pointer-events-none.absolute.inset-0,
+#prices .site-price-card--tv .pointer-events-none.absolute.inset-0 {
+  border-radius: 16px;
+  background: rgba(56, 168, 242, 0.72) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="light"] #market-windows .site-price-card--pulse,
+html[data-theme="light"] #prices .site-price-card--pulse,
+html[data-theme="light"] .site-market-pulse-panel .site-price-card--pulse {
+  background: var(--site-sidebar-blue-solid) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 6px 16px rgba(56, 168, 242, 0.18) !important;
+}
+
+html[data-theme="light"] #market-windows .site-price-card__eyebrow,
+html[data-theme="light"] #market-windows .site-price-card__title,
+html[data-theme="light"] #market-windows .site-price-card__value,
+html[data-theme="light"] #market-windows .site-price-card__status,
+html[data-theme="light"] #prices .site-price-card__eyebrow,
+html[data-theme="light"] #prices .site-price-card__title,
+html[data-theme="light"] #prices .site-price-card__value,
+html[data-theme="light"] #prices .site-price-card__status,
+html[data-theme="light"] .site-market-pulse-panel .site-price-card__eyebrow,
+html[data-theme="light"] .site-market-pulse-panel .site-price-card__title,
+html[data-theme="light"] .site-market-pulse-panel .site-price-card__value,
+html[data-theme="light"] .site-market-pulse-badge {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] .site-market-pulse-panel,
+html[data-theme="light"] #market-windows .site-price-card--tv,
+html[data-theme="light"] #prices .site-price-card--tv {
+  background: var(--site-sidebar-blue-solid) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 8px 24px rgba(56, 168, 242, 0.2) !important;
+}
+
+html[data-theme="light"] #market-windows .site-price-card--tv > div,
+html[data-theme="light"] #prices .site-price-card--tv > div,
+html[data-theme="light"] #market-windows .site-price-card--tv .relative,
+html[data-theme="light"] #prices .site-price-card--tv .relative,
+html[data-theme="light"] #market-windows .site-price-card--tv div:has(> .tradingview-widget-container),
+html[data-theme="light"] #prices .site-price-card--tv div:has(> .tradingview-widget-container) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] #market-windows .site-price-card--tv .tradingview-widget-container,
+html[data-theme="light"] #prices .site-price-card--tv .tradingview-widget-container {
+  background: var(--site-sidebar-blue-solid) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: none !important;
 }
 
 /* ===== Homepage UI polish (Hero spacing only) ===== */
@@ -3374,7 +4345,7 @@ html[data-theme="light"] .user-dashboard-ai__availability--wait {
 
 .ia-v3-disclaimer {
   margin-top: 0.75rem;
-  color: #DC2626;
+  color: #DC2626 !important;
   font-size: 0.8125rem;
 }
 
@@ -3579,7 +4550,7 @@ html[data-theme="light"] .user-dashboard-ai__availability--wait {
   }
 
   body {
-    background: #fff;
+    background: #fff !important;
   }
 
   .ia-v3-no-print,
@@ -3597,29 +4568,29 @@ html[data-theme="light"] .user-dashboard-ai__availability--wait {
   .ia-v3-card,
   .ia-v3-header,
   .ia-v3-chart-wrap {
-    background: #fff;
-    color: #0f172a;
-    box-shadow: none;
-    border-color: #cbd5e1;
+    background: #fff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border-color: #cbd5e1 !important;
     animation: none !important;
   }
 
   .ia-v3-badge {
-    background: #eff6ff;
-    color: #1e3a8a;
-    border-color: #93c5fd;
+    background: #eff6ff !important;
+    color: #1e3a8a !important;
+    border-color: #93c5fd !important;
   }
 
   .ia-v3-decision__title,
   .ia-v3-trade-table td,
   .ia-v3-card__title,
   .ia-v3-header__symbol {
-    color: #0f172a;
+    color: #0f172a !important;
   }
 
   .ia-v3-trade-table th {
-    background: #f8fafc;
-    color: #475569;
+    background: #f8fafc !important;
+    color: #475569 !important;
   }
 
   .ia-v3-section,
@@ -4605,7 +5576,7 @@ html[data-theme="light"] .news-fallback-cover__pattern {
   padding: 0.7rem 1rem;
   border-radius: 0.875rem;
   background: var(--news-blue);
-  color: #fff;
+  color: #fff !important;
   font-size: 0.8125rem;
   font-weight: 900;
   text-decoration: none;
@@ -5412,7 +6383,7 @@ html[data-theme="light"] .daily-analysis-state__action {
   padding: 0.875rem 1.25rem;
   border-radius: 1rem;
   background: var(--da-blue);
-  color: #fff;
+  color: #fff !important;
   font-size: 0.875rem;
   font-weight: 900;
   text-decoration: none;
@@ -5427,7 +6398,7 @@ html[data-theme="light"] .daily-analysis-state__action {
 .daily-analysis-hero__cta--secondary {
   border: 1px solid var(--da-panel-border);
   background: rgba(56, 168, 242, 0.1);
-  color: var(--da-text);
+  color: var(--da-text) !important;
 }
 
 .daily-analysis-filters {
@@ -5601,7 +6572,7 @@ html[data-theme="light"] .daily-analysis-trending__symbol {
   padding: 0.875rem 1.25rem;
   border-radius: 1rem;
   background: var(--da-blue);
-  color: #fff;
+  color: #fff !important;
   font-size: 0.875rem;
   font-weight: 900;
   text-decoration: none;
@@ -5677,12 +6648,12 @@ html[data-theme="light"] .daily-analysis-card__asset {
 .daily-analysis-card__asset-link {
   border: 1px solid var(--da-panel-border);
   background: rgba(56, 168, 242, 0.1);
-  color: var(--da-text);
+  color: var(--da-text) !important;
 }
 
 .daily-analysis-card__cta {
   background: var(--da-blue);
-  color: #fff;
+  color: #fff !important;
 }
 
 .daily-analysis-card__asset-link:hover,

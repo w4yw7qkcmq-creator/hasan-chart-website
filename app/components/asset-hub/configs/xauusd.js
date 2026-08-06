@@ -27,16 +27,7 @@ export const xauusdAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: [
-      "xauusd",
-      "xau/usd",
-      "gold",
-      "xau",
-      "ذهب",
-      "dollar",
-      "fed",
-      "الدولار",
-    ],
+    keywords: ["xauusd", "xau/usd", "gold", "xau", "ذهب", "dollar", "fed", "الدولار"],
     tagHref: "/news/tag/gold",
     archiveLabel: "أرشيف أخبار الذهب",
   },
@@ -66,30 +57,10 @@ export const xauusdAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "DXY",
-      name: "مؤشر الدولار",
-      description: "مرجع قوة الدولار — عكسي غالباً مع الذهب.",
-      href: "/dxy",
-    },
-    {
-      symbol: "EUR",
-      name: "اليورو دولار",
-      description: "زوج EUR/USD — مرتبط بحركة الدولار.",
-      href: "/eurusd",
-    },
-    {
-      symbol: "XAG",
-      name: "الفضة",
-      description: "XAG/USD — معدن ثمين مرتبط بالذهب.",
-      href: "/xag",
-    },
-    {
-      symbol: "OIL",
-      name: "النفط",
-      description: "USOIL — سلعة طاقة مؤثرة على التضخم.",
-      href: "/usoil",
-    },
+    { symbol: "DXY", name: "مؤشر الدولار", description: "مرجع قوة الدولار — عكسي غالباً مع الذهب.", href: "/dxy" },
+    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — مرتبط بحركة الدولار.", href: "/eurusd" },
+    { symbol: "XAG", name: "الفضة", description: "XAG/USD — معدن ثمين مرتبط بالذهب.", href: "/xag" },
+    { symbol: "OIL", name: "النفط", description: "USOIL — سلعة طاقة مؤثرة على التضخم.", href: "/usoil" },
   ],
   links: {
     internal: [

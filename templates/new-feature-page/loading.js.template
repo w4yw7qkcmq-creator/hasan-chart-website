@@ -1,5 +1,0 @@
-import { UiLoadingState } from "../../components/ui";
-
-export default function Loading() {
-  return <UiLoadingState label="جاري التحميل..." />;
-}

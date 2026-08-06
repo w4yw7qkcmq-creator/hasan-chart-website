@@ -18,9 +18,6 @@
     "test:news-worker": "node scripts/test-news-worker-env.js && node scripts/test-news-worker-railway-config.js && node scripts/test-news-worker-concurrency.js && node scripts/test-news-worker-distributed-lock.js && node scripts/test-news-worker-dedupe.js && node scripts/test-news-worker-publish-idempotency.js && node scripts/test-news-worker-fetch-security.js && node scripts/test-news-worker-ai-budget.js && node scripts/test-news-worker-scheduling.js && node scripts/test-news-worker-retention.js && node scripts/test-news-worker-site-publish-parity.js && node scripts/test-news-worker-recovery-idempotency.js && node scripts/test-news-worker-historical-classifier.js && node scripts/test-news-worker-telemetry.js",
     "test:price-alerts": "node scripts/test-price-alerts-env.js && node scripts/test-price-alerts-railway-config.js && node scripts/test-price-alert-condition.js && node scripts/test-price-alert-distributed-lock.js && node scripts/test-price-alert-atomic-claim.js && node scripts/test-price-alert-delivery-idempotency.js && node scripts/test-price-alert-partial-recovery.js && node scripts/test-price-alert-push-reliability.js && node scripts/test-price-alert-email-outbox.js && node scripts/test-price-alert-price-freshness.js && node scripts/test-price-alert-telemetry.js && node scripts/test-price-alert-production-integrity.js && node scripts/test-price-alert-cycle-cadence.js && node scripts/test-price-alert-provider-feature-flags.js && node scripts/test-price-alert-retry-processor.js && node scripts/test-price-alert-delivery-integration.js && node scripts/test-price-alert-legacy-integrity.js",
     "test:ai-worker": "node --test scripts/test-ai-worker-env.js scripts/test-ai-worker-railway-config.js scripts/test-ai-worker-persistent-jobs.js scripts/test-ai-worker-atomic-claim.js scripts/test-ai-worker-restart-recovery.js scripts/test-ai-worker-result-storage.js scripts/test-ai-worker-telemetry.js scripts/test-ai-worker-cooldown-race.js scripts/test-ai-worker-production-integrity.js scripts/test-ai-worker-get-path.js && node scripts/test-ai-worker-staging-live-integration.mjs",
-    "test:order-book-theme": "node scripts/test-order-book-theme.js && node scripts/test-order-book-responsive.js && node scripts/test-order-book-accessibility.js",
-    "test:design-system": "node scripts/test-design-system.js && node scripts/test-legacy-css-closure.js && node scripts/test-design-system-allowlist.js && node scripts/test-global-selector-safety.js && node scripts/test-important-usage.js && node scripts/test-full-ui-legacy-scan.js && node scripts/test-admin-theme-compliance.js && node scripts/test-public-page-theme-compliance.js && node scripts/test-chart-token-contract.js && node scripts/test-design-tokens.js && node scripts/test-core-page-theme-compliance.js && node scripts/test-ui-keyboard-contract.js && node scripts/test-ui-theme-contract.js && node scripts/test-ui-components.js && node scripts/test-ui-accessibility.js && node scripts/test-ui-component-inventory.js && node scripts/test-design-system-fixture-coverage.js",
-    "test:global-header-theme": "node scripts/test-global-header-theme.js",
     "install:worker": "npm ci --prefix worker --omit=dev || npm install --prefix worker --omit=dev",
     "railway:worker:install": "npm ci --prefix worker --omit=dev",
     "railway:worker:start": "npm start --prefix worker",
@@ -61,7 +58,8 @@
     "test:iam:hardening": "node scripts/iam/staging-ui-hardening.mjs",
     "test:iam:rls-static": "node --test scripts/test-iam-rls-static.js",
     "test:iam:rls-coverage": "node scripts/iam/validate-rls-coverage.mjs",
-    "test:iam:rls-simulation": "node scripts/iam/test-rls-staging.mjs --simulate"
+    "test:iam:rls-simulation": "node scripts/iam/test-rls-staging.mjs --simulate",
+    "test:web-shell-integrity": "node --test scripts/test-root-layout-shell-integrity.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

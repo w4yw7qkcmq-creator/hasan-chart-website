@@ -31,7 +31,9 @@ export const pepeAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["pepe", "بيبي", "pepeusdt"] },
+  analysis: {
+    keywords: ["pepe", "بيبي", "pepeusdt"],
+  },
   faq: [
     {
       q: "ما هو بيبي (PEPE)؟",
@@ -55,30 +57,10 @@ export const pepeAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "SHIB",
-      name: "شيبا إينو",
-      description: "عملة ميم شهيرة.",
-      href: "/shib",
-    },
-    {
-      symbol: "DOGE",
-      name: "دوجكوين",
-      description: "عملة الميم الأصلية.",
-      href: "/doge",
-    },
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "المرجع الرئيسي لسوق الكريبتو.",
-      href: "/btc",
-    },
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "الشبكة الأساسية لـ PEPE.",
-      href: "/eth",
-    },
+    { symbol: "SHIB", name: "شيبا إينو", description: "عملة ميم شهيرة.", href: "/shib" },
+    { symbol: "DOGE", name: "دوجكوين", description: "عملة الميم الأصلية.", href: "/doge" },
+    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
+    { symbol: "ETH", name: "الإيثيريوم", description: "الشبكة الأساسية لـ PEPE.", href: "/eth" },
   ],
   links: {
     internal: [
@@ -129,14 +111,7 @@ export const pepeAssetConfig = {
     title: "HasaN CharT World | بيبي PEPE — مركز المعلومات",
     description:
       "مركز معلومات بيبي: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات PEPE، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "بيبي",
-      "PEPE",
-      "Pepe",
-      "ميم كوين",
-      "سعر PEPE",
-    ],
+    keywords: ["HasaN CharT World", "بيبي", "PEPE", "Pepe", "ميم كوين", "سعر PEPE"],
   },
   jsonLd: {
     productName: "Pepe",

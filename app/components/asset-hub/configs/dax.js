@@ -27,22 +27,13 @@ export const daxAssetConfig = {
     platform: "XETRA",
   },
   news: {
-    keywords: [
-      "dax",
-      "germany",
-      "german",
-      "frankfurt",
-      "ecb",
-      "ألمانيا",
-      "داكس",
-      "stocks",
-      "أسهم",
-      "euro",
-    ],
+    keywords: ["dax", "germany", "german", "frankfurt", "ecb", "ألمانيا", "داكس", "stocks", "أسهم", "euro"],
     tagHref: "/news/tag/stocks",
     archiveLabel: "أرشيف أخبار الأسهم",
   },
-  analysis: { keywords: ["dax", "dax 40", "germany", "داكس", "ألمانيا"] },
+  analysis: {
+    keywords: ["dax", "dax 40", "germany", "داكس", "ألمانيا"],
+  },
   faq: [
     {
       q: "ما هو مؤشر DAX؟",
@@ -66,30 +57,10 @@ export const daxAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "EUR",
-      name: "اليورو دولار",
-      description: "EUR/USD — مرتبط باقتصاد ألمانيا.",
-      href: "/eurusd",
-    },
-    {
-      symbol: "SPX",
-      name: "S&P 500",
-      description: "المؤشر الأمريكي المرجعي.",
-      href: "/sp500",
-    },
-    {
-      symbol: "NDX",
-      name: "ناسداك",
-      description: "مؤشر التكنولوجيا الأمريكية.",
-      href: "/nasdaq",
-    },
-    {
-      symbol: "OIL",
-      name: "النفط",
-      description: "USOIL — يؤثر على الاقتصاد الألماني.",
-      href: "/usoil",
-    },
+    { symbol: "EUR", name: "اليورو دولار", description: "EUR/USD — مرتبط باقتصاد ألمانيا.", href: "/eurusd" },
+    { symbol: "SPX", name: "S&P 500", description: "المؤشر الأمريكي المرجعي.", href: "/sp500" },
+    { symbol: "NDX", name: "ناسداك", description: "مؤشر التكنولوجيا الأمريكية.", href: "/nasdaq" },
+    { symbol: "OIL", name: "النفط", description: "USOIL — يؤثر على الاقتصاد الألماني.", href: "/usoil" },
   ],
   links: {
     internal: [
@@ -143,15 +114,7 @@ export const daxAssetConfig = {
     title: "HasaN CharT World | DAX — مركز المؤشرات",
     description:
       "مركز معلومات DAX: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات مؤشر داكس الألماني، التنبيهات السعرية.",
-    keywords: [
-      "HasaN CharT World",
-      "DAX",
-      "داكس",
-      "DAX 40",
-      "ألمانيا",
-      "المؤشرات",
-      "الأسهم",
-    ],
+    keywords: ["HasaN CharT World", "DAX", "داكس", "DAX 40", "ألمانيا", "المؤشرات", "الأسهم"],
   },
   jsonLd: {
     productName: "DAX",

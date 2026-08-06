@@ -31,7 +31,9 @@ export const arbAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["arb", "arbitrum", "أربيتروم", "arbusdt"] },
+  analysis: {
+    keywords: ["arb", "arbitrum", "أربيتروم", "arbusdt"],
+  },
   faq: [
     {
       q: "ما هو Arbitrum (ARB)؟",
@@ -55,30 +57,10 @@ export const arbAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "الشبكة الأساسية لـ Arbitrum.",
-      href: "/eth",
-    },
-    {
-      symbol: "OP",
-      name: "أوبتيميزم",
-      description: "Layer 2 منافس.",
-      href: "/op",
-    },
-    {
-      symbol: "MATIC",
-      name: "بوليجون",
-      description: "Layer 2 لإيثيريوم.",
-      href: "/matic",
-    },
-    {
-      symbol: "UNI",
-      name: "يونيسواب",
-      description: "بروتوكول DeFi.",
-      href: "/uni",
-    },
+    { symbol: "ETH", name: "الإيثيريوم", description: "الشبكة الأساسية لـ Arbitrum.", href: "/eth" },
+    { symbol: "OP", name: "أوبتيميزم", description: "Layer 2 منافس.", href: "/op" },
+    { symbol: "MATIC", name: "بوليجون", description: "Layer 2 لإيثيريوم.", href: "/matic" },
+    { symbol: "UNI", name: "يونيسواب", description: "بروتوكول DeFi.", href: "/uni" },
   ],
   links: {
     internal: [
@@ -129,14 +111,7 @@ export const arbAssetConfig = {
     title: "HasaN CharT World | أربيتروم ARB — مركز المعلومات",
     description:
       "مركز معلومات Arbitrum: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات ARB، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "أربيتروم",
-      "ARB",
-      "Arbitrum",
-      "Layer 2",
-      "سعر ARB",
-    ],
+    keywords: ["HasaN CharT World", "أربيتروم", "ARB", "Arbitrum", "Layer 2", "سعر ARB"],
   },
   jsonLd: {
     productName: "Arbitrum",

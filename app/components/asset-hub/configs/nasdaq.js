@@ -27,20 +27,13 @@ export const nasdaqAssetConfig = {
     platform: "TradingView",
   },
   news: {
-    keywords: [
-      "nasdaq",
-      "ndx",
-      "qqq",
-      "tech stocks",
-      "ناسداك",
-      "تكنولوجيا",
-      "stocks",
-      "أسهم",
-    ],
+    keywords: ["nasdaq", "ndx", "qqq", "tech stocks", "ناسداك", "تكنولوجيا", "stocks", "أسهم"],
     tagHref: "/news/tag/stocks",
     archiveLabel: "أرشيف أخبار الأسهم",
   },
-  analysis: { keywords: ["nasdaq", "ndx", "qqq", "ناسداك", "nas100"] },
+  analysis: {
+    keywords: ["nasdaq", "ndx", "qqq", "ناسداك", "nas100"],
+  },
   faq: [
     {
       q: "ما هو مؤشر ناسداك؟",
@@ -64,30 +57,10 @@ export const nasdaqAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "SPX",
-      name: "S&P 500",
-      description: "المؤشر الأمريكي الأوسع.",
-      href: "/sp500",
-    },
-    {
-      symbol: "DJI",
-      name: "داو جونز",
-      description: "مؤشر 30 شركة أمريكية كبرى.",
-      href: "/dowjones",
-    },
-    {
-      symbol: "DAX",
-      name: "داكس",
-      description: "المؤشر الألماني الرئيسي.",
-      href: "/dax",
-    },
-    {
-      symbol: "DXY",
-      name: "مؤشر الدولار",
-      description: "يؤثر على تدفقات رأس المال.",
-      href: "/dxy",
-    },
+    { symbol: "SPX", name: "S&P 500", description: "المؤشر الأمريكي الأوسع.", href: "/sp500" },
+    { symbol: "DJI", name: "داو جونز", description: "مؤشر 30 شركة أمريكية كبرى.", href: "/dowjones" },
+    { symbol: "DAX", name: "داكس", description: "المؤشر الألماني الرئيسي.", href: "/dax" },
+    { symbol: "DXY", name: "مؤشر الدولار", description: "يؤثر على تدفقات رأس المال.", href: "/dxy" },
   ],
   links: {
     internal: [
@@ -141,15 +114,7 @@ export const nasdaqAssetConfig = {
     title: "HasaN CharT World | ناسداك Nasdaq — مركز المؤشرات",
     description:
       "مركز معلومات ناسداك: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات Nasdaq 100، التنبيهات السعرية.",
-    keywords: [
-      "HasaN CharT World",
-      "ناسداك",
-      "Nasdaq",
-      "NDX",
-      "Nasdaq 100",
-      "المؤشرات",
-      "الأسهم",
-    ],
+    keywords: ["HasaN CharT World", "ناسداك", "Nasdaq", "NDX", "Nasdaq 100", "المؤشرات", "الأسهم"],
   },
   jsonLd: {
     productName: "Nasdaq 100",

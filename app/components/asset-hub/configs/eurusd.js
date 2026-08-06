@@ -27,20 +27,13 @@ export const eurusdAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: [
-      "eurusd",
-      "eur/usd",
-      "euro",
-      "ecb",
-      "اليورو",
-      "يورو",
-      "forex",
-      "فوركس",
-    ],
+    keywords: ["eurusd", "eur/usd", "euro", "ecb", "اليورو", "يورو", "forex", "فوركس"],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
-  analysis: { keywords: ["eurusd", "eur/usd", "eur usd", "euro", "اليورو"] },
+  analysis: {
+    keywords: ["eurusd", "eur/usd", "eur usd", "euro", "اليورو"],
+  },
   faq: [
     {
       q: "ما هو زوج EUR/USD؟",
@@ -64,30 +57,10 @@ export const eurusdAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "DXY",
-      name: "مؤشر الدولار",
-      description: "مرجع قوة الدولار — يؤثر مباشرة على EUR/USD.",
-      href: "/dxy",
-    },
-    {
-      symbol: "XAU",
-      name: "الذهب دولار",
-      description: "زوج XAU/USD — مرتبط بحركة الدولار.",
-      href: "/xauusd",
-    },
-    {
-      symbol: "GBP",
-      name: "الجنيه دولار",
-      description: "زوج GBP/USD — الكابل البريطاني.",
-      href: "/gbpusd",
-    },
-    {
-      symbol: "JPY",
-      name: "الدولار ين",
-      description: "زوج USD/JPY — حساس لسياسة البنوك المركزية.",
-      href: "/usdjpy",
-    },
+    { symbol: "DXY", name: "مؤشر الدولار", description: "مرجع قوة الدولار — يؤثر مباشرة على EUR/USD.", href: "/dxy" },
+    { symbol: "XAU", name: "الذهب دولار", description: "زوج XAU/USD — مرتبط بحركة الدولار.", href: "/xauusd" },
+    { symbol: "GBP", name: "الجنيه دولار", description: "زوج GBP/USD — الكابل البريطاني.", href: "/gbpusd" },
+    { symbol: "JPY", name: "الدولار ين", description: "زوج USD/JPY — حساس لسياسة البنوك المركزية.", href: "/usdjpy" },
   ],
   links: {
     internal: [
@@ -122,8 +95,7 @@ export const eurusdAssetConfig = {
     {
       icon: "📊",
       title: "إشارات الفوركس",
-      description:
-        "تحليلات وإشارات احترافية لزوج EUR/USD وأزواج الفوركس الرئيسية.",
+      description: "تحليلات وإشارات احترافية لزوج EUR/USD وأزواج الفوركس الرئيسية.",
       href: "/forex-signals",
       cta: "إشارات الفوركس",
     },

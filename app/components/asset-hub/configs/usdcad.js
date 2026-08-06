@@ -27,19 +27,7 @@ export const usdcadAssetConfig = {
     platform: "OANDA",
   },
   news: {
-    keywords: [
-      "usdcad",
-      "usd/cad",
-      "cad",
-      "loonie",
-      "canada",
-      "boc",
-      "كندا",
-      "لوني",
-      "oil",
-      "نفط",
-      "forex",
-    ],
+    keywords: ["usdcad", "usd/cad", "cad", "loonie", "canada", "boc", "كندا", "لوني", "oil", "نفط", "forex"],
     tagHref: "/news/tag/forex",
     archiveLabel: "أرشيف أخبار الفوركس",
   },
@@ -69,30 +57,10 @@ export const usdcadAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "OIL",
-      name: "النفط الأمريكي",
-      description: "USOIL — مرتبط باللوني.",
-      href: "/usoil",
-    },
-    {
-      symbol: "AUD",
-      name: "الأسترالي دولار",
-      description: "زوج AUD/USD — عملة سلعية.",
-      href: "/audusd",
-    },
-    {
-      symbol: "EUR",
-      name: "اليورو دولار",
-      description: "زوج EUR/USD.",
-      href: "/eurusd",
-    },
-    {
-      symbol: "DXY",
-      name: "مؤشر الدولار",
-      description: "مرجع قوة الدولار.",
-      href: "/dxy",
-    },
+    { symbol: "OIL", name: "النفط الأمريكي", description: "USOIL — مرتبط باللوني.", href: "/usoil" },
+    { symbol: "AUD", name: "الأسترالي دولار", description: "زوج AUD/USD — عملة سلعية.", href: "/audusd" },
+    { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD.", href: "/eurusd" },
+    { symbol: "DXY", name: "مؤشر الدولار", description: "مرجع قوة الدولار.", href: "/dxy" },
   ],
   links: {
     internal: [
@@ -144,15 +112,7 @@ export const usdcadAssetConfig = {
     title: "HasaN CharT World | USD/CAD — مركز معلومات الفوركس",
     description:
       "مركز معلومات USD/CAD: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات الدولار كندي، التنبيهات السعرية.",
-    keywords: [
-      "HasaN CharT World",
-      "USD/CAD",
-      "USDCAD",
-      "اللوني",
-      "Loonie",
-      "كندا",
-      "الفوركس",
-    ],
+    keywords: ["HasaN CharT World", "USD/CAD", "USDCAD", "اللوني", "Loonie", "كندا", "الفوركس"],
   },
   jsonLd: {
     productName: "USD/CAD",

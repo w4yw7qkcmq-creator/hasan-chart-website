@@ -120,11 +120,8 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
     permission: null,
   },
 ];
-export function filterAdminNavByPermission(
-  items,
-  can,
-  { iamUiEnabled = false, isAdmin = false } = {},
-) {
+
+export function filterAdminNavByPermission(items, can, { iamUiEnabled = false, isAdmin = false } = {}) {
   return (items || []).filter((item) => {
     if (!item.permission) return true;
     if (!isAdmin) return false;

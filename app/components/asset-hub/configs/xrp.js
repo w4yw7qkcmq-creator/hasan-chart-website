@@ -31,7 +31,9 @@ export const xrpAssetConfig = {
     tagHref: "/news/tag/crypto",
     archiveLabel: "أرشيف أخبار الكريبتو",
   },
-  analysis: { keywords: ["xrp", "ripple", "ريبل", "xrpusdt"] },
+  analysis: {
+    keywords: ["xrp", "ripple", "ريبل", "xrpusdt"],
+  },
   faq: [
     {
       q: "ما هو ريبل (XRP)؟",
@@ -55,30 +57,10 @@ export const xrpAssetConfig = {
     },
   ],
   relatedAssets: [
-    {
-      symbol: "BTC",
-      name: "البيتكوين",
-      description: "المرجع الرئيسي لسوق الكريبتو.",
-      href: "/btc",
-    },
-    {
-      symbol: "ETH",
-      name: "الإيثيريوم",
-      description: "منصة العقود الذكية.",
-      href: "/crypto",
-    },
-    {
-      symbol: "FX",
-      name: "الفوركس",
-      description: "أسواق المدفوعات والعملات.",
-      href: "/forex",
-    },
-    {
-      symbol: "XAU",
-      name: "الذهب",
-      description: "ملاذ آمن عالمي.",
-      href: "/gold",
-    },
+    { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
+    { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية.", href: "/crypto" },
+    { symbol: "FX", name: "الفوركس", description: "أسواق المدفوعات والعملات.", href: "/forex" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/gold" },
   ],
   links: {
     internal: [
@@ -128,14 +110,7 @@ export const xrpAssetConfig = {
     title: "HasaN CharT World | ريبل XRP — مركز المعلومات",
     description:
       "مركز معلومات ريبل: السعر المباشر، شارت TradingView، ملخص السوق، أخبار وتحليلات XRP، التنبيهات السعرية وخدمات VIP.",
-    keywords: [
-      "HasaN CharT World",
-      "ريبل",
-      "XRP",
-      "Ripple",
-      "سعر ريبل",
-      "تحليل XRP",
-    ],
+    keywords: ["HasaN CharT World", "ريبل", "XRP", "Ripple", "سعر ريبل", "تحليل XRP"],
   },
   jsonLd: {
     productName: "Ripple",

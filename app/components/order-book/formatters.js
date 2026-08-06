@@ -1,14 +1,17 @@
 const EN_US = "en-US";
 const EN_US_LATN = { numberingSystem: "latn" };
+
 export function formatUsd(value, { compact = false } = {}) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "—";
+
   if (compact) {
     const abs = Math.abs(num);
     if (abs >= 1_000_000_000) return `$${(num / 1_000_000_000).toFixed(2)}B`;
     if (abs >= 1_000_000) return `$${(num / 1_000_000).toFixed(2)}M`;
     if (abs >= 1_000) return `$${(num / 1_000).toFixed(1)}K`;
   }
+
   return new Intl.NumberFormat(EN_US, {
     style: "currency",
     currency: "USD",
@@ -16,6 +19,7 @@ export function formatUsd(value, { compact = false } = {}) {
     ...EN_US_LATN,
   }).format(num);
 }
+
 export function formatPrice(value, digits = 2) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "—";
@@ -25,26 +29,31 @@ export function formatPrice(value, digits = 2) {
     ...EN_US_LATN,
   });
 }
+
 export function formatQuantity(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "—";
   return num.toLocaleString(EN_US, { maximumFractionDigits: 6, ...EN_US_LATN });
 }
+
 export function formatPercent(value, digits = 2) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "—";
   return `${num.toFixed(digits)}%`;
 }
+
 export function formatSpreadPercent(value, digits = 4) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "—";
   return `${num.toFixed(digits)}%`;
 }
+
 export function formatInteger(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "—";
   return num.toLocaleString(EN_US, { maximumFractionDigits: 0, ...EN_US_LATN });
 }
+
 export function formatTime(ts) {
   const date = new Date(ts);
   if (Number.isNaN(date.getTime())) return "—";
@@ -56,9 +65,11 @@ export function formatTime(ts) {
     ...EN_US_LATN,
   });
 }
+
 export function formatThresholdLabel(value) {
   return formatUsd(value, { compact: true });
 }
+
 export function formatFlowWindowLabelAr(window) {
   switch (window) {
     case "1m":
@@ -83,9 +94,14 @@ export function formatFlowWindowLabelAr(window) {
       return window || "—";
   }
 }
+
 export function formatLargeTradeEmptyMessage(threshold, window) {
   return `لا توجد صفقات كبيرة ضمن الحد المحدد (${formatThresholdLabel(threshold)}) في هذه الفترة (${formatFlowWindowLabelAr(window)}).`;
-} /** * @param {number} seconds */
+}
+
+/**
+ * @param {number} seconds
+ */
 export function formatDurationAr(seconds) {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
   if (total === 0) return "حديثًا";
@@ -99,7 +115,12 @@ export function formatDurationAr(seconds) {
   const hours = Math.floor(minutes / 60);
   const remMinutes = minutes % 60;
   return remMinutes ? `${hours} س ${remMinutes} د` : `${hours} س`;
-} /** * @param {number} ts * @param {number} [now] */
+}
+
+/**
+ * @param {number} ts
+ * @param {number} [now]
+ */
 export function formatMinutesAgoAr(ts, now = Date.now()) {
   const diffMs = now - Number(ts);
   if (!Number.isFinite(diffMs) || diffMs < 0) return "—";
@@ -110,11 +131,13 @@ export function formatMinutesAgoAr(ts, now = Date.now()) {
   const rem = minutes % 60;
   return rem ? `منذ ${hours} س ${rem} د` : `منذ ${hours} س`;
 }
+
 export function sideLabelAr(side) {
   if (side === "bid" || side === "buy") return "شراء";
   if (side === "ask" || side === "sell") return "بيع";
   return side || "—";
 }
+
 export function statusLabelAr(status) {
   switch (status) {
     case "connected":

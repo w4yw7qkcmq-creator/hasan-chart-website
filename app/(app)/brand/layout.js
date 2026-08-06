@@ -2,6 +2,8 @@ import BrandPageJsonLd from "../../components/brand/BrandPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
 export const revalidate = REVALIDATE_STATIC_MARKETING;
+
+
 export const metadata = buildPublicPageMetadata({
   path: "/brand",
   title: "HasaN CharT World | العلامة التجارية الرسمية",
@@ -17,11 +19,12 @@ export const metadata = buildPublicPageMetadata({
     "الأخبار الاقتصادية",
   ],
 });
+
 export default function BrandLayout({ children }) {
   return (
     <>
-      
-      <BrandPageJsonLd /> {children}
+      <BrandPageJsonLd />
+      {children}
     </>
   );
 }

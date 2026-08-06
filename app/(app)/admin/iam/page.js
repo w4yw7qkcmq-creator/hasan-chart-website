@@ -1,4 +1,5 @@
 "use client";
+
 import "../admin-theme.css";
 import "./iam-ui.css";
 import dynamic from "next/dynamic";
@@ -9,52 +10,20 @@ import { PermissionGate } from "../../../components/PermissionGate";
 import { useAuth } from "../../../components/AuthProvider";
 import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { IAM_TAB_DEFS } from "../../../../lib/iam/ui-labels";
-import {
-  IamToast,
-  IamLoadingSkeleton,
-} from "../../../components/iam/IamShared";
-import {
-  IamGrantModal,
-  IamRevokeModal,
-  IamOverrideRevokeModal,
-  IamUserDrawer,
-} from "../../../components/iam/IamModals";
+import { IamToast, IamLoadingSkeleton } from "../../../components/iam/IamShared";
+import { IamGrantModal, IamRevokeModal, IamOverrideRevokeModal, IamUserDrawer } from "../../../components/iam/IamModals";
+
 const tabLoading = () => <IamLoadingSkeleton rows={6} variant="cards" />;
-const IamOverviewTab = dynamic(
-  () => import("../../../components/iam/IamTabs").then((m) => m.IamOverviewTab),
-  { loading: tabLoading },
-);
-const IamAdminUsersTab = dynamic(
-  () =>
-    import("../../../components/iam/IamTabs").then((m) => m.IamAdminUsersTab),
-  { loading: tabLoading },
-);
-const IamRolesTab = dynamic(
-  () => import("../../../components/iam/IamTabs").then((m) => m.IamRolesTab),
-  { loading: tabLoading },
-);
-const IamAssignmentsTab = dynamic(
-  () =>
-    import("../../../components/iam/IamTabs").then((m) => m.IamAssignmentsTab),
-  { loading: tabLoading },
-);
-const IamOverridesTab = dynamic(
-  () =>
-    import("../../../components/iam/IamTabs").then((m) => m.IamOverridesTab),
-  { loading: tabLoading },
-);
-const IamSessionsTab = dynamic(
-  () => import("../../../components/iam/IamTabs").then((m) => m.IamSessionsTab),
-  { loading: tabLoading },
-);
-const IamSecurityTab = dynamic(
-  () => import("../../../components/iam/IamTabs").then((m) => m.IamSecurityTab),
-  { loading: tabLoading },
-);
-const IamAuditTab = dynamic(
-  () => import("../../../components/iam/IamTabs").then((m) => m.IamAuditTab),
-  { loading: tabLoading },
-);
+
+const IamOverviewTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamOverviewTab), { loading: tabLoading });
+const IamAdminUsersTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamAdminUsersTab), { loading: tabLoading });
+const IamRolesTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamRolesTab), { loading: tabLoading });
+const IamAssignmentsTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamAssignmentsTab), { loading: tabLoading });
+const IamOverridesTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamOverridesTab), { loading: tabLoading });
+const IamSessionsTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamSessionsTab), { loading: tabLoading });
+const IamSecurityTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamSecurityTab), { loading: tabLoading });
+const IamAuditTab = dynamic(() => import("../../../components/iam/IamTabs").then((m) => m.IamAuditTab), { loading: tabLoading });
+
 export default function AdminIamPage() {
   const { can, iam } = useAuth();
   const featureFlags = iam?.featureFlags;
@@ -82,16 +51,15 @@ export default function AdminIamPage() {
     effect: "deny",
     reason: "",
   });
-  const [overrideLookup, setOverrideLookup] = useState({
-    email: "",
-    userId: "",
-  });
+  const [overrideLookup, setOverrideLookup] = useState({ email: "", userId: "" });
   const [userOverrides, setUserOverrides] = useState([]);
   const [overrideRevokeTarget, setOverrideRevokeTarget] = useState(null);
+
   const visibleTabs = useMemo(
     () => IAM_TAB_DEFS.filter((t) => can(t.permission)),
-    [can],
+    [can]
   );
+
   const loadCore = useCallback(async () => {
     const [rolesRes, permsRes, assignRes, assignAllRes] = await Promise.all([
       adminFetch("/api/iam/roles"),
@@ -103,42 +71,36 @@ export default function AdminIamPage() {
     const permsJson = await permsRes.json();
     const assignJson = await assignRes.json();
     const assignAllJson = await assignAllRes.json();
+
     if (rolesJson.success) {
       setRoles(rolesJson.roles || []);
       setMatrix(rolesJson.matrix || {});
     }
     if (permsJson.success) setPermissions(permsJson.permissions || []);
     if (assignJson.success) setAssignments(assignJson.assignments || []);
-    if (assignAllJson.success)
-      setAllAssignments(assignAllJson.assignments || []);
+    if (assignAllJson.success) setAllAssignments(assignAllJson.assignments || []);
   }, []);
-  const loadTabData = useCallback(
-    async (tab) => {
-      if (tab === "overview") {
-        await Promise.all([
-          can(IAM_PERMISSIONS.IAM_SESSIONS_READ)
-            ? adminFetch("/api/iam/sessions?activeOnly=true&limit=20").then(
-                (r) => r.json(),
-              )
-            : Promise.resolve({ success: true, sessions: [] }),
-          can(IAM_PERMISSIONS.IAM_SECURITY_READ)
-            ? adminFetch("/api/iam/security-events?limit=10").then((r) =>
-                r.json(),
-              )
-            : Promise.resolve({ success: true, events: [] }),
-          can(IAM_PERMISSIONS.IAM_AUDIT_READ)
-            ? adminFetch("/api/iam/audit?limit=10").then((r) => r.json())
-            : Promise.resolve({ success: true, logs: [] }),
-        ]).then(([sJson, eJson, aJson]) => {
-          if (sJson.success) setSessions(sJson.sessions || sJson.items || []);
-          if (eJson.success)
-            setSecurityEvents(eJson.events || eJson.items || []);
-          if (aJson.success) setAuditLogs(aJson.logs || aJson.items || []);
-        });
-      }
-    },
-    [can],
-  );
+
+  const loadTabData = useCallback(async (tab) => {
+    if (tab === "overview") {
+      await Promise.all([
+        can(IAM_PERMISSIONS.IAM_SESSIONS_READ)
+          ? adminFetch("/api/iam/sessions?activeOnly=true&limit=20").then((r) => r.json())
+          : Promise.resolve({ success: true, sessions: [] }),
+        can(IAM_PERMISSIONS.IAM_SECURITY_READ)
+          ? adminFetch("/api/iam/security-events?limit=10").then((r) => r.json())
+          : Promise.resolve({ success: true, events: [] }),
+        can(IAM_PERMISSIONS.IAM_AUDIT_READ)
+          ? adminFetch("/api/iam/audit?limit=10").then((r) => r.json())
+          : Promise.resolve({ success: true, logs: [] }),
+      ]).then(([sJson, eJson, aJson]) => {
+        if (sJson.success) setSessions(sJson.sessions || sJson.items || []);
+        if (eJson.success) setSecurityEvents(eJson.events || eJson.items || []);
+        if (aJson.success) setAuditLogs(aJson.logs || aJson.items || []);
+      });
+    }
+  }, [can]);
+
   const refresh = useCallback(async () => {
     setTabLoading(true);
     setError("");
@@ -151,9 +113,11 @@ export default function AdminIamPage() {
       setTabLoading(false);
     }
   }, [loadCore]);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -170,11 +134,13 @@ export default function AdminIamPage() {
       cancelled = true;
     };
   }, [activeTab, loadTabData]);
+
   useEffect(() => {
     if (!visibleTabs.find((t) => t.id === activeTab) && visibleTabs.length) {
       setActiveTab(visibleTabs[0].id);
     }
   }, [visibleTabs, activeTab]);
+
   const handleGrant = async (form) => {
     setSubmitting(true);
     setError("");
@@ -200,6 +166,7 @@ export default function AdminIamPage() {
       setSubmitting(false);
     }
   };
+
   const handleRevoke = async (assignment) => {
     setSubmitting(true);
     setError("");
@@ -226,14 +193,13 @@ export default function AdminIamPage() {
       setSubmitting(false);
     }
   };
+
   const resolveOverrideUser = async (event) => {
     event.preventDefault();
     setError("");
     const email = overrideLookup.email.trim();
     if (!email) return;
-    const match = assignments.find(
-      (a) => a.user_email?.toLowerCase() === email.toLowerCase(),
-    );
+    const match = assignments.find((a) => a.user_email?.toLowerCase() === email.toLowerCase());
     const userId = match?.user_id || "";
     setOverrideLookup({ email, userId });
     if (!userId) {
@@ -241,9 +207,7 @@ export default function AdminIamPage() {
       setUserOverrides([]);
       return;
     }
-    const res = await adminFetch(
-      `/api/iam/overrides?userId=${encodeURIComponent(userId)}`,
-    );
+    const res = await adminFetch(`/api/iam/overrides?userId=${encodeURIComponent(userId)}`);
     const json = await res.json();
     if (!json.success) {
       setError(json.error || "تعذر تحميل الاستثناءات");
@@ -251,6 +215,7 @@ export default function AdminIamPage() {
     }
     setUserOverrides(json.overrides || []);
   };
+
   const handleOverrideGrant = async (event) => {
     event.preventDefault();
     setError("");
@@ -270,9 +235,7 @@ export default function AdminIamPage() {
       if (!json.success) throw new Error(json.error || "تعذر حفظ الاستثناء");
       setToast({ message: "تم حفظ الاستثناء", type: "ok" });
       if (overrideLookup.userId) {
-        const reload = await adminFetch(
-          `/api/iam/overrides?userId=${encodeURIComponent(overrideLookup.userId)}`,
-        );
+        const reload = await adminFetch(`/api/iam/overrides?userId=${encodeURIComponent(overrideLookup.userId)}`);
         const reloadJson = await reload.json();
         if (reloadJson.success) setUserOverrides(reloadJson.overrides || []);
       }
@@ -280,6 +243,7 @@ export default function AdminIamPage() {
       setError(err?.message || "تعذر حفظ الاستثناء");
     }
   };
+
   const handleOverrideRevoke = async (override) => {
     if (!override?.reason) {
       setOverrideRevokeTarget(override);
@@ -290,11 +254,7 @@ export default function AdminIamPage() {
       const res = await adminFetch("/api/iam/overrides", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "revoke",
-          overrideId: override.id,
-          reason: override.reason.trim(),
-        }),
+        body: JSON.stringify({ action: "revoke", overrideId: override.id, reason: override.reason.trim() }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || "تعذر إلغاء الاستثناء");
@@ -307,26 +267,22 @@ export default function AdminIamPage() {
       setSubmitting(false);
     }
   };
+
   const canGrant = can(IAM_PERMISSIONS.IAM_ASSIGNMENTS_GRANT);
   const canRevoke = can(IAM_PERMISSIONS.IAM_ASSIGNMENTS_REVOKE);
   const flags = featureFlags || {};
+
   return (
     <main className="admin-hub admin-iam-page iam-redesign">
-      {" "}
       <header className="iam-page-header">
-        {" "}
         <Link href="/admin" className="iam-breadcrumb">
-          {" "}
-          لوحة الإدارة ← إدارة الصلاحيات والأدوار{" "}
-        </Link>{" "}
-        <h1>إدارة الصلاحيات والأدوار</h1>{" "}
-        <p>
-          إدارة وصول الموظفين، الأدوار، الصلاحيات، الجلسات، والسجل الأمني من
-          مكان واحد.
-        </p>{" "}
-      </header>{" "}
+          لوحة الإدارة ← إدارة الصلاحيات والأدوار
+        </Link>
+        <h1>إدارة الصلاحيات والأدوار</h1>
+        <p>إدارة وصول الموظفين، الأدوار، الصلاحيات، الجلسات، والسجل الأمني من مكان واحد.</p>
+      </header>
+
       <nav className="iam-tabs" aria-label="تبويبات إدارة الصلاحيات">
-        {" "}
         {visibleTabs.map((tab) => (
           <button
             key={tab.id}
@@ -334,30 +290,22 @@ export default function AdminIamPage() {
             className={`iam-tabs__btn ${activeTab === tab.id ? "is-active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            {" "}
-            <span aria-hidden="true">{tab.icon}</span> {tab.label}{" "}
+            <span aria-hidden="true">{tab.icon}</span>
+            {tab.label}
           </button>
-        ))}{" "}
-      </nav>{" "}
-      <IamToast
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast({ message: "", type: "ok" })}
-      />{" "}
+        ))}
+      </nav>
+
+      <IamToast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "ok" })} />
       {error ? (
         <div className="iam-toast iam-toast--error" role="alert">
-          {" "}
-          {error}{" "}
-          <button
-            type="button"
-            className="iam-btn iam-btn--ghost"
-            onClick={() => refresh()}
-          >
-            {" "}
-            إعادة المحاولة{" "}
-          </button>{" "}
+          {error}
+          <button type="button" className="iam-btn iam-btn--ghost" onClick={() => refresh()}>
+            إعادة المحاولة
+          </button>
         </div>
-      ) : null}{" "}
+      ) : null}
+
       {activeTab === "overview" ? (
         <IamOverviewTab
           assignments={allAssignments}
@@ -373,7 +321,8 @@ export default function AdminIamPage() {
           canGrant={canGrant}
           loading={loading || tabLoading}
         />
-      ) : null}{" "}
+      ) : null}
+
       {activeTab === "users" ? (
         <IamAdminUsersTab
           assignments={assignments}
@@ -382,7 +331,8 @@ export default function AdminIamPage() {
           onGrantClick={() => setGrantOpen(true)}
           canGrant={canGrant}
         />
-      ) : null}{" "}
+      ) : null}
+
       {activeTab === "roles" ? (
         <IamRolesTab
           matrix={matrix}
@@ -392,7 +342,8 @@ export default function AdminIamPage() {
           loading={loading || tabLoading}
           showTechnical={isSuperAdmin}
         />
-      ) : null}{" "}
+      ) : null}
+
       {activeTab === "assignments" ? (
         <IamAssignmentsTab
           assignments={assignments}
@@ -402,7 +353,8 @@ export default function AdminIamPage() {
           canGrant={canGrant}
           canRevoke={canRevoke}
         />
-      ) : null}{" "}
+      ) : null}
+
       {activeTab === "overrides" ? (
         <IamOverridesTab
           permissions={permissions}
@@ -416,37 +368,48 @@ export default function AdminIamPage() {
           onRevokeOverride={handleOverrideRevoke}
           loading={loading || tabLoading}
         />
-      ) : null}{" "}
-      {activeTab === "sessions" ? <IamSessionsTab /> : null}{" "}
-      {activeTab === "security" ? <IamSecurityTab /> : null}{" "}
-      {activeTab === "audit" ? <IamAuditTab /> : null}{" "}
+      ) : null}
+
+      {activeTab === "sessions" ? (
+        <IamSessionsTab />
+      ) : null}
+
+      {activeTab === "security" ? (
+        <IamSecurityTab />
+      ) : null}
+
+      {activeTab === "audit" ? (
+        <IamAuditTab />
+      ) : null}
+
       <PermissionGate permission={IAM_PERMISSIONS.IAM_ASSIGNMENTS_GRANT}>
-        {" "}
         <IamGrantModal
           open={grantOpen}
           onClose={() => setGrantOpen(false)}
           roles={roles}
           onSubmit={handleGrant}
           submitting={submitting}
-        />{" "}
-      </PermissionGate>{" "}
+        />
+      </PermissionGate>
+
       <PermissionGate permission={IAM_PERMISSIONS.IAM_ASSIGNMENTS_REVOKE}>
-        {" "}
         <IamRevokeModal
           open={Boolean(revokeTarget)}
           assignment={revokeTarget}
           onClose={() => setRevokeTarget(null)}
           onConfirm={handleRevoke}
           submitting={submitting}
-        />{" "}
-      </PermissionGate>{" "}
+        />
+      </PermissionGate>
+
       <IamOverrideRevokeModal
         open={Boolean(overrideRevokeTarget)}
         override={overrideRevokeTarget}
         onClose={() => setOverrideRevokeTarget(null)}
         onConfirm={handleOverrideRevoke}
         submitting={submitting}
-      />{" "}
+      />
+
       <IamUserDrawer
         user={selectedUser}
         assignments={selectedUser?.assignments || []}
@@ -454,7 +417,7 @@ export default function AdminIamPage() {
         matrix={matrix}
         onClose={() => setSelectedUser(null)}
         showTechnical={isSuperAdmin}
-      />{" "}
+      />
     </main>
   );
 }
