@@ -1,13 +1,10 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
 import { createAdaptivePoller } from "../../lib/client/adaptive-poller.js";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout.js";
-
 const SUMMARY_WINDOW = "1d";
 const SUMMARY_SCOPE = "aggregated";
 const REFRESH_MS = 45_000;
-
 function buildQuery(symbol) {
   const params = new URLSearchParams();
   params.set("symbol", symbol);
@@ -15,7 +12,6 @@ function buildQuery(symbol) {
   params.set("scope", SUMMARY_SCOPE);
   return params.toString();
 }
-
 export function useOrderBook24hSummary({ symbol, hydrated }) {
   const [summary, setSummary] = useState(null);
   const [initialLoading, setInitialLoading] = useState(false);
@@ -23,7 +19,6 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
   const hasDataRef = useRef(false);
-
   useEffect(() => {
     if (!hydrated || !symbol) {
       setSummary(null);
@@ -33,11 +28,9 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
       hasDataRef.current = false;
       return undefined;
     }
-
     const load = ({ background = false, signal } = {}) => {
       const requestId = ++requestIdRef.current;
       const hasCachedData = hasDataRef.current;
-
       if (!background || !hasCachedData) {
         setInitialLoading(!hasCachedData);
       }
@@ -47,7 +40,6 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
       if (!background) {
         setError(null);
       }
-
       return fetchWithTimeout(
         `/api/market-depth/history/flow?${buildQuery(symbol)}`,
         { signal },
@@ -83,7 +75,6 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
           }
         });
     };
-
     const poller = createAdaptivePoller({
       intervalMs: REFRESH_MS,
       minIntervalMs: REFRESH_MS,
@@ -93,15 +84,12 @@ export function useOrderBook24hSummary({ symbol, hydrated }) {
         await load({ background: reason !== "initial", signal });
       },
     });
-
     poller.start({ immediate: true });
-
     return () => {
       poller.destroy();
       requestIdRef.current += 1;
     };
   }, [hydrated, symbol]);
-
   return {
     summary,
     initialLoading,

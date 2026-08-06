@@ -1,6 +1,5 @@
 import Link from "next/link";
 import "../admin/admin-theme.css";
-
 const REASON_COPY = {
   not_admin: {
     title: "غير مصرح لك بالدخول",
@@ -27,13 +26,18 @@ const REASON_COPY = {
     backLabel: "العودة",
   },
 };
-
-export default function AdminForbiddenPage({ reason = "default", isAdmin = false, requestId = null }) {
+export default function AdminForbiddenPage({
+  reason = "default",
+  isAdmin = false,
+  requestId = null,
+}) {
   const copy = REASON_COPY[reason] || REASON_COPY.default;
-  const backHref = isAdmin || reason === "missing_permission" ? "/admin" : copy.backHref;
+  const backHref =
+    isAdmin || reason === "missing_permission" ? "/admin" : copy.backHref;
   const backLabel =
-    isAdmin || reason === "missing_permission" ? "العودة إلى لوحة الإدارة" : copy.backLabel;
-
+    isAdmin || reason === "missing_permission"
+      ? "العودة إلى لوحة الإدارة"
+      : copy.backLabel;
   return (
     <main
       className="admin-forbidden-page"
@@ -41,32 +45,47 @@ export default function AdminForbiddenPage({ reason = "default", isAdmin = false
       aria-labelledby="admin-forbidden-title"
       aria-describedby="admin-forbidden-desc"
     >
+      {" "}
       <div className="admin-forbidden-page__panel">
+        {" "}
         <div className="admin-forbidden-page__icon" aria-hidden="true">
-          🚫
-        </div>
+          {" "}
+          🚫{" "}
+        </div>{" "}
         <h1 id="admin-forbidden-title" className="admin-forbidden-page__title">
-          {copy.title}
-        </h1>
+          {" "}
+          {copy.title}{" "}
+        </h1>{" "}
         <p id="admin-forbidden-desc" className="admin-forbidden-page__desc">
-          {copy.description}
-        </p>
+          {" "}
+          {copy.description}{" "}
+        </p>{" "}
         {requestId ? (
-          <p className="admin-forbidden-page__rid" aria-label="معرّف الطلب للدعم">
-            مرجع الدعم: {requestId}
+          <p
+            className="admin-forbidden-page__rid"
+            aria-label="معرّف الطلب للدعم"
+          >
+            {" "}
+            مرجع الدعم: {requestId}{" "}
           </p>
-        ) : null}
+        ) : null}{" "}
         <div className="admin-forbidden-page__actions">
-          <Link href={backHref} className="admin-forbidden-page__btn admin-forbidden-page__btn--primary">
-            {backLabel}
-          </Link>
+          {" "}
+          <Link
+            href={backHref}
+            className="admin-forbidden-page__btn admin-forbidden-page__btn--primary"
+          >
+            {" "}
+            {backLabel}{" "}
+          </Link>{" "}
           {backHref !== "/dashboard" ? (
             <Link href="/dashboard" className="admin-forbidden-page__btn">
-              لوحة المستخدم
+              {" "}
+              لوحة المستخدم{" "}
             </Link>
-          ) : null}
-        </div>
-      </div>
+          ) : null}{" "}
+        </div>{" "}
+      </div>{" "}
     </main>
   );
 }

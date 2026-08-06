@@ -7,7 +7,6 @@ export const ANALYSIS_REQUEST_HUB_LINKS = [
   { label: "VIP Futures", href: "/vip-futures" },
   { label: "برنامج الشركاء", href: "/partner-center" },
 ];
-
 export const ANALYSIS_REQUEST_ASSET_LINKS = [
   { label: "البيتكوين", href: "/btc" },
   { label: "الإيثريوم", href: "/eth" },

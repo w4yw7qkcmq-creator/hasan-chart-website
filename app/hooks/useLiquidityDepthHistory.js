@@ -1,9 +1,7 @@
 "use client";
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout.js";
 import { isHistoricalLiquidityDepthWindow } from "../../lib/market-data/constants.js";
-
 function buildQuery({ symbol, window, exchange }) {
   const params = new URLSearchParams();
   params.set("symbol", symbol);
@@ -14,19 +12,16 @@ function buildQuery({ symbol, window, exchange }) {
   }
   return params.toString();
 }
-
 export function useLiquidityDepthHistory({ prefs, hydrated, depthWindow }) {
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
-
   const enabled = isHistoricalLiquidityDepthWindow(depthWindow);
   const queryKey = useMemo(
     () => [prefs.symbol, prefs.mode, depthWindow].join("|"),
     [prefs.symbol, prefs.mode, depthWindow],
   );
-
   useEffect(() => {
     if (!hydrated || !enabled) {
       setPayload(null);
@@ -34,20 +29,13 @@ export function useLiquidityDepthHistory({ prefs, hydrated, depthWindow }) {
       setError(null);
       return undefined;
     }
-
     const requestId = ++requestIdRef.current;
     let cancelled = false;
     setLoading(true);
     setError(null);
-
     const exchange = prefs.mode === "aggregated" ? null : prefs.mode;
-
     void fetchWithTimeout(
-      `/api/market-depth/history/liquidity-walls?${buildQuery({
-        symbol: prefs.symbol,
-        window: depthWindow,
-        exchange,
-      })}`,
+      `/api/market-depth/history/liquidity-walls?${buildQuery({ symbol: prefs.symbol, window: depthWindow, exchange })}`,
       {},
       10_000,
     )
@@ -72,16 +60,9 @@ export function useLiquidityDepthHistory({ prefs, hydrated, depthWindow }) {
           setLoading(false);
         }
       });
-
     return () => {
       cancelled = true;
     };
   }, [depthWindow, enabled, hydrated, prefs.mode, prefs.symbol, queryKey]);
-
-  return {
-    depthHistory: payload,
-    loading,
-    error,
-    enabled,
-  };
+  return { depthHistory: payload, loading, error, enabled };
 }

@@ -1,11 +1,10 @@
 export const FEAR_GREED_GAUGE_SEGMENTS = [
-  { from: 0, to: 20, color: "#dc2626" },
-  { from: 20, to: 40, color: "#f97316" },
-  { from: 40, to: 60, color: "#eab308" },
-  { from: 60, to: 80, color: "#84cc16" },
-  { from: 80, to: 100, color: "#059669" },
+  { from: 0, to: 20, color: "var(--ui-chart-fear-extreme)" },
+  { from: 20, to: 40, color: "var(--ui-chart-fear)" },
+  { from: 40, to: 60, color: "var(--ui-chart-neutral-mid)" },
+  { from: 60, to: 80, color: "var(--ui-chart-greed-mid)" },
+  { from: 80, to: 100, color: "var(--ui-chart-greed-extreme)" },
 ];
-
 export function fearGreedClassificationAr(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "محايد";
@@ -15,7 +14,6 @@ export function fearGreedClassificationAr(value) {
   if (n <= 79) return "طمع";
   return "طمع شديد";
 }
-
 export function fearGreedPointerPosition(value) {
   const clamped = Math.max(0, Math.min(100, Number(value) || 0));
   const angleDeg = 180 - (clamped / 100) * 180;
@@ -29,7 +27,6 @@ export function fearGreedPointerPosition(value) {
     angleDeg,
   };
 }
-
 export function describeFearGreedArcSegment(startValue, endValue, radius = 80) {
   const cx = 100;
   const cy = 100;

@@ -1,34 +1,31 @@
 "use client";
-
+import { UiPageShell } from "../../../../components/ui";
 import "../../admin-theme.css";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { adminFetch } from "../../../../../lib/admin-fetch";
-
 const DEFAULT_SETTINGS = {
   enableAutoUpgrade: true,
   enableAutoRelease: true,
   enableMonthlyBonus: true,
   enableAchievements: true,
-  monthlyBonusValues: {
-    silver: 100,
-    gold: 300,
-    platinum: 800,
-    diamond: 2000,
-  },
+  monthlyBonusValues: { silver: 100, gold: 300, platinum: 800, diamond: 2000 },
   minimumSalesForBonus: 0,
   minimumReferralsForBonus: 0,
 };
-
 function Toggle({ label, checked, onChange }) {
   return (
-    <label className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-      <span className="font-bold">{label}</span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    <label className="flex items-center justify-between gap-4 rounded-2xl border admin-panel-border admin-panel px-4 py-3">
+      {" "}
+      <span className="font-bold">{label}</span>{" "}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />{" "}
     </label>
   );
 }
-
 export default function PartnerAutomationSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,22 +34,18 @@ export default function PartnerAutomationSettingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-
   const loadSettings = useCallback(async () => {
     setLoading(true);
     setError("");
-
     try {
       const response = await adminFetch("/api/admin/partner-settings", {
         method: "GET",
         cache: "no-store",
       });
       const result = await response.json().catch(() => ({}));
-
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || "تعذر تحميل الإعدادات");
       }
-
       setSettings(result.settings || DEFAULT_SETTINGS);
     } catch (loadError) {
       setError(loadError?.message || "تعذر تحميل الإعدادات");
@@ -60,17 +53,14 @@ export default function PartnerAutomationSettingsPage() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
-
   const saveSettings = async (event) => {
     event.preventDefault();
     setSaving(true);
     setMessage("");
     setError("");
-
     try {
       const response = await adminFetch("/api/admin/partner-settings", {
         method: "POST",
@@ -78,11 +68,9 @@ export default function PartnerAutomationSettingsPage() {
         body: JSON.stringify(settings),
       });
       const result = await response.json().catch(() => ({}));
-
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || "تعذر حفظ الإعدادات");
       }
-
       setSettings(result.settings || settings);
       setMessage(result.message || "تم الحفظ");
     } catch (saveError) {
@@ -91,12 +79,10 @@ export default function PartnerAutomationSettingsPage() {
       setSaving(false);
     }
   };
-
   const runBonus = async () => {
     setRunningBonus(true);
     setMessage("");
     setError("");
-
     try {
       const response = await adminFetch("/api/admin/run-partner-bonus", {
         method: "POST",
@@ -104,11 +90,9 @@ export default function PartnerAutomationSettingsPage() {
         body: JSON.stringify({ force: true }),
       });
       const result = await response.json().catch(() => ({}));
-
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || "تعذر تشغيل المكافآت");
       }
-
       setMessage(result.message || "تم تشغيل المكافآت الشهرية");
     } catch (runError) {
       setError(runError?.message || "تعذر تشغيل المكافآت");
@@ -116,12 +100,10 @@ export default function PartnerAutomationSettingsPage() {
       setRunningBonus(false);
     }
   };
-
   const runUpgrade = async () => {
     setRunningUpgrade(true);
     setMessage("");
     setError("");
-
     try {
       const response = await adminFetch("/api/admin/run-partner-upgrade", {
         method: "POST",
@@ -129,11 +111,9 @@ export default function PartnerAutomationSettingsPage() {
         body: JSON.stringify({ force: true }),
       });
       const result = await response.json().catch(() => ({}));
-
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || "تعذر تشغيل الترقية");
       }
-
       setMessage(result.message || "تم تشغيل الترقية التلقائية");
     } catch (runError) {
       setError(runError?.message || "تعذر تشغيل الترقية");
@@ -141,70 +121,94 @@ export default function PartnerAutomationSettingsPage() {
       setRunningUpgrade(false);
     }
   };
-
   if (loading) {
     return (
-      <main className="rounded-[34px] border border-cyan-300/10 bg-[#020617] p-6 text-white">
-        <p>جاري تحميل إعدادات الأتمتة...</p>
+      <main className="rounded-[34px] border admin-panel-border ui-page-dark p-6 admin-text">
+        {" "}
+        <p>جاري تحميل إعدادات الأتمتة...</p>{" "}
       </main>
     );
   }
-
   return (
-    <main className="admin-theme-page space-y-6 rounded-[34px] border border-cyan-300/10 bg-[#020617] p-4 text-white md:p-6">
+    <main className="admin-theme-page space-y-6 rounded-[34px] border admin-panel-border ui-page-dark p-4 admin-text md:p-6">
+      {" "}
       <header className="flex flex-wrap items-center justify-between gap-4">
+        {" "}
         <div>
-          <p className="text-sm font-bold text-cyan-200/70">Partner Automation</p>
-          <h1 className="mt-2 text-3xl font-black">إعدادات الأتمتة والمكافآت</h1>
-        </div>
+          {" "}
+          <p className="text-sm font-bold admin-text-muted/70">
+            Partner Automation
+          </p>{" "}
+          <h1 className="mt-2 text-3xl font-black">
+            إعدادات الأتمتة والمكافآت
+          </h1>{" "}
+        </div>{" "}
         <Link
           href="/admin/partners"
-          className="rounded-2xl border border-cyan-300/20 px-4 py-2 text-sm font-black text-cyan-100"
+          className="rounded-2xl border admin-panel-border px-4 py-2 text-sm font-black ui-public-seo-link-chip"
         >
-          ← العودة
-        </Link>
-      </header>
-
+          {" "}
+          ← العودة{" "}
+        </Link>{" "}
+      </header>{" "}
       {error ? (
-        <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm">{error}</div>
-      ) : null}
+        <div className="admin-banner-danger text-sm">
+          {error}
+        </div>
+      ) : null}{" "}
       {message ? (
-        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm">{message}</div>
-      ) : null}
-
+        <div className="admin-banner-success text-sm">
+          {message}
+        </div>
+      ) : null}{" "}
       <form onSubmit={saveSettings} className="space-y-6">
-        <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-          <h2 className="text-xl font-black">Partner Automation</h2>
+        {" "}
+        <section className="rounded-[28px] border admin-panel-border ui-glass-045 p-5">
+          {" "}
+          <h2 className="text-xl font-black">Partner Automation</h2>{" "}
           <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {" "}
             <Toggle
               label="Enable Auto Upgrade"
               checked={settings.enableAutoUpgrade}
-              onChange={(value) => setSettings((prev) => ({ ...prev, enableAutoUpgrade: value }))}
-            />
+              onChange={(value) =>
+                setSettings((prev) => ({ ...prev, enableAutoUpgrade: value }))
+              }
+            />{" "}
             <Toggle
               label="Enable Auto Release"
               checked={settings.enableAutoRelease}
-              onChange={(value) => setSettings((prev) => ({ ...prev, enableAutoRelease: value }))}
-            />
+              onChange={(value) =>
+                setSettings((prev) => ({ ...prev, enableAutoRelease: value }))
+              }
+            />{" "}
             <Toggle
               label="Enable Monthly Bonus"
               checked={settings.enableMonthlyBonus}
-              onChange={(value) => setSettings((prev) => ({ ...prev, enableMonthlyBonus: value }))}
-            />
+              onChange={(value) =>
+                setSettings((prev) => ({ ...prev, enableMonthlyBonus: value }))
+              }
+            />{" "}
             <Toggle
               label="Enable Achievements"
               checked={settings.enableAchievements}
-              onChange={(value) => setSettings((prev) => ({ ...prev, enableAchievements: value }))}
-            />
-          </div>
-        </section>
-
-        <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-          <h2 className="text-xl font-black">Bonus Values (USDT)</h2>
+              onChange={(value) =>
+                setSettings((prev) => ({ ...prev, enableAchievements: value }))
+              }
+            />{" "}
+          </div>{" "}
+        </section>{" "}
+        <section className="rounded-[28px] border admin-panel-border ui-glass-045 p-5">
+          {" "}
+          <h2 className="text-xl font-black">Bonus Values (USDT)</h2>{" "}
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {" "}
             {["silver", "gold", "platinum", "diamond"].map((tier) => (
               <label key={tier} className="block">
-                <span className="mb-2 block text-sm capitalize text-slate-300">{tier}</span>
+                {" "}
+                <span className="mb-2 block text-sm capitalize admin-text-muted">
+                  {tier}
+                </span>{" "}
                 <input
                   type="number"
                   min="0"
@@ -219,18 +223,22 @@ export default function PartnerAutomationSettingsPage() {
                       },
                     }))
                   }
-                  className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3"
-                />
+                  className="w-full rounded-xl border admin-panel-border admin-panel px-4 py-3"
+                />{" "}
               </label>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5">
-          <h2 className="text-xl font-black">Minimum Requirements</h2>
+            ))}{" "}
+          </div>{" "}
+        </section>{" "}
+        <section className="rounded-[28px] border admin-panel-border ui-glass-045 p-5">
+          {" "}
+          <h2 className="text-xl font-black">Minimum Requirements</h2>{" "}
           <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {" "}
             <label className="block">
-              <span className="mb-2 block text-sm text-slate-300">Minimum Sales</span>
+              {" "}
+              <span className="mb-2 block text-sm admin-text-muted">
+                Minimum Sales
+              </span>{" "}
               <input
                 type="number"
                 min="0"
@@ -242,11 +250,14 @@ export default function PartnerAutomationSettingsPage() {
                     minimumSalesForBonus: Number(event.target.value),
                   }))
                 }
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3"
-              />
-            </label>
+                className="w-full rounded-xl border admin-panel-border admin-panel px-4 py-3"
+              />{" "}
+            </label>{" "}
             <label className="block">
-              <span className="mb-2 block text-sm text-slate-300">Minimum Referrals</span>
+              {" "}
+              <span className="mb-2 block text-sm admin-text-muted">
+                Minimum Referrals
+              </span>{" "}
               <input
                 type="number"
                 min="0"
@@ -258,38 +269,41 @@ export default function PartnerAutomationSettingsPage() {
                     minimumReferralsForBonus: Number(event.target.value),
                   }))
                 }
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3"
-              />
-            </label>
-          </div>
-        </section>
-
+                className="w-full rounded-xl border admin-panel-border admin-panel px-4 py-3"
+              />{" "}
+            </label>{" "}
+          </div>{" "}
+        </section>{" "}
         <div className="flex flex-wrap gap-3">
+          {" "}
           <button
             type="submit"
             disabled={saving}
-            className="rounded-2xl bg-cyan-400 px-6 py-3 font-black text-slate-900 disabled:opacity-60"
+            className="rounded-2xl admin-panel px-6 py-3 font-black ui-text-strong disabled:opacity-60"
           >
-            {saving ? "جاري الحفظ..." : "حفظ الإعدادات"}
-          </button>
+            {" "}
+            {saving ? "جاري الحفظ..." : "حفظ الإعدادات"}{" "}
+          </button>{" "}
           <button
             type="button"
             disabled={runningBonus}
             onClick={() => void runBonus()}
-            className="rounded-2xl border border-white/10 px-6 py-3 font-black disabled:opacity-60"
+            className="rounded-2xl border admin-panel-border px-6 py-3 font-black disabled:opacity-60"
           >
-            {runningBonus ? "..." : "Run Monthly Bonus"}
-          </button>
+            {" "}
+            {runningBonus ? "..." : "Run Monthly Bonus"}{" "}
+          </button>{" "}
           <button
             type="button"
             disabled={runningUpgrade}
             onClick={() => void runUpgrade()}
-            className="rounded-2xl border border-white/10 px-6 py-3 font-black disabled:opacity-60"
+            className="rounded-2xl border admin-panel-border px-6 py-3 font-black disabled:opacity-60"
           >
-            {runningUpgrade ? "..." : "Run Auto Upgrade"}
-          </button>
-        </div>
-      </form>
+            {" "}
+            {runningUpgrade ? "..." : "Run Auto Upgrade"}{" "}
+          </button>{" "}
+        </div>{" "}
+      </form>{" "}
     </main>
   );
 }

@@ -1,12 +1,9 @@
 "use client";
-
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
-
 function resolveProofImageSrc(proof) {
   return String(proof?.proof || proof?.imageUrl || "").trim();
 }
-
 function isDisplayableProofImage(src) {
   const value = String(src || "").trim();
   if (!value) return false;
@@ -15,114 +12,160 @@ function isDisplayableProofImage(src) {
   if (/^https?:\/\//i.test(value)) return true;
   return false;
 }
-
 function shouldUseNativeProofImage(imageUrl) {
   const src = String(imageUrl || "").trim();
   return src.startsWith("blob:") || src.startsWith("data:");
 }
-
 export default function AdminPaymentProofModal({ proof, onClose }) {
   const [imageError, setImageError] = useState("");
-
   useEffect(() => {
     if (!proof) return undefined;
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
         onClose?.();
       }
     };
-
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose, proof]);
-
   useEffect(() => {
     setImageError("");
   }, [proof?.proof, proof?.imageUrl, proof?.requestId]);
-
   if (!proof || typeof document === "undefined") return null;
-
   const proofValue = resolveProofImageSrc(proof);
   const canRenderImage = isDisplayableProofImage(proofValue);
   const showImage = canRenderImage && !imageError;
-
   return createPortal(
     <div className="admin-financial-proof-modal" role="presentation">
-      <button type="button" className="admin-financial-proof-modal__backdrop" onClick={onClose} aria-label="إغلاق" />
-      <div className="admin-financial-proof-modal__panel" role="dialog" aria-modal="true" aria-labelledby="admin-proof-title">
+      {" "}
+      <button
+        type="button"
+        className="admin-financial-proof-modal__backdrop"
+        onClick={onClose}
+        aria-label="إغلاق"
+      />{" "}
+      <div
+        className="admin-financial-proof-modal__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-proof-title"
+      >
+        {" "}
         <button
           type="button"
           className="admin-financial-proof-modal__close"
           onClick={onClose}
           aria-label="إغلاق النافذة"
         >
-          ×
-        </button>
-
+          {" "}
+          ×{" "}
+        </button>{" "}
         <header className="admin-financial-proof-modal__head">
-          <h3 id="admin-proof-title" className="admin-financial-proof-modal__title">
-            إثبات الدفع
-          </h3>
+          {" "}
+          <h3
+            id="admin-proof-title"
+            className="admin-financial-proof-modal__title"
+          >
+            {" "}
+            إثبات الدفع{" "}
+          </h3>{" "}
           <div className="admin-financial-proof-modal__meta-grid">
+            {" "}
             <div className="admin-financial-proof-modal__meta-item">
-              <span className="admin-financial-proof-modal__meta-label">المستخدم</span>
-              <span className="admin-financial-proof-modal__meta-value">{proof.username || "—"}</span>
-            </div>
+              {" "}
+              <span className="admin-financial-proof-modal__meta-label">
+                المستخدم
+              </span>{" "}
+              <span className="admin-financial-proof-modal__meta-value">
+                {proof.username || "—"}
+              </span>{" "}
+            </div>{" "}
             <div className="admin-financial-proof-modal__meta-item">
-              <span className="admin-financial-proof-modal__meta-label">البريد</span>
-              <span className="admin-financial-proof-modal__meta-value">{proof.userEmail || "—"}</span>
-            </div>
+              {" "}
+              <span className="admin-financial-proof-modal__meta-label">
+                البريد
+              </span>{" "}
+              <span className="admin-financial-proof-modal__meta-value">
+                {proof.userEmail || "—"}
+              </span>{" "}
+            </div>{" "}
             <div className="admin-financial-proof-modal__meta-item">
-              <span className="admin-financial-proof-modal__meta-label">الخطة</span>
-              <span className="admin-financial-proof-modal__meta-value">{proof.planName || proof.plan || "—"}</span>
-            </div>
+              {" "}
+              <span className="admin-financial-proof-modal__meta-label">
+                الخطة
+              </span>{" "}
+              <span className="admin-financial-proof-modal__meta-value">
+                {proof.planName || proof.plan || "—"}
+              </span>{" "}
+            </div>{" "}
             <div className="admin-financial-proof-modal__meta-item">
-              <span className="admin-financial-proof-modal__meta-label">المبلغ</span>
-              <span className="admin-financial-proof-modal__meta-value">{proof.priceRaw || proof.amount || "—"}</span>
-            </div>
+              {" "}
+              <span className="admin-financial-proof-modal__meta-label">
+                المبلغ
+              </span>{" "}
+              <span className="admin-financial-proof-modal__meta-value">
+                {proof.priceRaw || proof.amount || "—"}
+              </span>{" "}
+            </div>{" "}
             <div className="admin-financial-proof-modal__meta-item">
-              <span className="admin-financial-proof-modal__meta-label">الحالة</span>
-              <span className="admin-financial-proof-modal__meta-value">{proof.status || proof.reviewStatus || "—"}</span>
-            </div>
-          </div>
+              {" "}
+              <span className="admin-financial-proof-modal__meta-label">
+                الحالة
+              </span>{" "}
+              <span className="admin-financial-proof-modal__meta-value">
+                {proof.status || proof.reviewStatus || "—"}
+              </span>{" "}
+            </div>{" "}
+          </div>{" "}
           <p className="admin-financial-proof-modal__notice">
-            وجود إثبات دفع لا يعني أن العملية مؤكدة.
-          </p>
-        </header>
-
+            {" "}
+            وجود إثبات دفع لا يعني أن العملية مؤكدة.{" "}
+          </p>{" "}
+        </header>{" "}
         <div className="admin-financial-proof-modal__body">
+          {" "}
           {showImage ? (
             <div className="admin-financial-proof-modal__image-wrap">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {" "}
+              {/* eslint-disable-next-line @next/next/no-img-element */}{" "}
               <img
                 src={proofValue}
                 alt="إثبات الدفع"
                 className="admin-financial-proof-modal__image"
-                referrerPolicy={shouldUseNativeProofImage(proofValue) ? undefined : "no-referrer"}
-                onError={() =>
-                  setImageError("تعذر عرض الصورة. قد يكون الرابط منتهيًا أو غير متاح.")
+                referrerPolicy={
+                  shouldUseNativeProofImage(proofValue)
+                    ? undefined
+                    : "no-referrer"
                 }
-              />
+                onError={() =>
+                  setImageError(
+                    "تعذر عرض الصورة. قد يكون الرابط منتهيًا أو غير متاح.",
+                  )
+                }
+              />{" "}
             </div>
           ) : imageError ? (
             <div className="admin-financial-proof-modal__fallback">
-              <p className="admin-financial-proof-modal__fallback-message">{imageError}</p>
+              {" "}
+              <p className="admin-financial-proof-modal__fallback-message">
+                {imageError}
+              </p>{" "}
               <div className="admin-financial-proof-modal__fallback-actions">
+                {" "}
                 <button
                   type="button"
                   className="admin-financial-action-button admin-financial-action-button--secondary"
                   onClick={() => setImageError("")}
                 >
-                  إعادة المحاولة
-                </button>
+                  {" "}
+                  إعادة المحاولة{" "}
+                </button>{" "}
                 {proofValue ? (
                   <a
                     href={proofValue}
@@ -130,10 +173,11 @@ export default function AdminPaymentProofModal({ proof, onClose }) {
                     rel="noopener noreferrer"
                     className="admin-financial-action-button admin-financial-action-button--primary"
                   >
-                    فتح في تبويب جديد
+                    {" "}
+                    فتح في تبويب جديد{" "}
                   </a>
-                ) : null}
-              </div>
+                ) : null}{" "}
+              </div>{" "}
             </div>
           ) : proofValue ? (
             <a
@@ -142,17 +186,25 @@ export default function AdminPaymentProofModal({ proof, onClose }) {
               rel="noopener noreferrer"
               className="admin-financial-action-button admin-financial-action-button--primary"
             >
-              فتح رابط إثبات الدفع
+              {" "}
+              فتح رابط إثبات الدفع{" "}
             </a>
           ) : (
-            <p className="admin-financial-proof-modal__empty">لا يوجد إثبات متاح للعرض.</p>
-          )}
-        </div>
-
+            <p className="admin-financial-proof-modal__empty">
+              لا يوجد إثبات متاح للعرض.
+            </p>
+          )}{" "}
+        </div>{" "}
         <footer className="admin-financial-proof-modal__footer">
-          <button type="button" className="admin-financial-action-button admin-financial-action-button--secondary" onClick={onClose}>
-            إغلاق
-          </button>
+          {" "}
+          <button
+            type="button"
+            className="admin-financial-action-button admin-financial-action-button--secondary"
+            onClick={onClose}
+          >
+            {" "}
+            إغلاق{" "}
+          </button>{" "}
           {proofValue ? (
             <a
               href={proofValue}
@@ -160,12 +212,13 @@ export default function AdminPaymentProofModal({ proof, onClose }) {
               rel="noopener noreferrer"
               className="admin-financial-action-button admin-financial-action-button--primary"
             >
-              فتح بحجم كامل
+              {" "}
+              فتح بحجم كامل{" "}
             </a>
-          ) : null}
-        </footer>
-      </div>
+          ) : null}{" "}
+        </footer>{" "}
+      </div>{" "}
     </div>,
-    document.body
+    document.body,
   );
 }

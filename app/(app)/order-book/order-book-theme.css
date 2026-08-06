@@ -301,6 +301,29 @@ html[data-theme="light"] .ob-page {
   background: var(--ob-chart-sell);
 }
 
+.ob-page .ob-depth-glow-bar {
+  pointer-events: none;
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+}
+
+.ob-page .ob-depth-glow-bar--ask {
+  background: linear-gradient(to left, rgba(244, 63, 94, 0.22) 0%, rgba(244, 63, 94, 0.14) 42%, rgba(244, 63, 94, 0) 100%);
+}
+
+.ob-page .ob-depth-glow-bar--bid {
+  background: linear-gradient(to left, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.14) 42%, rgba(16, 185, 129, 0) 100%);
+}
+
+html[data-theme="dark"] .ob-page .ob-depth-glow-bar--ask {
+  background: linear-gradient(to left, rgba(244, 63, 94, 0.28) 0%, rgba(244, 63, 94, 0.16) 42%, rgba(244, 63, 94, 0) 100%);
+}
+
+html[data-theme="dark"] .ob-page .ob-depth-glow-bar--bid {
+  background: linear-gradient(to left, rgba(16, 185, 129, 0.28) 0%, rgba(16, 185, 129, 0.16) 42%, rgba(16, 185, 129, 0) 100%);
+}
+
 .ob-page .ob-wall-buy {
   border-color: var(--ob-positive-border);
   background: var(--ob-positive-soft);

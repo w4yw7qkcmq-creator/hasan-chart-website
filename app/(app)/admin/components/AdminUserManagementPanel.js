@@ -10,7 +10,7 @@ import { adminFetch } from "../../../../lib/admin-fetch";
 import { fetchAdminUserList, postAdminUserAction } from "../../../../lib/admin-user-management-client";
 import { sanitizeAdminUserFacingError } from "../../../../lib/admin-user-management-shared";
 import { notify } from "../../../../lib/notification-center";
-import AdminUserQuickPreviewDrawer from "./AdminUserQuickPreviewDrawer";
+import { UiSelect } from "../../../components/ui";
 import AdminUserBulkActionModal from "./AdminUserBulkActionModal";
 import AdminUserBulkActionsBar from "./AdminUserBulkActionsBar";
 import AdminUserManagementDashboard from "./AdminUserManagementDashboard";
@@ -59,15 +59,15 @@ function UserManagementSkeleton() {
     <div className="animate-pulse space-y-5">
       <div className="admin-user-dashboard admin-user-dashboard--skeleton h-40" />
       <section className="admin-section p-4 md:p-5">
-        <div className="h-12 rounded-2xl bg-white/10" />
+        <div className="h-12 rounded-2xl admin-skeleton-block" />
       </section>
       <div className="admin-section overflow-hidden p-0">
         {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="flex items-center gap-4 border-b border-cyan-300/10 px-4 py-4">
-            <div className="h-11 w-11 rounded-full bg-white/10" />
+          <div key={index} className="flex items-center gap-4 border-b admin-panel-border px-4 py-4">
+            <div className="h-11 w-11 rounded-full admin-skeleton-block" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-40 rounded bg-white/15" />
-              <div className="h-3 w-56 rounded bg-white/10" />
+              <div className="h-4 w-40 rounded admin-skeleton-block" />
+              <div className="h-3 w-56 rounded admin-skeleton-block" />
             </div>
           </div>
         ))}
@@ -789,7 +789,7 @@ export default function AdminUserManagementPanel({
 
         <div className="admin-section p-4 md:p-5 space-y-4">
           <div>
-            <label className="text-xs font-bold text-slate-400">بحث ذكي</label>
+            <label className="text-xs font-bold admin-text-subtle">بحث ذكي</label>
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
@@ -800,8 +800,8 @@ export default function AdminUserManagementPanel({
 
           <div className="admin-user-filters-grid">
             <div>
-              <label className="text-xs font-bold text-slate-400">الخدمة</label>
-              <select
+              <label className="text-xs font-bold admin-text-subtle">الخدمة</label>
+              <UiSelect
                 className="admin-field mt-2 text-sm"
                 value={clientFilters.service}
                 onChange={(event) =>
@@ -813,10 +813,10 @@ export default function AdminUserManagementPanel({
                 <option value="account_management">إدارة الحسابات</option>
                 <option value="alerts">التنبيهات</option>
                 <option value="academy">الأكاديمية</option>
-              </select>
+              </UiSelect>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400">الخطة</label>
+              <label className="text-xs font-bold admin-text-subtle">الخطة</label>
               <input
                 className="admin-field mt-2 text-sm"
                 value={clientFilters.plan}
@@ -827,8 +827,8 @@ export default function AdminUserManagementPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400">الحالة</label>
-              <select
+              <label className="text-xs font-bold admin-text-subtle">الحالة</label>
+              <UiSelect
                 className="admin-field mt-2 text-sm"
                 value={clientFilters.status}
                 onChange={(event) =>
@@ -840,10 +840,10 @@ export default function AdminUserManagementPanel({
                 <option value="suspended">معلق</option>
                 <option value="banned">محظور</option>
                 <option value="deleted">محذوف</option>
-              </select>
+              </UiSelect>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400">تاريخ التسجيل من</label>
+              <label className="text-xs font-bold admin-text-subtle">تاريخ التسجيل من</label>
               <input
                 type="date"
                 className="admin-field mt-2 text-sm"
@@ -854,7 +854,7 @@ export default function AdminUserManagementPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400">تاريخ التسجيل إلى</label>
+              <label className="text-xs font-bold admin-text-subtle">تاريخ التسجيل إلى</label>
               <input
                 type="date"
                 className="admin-field mt-2 text-sm"
@@ -865,7 +865,7 @@ export default function AdminUserManagementPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400">آخر دخول من</label>
+              <label className="text-xs font-bold admin-text-subtle">آخر دخول من</label>
               <input
                 type="date"
                 className="admin-field mt-2 text-sm"
@@ -876,7 +876,7 @@ export default function AdminUserManagementPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400">آخر دخول إلى</label>
+              <label className="text-xs font-bold admin-text-subtle">آخر دخول إلى</label>
               <input
                 type="date"
                 className="admin-field mt-2 text-sm"
@@ -911,7 +911,7 @@ export default function AdminUserManagementPanel({
             >
               ترتيب حسب آخر دخول {sort === "last_sign_in" ? (order === "desc" ? "↓" : "↑") : ""}
             </button>
-            <span className="self-center text-xs font-bold text-slate-500">{sortLabel}</span>
+            <span className="self-center text-xs font-bold admin-text-subtle">{sortLabel}</span>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -926,7 +926,7 @@ export default function AdminUserManagementPanel({
                 key={item.id}
                 type="button"
                 onClick={() => handleAccountStatusFilterClick(item.id)}
-                className={`rounded-2xl border px-4 py-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
+                className={`rounded-2xl border px-4 py-2 text-sm font-black transition focus-visible:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ui-focus-ring)] ${
                   !expiredFilterActive && accountStatusFilter === item.id
                     ? "admin-filter-btn admin-filter-btn--active"
                     : "admin-filter-btn admin-filter-btn--idle"
@@ -948,12 +948,12 @@ export default function AdminUserManagementPanel({
             </button>
           </div>
 
-          {uxNotice ? <p className="text-xs font-bold text-cyan-200/80">{uxNotice}</p> : null}
+          {uxNotice ? <p className="text-xs font-bold admin-text-muted">{uxNotice}</p> : null}
         </div>
 
         {error ? (
           <div className="admin-section p-6 text-center">
-            <p className="font-black text-red-200">{error}</p>
+            <p className="font-black admin-text-danger">{error}</p>
             <button
               type="button"
               className="admin-btn-surface mt-4 px-5 py-3"
@@ -1017,7 +1017,7 @@ export default function AdminUserManagementPanel({
                         <div>
                           <p className="font-black">{user.username || "—"}</p>
                           {user.role === "admin" ? (
-                            <span className="text-xs font-bold text-cyan-300">مدير</span>
+                            <span className="text-xs font-bold admin-text-muted">مدير</span>
                           ) : null}
                         </div>
                       </div>
@@ -1025,7 +1025,7 @@ export default function AdminUserManagementPanel({
                     <td>{user.email || "—"}</td>
                     <td className="text-xs">
                       <p>{user.telegram || "—"}</p>
-                      <p className="text-slate-500">{user.uid || user.id}</p>
+                      <p className="admin-text-subtle">{user.uid || user.id}</p>
                     </td>
                     <td>{formatDateTime(user.createdAt)}</td>
                     <td>{formatDateTime(user.lastSignInAt)}</td>
@@ -1061,7 +1061,7 @@ export default function AdminUserManagementPanel({
         )}
 
         {!error && users.length > 0 ? (
-          <p className="px-1 text-sm font-bold text-slate-500">
+          <p className="px-1 text-sm font-bold admin-text-subtle">
             عرض {users.length} مستخدم{listTotal > users.length ? ` من ${listTotal}` : ""}
           </p>
         ) : null}

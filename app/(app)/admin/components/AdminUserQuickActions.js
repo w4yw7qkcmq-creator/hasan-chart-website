@@ -1,5 +1,4 @@
 "use client";
-
 const ACTIONS = [
   {
     id: "export-csv",
@@ -16,12 +15,13 @@ const ACTIONS = [
     tooltip: "إعادة تحميل قائمة المستخدمين ومؤشرات لوحة التحكم",
   },
 ];
-
 export default function AdminUserQuickActions({ onAction, disabled = false }) {
   return (
     <section className="admin-user-quick-actions">
-      <p className="admin-user-hero__eyebrow">إجراءات سريعة</p>
+      {" "}
+      <p className="admin-user-hero__eyebrow">إجراءات سريعة</p>{" "}
       <div className="admin-user-quick-actions__grid">
+        {" "}
         {ACTIONS.map((action) => (
           <button
             key={action.id}
@@ -32,14 +32,20 @@ export default function AdminUserQuickActions({ onAction, disabled = false }) {
             title={action.tooltip}
             aria-label={action.label}
           >
+            {" "}
             <span className="admin-user-quick-actions__icon" aria-hidden="true">
-              {action.icon}
-            </span>
-            <span className="admin-user-quick-actions__label">{action.label}</span>
-            <span className="admin-user-quick-actions__desc">{action.description}</span>
+              {" "}
+              {action.icon}{" "}
+            </span>{" "}
+            <span className="admin-user-quick-actions__label">
+              {action.label}
+            </span>{" "}
+            <span className="admin-user-quick-actions__desc">
+              {action.description}
+            </span>{" "}
           </button>
-        ))}
-      </div>
+        ))}{" "}
+      </div>{" "}
     </section>
   );
 }
