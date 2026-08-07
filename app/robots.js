@@ -7,6 +7,6 @@ export default function robots() {
       allow: PUBLIC_ROBOTS_ALLOW_PATHS,
       disallow: PRIVATE_ROBOTS_PATHS,
     },
-    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/news-sitemap.xml`],
+    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/news-sitemap.xml`, `${SITE_URL}/content-sitemap.xml`],
   };
 }

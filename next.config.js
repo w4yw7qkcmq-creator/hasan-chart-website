@@ -100,6 +100,15 @@ const nextConfig = {
         ],
       },
       {
+        source: "/content-sitemap.xml",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: CACHE_PUBLIC_SEO_ARTIFACT,
+          },
+        ],
+      },
+      {
         source: "/news",
         headers: [
           {
