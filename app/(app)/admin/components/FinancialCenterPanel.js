@@ -544,7 +544,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
           const result = await fetchFinancialCenterSection(adminFetch, "subscriptions", {
             signal: controller.signal,
             query: {
-              cursor: subscriptionCursor || undefined,
+              ...(subscriptionCursor ? { cursor: subscriptionCursor } : {}),
               search: debouncedSearch,
               status: filters.status,
               service: filters.service,
@@ -562,7 +562,7 @@ export default function FinancialCenterPanel({ standalone = false }) {
           const result = await fetchFinancialCenterSection(adminFetch, "payment-reviews", {
             signal: controller.signal,
             query: {
-              cursor: paymentCursor || undefined,
+              ...(paymentCursor ? { cursor: paymentCursor } : {}),
               search: debouncedSearch,
               reviewStatus,
             },

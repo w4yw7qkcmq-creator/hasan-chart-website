@@ -62,7 +62,9 @@ export async function GET(request) {
 
     const page = Number(searchParams.get("page") || 1);
     const pageSize = Number(searchParams.get("pageSize") || 25);
-    const cursor = String(searchParams.get("cursor") || "").trim() || null;
+    const rawCursor = String(searchParams.get("cursor") || "").trim();
+    const cursor =
+      rawCursor && !["undefined", "null"].includes(rawCursor.toLowerCase()) ? rawCursor : null;
     const includeTotal = searchParams.get("includeTotal") === "true";
     const search = String(searchParams.get("search") || "");
     const period = String(searchParams.get("period") || "30d");
