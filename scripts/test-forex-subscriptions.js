@@ -89,3 +89,14 @@ test("Payment networks remain reusable for Forex checkout", () => {
   assert.equal(validatePaymentNetwork("BEP20").ok, true);
   assert.equal(validatePaymentNetwork("TRC20").ok, true);
 });
+
+test("VIP Forex public landing has safe CTA hrefs for guests", async () => {
+  const { getPublicSeoPage } = await import("../lib/public-seo-content/index.js");
+  const page = getPublicSeoPage("vip-forex");
+  assert.ok(page, "vip-forex public seo page exists");
+  assert.equal(typeof page.startHref, "string");
+  assert.ok(page.startHref.startsWith("/"));
+  for (const cta of page.ctaLinks || []) {
+    assert.ok(cta.href, `ctaLinks href missing for ${cta.label}`);
+  }
+});

@@ -49,7 +49,7 @@ function SignalCard({ signal }) {
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
             <span className="inline-flex rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-xs font-black text-teal-700">
-              VIP FUTURES 💱
+              VIP FOREX 💱
             </span>
             <h3 className="mt-4 text-3xl font-black text-slate-950">{signal.coin}</h3>
             <p className="mt-2 text-sm font-bold text-slate-500">{signal.createdAt}</p>
