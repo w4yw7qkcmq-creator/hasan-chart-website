@@ -436,12 +436,18 @@ function RootLayoutShell({ children }) {
   const headerThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { compact: true });
   const browserNotificationsActive =
     shellNotificationPermission === "granted" && shellWebPushEnabled;
+  const browserPushNeedsReenable =
+    shellNotificationPermission === "granted" && !shellWebPushEnabled;
   const browserNotificationLabel = browserNotificationsActive
     ? "🔔 إشعارات المتصفح مفعّلة ✅"
-    : "🔔 تفعيل إشعارات المتصفح";
+    : browserPushNeedsReenable
+      ? "🔔 إشعارات المتصفح تحتاج إعادة تفعيل"
+      : "🔔 تفعيل إشعارات المتصفح";
   const browserNotificationAriaLabel = browserNotificationsActive
     ? "إشعارات المتصفح مفعّلة"
-    : "تفعيل إشعارات المتصفح";
+    : browserPushNeedsReenable
+      ? "إعادة تفعيل إشعارات المتصفح"
+      : "تفعيل إشعارات المتصفح";
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const toggleMenuGroup = useCallback((groupId) => {
     setCollapsedGroups((current) => ({
@@ -479,14 +485,14 @@ function RootLayoutShell({ children }) {
     let active = true;
 
     const cancelDeferred = scheduleAfterPaint(() => {
-      void import("../../lib/push-client").then(({ resolveBrowserPushState, setStoredPushEndpoint }) => {
+      void import("../../lib/push-client").then(({ resolvePushEnrollmentState, setStoredPushEndpoint }) => {
         void (async () => {
-          const browserState = await resolveBrowserPushState();
+          const browserState = await resolvePushEnrollmentState();
           if (!active) return;
 
           setNotificationPermission(browserState.permission);
 
-          if (browserState.permission === "granted" && browserState.hasSubscription) {
+          if (browserState.isEnrolled) {
             setWebPushEnabled(true);
 
             const endpoint = browserState.subscription?.endpoint;
@@ -501,6 +507,8 @@ function RootLayoutShell({ children }) {
                 hasEndpoint: Boolean(endpoint),
               })
             );
+          } else {
+            setWebPushEnabled(false);
           }
         })();
       });
@@ -655,43 +663,54 @@ function RootLayoutShell({ children }) {
     }
 
     try {
-      const { resolveBrowserPushState, setStoredPushEndpoint } = await import("../../lib/push-client");
-      const browserState = await resolveBrowserPushState();
+      const { resolvePushEnrollmentState, setStoredPushEndpoint } = await import("../../lib/push-client");
+      const browserState = await resolvePushEnrollmentState();
       setNotificationPermission(browserState.permission);
 
-      if (browserState.permission === "granted" && browserState.hasSubscription) {
-        setWebPushEnabled(true);
-
+      if (browserState.isEnrolled) {
         if (browserState.subscription?.endpoint) {
           setStoredPushEndpoint(browserState.subscription.endpoint);
         }
-
-        console.log(
-          "push:ui:enabled",
-          JSON.stringify({
-            source: "button_existing_subscription",
-          })
-        );
 
         if (authResolved && currentUser?.email && currentUser?.id) {
           try {
             await savePushSubscription({
               existingSubscription: browserState.subscription,
             });
+            setWebPushEnabled(true);
+            showAppModal({
+              type: "success",
+              title: "إشعارات المتصفح",
+              message: "تم التحقق من اشتراك الإشعارات وحفظه.",
+            });
+            return;
           } catch (syncError) {
+            setWebPushEnabled(false);
             console.warn(
-              "Push subscription sync skipped:",
+              "Push subscription sync failed:",
               syncError?.message || syncError
             );
+            showAppModal({
+              type: "warning",
+              title: "إشعارات المتصفح تحتاج إعادة تفعيل",
+              message:
+                "الإذن مفعّل لكن الاشتراك غير محفوظ. اضغط «إعادة تفعيل إشعارات المتصفح» لإكمال الإعداد.",
+            });
+            return;
           }
         }
 
+        setWebPushEnabled(true);
         showAppModal({
           type: "success",
           title: "إشعارات المتصفح",
-          message: "الإشعارات مفعّلة مسبقًا.",
+          message: "الإشعارات مفعّلة على هذا المتصفح.",
         });
         return;
+      }
+
+      if (browserState.needsReenable) {
+        setWebPushEnabled(false);
       }
 
       const permission = await Notification.requestPermission();
@@ -751,14 +770,15 @@ function RootLayoutShell({ children }) {
     const cancelDeferred = scheduleAfterPaint(() => {
       if (!active) return;
 
-      void import("../../lib/push-client").then(({ resolveBrowserPushState, setStoredPushEndpoint }) => {
+      void import("../../lib/push-client").then(({ resolvePushEnrollmentState, setStoredPushEndpoint }) => {
         void (async () => {
-          const browserState = await resolveBrowserPushState();
+          const browserState = await resolvePushEnrollmentState();
           if (!active) return;
 
           setNotificationPermission(browserState.permission);
 
-          if (browserState.permission !== "granted" || !browserState.hasSubscription) {
+          if (!browserState.isEnrolled) {
+            setWebPushEnabled(false);
             return;
           }
 

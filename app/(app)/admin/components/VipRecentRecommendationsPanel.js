@@ -80,6 +80,37 @@ function deliveryChannelLabelAr(channel, bucket) {
   return "—";
 }
 
+function deliveryChannelTone(bucket) {
+  if (bucket?.delivered > 0) {
+    return {
+      chip: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100",
+      label: "text-emerald-700 dark:text-emerald-200",
+    };
+  }
+  if (bucket?.failed > 0) {
+    return {
+      chip: "border-red-200 bg-red-50 text-red-800 dark:border-red-400/30 dark:bg-red-500/15 dark:text-red-100",
+      label: "text-red-700 dark:text-red-200",
+    };
+  }
+  if (bucket?.unavailable > 0) {
+    return {
+      chip: "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-500/30 dark:bg-slate-500/15 dark:text-slate-200",
+      label: "text-slate-700 dark:text-slate-300",
+    };
+  }
+  if (bucket?.processing > 0 || bucket?.pending > 0) {
+    return {
+      chip: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-100",
+      label: "text-amber-800 dark:text-amber-200",
+    };
+  }
+  return {
+    chip: "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-black/20 dark:text-slate-300",
+    label: "text-slate-600 dark:text-slate-300",
+  };
+}
+
 function DeliverySummaryInline({ deliverySummary }) {
   if (!deliverySummary) return null;
 
@@ -94,23 +125,32 @@ function DeliverySummaryInline({ deliverySummary }) {
       {channels.map(({ key, label }) => {
         const bucket = deliverySummary.channels?.[key];
         const state = deliveryChannelLabelAr(key, bucket);
-        const tone =
-          bucket?.delivered > 0
-            ? "text-emerald-200"
-            : bucket?.failed > 0
-              ? "text-red-200"
-              : bucket?.unavailable > 0
-                ? "text-amber-200"
-                : "text-slate-300";
+        const tone = deliveryChannelTone(bucket);
         return (
-          <div key={key} className="rounded-lg border border-white/5 bg-black/20 px-2 py-1.5 text-[10px]">
-            <span className="font-bold text-slate-400">{label}: </span>
-            <span className={`font-black ${tone}`}>{state}</span>
+          <div
+            key={key}
+            className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold ${tone.chip}`}
+          >
+            <span className="text-slate-600 dark:text-slate-400">{label}: </span>
+            <span className={tone.label}>{state}</span>
           </div>
         );
       })}
     </div>
   );
+}
+
+function historyEventBadgeClass(eventType) {
+  if (eventType === "target_1_hit") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100";
+  }
+  if (eventType === "target_2_hit") {
+    return "border-teal-200 bg-teal-50 text-teal-800 dark:border-cyan-400/30 dark:bg-cyan-500/15 dark:text-cyan-100";
+  }
+  if (eventType === "close_now") {
+    return "border-red-200 bg-red-50 text-red-800 dark:border-red-400/30 dark:bg-red-500/15 dark:text-red-100";
+  }
+  return "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-100";
 }
 
 function historyEventLabel(eventType) {
@@ -124,25 +164,31 @@ function ActiveRecommendationCard({
   onRetryFailedChannels,
 }) {
   return (
-    <article className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl backdrop-blur-2xl">
+    <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-lg dark:border-cyan-300/15 dark:bg-slate-900/70 dark:shadow-2xl dark:backdrop-blur-2xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-black text-cyan-100">
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-black ${
+                item.signalType === "futures"
+                  ? "border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-100"
+                  : "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100"
+              }`}
+            >
               {signalTypeBadge(item.signalType)}
             </span>
-            <span className="text-xl font-black text-white">{item.coin}</span>
+            <span className="text-xl font-black text-slate-900 dark:text-white">{item.coin}</span>
             {item.tradeStatus === "target_1_hit" ? (
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-xs font-black text-emerald-100">
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100">
                 تم تحقيق الهدف الأول
               </span>
             ) : null}
           </div>
-          <p className="mt-2 text-sm font-bold text-slate-300">
+          <p className="mt-2 text-sm font-bold text-slate-700 dark:text-slate-300">
             الحالة: {tradeStatusLabelAr(item.tradeStatus)}
           </p>
         </div>
-        <div className="text-left text-xs font-bold text-slate-400">
+        <div className="text-left text-xs font-bold text-slate-500 dark:text-slate-400">
           <p>{formatDateTime(item.createdAt)}</p>
           {item.publishRecipientCount != null ? (
             <p className="mt-1">المستلمون عند النشر: {item.publishRecipientCount}</p>
@@ -152,44 +198,48 @@ function ActiveRecommendationCard({
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-cyan-300/10 bg-black/20 px-4 py-3">
-          <p className="text-xs font-bold text-slate-400">منطقة الدخول</p>
-          <p className="mt-1 font-black text-white">{item.entry || "—"}</p>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 px-4 py-3 dark:border-cyan-300/10 dark:bg-black/20">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-400">منطقة الدخول</p>
+          <p className="mt-1 font-black text-slate-900 dark:text-white">{item.entry || "—"}</p>
         </div>
-        <div className="rounded-2xl border border-emerald-400/10 bg-black/20 px-4 py-3">
-          <p className="text-xs font-bold text-slate-400">الأهداف</p>
-          <p className="mt-1 font-black text-emerald-100">{item.targets || "—"}</p>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-400/10 dark:bg-black/20">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-400">الأهداف</p>
+          <p className="mt-1 font-black text-emerald-800 dark:text-emerald-100">{item.targets || "—"}</p>
         </div>
-        <div className="rounded-2xl border border-red-400/10 bg-black/20 px-4 py-3">
-          <p className="text-xs font-bold text-slate-400">وقف الخسارة</p>
-          <p className="mt-1 font-black text-red-100">{item.stopLoss || "—"}</p>
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 dark:border-red-400/10 dark:bg-black/20">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-400">وقف الخسارة</p>
+          <p className="mt-1 font-black text-red-800 dark:text-red-100">{item.stopLoss || "—"}</p>
         </div>
       </div>
 
       {item.notes ? (
-        <p className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-300">
+        <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-300">
           {item.notes}
         </p>
       ) : null}
 
       {item.statusHistory?.length ? (
-        <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-          <p className="text-xs font-bold text-slate-400">سجل الحالة</p>
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-black/20">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-400">سجل الحالة</p>
           <ul className="mt-2 space-y-2">
-            <li className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
-              <span>نُشرت</span>
+            <li className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 font-bold text-blue-800 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100">
+                نُشرت
+              </span>
               <span>{formatDateTime(item.createdAt)}</span>
             </li>
             {item.statusHistory.map((ev) => (
               <li
                 key={ev.id}
-                className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-white/5 dark:bg-white/[0.03]"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-200">
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs font-bold ${historyEventBadgeClass(ev.eventType)}`}
+                  >
                     {historyEventLabel(ev.eventType)}
                   </span>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
                     {ev.deliveryStatus === "processing"
                       ? "قيد الإرسال"
                       : ev.deliveryStatus === "completed"
@@ -205,7 +255,7 @@ function ActiveRecommendationCard({
                     type="button"
                     disabled={Boolean(submittingKey)}
                     onClick={() => onRetryFailedChannels({ id: item.id, eventType: ev.eventType })}
-                    className="mt-2 rounded-lg border border-amber-300/20 px-2 py-1 text-[10px] font-black text-amber-100 disabled:opacity-50"
+                    className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-900 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-300/20 dark:bg-amber-500/10 dark:text-amber-100 dark:hover:bg-amber-500/20"
                   >
                     {submittingKey === `retry:${item.id}:${ev.eventType}`
                       ? "جاري إعادة المحاولة..."
@@ -226,10 +276,10 @@ function ActiveRecommendationCard({
           const label = VIP_STATUS_EVENT_LABELS_AR[eventType];
           const buttonClass =
             eventType === "close_now"
-              ? "from-red-700 via-red-600 to-rose-500 shadow-[0_16px_40px_rgba(220,38,38,0.28)]"
+              ? "from-red-600 via-red-500 to-rose-500 shadow-md dark:from-red-700 dark:via-red-600 dark:to-rose-500 dark:shadow-[0_16px_40px_rgba(220,38,38,0.28)]"
               : eventType === "target_2_hit"
-                ? "from-emerald-700 via-green-600 to-lime-400 shadow-[0_16px_40px_rgba(34,197,94,0.28)]"
-                : "from-emerald-800 via-emerald-600 to-green-400 shadow-[0_16px_40px_rgba(16,185,129,0.28)]";
+                ? "from-teal-600 via-cyan-600 to-blue-500 shadow-md dark:from-emerald-700 dark:via-green-600 dark:to-lime-400 dark:shadow-[0_16px_40px_rgba(34,197,94,0.28)]"
+                : "from-emerald-600 via-emerald-500 to-green-400 shadow-md dark:from-emerald-800 dark:via-emerald-600 dark:to-green-400 dark:shadow-[0_16px_40px_rgba(16,185,129,0.28)]";
 
           return (
             <div key={eventType} className="space-y-1">
@@ -245,11 +295,13 @@ function ActiveRecommendationCard({
                     label,
                   })
                 }
-                className={`w-full rounded-2xl bg-gradient-to-l px-4 py-3 text-sm font-black text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 ${buttonClass}`}
+                className={`w-full rounded-2xl bg-gradient-to-l px-4 py-3 text-sm font-black text-white transition hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:from-slate-400 disabled:via-slate-400 disabled:to-slate-500 disabled:text-slate-100 disabled:opacity-100 disabled:shadow-none disabled:hover:scale-100 ${buttonClass}`}
               >
                 {isLoading ? "جاري الإرسال..." : label}
               </button>
-              {reason ? <p className="text-[10px] font-bold text-slate-500">{reason}</p> : null}
+              {reason ? (
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{reason}</p>
+              ) : null}
             </div>
           );
         })}
@@ -260,30 +312,30 @@ function ActiveRecommendationCard({
 
 function CompletedRecommendationRow({ item }) {
   return (
-    <article className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+    <article className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-white/10 dark:bg-black/20">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-slate-400/20 bg-slate-500/10 px-3 py-1 text-xs font-black text-slate-200">
+          <span className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-black text-slate-700 dark:border-slate-400/20 dark:bg-slate-500/10 dark:text-slate-200">
             {signalTypeBadge(item.signalType)}
           </span>
-          <span className="text-lg font-black text-white">{item.coin}</span>
+          <span className="text-lg font-black text-slate-900 dark:text-white">{item.coin}</span>
         </div>
-        <span className="rounded-full border border-slate-400/20 bg-white/5 px-3 py-1 text-xs font-black text-slate-200">
+        <span className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-black text-slate-700 dark:border-slate-400/20 dark:bg-white/5 dark:text-slate-200">
           {tradeStatusLabelAr(item.tradeStatus)}
         </span>
       </div>
-      <dl className="mt-3 grid gap-2 text-xs font-bold text-slate-400 md:grid-cols-3">
+      <dl className="mt-3 grid gap-2 text-xs font-bold text-slate-500 md:grid-cols-3 dark:text-slate-400">
         <div>
           <dt>تاريخ النشر</dt>
-          <dd className="mt-1 text-slate-200">{formatDateTime(item.createdAt)}</dd>
+          <dd className="mt-1 text-slate-800 dark:text-slate-200">{formatDateTime(item.createdAt)}</dd>
         </div>
         <div>
           <dt>تاريخ الإغلاق</dt>
-          <dd className="mt-1 text-slate-200">{formatDateTime(resolveClosedAt(item))}</dd>
+          <dd className="mt-1 text-slate-800 dark:text-slate-200">{formatDateTime(resolveClosedAt(item))}</dd>
         </div>
         <div>
           <dt>آخر تحديث</dt>
-          <dd className="mt-1 text-slate-200">{formatDateTime(item.lastStatusEventAt)}</dd>
+          <dd className="mt-1 text-slate-800 dark:text-slate-200">{formatDateTime(item.lastStatusEventAt)}</dd>
         </div>
       </dl>
     </article>
@@ -458,9 +510,9 @@ export default function VipRecentRecommendationsPanel() {
 
   return (
     <section className="space-y-4">
-      <div>
-        <h3 className="text-2xl font-black text-white">التوصيات النشطة</h3>
-        <p className="mt-1 text-sm font-bold text-slate-400">
+      <div className="rounded-2xl border border-slate-200 bg-gradient-to-l from-slate-50 to-blue-50/80 px-5 py-4 dark:border-cyan-300/15 dark:from-slate-900/80 dark:to-blue-950/40">
+        <h3 className="text-2xl font-black text-slate-900 dark:text-white">التوصيات النشطة</h3>
+        <p className="mt-1 text-sm font-bold text-slate-600 dark:text-slate-300">
           التوصيات ذات الحالة النشطة أو بعد الهدف الأول — خلال 48 ساعة من النشر.
         </p>
       </div>
@@ -469,10 +521,10 @@ export default function VipRecentRecommendationsPanel() {
         <div
           className={`rounded-2xl border px-4 py-4 text-sm font-bold ${
             resultBanner.type === "success"
-              ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100"
               : resultBanner.type === "warning"
-                ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
-                : "border-red-400/30 bg-red-500/10 text-red-100"
+                ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100"
+                : "border-red-300 bg-red-50 text-red-900 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-100"
           }`}
         >
           {resultBanner.message ? (
@@ -504,22 +556,22 @@ export default function VipRecentRecommendationsPanel() {
       ) : null}
 
       {loading ? (
-        <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-6 text-slate-300">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 text-slate-700 dark:border-cyan-300/15 dark:bg-white/[0.04] dark:text-slate-300">
           جاري تحميل التوصيات النشطة...
         </div>
       ) : error ? (
-        <div className="rounded-[28px] border border-red-400/20 bg-red-500/10 p-6">
-          <p className="font-bold text-red-100">{error}</p>
+        <div className="rounded-[28px] border border-red-300 bg-red-50 p-6 dark:border-red-400/20 dark:bg-red-500/10">
+          <p className="font-bold text-red-800 dark:text-red-100">{error}</p>
           <button
             type="button"
             onClick={() => void loadQueues()}
-            className="mt-3 rounded-xl border border-red-300/30 px-4 py-2 text-sm font-black text-red-100"
+            className="mt-3 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-black text-red-800 dark:border-red-300/30 dark:bg-transparent dark:text-red-100"
           >
             إعادة المحاولة
           </button>
         </div>
       ) : activeItems.length === 0 ? (
-        <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-6 text-slate-400">
+        <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 text-slate-600 dark:border-cyan-300/15 dark:bg-white/[0.04] dark:text-slate-400">
           لا توجد توصيات نشطة حالياً.
         </div>
       ) : (
@@ -536,22 +588,22 @@ export default function VipRecentRecommendationsPanel() {
         </div>
       )}
 
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.03]">
+      <div className="rounded-[28px] border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
         <button
           type="button"
           onClick={() => setHistoryOpen((open) => !open)}
           className="flex w-full items-center justify-between gap-3 px-5 py-4 text-right"
           aria-expanded={historyOpen}
         >
-          <span className="text-lg font-black text-white">سجل التوصيات المنتهية</span>
-          <span className="text-sm font-bold text-slate-400">
+          <span className="text-lg font-black text-slate-900 dark:text-white">سجل التوصيات المنتهية</span>
+          <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
             {historyOpen ? "إخفاء" : "عرض"} ({completedItems.length})
           </span>
         </button>
         {historyOpen ? (
-          <div className="space-y-3 border-t border-white/10 px-5 py-4">
+          <div className="space-y-3 border-t border-slate-200 px-5 py-4 dark:border-white/10">
             {completedItems.length === 0 ? (
-              <p className="text-sm font-bold text-slate-400">لا توجد توصيات منتهية بعد.</p>
+              <p className="text-sm font-bold text-slate-600 dark:text-slate-400">لا توجد توصيات منتهية بعد.</p>
             ) : (
               completedItems.map((item) => (
                 <CompletedRecommendationRow key={`completed-${item.id}`} item={item} />
