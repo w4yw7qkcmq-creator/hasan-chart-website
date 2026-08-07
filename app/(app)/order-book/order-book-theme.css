@@ -316,6 +316,19 @@ html[data-theme="light"] .ob-page {
   border-top-color: var(--ob-text-strong);
 }
 
+/* Order Blocks — mobile host must not clip buy rows below asks */
+@media (max-width: 1023px) {
+  .ob-page section.grid > .lg\:col-span-8.flex.flex-col {
+    min-height: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .ob-page .ob-order-blocks {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ob-page *,
   .ob-page *::before,

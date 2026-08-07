@@ -33,6 +33,7 @@ function readSources() {
     walls: readFileSync(join(ROOT, "app/components/order-book/HistoricalLiquidityWallsPanel.js"), "utf8"),
     ui: readFileSync(join(ROOT, "app/components/order-book/order-book-ui.js"), "utf8"),
     panel: readFileSync(join(ROOT, "app/components/order-book/OrderBookPanel.js"), "utf8"),
+    blocks: readFileSync(join(ROOT, "app/components/order-book/OrderBlocksPanel.js"), "utf8"),
     chart: readFileSync(join(ROOT, "app/components/order-book/LiquidityDepthChart.js"), "utf8"),
     fearGreed: readFileSync(join(ROOT, "app/components/order-book/FearGreedCard.js"), "utf8"),
     summaryHook: readFileSync(join(ROOT, "app/hooks/useOrderBook24hSummary.js"), "utf8"),
@@ -369,11 +370,12 @@ test("order book layout uses separate rows without grid placement hacks", () => 
   assert.doesNotMatch(row1, /ORDER_BOOK_ROW_HEIGHT_LG/);
   assert.doesNotMatch(row1, /overflow-hidden lg:col-span-4/);
   assert.doesNotMatch(row1, /title="جدران السيولة"/);
+  const { panel, blocks } = readSources();
   assert.match(panel, /ORDER_BOOK_VISIBLE_ROWS = 12/);
   assert.match(panel, /ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-\[36rem\]"/);
-  assert.match(panel, /visibleAsks = asks\.slice\(0, ORDER_BOOK_VISIBLE_ROWS\)/);
-  assert.match(panel, /h-full min-h-0/);
-  assert.match(panel, /overflow-y-auto overscroll-contain/);
+  assert.match(blocks, /visibleAsks = asks\.slice\(0, ORDER_BLOCKS_VISIBLE_ROWS\)/);
+  assert.match(panel, /max-lg:h-auto lg:h-full/);
+  assert.match(blocks, /overflow-y-auto overscroll-contain/);
 });
 
 test("row 1 sidebar has natural height without walls stack", () => {

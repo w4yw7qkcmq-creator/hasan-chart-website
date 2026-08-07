@@ -390,6 +390,10 @@ function testOrderBookUiSourceGuards() {
     fileURLToPath(new URL("../app/components/order-book/OrderBookPanel.js", import.meta.url)),
     "utf8"
   );
+  const blocksSource = readFileSync(
+    fileURLToPath(new URL("../app/components/order-book/OrderBlocksPanel.js", import.meta.url)),
+    "utf8"
+  );
   const formatterSource = readFileSync(
     fileURLToPath(new URL("../app/components/order-book/formatters.js", import.meta.url)),
     "utf8"
@@ -417,8 +421,8 @@ function testOrderBookUiSourceGuards() {
   assert.match(pageSource, /grid grid-cols-1 gap-3 md:grid-cols-2/);
   assert.match(panelSource, /ORDER_BOOK_VISIBLE_ROWS = 12/);
   assert.match(panelSource, /ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-\[36rem\]"/);
-  assert.match(panelSource, /h-full min-h-0/);
-  assert.match(panelSource, /overflow-y-auto overscroll-contain/);
+  assert.match(panelSource, /max-lg:h-auto lg:h-full/);
+  assert.match(blocksSource, /overflow-y-auto overscroll-contain/);
 }
 
 function testIndependentFlowDominanceWindows() {

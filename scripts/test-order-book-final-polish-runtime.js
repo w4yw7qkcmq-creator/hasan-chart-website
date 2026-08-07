@@ -37,8 +37,10 @@ test("row 1 stretches order book to left column height on desktop", () => {
 
 test("order book panel keeps internal scroll region", () => {
   const panel = readFileSync(join(ROOT, "app/components/order-book/OrderBookPanel.js"), "utf8");
-  assert.match(panel, /min-h-0 flex-1 overflow-y-auto/);
-  assert.match(panel, /flex h-full min-h-0 min-w-0 flex-col/);
+  const blocks = readFileSync(join(ROOT, "app/components/order-book/OrderBlocksPanel.js"), "utf8");
+  assert.match(blocks, /min-h-0 flex-none overflow-y-auto/);
+  assert.match(panel, /max-lg:h-auto lg:h-full max-lg:overflow-visible lg:overflow-hidden/);
+  assert.match(panel, /OrderBlocksPanel/);
 });
 
 test("executed flow binds display to selected window only", () => {

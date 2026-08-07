@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 
 const page = readFileSync(join(process.cwd(), "app/components/order-book/OrderBookPageContent.js"), "utf8");
 const panel = readFileSync(join(process.cwd(), "app/components/order-book/OrderBookPanel.js"), "utf8");
+const blocks = readFileSync(join(process.cwd(), "app/components/order-book/OrderBlocksPanel.js"), "utf8");
 const ui = readFileSync(join(process.cwd(), "app/components/order-book/order-book-ui.js"), "utf8");
 
 let passed = 0;
@@ -18,9 +19,10 @@ assert.match(page, /overflow-x-auto/);
 assert.match(page, /md:block|md:hidden|max-lg:|lg:/);
 passed += 7;
 
-assert.match(panel, /grid-cols-3/);
-assert.match(panel, /overflow-y-auto/);
-assert.match(panel, /min-h-0/);
+assert.match(blocks, /grid-cols-3/);
+assert.match(blocks, /overflow-y-auto/);
+assert.match(blocks, /min-h-0/);
+assert.match(panel, /OrderBlocksPanel/);
 passed += 3;
 
 assert.match(page, /dir="rtl"/);

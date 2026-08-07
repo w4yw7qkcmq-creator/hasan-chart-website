@@ -13,60 +13,15 @@ import {
 import { CoverageBadge, NumericValue } from "./order-book-ui";
 import { ob } from "./order-book-theme";
 
-import { computeDepthBarWidthPercent } from "./depth-bar-utils";
+import OrderBlocksPanel, {
+  ORDER_BLOCKS_MOBILE_SCROLL_MAX,
+  ORDER_BLOCKS_VISIBLE_ROWS,
+} from "./OrderBlocksPanel";
 
-export const ORDER_BOOK_VISIBLE_ROWS = 12;
+export const ORDER_BOOK_VISIBLE_ROWS = ORDER_BLOCKS_VISIBLE_ROWS;
 export const ORDER_BOOK_ROW_HEIGHT = "h-[36rem]";
 export const ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-[36rem]";
-export const ORDER_BOOK_MOBILE_SCROLL_MAX = "max-h-[min(70vh,36rem)]";
-
-function DepthGlowBar({ side, widthPercent }) {
-  const isAsk = side === "ask";
-  const width = Math.min(100, Math.max(0, widthPercent || 0));
-  if (width <= 0) return null;
-
-  const lightGradient = isAsk
-    ? "linear-gradient(to left, rgba(244,63,94,0.22) 0%, rgba(244,63,94,0.14) 42%, rgba(244,63,94,0) 100%)"
-    : "linear-gradient(to left, rgba(16,185,129,0.22) 0%, rgba(16,185,129,0.14) 42%, rgba(16,185,129,0) 100%)";
-  const darkGradient = isAsk
-    ? "linear-gradient(to left, rgba(244,63,94,0.28) 0%, rgba(244,63,94,0.16) 42%, rgba(244,63,94,0) 100%)"
-    : "linear-gradient(to left, rgba(16,185,129,0.28) 0%, rgba(16,185,129,0.16) 42%, rgba(16,185,129,0) 100%)";
-
-  return (
-    <>
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 dark:hidden"
-        style={{ width: `${width}%`, background: lightGradient }}
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 hidden dark:block"
-        style={{ width: `${width}%`, background: darkGradient }}
-        aria-hidden="true"
-      />
-    </>
-  );
-}
-
-function DepthRow({ level, side, widthPercent }) {
-  const isAsk = side === "ask";
-  const textColor = isAsk ? ob.negative : ob.positive;
-
-  return (
-    <div className={`group relative grid grid-cols-3 gap-2 px-3 py-1 text-sm ${ob.rowHover}`}>
-      <DepthGlowBar side={side} widthPercent={widthPercent} />
-      <span dir="ltr" className={`relative z-[1] text-left font-medium tabular-nums ${textColor}`}>
-        {formatPrice(level.price)}
-      </span>
-      <span dir="ltr" className={`relative z-[1] text-center tabular-nums ${ob.textNormal}`}>
-        {formatQuantity(level.quantity)}
-      </span>
-      <span dir="ltr" className={`relative z-[1] text-right tabular-nums ${ob.textMuted}`}>
-        {formatUsd(level.notional, { compact: true })}
-      </span>
-    </div>
-  );
-}
+export const ORDER_BOOK_MOBILE_SCROLL_MAX = ORDER_BLOCKS_MOBILE_SCROLL_MAX;
 
 function ExchangePills({ statuses = [] }) {
   const connected = statuses.filter((item) => item.status === "connected").length;
@@ -97,21 +52,7 @@ function ExchangePills({ statuses = [] }) {
 export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
   const asks = useMemo(() => [...(data?.asks || [])].reverse(), [data?.asks]);
   const bids = data?.bids || [];
-  const showAsks = mobileSide === "all" || mobileSide === "asks";
-  const showBids = mobileSide === "all" || mobileSide === "bids";
   const symbolLabel = SYMBOL_LABELS[symbol] || symbol || "—";
-
-  const maxAskNotional = useMemo(
-    () => Math.max(...asks.map((level) => Number(level.notional) || 0), 0),
-    [asks],
-  );
-  const maxBidNotional = useMemo(
-    () => Math.max(...bids.map((level) => Number(level.notional) || 0), 0),
-    [bids],
-  );
-
-  const visibleAsks = asks.slice(0, ORDER_BOOK_VISIBLE_ROWS);
-  const visibleBids = bids.slice(0, ORDER_BOOK_VISIBLE_ROWS);
 
   return (
     <div
@@ -156,42 +97,12 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
         <span className="text-right">القيمة</span>
       </div>
 
-      <div
-        className={`${ORDER_BOOK_MOBILE_SCROLL_MAX} min-h-0 flex-none overflow-y-auto overscroll-contain lg:max-h-none lg:flex-1`}
-      >
-      {showAsks ? (
-        <div>
-          {visibleAsks.map((level) => (
-            <DepthRow
-              key={`ask-${level.price}`}
-              level={level}
-              side="ask"
-              widthPercent={computeDepthBarWidthPercent(level.notional, maxAskNotional)}
-            />
-          ))}
-        </div>
-      ) : null}
-
-      <div className={`${ob.midPrice} top-0`}>
-        خط السعر —{" "}
-        <NumericValue className={`font-semibold ${ob.textStrong}`}>
-          {formatPrice(data?.midPrice)}
-        </NumericValue>
-      </div>
-
-      {showBids ? (
-        <div>
-          {visibleBids.map((level) => (
-            <DepthRow
-              key={`bid-${level.price}`}
-              level={level}
-              side="bid"
-              widthPercent={computeDepthBarWidthPercent(level.notional, maxBidNotional)}
-            />
-          ))}
-        </div>
-      ) : null}
-      </div>
+      <OrderBlocksPanel
+        asks={asks}
+        bids={bids}
+        midPrice={data?.midPrice}
+        mobileSide={mobileSide}
+      />
     </div>
   );
 }
