@@ -16,7 +16,7 @@ assert.match(panel, /max-lg:overflow-visible lg:overflow-hidden/);
 assert.match(panel, /OrderBlocksPanel/);
 
 assert.match(blocks, /ob-order-blocks/);
-assert.match(blocks, /ORDER_BLOCKS_MOBILE_SCROLL_MAX/);
+assert.match(blocks, /ORDER_BLOCKS_DESKTOP_SCROLL_MAX|ORDER_BLOCKS_MOBILE_SCROLL_MAX/);
 assert.match(panel, /ORDER_BOOK_MOBILE_SCROLL_MAX = ORDER_BLOCKS_MOBILE_SCROLL_MAX/);
 
 assert.match(page, /header className=\{`mt-4 mb-6 p-4 sm:p-5 \$\{ob\.surface\}`\}/);

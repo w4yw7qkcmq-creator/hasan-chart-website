@@ -316,7 +316,7 @@ html[data-theme="light"] .ob-page {
   border-top-color: var(--ob-text-strong);
 }
 
-/* Order Blocks — mobile host must not clip buy rows below asks */
+/* Order Blocks — mobile uses page scroll (no nested clip) */
 @media (max-width: 1023px) {
   .ob-page section.grid > .lg\:col-span-8.flex.flex-col {
     min-height: auto;
@@ -325,7 +325,13 @@ html[data-theme="light"] .ob-page {
   }
 
   .ob-page .ob-order-blocks {
-    -webkit-overflow-scrolling: touch;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .ob-page .ob-order-blocks .ob-mid-row {
+    position: static;
   }
 }
 

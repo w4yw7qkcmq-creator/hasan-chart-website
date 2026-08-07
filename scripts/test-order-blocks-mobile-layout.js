@@ -12,9 +12,10 @@ const css = read("app/(app)/order-book/order-book-theme.css");
 
 assert.match(blocks, /export default function OrderBlocksPanel/);
 assert.match(blocks, /ob-order-blocks/);
-assert.match(blocks, /ORDER_BLOCKS_MOBILE_SCROLL_MAX/);
-assert.match(blocks, /max-h-\[min\(70vh,36rem\)\]/);
-assert.match(blocks, /flex-none overflow-y-auto overscroll-contain lg:max-h-none lg:flex-1/);
+assert.match(blocks, /ORDER_BLOCKS_DESKTOP_SCROLL_MAX/);
+assert.match(blocks, /max-lg:h-auto max-lg:max-h-none max-lg:overflow-visible/);
+assert.match(blocks, /lg:overflow-y-auto lg:overscroll-contain/);
+assert.doesNotMatch(blocks, /overflow-y-auto overscroll-contain lg:max-h-none/);
 assert.match(blocks, /data-order-blocks-section="sell"/);
 assert.match(blocks, /data-order-blocks-section="buy"/);
 assert.match(blocks, /data-order-blocks-section="mid"/);
@@ -26,7 +27,7 @@ assert.match(panel, /import OrderBlocksPanel/);
 assert.match(panel, /<OrderBlocksPanel/);
 assert.doesNotMatch(panel, /function DepthRow/);
 
-assert.match(css, /\.ob-page \.ob-order-blocks/);
+assert.match(css, /\.ob-page \.ob-order-blocks[\s\S]*overflow: visible !important/);
 assert.match(css, /lg\\:col-span-8\.flex\.flex-col/);
 
 console.log("test-order-blocks-mobile-layout: PASS");

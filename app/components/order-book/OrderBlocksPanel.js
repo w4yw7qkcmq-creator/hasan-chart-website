@@ -7,7 +7,9 @@ import { ob } from "./order-book-theme";
 import { computeDepthBarWidthPercent } from "./depth-bar-utils";
 
 export const ORDER_BLOCKS_VISIBLE_ROWS = 12;
-export const ORDER_BLOCKS_MOBILE_SCROLL_MAX = "max-h-[min(70vh,36rem)]";
+export const ORDER_BLOCKS_DESKTOP_SCROLL_MAX = "lg:max-h-[min(70vh,36rem)]";
+/** @deprecated use ORDER_BLOCKS_DESKTOP_SCROLL_MAX — mobile uses natural page flow */
+export const ORDER_BLOCKS_MOBILE_SCROLL_MAX = ORDER_BLOCKS_DESKTOP_SCROLL_MAX;
 
 function DepthGlowBar({ side, widthPercent }) {
   const isAsk = side === "ask";
@@ -80,7 +82,7 @@ export default function OrderBlocksPanel({
 
   return (
     <div
-      className={`ob-order-blocks ${ORDER_BLOCKS_MOBILE_SCROLL_MAX} min-h-0 flex-none overflow-y-auto overscroll-contain lg:max-h-none lg:flex-1`}
+      className={`ob-order-blocks max-lg:h-auto max-lg:max-h-none max-lg:overflow-visible max-lg:overscroll-auto min-h-0 flex-none ${ORDER_BLOCKS_DESKTOP_SCROLL_MAX} lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain`}
     >
       {showAsks ? (
         <div data-order-blocks-section="sell">
@@ -95,7 +97,7 @@ export default function OrderBlocksPanel({
         </div>
       ) : null}
 
-      <div className={`${ob.midPrice} top-0`} data-order-blocks-section="mid">
+      <div className={`${ob.midPrice} max-lg:static lg:sticky top-0`} data-order-blocks-section="mid">
         خط السعر —{" "}
         <NumericValue className={`font-semibold ${ob.textStrong}`}>
           {formatPrice(midPrice)}

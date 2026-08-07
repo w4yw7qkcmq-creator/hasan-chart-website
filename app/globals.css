@@ -1070,6 +1070,36 @@ html[data-theme="light"] .site-top-header__gradient {
   }
 }
 
+.site-header-brand__text--primary,
+.site-header-brand__text--suffix {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+@media (max-width: 1023px) {
+  .site-header-brand__text--primary,
+  .site-header-brand__text--suffix {
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
+@media (max-width: 639px) {
+  .site-header-brand {
+    flex: 0 1 auto;
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .site-header-brand__text--primary {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+}
+
 .browserPushBtn:hover {
   background: rgba(34, 211, 238, 0.18);
 }

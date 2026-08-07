@@ -64,7 +64,9 @@ passed += 6;
 
 assert.match(globals, /html\[data-theme="light"\][\s\S]*--header-brand-text/);
 assert.match(globals, /:root[\s\S]*--header-brand-text/);
-assert.match(globals, /\.site-header-brand__text[\s\S]*color:\s*var\(--header-brand-text/);
+assert.match(shell, /site-header-brand__text--primary/);
+assert.match(shell, /HasaN CharT/);
+assert.match(globals, /@media \(max-width: 639px\)[\s\S]*site-header-brand__text--primary/);
 assert.match(globals, /\.site-sidebar-brand-title[\s\S]*color:\s*var\(--header-brand-text/);
 assert.match(globals, /\.site-sidebar-brand-subtitle[\s\S]*color:\s*var\(--header-brand-muted/);
 assert.match(globals, /\.site-header-logo-badge[\s\S]*color:\s*var\(--header-logo-text\)/);

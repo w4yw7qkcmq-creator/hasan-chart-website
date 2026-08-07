@@ -1247,11 +1247,17 @@ function RootLayoutShell({ children }) {
                 >
                   <span aria-hidden="true">⋮</span>
                 </button>
-                <Link href="/" className="site-header-brand font-black text-lg flex items-center gap-2 min-w-0">
-                  <span aria-hidden="true" className="site-header-logo-badge font-black">
+                <Link href="/" className="site-header-brand font-black flex items-center gap-1.5 min-w-0 sm:gap-2 sm:text-lg">
+                  <span aria-hidden="true" className="site-header-logo-badge shrink-0 font-black">
                     HC
                   </span>
-                  <span className="site-header-brand__text">HasaN CharT</span>
+                  <span className="site-header-brand__text site-header-brand__text--primary">
+                    HasaN CharT
+                  </span>
+                  <span className="site-header-brand__text site-header-brand__text--suffix hidden md:inline">
+                    {" "}
+                    World
+                  </span>
                 </Link>
 
                 <button
