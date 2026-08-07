@@ -61,6 +61,7 @@ const SERVICE_OPTIONS = [
   { value: "all", label: "كل الخدمات" },
   { value: "vip_spot", label: "VIP Spot" },
   { value: "vip_futures", label: "VIP Futures" },
+  { value: "vip_forex", label: "VIP Forex" },
   { value: "vip_signals", label: "VIP Signals" },
   { value: "academy", label: "Academy" },
 ];

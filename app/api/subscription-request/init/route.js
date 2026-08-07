@@ -10,6 +10,7 @@ import {
 } from "../../../../lib/payment-proof-storage.js";
 import { initUploadSession } from "../../../../lib/payment-proof-subscription-flow.js";
 import { validatePaymentNetwork } from "../../../../lib/payment-networks.js";
+import { resolveSubscriptionPlan } from "../../../../lib/subscription-plan-registry.js";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +50,30 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const planName = String(body.plan_name || "").trim();
     const category = String(body.category || "").trim();
-    const price = String(body.price || "").trim();
     const telegramUsername = String(body.telegram_username || "").trim().slice(0, 64);
     const paymentNetworkInput = body.payment_network ?? body.paymentNetwork;
 
-    if (!planName || !category || !price || !telegramUsername) {
+    const planResolution = resolveSubscriptionPlan({
+      planId: body.plan_id || body.planId,
+      plan_name: planName,
+      category,
+      price: body.price,
+    });
+
+    if (!planResolution.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: planResolution.error,
+          errorCode: planResolution.code,
+        },
+        { status: 400 }
+      );
+    }
+
+    const canonicalPlan = planResolution.plan;
+
+    if (!telegramUsername) {
       return NextResponse.json(
         {
           success: false,
@@ -81,9 +101,9 @@ export async function POST(request) {
       userId: session.id,
       userEmail: session.email,
       username: String(body.username || session.username || session.email).trim(),
-      planName,
-      category,
-      price,
+      planName: canonicalPlan.planName,
+      category: canonicalPlan.category,
+      price: canonicalPlan.price,
       telegramUsername,
       paymentNetwork: networkValidation.value,
     });

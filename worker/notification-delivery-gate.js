@@ -19,7 +19,7 @@ function normalizeNotificationKey(value) {
   const underscored = raw.replace(/-/g, "_");
   if (PHASE1_CHANNEL_KEYS.includes(underscored)) return underscored;
   if (raw === "price-alert") return "price_alert";
-  if (raw === "vip-signal" || raw === "vip-spot" || raw === "vip-futures") return "vip_signal";
+  if (raw === "vip-signal" || raw === "vip-spot" || raw === "vip-futures" || raw === "vip-forex") return "vip_signal";
   if (raw === "breaking-news") return "breaking_news";
   if (raw === "analysis-reply") return "analysis_reply";
   if (raw === "account-management") return "account_management";

@@ -193,6 +193,13 @@ test("eligibility: futures subscriber receives futures only", () => {
   assert.equal(matchesSignalSubscription("VIP Futures Pro", "spot"), false);
 });
 
+test("eligibility: forex subscriber receives forex only", () => {
+  assert.equal(matchesSignalSubscription("فوركس - شهر", "forex"), true);
+  assert.equal(matchesSignalSubscription("فوركس - شهر", "futures"), false);
+  assert.equal(matchesSignalSubscription("فوركس - شهر", "spot"), false);
+  assert.equal(matchesSignalSubscription("VIP Futures Pro", "forex"), false);
+});
+
 test("eligibility: combined subscriber receives both", () => {
   assert.equal(isCombinedVipPlan("VIP Signals Combined"), true);
   assert.equal(matchesSignalSubscription("VIP Signals Combined", "spot"), true);

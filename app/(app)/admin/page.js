@@ -1630,7 +1630,9 @@ export default function AdminPage() {
     const confirmed = await confirmAdminAction(
       signalType === "spot"
         ? "هل تريد نشر توصية VIP Spot؟"
-        : "هل تريد نشر توصية VIP Futures؟"
+        : signalType === "forex"
+          ? "هل تريد نشر توصية VIP Forex؟"
+          : "هل تريد نشر توصية VIP Futures؟"
     );
 
     if (!confirmed) return;
@@ -1662,7 +1664,9 @@ export default function AdminPage() {
       showAdminNotice(
         signalType === "spot"
           ? "تم نشر توصية VIP Spot"
-          : "تم نشر توصية VIP Futures"
+          : signalType === "forex"
+            ? "تم نشر توصية VIP Forex"
+            : "تم نشر توصية VIP Futures"
       );
 
       window.dispatchEvent(new CustomEvent(VIP_RECOMMENDATIONS_REFRESH_EVENT));
@@ -2178,7 +2182,7 @@ export default function AdminPage() {
               />
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
               <button
                 onClick={() => publishVipSignal("spot")}
                 className="rounded-2xl bg-gradient-to-l from-amber-600 via-yellow-500 to-amber-300 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(245,158,11,0.35)] transition hover:scale-[1.01] hover:brightness-110"
@@ -2191,6 +2195,13 @@ export default function AdminPage() {
                 className="rounded-2xl bg-gradient-to-l from-fuchsia-700 via-purple-600 to-pink-400 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(192,38,211,0.35)] transition hover:scale-[1.01] hover:brightness-110"
               >
                 نشر توصية VIP Futures 🔥
+              </button>
+
+              <button
+                onClick={() => publishVipSignal("forex")}
+                className="rounded-2xl bg-gradient-to-l from-teal-700 via-emerald-600 to-cyan-400 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(20,184,166,0.35)] transition hover:scale-[1.01] hover:brightness-110"
+              >
+                💱 نشر توصية VIP Forex
               </button>
             </div>
           </div>

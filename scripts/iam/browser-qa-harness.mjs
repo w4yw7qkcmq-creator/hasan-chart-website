@@ -96,7 +96,7 @@ export function getPidsOnPort(port) {
 export function isQaDevProcess(pid) {
   try {
     const cmd = execSync(`ps -p ${pid} -o command=`, { encoding: "utf8" });
-    return /next dev|next-server|npm run dev.*-p\s*3019|node.*3019/.test(cmd);
+    return /next dev|next-server|npm run dev/.test(cmd);
   } catch {
     return false;
   }

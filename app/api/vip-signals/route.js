@@ -9,6 +9,10 @@ import {
   VIP_SIGNALS_LIST_COLUMNS,
   VIP_SIGNALS_MAX_LIMIT,
 } from "../../../lib/supabase-query-columns";
+import {
+  matchesSignalSubscription,
+  normalizeVipSignalType,
+} from "../../../lib/vip-recommendation-eligibility.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -21,34 +25,7 @@ const supabase = createClient(
   }
 );
 
-const normalizeSignalType = (value) => {
-  const text = String(value || "spot").trim().toLowerCase();
-
-  if (text.includes("future") || text.includes("futures") || text.includes("فيوتشر")) {
-    return "futures";
-  }
-
-  return "spot";
-};
-
-const matchesSignalSubscription = (planText, signalType) => {
-  const text = String(planText || "").toLowerCase();
-
-  if (signalType === "futures") {
-    return (
-      text.includes("future") ||
-      text.includes("futures") ||
-      text.includes("فيوتشر") ||
-      text.includes("vip futures")
-    );
-  }
-
-  return (
-    text.includes("spot") ||
-    text.includes("سبوت") ||
-    text.includes("vip spot")
-  );
-};
+const normalizeSignalType = normalizeVipSignalType;
 
 const getAuthenticatedUser = async () => {
   const cookieStore = await cookies();

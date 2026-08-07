@@ -469,9 +469,9 @@ export default function SubscriptionsAuthenticated({ user }) {
 
         <header className="subscriptions-hero">
           <span className="subscriptions-hero__eyebrow">PREMIUM MEMBERSHIPS</span>
-          <h1 className="subscriptions-hero__title">اشتراكات التوصيات Spot & Futures</h1>
+          <h1 className="subscriptions-hero__title">اشتراكات التوصيات Spot & Futures & Forex</h1>
           <p className="subscriptions-hero__text">
-            اختر باقة السبوت أو الفيوتشر المناسبة لأسلوب تداولك، مع توصيات واضحة ومتابعة
+            اختر باقة السبوت أو الفيوتشر أو الفوركس المناسبة لأسلوب تداولك، مع توصيات واضحة ومتابعة
             احترافية من فريق HasaN CharT World.
           </p>
         </header>
@@ -536,20 +536,30 @@ export default function SubscriptionsAuthenticated({ user }) {
         <HubLinks />
 
         <section id="plans" className="subscriptions-plans">
-          {["باقات السبوت", "باقات الفيوتشر"].map((category) => (
+          {[
+            {
+              category: "باقات السبوت",
+              badge: "SPOT",
+              description: "اشتراكات توصيات السبوت للفترات الشهرية والربع سنوية والسنوية.",
+            },
+            {
+              category: "باقات الفيوتشر",
+              badge: "FUTURES",
+              description: "اشتراكات توصيات الفيوتشر مع متابعة وإدارة مخاطر حسب مدة الباقة.",
+            },
+            {
+              category: "باقات الفوركس",
+              badge: "FOREX",
+              description: "اشتراكات توصيات الفوركس مع متابعة أزواج العملات وإدارة مخاطر حسب مدة الباقة.",
+            },
+          ].map(({ category, badge, description }) => (
             <div key={category} className="subscriptions-plans-group">
               <div className="subscriptions-plans-group__head">
                 <div>
                   <h2>{category}</h2>
-                  <p>
-                    {category === "باقات السبوت"
-                      ? "اشتراكات توصيات السبوت للفترات الشهرية والربع سنوية والسنوية."
-                      : "اشتراكات توصيات الفيوتشر مع متابعة وإدارة مخاطر حسب مدة الباقة."}
-                  </p>
+                  <p>{description}</p>
                 </div>
-                <span className="subscriptions-plans-group__badge">
-                  {category === "باقات السبوت" ? "SPOT" : "FUTURES"}
-                </span>
+                <span className="subscriptions-plans-group__badge">{badge}</span>
               </div>
 
               <div className="subscriptions-plans-grid">

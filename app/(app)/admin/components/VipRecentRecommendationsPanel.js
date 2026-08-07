@@ -6,6 +6,7 @@ import {
   VIP_STATUS_EVENT_LABELS_AR,
   tradeStatusLabelAr,
 } from "../../../../lib/vip-recommendation-status-copy.js";
+import { signalTypeBadge } from "../../../../lib/vip-signal-types.js";
 
 export const VIP_RECOMMENDATIONS_REFRESH_EVENT = "vip-recommendations:refresh";
 
@@ -25,8 +26,15 @@ function formatDateTime(value) {
   }
 }
 
-function signalTypeBadge(signalType) {
-  return signalType === "futures" ? "Futures 🔥" : "Spot ⭐";
+
+function vipSignalBadgeClass(signalType) {
+  if (signalType === "futures") {
+    return "border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-100";
+  }
+  if (signalType === "forex") {
+    return "border-teal-300 bg-teal-50 text-teal-800 dark:border-teal-400/30 dark:bg-teal-500/15 dark:text-teal-100";
+  }
+  return "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100";
 }
 
 function resolveClosedAt(item) {
@@ -169,11 +177,7 @@ function ActiveRecommendationCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-full border px-3 py-1 text-xs font-black ${
-                item.signalType === "futures"
-                  ? "border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-100"
-                  : "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100"
-              }`}
+              className={`rounded-full border px-3 py-1 text-xs font-black ${vipSignalBadgeClass(item.signalType)}`}
             >
               {signalTypeBadge(item.signalType)}
             </span>
