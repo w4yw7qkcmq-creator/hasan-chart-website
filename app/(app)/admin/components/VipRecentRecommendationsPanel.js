@@ -69,6 +69,50 @@ function disabledReason(tradeStatus, eventType) {
   return "";
 }
 
+function deliveryChannelLabelAr(channel, bucket) {
+  if (!bucket) return null;
+  if (bucket.delivered > 0) return "تم التسليم";
+  if (bucket.failed > 0) return "فشل";
+  if (bucket.unavailable > 0) return "غير متاح";
+  if (bucket.processing > 0) return "قيد الإرسال";
+  if (bucket.pending > 0) return "بالانتظار";
+  if (bucket.skipped > 0) return "تم التخطي";
+  return "—";
+}
+
+function DeliverySummaryInline({ deliverySummary }) {
+  if (!deliverySummary) return null;
+
+  const channels = [
+    { key: "site", label: "الموقع" },
+    { key: "push", label: "المتصفح" },
+    { key: "email", label: "البريد" },
+  ];
+
+  return (
+    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+      {channels.map(({ key, label }) => {
+        const bucket = deliverySummary.channels?.[key];
+        const state = deliveryChannelLabelAr(key, bucket);
+        const tone =
+          bucket?.delivered > 0
+            ? "text-emerald-200"
+            : bucket?.failed > 0
+              ? "text-red-200"
+              : bucket?.unavailable > 0
+                ? "text-amber-200"
+                : "text-slate-300";
+        return (
+          <div key={key} className="rounded-lg border border-white/5 bg-black/20 px-2 py-1.5 text-[10px]">
+            <span className="font-bold text-slate-400">{label}: </span>
+            <span className={`font-black ${tone}`}>{state}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function historyEventLabel(eventType) {
   return VIP_STATUS_EVENT_LABELS_AR[eventType] || eventType;
 }
@@ -145,8 +189,17 @@ function ActiveRecommendationCard({
                   <span className="text-xs font-bold text-slate-200">
                     {historyEventLabel(ev.eventType)}
                   </span>
-                  <span className="text-[11px] text-slate-400">{formatDateTime(ev.createdAt)}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {ev.deliveryStatus === "processing"
+                      ? "قيد الإرسال"
+                      : ev.deliveryStatus === "completed"
+                        ? "اكتمل"
+                        : ev.deliveryStatus === "partial"
+                          ? "اكتمل جزئيًا"
+                          : formatDateTime(ev.createdAt)}
+                  </span>
                 </div>
+                <DeliverySummaryInline deliverySummary={ev.deliverySummary} />
                 {ev.partialFailure ? (
                   <button
                     type="button"
@@ -248,6 +301,8 @@ export default function VipRecentRecommendationsPanel() {
   const [resultBanner, setResultBanner] = useState(null);
   const [retryContext, setRetryContext] = useState(null);
 
+  const [pollUntil, setPollUntil] = useState(0);
+
   const loadQueues = useCallback(async ({ silent = false } = {}) => {
     if (!silent) {
       setLoading(true);
@@ -293,6 +348,18 @@ export default function VipRecentRecommendationsPanel() {
     return () => window.removeEventListener(VIP_RECOMMENDATIONS_REFRESH_EVENT, handler);
   }, [loadQueues]);
 
+  useEffect(() => {
+    if (!pollUntil || Date.now() >= pollUntil) return undefined;
+
+    const tick = () => {
+      void loadQueues({ silent: true });
+    };
+
+    tick();
+    const timer = window.setInterval(tick, 3000);
+    return () => window.clearInterval(timer);
+  }, [pollUntil, loadQueues]);
+
   const confirmAndSend = async () => {
     if (!pendingAction) return;
 
@@ -325,8 +392,13 @@ export default function VipRecentRecommendationsPanel() {
         partialFailure: Boolean(data.partialFailure),
         signalId: pendingAction.id,
         eventType: pendingAction.eventType,
+        message:
+          response.status === 202 || data?.deliveryStatus === "processing"
+            ? "تم قبول التحديث — جاري إرسال الإشعارات..."
+            : undefined,
       });
 
+      setPollUntil(Date.now() + 90000);
       await loadQueues({ silent: true });
     } catch (err) {
       setResultBanner({

@@ -240,11 +240,15 @@ test("worker sync: outbox sent updates VIP delivery", async () => {
         },
       };
     },
+    rpc: async () => ({ error: null }),
   };
 
   const sync = await syncVipStatusDeliveryFromOutbox(
     supabase,
-    { message_type: VIP_STATUS_EMAIL_MESSAGE_TYPE, metadata: { vipDeliveryId: "del-99" } },
+    {
+      message_type: VIP_STATUS_EMAIL_MESSAGE_TYPE,
+      metadata: { vipDeliveryId: "del-99", signalId: 1, eventType: "target_1_hit" },
+    },
     { outcome: "sent", providerMessageId: "resend-xyz" }
   );
 
@@ -266,6 +270,7 @@ test("email-queue-worker sync after mock Resend", async () => {
       }
       return {};
     },
+    rpc: async () => ({ error: null }),
   };
 
   const status = await processSingleOutboxEmail(
@@ -277,7 +282,7 @@ test("email-queue-worker sync after mock Resend", async () => {
       subject: "Test",
       html: "<p>Hi</p>",
       attempts: 1,
-      metadata: { vipDeliveryId: "del-1" },
+      metadata: { vipDeliveryId: "del-1", signalId: 1, eventType: "target_1_hit" },
     },
     {
       sendOutboxEmail: async () => {
