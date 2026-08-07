@@ -18,6 +18,7 @@ import { computeDepthBarWidthPercent } from "./depth-bar-utils";
 export const ORDER_BOOK_VISIBLE_ROWS = 12;
 export const ORDER_BOOK_ROW_HEIGHT = "h-[36rem]";
 export const ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-[36rem]";
+export const ORDER_BOOK_MOBILE_SCROLL_MAX = "max-h-[min(70vh,36rem)]";
 
 function DepthGlowBar({ side, widthPercent }) {
   const isAsk = side === "ask";
@@ -113,7 +114,9 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
   const visibleBids = bids.slice(0, ORDER_BOOK_VISIBLE_ROWS);
 
   return (
-    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${ob.surface}`}>
+    <div
+      className={`flex min-h-0 min-w-0 flex-col max-lg:h-auto lg:h-full max-lg:overflow-visible lg:overflow-hidden ${ob.surface}`}
+    >
       <div className="border-b px-4 py-3 sm:px-5 border-[var(--ob-border)]">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -153,7 +156,9 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
         <span className="text-right">القيمة</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div
+        className={`${ORDER_BOOK_MOBILE_SCROLL_MAX} min-h-0 flex-none overflow-y-auto overscroll-contain lg:max-h-none lg:flex-1`}
+      >
       {showAsks ? (
         <div>
           {visibleAsks.map((level) => (

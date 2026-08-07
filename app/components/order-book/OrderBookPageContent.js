@@ -327,7 +327,7 @@ export default function OrderBookPageContent() {
     <div className={`mx-auto max-w-7xl px-4 py-6 sm:py-8 ${ob.page}`} dir="rtl">
       <Breadcrumbs items={breadcrumbs} />
 
-      <header className="mt-4 mb-6">
+      <header className={`mt-4 mb-6 p-4 sm:p-5 ${ob.surface}`}>
         <p className={ob.eyebrow}>عمق السوق</p>
         <h1 className={`mt-1 ${ob.heading}`}>دفتر الأوامر والسيولة</h1>
         <p className={`mt-2 max-w-2xl ${ob.body} ob-text-muted`}>
