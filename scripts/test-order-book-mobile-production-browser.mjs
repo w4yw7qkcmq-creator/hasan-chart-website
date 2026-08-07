@@ -125,6 +125,20 @@ async function evaluatePage(page, viewport, theme) {
 
     const overflowX = document.documentElement.scrollWidth > window.innerWidth + 2;
 
+    const innerScrollPresent = Boolean(
+      blocks &&
+        (blocksStyle?.overflowY === "auto" ||
+          blocksStyle?.overflowY === "scroll" ||
+          (blocksStyle?.maxHeight && blocksStyle.maxHeight !== "none")),
+    );
+
+    const pageScrollOnly = Boolean(
+      blocks &&
+        blocksStyle?.overflowY === "visible" &&
+        blocksStyle?.maxHeight === "none" &&
+        blocks.scrollHeight === blocks.clientHeight,
+    );
+
     return {
       missingBlocks: !blocks,
       sellRows: sellRows.length,
@@ -145,6 +159,8 @@ async function evaluatePage(page, viewport, theme) {
       orderBlocksClientHeight: blocks?.clientHeight ?? null,
       blocksOverflowY: blocksStyle?.overflowY ?? null,
       blocksMaxHeight: blocksStyle?.maxHeight ?? null,
+      innerScrollPresent,
+      pageScrollOnly,
       brandVisible,
       brandStartsWithHasan: brandText.startsWith("HasaN"),
       brandEllipsis: brandStyle?.textOverflow === "ellipsis",
@@ -179,8 +195,11 @@ async function evaluatePage(page, viewport, theme) {
     result.notificationButtonsVisible &&
     !result.overflowX &&
     result.dir === "rtl" &&
-    (!isMobile || result.blocksOverflowY === "visible") &&
-    (!isMobile || result.blocksMaxHeight === "none");
+    (!isTabletOrMobile || !result.innerScrollPresent) &&
+    (!isTabletOrMobile || result.pageScrollOnly) &&
+    (!isTabletOrMobile || result.blocksOverflowY === "visible") &&
+    (!isTabletOrMobile || result.blocksMaxHeight === "none") &&
+    (isTabletOrMobile ? result.orderBlocksScrollHeight === result.orderBlocksClientHeight : true);
 
   if (!ok) report.browserFailures += 1;
   if (result.overflowX) report.overflowFailures += 1;

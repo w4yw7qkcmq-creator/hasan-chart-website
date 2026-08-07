@@ -11,8 +11,7 @@ const blocks = read("app/components/order-book/OrderBlocksPanel.js");
 const page = read("app/components/order-book/OrderBookPageContent.js");
 
 assert.doesNotMatch(panel, /flex h-full min-h-0 min-w-0 flex-col overflow-hidden/);
-assert.match(panel, /max-lg:h-auto lg:h-full/);
-assert.match(panel, /max-lg:overflow-visible lg:overflow-hidden/);
+assert.match(panel, /max-lg:h-auto max-lg:min-h-0 max-lg:overflow-visible lg:min-h-0 lg:h-full lg:overflow-hidden/);
 assert.match(panel, /OrderBlocksPanel/);
 
 assert.match(blocks, /ob-order-blocks/);

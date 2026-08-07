@@ -160,7 +160,14 @@ function AuthAccountSkeleton({ compact = false }) {
 function AuthLoginLink({ className, onClick, compact = false }) {
   return (
     <Link href="/login" onClick={onClick} className={className}>
-      {compact ? "الدخول للحساب" : "الدخول للحساب"}
+      {compact ? (
+        <>
+          <span className="max-[359px]:hidden">الدخول للحساب</span>
+          <span className="hidden max-[359px]:inline">دخول</span>
+        </>
+      ) : (
+        "الدخول للحساب"
+      )}
     </Link>
   );
 }
@@ -1238,16 +1245,19 @@ function RootLayoutShell({ children }) {
           <div className="min-w-0 flex-1 overflow-x-hidden">
             <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl">
               <div className="site-top-header__gradient pointer-events-none absolute inset-0" />
-              <div className="relative z-10 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
+              <div className="site-top-header__row relative z-10 flex min-w-0 items-center gap-1 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(true)}
-                  className="site-header-menu-btn lg:hidden"
+                  className="site-header-menu-btn shrink-0 lg:hidden"
                   aria-label="فتح القائمة"
                 >
                   <span aria-hidden="true">⋮</span>
                 </button>
-                <Link href="/" className="site-header-brand font-black flex items-center gap-1.5 min-w-0 sm:gap-2 sm:text-lg">
+                <Link
+                  href="/"
+                  className="site-header-brand font-black flex min-w-0 flex-1 basis-0 items-center gap-1 overflow-hidden sm:gap-2 sm:text-lg md:flex-initial md:basis-auto md:overflow-visible"
+                >
                   <span aria-hidden="true" className="site-header-logo-badge shrink-0 font-black">
                     HC
                   </span>
@@ -1260,58 +1270,63 @@ function RootLayoutShell({ children }) {
                   </span>
                 </Link>
 
-                <button
-                  type="button"
-                  aria-label={browserNotificationAriaLabel}
-                  onClick={() => {
-                    void enableBrowserNotifications();
-                  }}
-                  className={`browserPushBtn inline-flex shrink-0 items-center justify-center rounded-2xl px-3 py-2 text-sm font-black transition sm:px-4 ${
-                    browserNotificationsActive ? "browserPushBtn--active" : ""
-                  }`}
-                >
-                  <span className="sm:hidden" aria-hidden="true">
-                    🔔
-                  </span>
-                  <span className="hidden sm:inline">{browserNotificationLabel}</span>
-                </button>
+                <div className="site-top-header__actions flex shrink-0 items-center gap-0.5 sm:gap-1.5">
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    aria-label={headerThemeLabel}
+                    className="site-header-theme-btn site-header-theme-btn--compact"
+                  >
+                    <span className="site-header-theme-btn__icon sm:hidden" aria-hidden="true">
+                      {shellThemeLabelSource === "dark" ? "☀️" : "🌙"}
+                    </span>
+                    <span className="hidden sm:inline">{headerThemeLabel}</span>
+                  </button>
 
-                {authLoading ? (
-                  <div
-                    className="hidden h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-white/10 sm:grid"
-                    aria-hidden="true"
-                  />
-                ) : shellUser ? (
-                  <NotificationBell className="relative shrink-0" />
-                ) : null}
+                  <button
+                    type="button"
+                    aria-label={browserNotificationAriaLabel}
+                    onClick={() => {
+                      void enableBrowserNotifications();
+                    }}
+                    className={`browserPushBtn browserPushBtn--compact inline-flex shrink-0 items-center justify-center rounded-2xl px-2 py-1.5 text-sm font-black transition sm:px-4 sm:py-2 ${
+                      browserNotificationsActive ? "browserPushBtn--active" : ""
+                    }`}
+                  >
+                    <span className="sm:hidden" aria-hidden="true">
+                      🔔
+                    </span>
+                    <span className="hidden sm:inline">{browserNotificationLabel}</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  aria-label={headerThemeLabel}
-                  className="site-header-theme-btn hidden md:inline-flex"
-                >
-                  {headerThemeLabel}
-                </button>
+                  {authLoading ? (
+                    <div
+                      className="hidden h-9 w-9 shrink-0 animate-pulse rounded-2xl bg-white/10 sm:grid sm:h-11 sm:w-11"
+                      aria-hidden="true"
+                    />
+                  ) : shellUser ? (
+                    <NotificationBell className="relative shrink-0" />
+                  ) : null}
 
-                {authLoading ? (
-                  <AuthAccountSkeleton compact />
-                ) : shellUser ? (
-                  <div className="hidden sm:flex items-center gap-3 min-w-0">
-                    <Link
-                      href="/my-dashboard"
-                      className="topUserChip"
-                      title={shellUser.username || shellUser.email || "حسابي"}
-                    >
-                      {shellUser.username || shellUser.email || "حسابي"}
-                    </Link>
-                    <button type="button" onClick={logoutAndRedirect} className="topLogoutBtn" aria-label="تسجيل الخروج">
-                      تسجيل الخروج
-                    </button>
-                  </div>
-                ) : (
-                  <AuthLoginLink className="topLoginBtn hidden sm:inline-flex" compact />
-                )}
+                  {authLoading ? (
+                    <AuthAccountSkeleton compact />
+                  ) : shellUser ? (
+                    <div className="hidden sm:flex items-center gap-3 min-w-0">
+                      <Link
+                        href="/my-dashboard"
+                        className="topUserChip"
+                        title={shellUser.username || shellUser.email || "حسابي"}
+                      >
+                        {shellUser.username || shellUser.email || "حسابي"}
+                      </Link>
+                      <button type="button" onClick={logoutAndRedirect} className="topLogoutBtn" aria-label="تسجيل الخروج">
+                        تسجيل الخروج
+                      </button>
+                    </div>
+                  ) : (
+                    <AuthLoginLink className="topLoginBtn topLoginBtn--compact shrink-0" compact />
+                  )}
+                </div>
               </div>
             </header>
 

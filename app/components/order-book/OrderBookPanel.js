@@ -56,7 +56,7 @@ export default function OrderBookPanel({ data, mobileSide = "all", symbol }) {
 
   return (
     <div
-      className={`flex min-h-0 min-w-0 flex-col max-lg:h-auto lg:h-full max-lg:overflow-visible lg:overflow-hidden ${ob.surface}`}
+      className={`flex min-w-0 flex-col max-lg:h-auto max-lg:min-h-0 max-lg:overflow-visible lg:min-h-0 lg:h-full lg:overflow-hidden ${ob.surface}`}
     >
       <div className="border-b px-4 py-3 sm:px-5 border-[var(--ob-border)]">
         <div className="flex flex-wrap items-start justify-between gap-2">
