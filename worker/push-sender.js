@@ -7,6 +7,9 @@ let configured = false;
 const SUBSCRIPTION_COLUMNS =
   "id, endpoint, p256dh, auth, email, anonymous_id, user_id, created_at, updated_at";
 
+const WEB_PUSH_NOTIFICATION_ICON = "/favicon-192.png";
+const WEB_PUSH_NOTIFICATION_BADGE = "/favicon-192.png";
+
 function isWebPushConfigured() {
   return getVapidEnvStatus().configured;
 }
@@ -333,8 +336,8 @@ async function sendPriceAlertPushNotifications({
   const payload = {
     title,
     body,
-    icon: "/logo.png",
-    badge: "/logo.png",
+    icon: WEB_PUSH_NOTIFICATION_ICON,
+    badge: WEB_PUSH_NOTIFICATION_BADGE,
     url: url || "/notifications",
     tag: `price-alert-${alertId}`,
     alertId: String(alertId),
