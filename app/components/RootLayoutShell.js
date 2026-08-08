@@ -244,9 +244,9 @@ function resolveMenuItemState(item, authResolved, currentUser) {
 }
 
 const sidebarMenuItemClass =
-  "group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] border border-cyan-300/15 bg-white/[0.045] px-4 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10";
+  "sidebar-nav-item group relative flex min-h-[54px] items-center gap-3 overflow-hidden rounded-[18px] px-4 py-3 text-white";
 
-const sidebarMenuItemDesktopClass = `${sidebarMenuItemClass} hover:-translate-x-1 hover:shadow-[0_16px_38px_rgba(0,102,255,0.28)]`;
+const sidebarMenuItemDesktopClass = `${sidebarMenuItemClass} sidebar-nav-item--interactive`;
 
 function SidebarMenuItem({
   item,
@@ -310,8 +310,8 @@ function SidebarMenuGroup({ group, isOpen, onToggle, children, variant = "deskto
 
   const summaryClass =
     variant === "desktop"
-      ? "flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] border border-cyan-300/10 bg-white/[0.03] px-3 py-2.5 text-white transition hover:border-cyan-300/30 hover:bg-white/[0.06]"
-      : "flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] border border-cyan-300/10 bg-white/[0.03] px-3 py-2.5 text-white transition hover:border-cyan-300/30 hover:bg-white/[0.06]";
+      ? "sidebar-section-toggle sidebar-section-toggle--interactive flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] px-3 py-2.5 text-white"
+      : "sidebar-section-toggle flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-[16px] px-3 py-2.5 text-white";
 
   return (
     <div className="space-y-2">
@@ -1137,14 +1137,20 @@ function RootLayoutShell({ children }) {
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(11,99,255,0.38),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(7,20,47,0.96),rgba(2,6,23,0.98))]" />
                 <div className="pointer-events-none absolute inset-0 opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
-                <div className="site-sidebar-brand-card relative z-10 mb-4 flex items-center justify-between gap-3 p-3">
-                  <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
-                    <div className="site-sidebar-brand-badge grid h-11 w-11 place-items-center rounded-2xl">
-                      <span className="site-sidebar-brand-badge__text font-black">HC</span>
-                    </div>
-                    <div>
-                      <h2 className="site-sidebar-brand-title font-black leading-5">HasaN CharT World</h2>
+                <div className="site-sidebar-mobile-header relative z-10 mb-4 flex items-start gap-2">
+                  <Link
+                    href="/"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="site-sidebar-brand-card site-sidebar-brand-card--mobile flex min-w-0 flex-1 items-center justify-between gap-3 p-3"
+                  >
+                    <div className="site-sidebar-brand-copy min-w-0">
+                      <h2 className="site-sidebar-brand-title font-black leading-5 tracking-tight" dir="ltr">
+                        HasaN CharT World
+                      </h2>
                       <p className="site-sidebar-brand-subtitle text-xs">منصة التداول الذكية</p>
+                    </div>
+                    <div className="site-sidebar-brand-badge grid h-11 w-11 shrink-0 place-items-center rounded-2xl">
+                      <span className="site-sidebar-brand-badge__text font-black">HC</span>
                     </div>
                   </Link>
 
@@ -1152,7 +1158,7 @@ function RootLayoutShell({ children }) {
                     type="button"
                     aria-label="إغلاق القائمة"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/10 text-xl font-black text-white"
+                    className="site-sidebar-close-btn grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/10 text-xl font-black text-white"
                   >
                     <span aria-hidden="true">✕</span>
                   </button>
@@ -1239,8 +1245,8 @@ function RootLayoutShell({ children }) {
                 variant: "desktop",
               })}
 
-              <details className="group/contact rounded-[18px] border border-cyan-300/15 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                <summary className="flex min-h-[54px] cursor-pointer list-none items-center gap-3 rounded-[18px] px-4 py-3 text-white transition hover:-translate-x-1 hover:border-cyan-300/45 hover:bg-gradient-to-l hover:from-blue-600/85 hover:via-cyan-500/45 hover:to-white/10">
+              <details className="group/contact sidebar-nav-item rounded-[18px] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <summary className="sidebar-nav-item sidebar-nav-item--interactive flex min-h-[54px] cursor-pointer list-none items-center gap-3 rounded-[18px] px-4 py-3 text-white">
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_18px_rgba(0,163,255,0.12)]">☎️</span>
                   <span className="font-bold leading-none">تواصل معنا</span>
                   <span className="mr-auto text-cyan-100/60 transition group-open/contact:rotate-180">⌄</span>
