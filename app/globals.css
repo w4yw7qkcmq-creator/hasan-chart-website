@@ -1092,34 +1092,51 @@ html[data-theme="light"] .site-top-header__gradient {
   align-items: center;
 }
 
-@media (min-width: 640px) and (max-width: 1023px) {
+.site-top-header__brand-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+@media (min-width: 768px) {
   .site-top-header__row {
-    gap: 0.75rem;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0;
+  }
+
+  .site-top-header__brand-group {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .site-top-header__brand-group > .site-header-brand,
+  .site-top-header__row > .site-header-brand {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-start;
+    margin-inline-end: 0;
   }
 
   .site-top-header__actions {
-    gap: 0.5rem;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.625rem;
+    margin-inline-start: 1rem;
+  }
+
+  .site-top-header__actions .topUserChip {
+    max-width: 11rem;
   }
 }
 
 @media (min-width: 1024px) {
-  .site-top-header__row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.5rem;
-  }
-
-  .site-top-header__row > .site-header-brand {
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: none;
-    margin-inline-end: auto;
-  }
-
   .site-top-header__actions {
-    gap: 0.75rem;
-    margin-inline-start: 1rem;
+    gap: 0.875rem;
+    margin-inline-start: 1.5rem;
   }
 
   .site-top-header .site-header-theme-btn--compact,
@@ -1135,17 +1152,34 @@ html[data-theme="light"] .site-top-header__gradient {
   }
 }
 
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .site-top-header .site-header-theme-btn--compact,
+  .site-top-header .browserPushBtn--compact,
+  .site-top-header .topUserChip,
+  .site-top-header .topLogoutBtn {
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
 @media (min-width: 1280px) {
   .site-top-header {
     padding-inline: 1.75rem;
   }
 
+  .site-top-header__actions {
+    gap: 1rem;
+    margin-inline-start: 2rem;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
   .site-top-header__row {
-    gap: 2rem;
+    gap: 0.75rem;
   }
 
   .site-top-header__actions {
-    gap: 1rem;
+    gap: 0.5rem;
   }
 }
 
@@ -1161,6 +1195,7 @@ html[data-theme="light"] .site-top-header__gradient {
     grid-column: 1;
   }
 
+  .site-top-header__row > .site-top-header__brand-group,
   .site-top-header__row > .site-header-brand {
     grid-column: 2;
     flex: none;

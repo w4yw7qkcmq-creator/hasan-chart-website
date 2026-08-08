@@ -1247,7 +1247,7 @@ function RootLayoutShell({ children }) {
           <div className="min-w-0 flex-1 overflow-x-hidden">
             <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl">
               <div className="site-top-header__gradient pointer-events-none absolute inset-0" />
-              <div className="site-top-header__row relative z-10 flex min-w-0 items-center gap-1 sm:gap-2">
+              <div className="site-top-header__row relative z-10 flex min-w-0 w-full items-center gap-1 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(true)}
@@ -1256,24 +1256,26 @@ function RootLayoutShell({ children }) {
                 >
                   <span aria-hidden="true">⋮</span>
                 </button>
-                <Link
-                  href="/"
-                  dir="ltr"
-                  className="site-header-brand font-black flex min-w-0 flex-1 basis-0 items-center gap-1 overflow-hidden sm:gap-2 sm:text-lg md:flex-initial md:basis-auto md:overflow-visible"
-                >
-                  <span aria-hidden="true" className="site-header-logo-badge shrink-0 font-black">
-                    HC
-                  </span>
-                  <span className="site-header-brand__text site-header-brand__text--primary">
-                    HasaN CharT
-                  </span>
-                  <span className="site-header-brand__text site-header-brand__text--suffix hidden md:inline">
-                    {" "}
-                    World
-                  </span>
-                </Link>
+                <div className="site-top-header__brand-group min-w-0">
+                  <Link
+                    href="/"
+                    dir="ltr"
+                    className="site-header-brand font-black flex min-w-0 flex-1 basis-0 items-center gap-1 overflow-hidden sm:gap-2 sm:text-lg md:flex-initial md:basis-auto md:overflow-visible lg:flex-none lg:shrink-0"
+                  >
+                    <span aria-hidden="true" className="site-header-logo-badge shrink-0 font-black">
+                      HC
+                    </span>
+                    <span className="site-header-brand__text site-header-brand__text--primary">
+                      HasaN CharT
+                    </span>
+                    <span className="site-header-brand__text site-header-brand__text--suffix hidden md:inline">
+                      {" "}
+                      World
+                    </span>
+                  </Link>
+                </div>
 
-                <div className="site-top-header__actions flex shrink-0 items-center gap-0.5 sm:gap-1.5">
+                <div className="site-top-header__actions flex shrink-0 items-center">
                   <button
                     type="button"
                     onClick={toggleTheme}
