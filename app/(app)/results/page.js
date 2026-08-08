@@ -38,7 +38,7 @@ export default async function ResultsPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-8">
           <ContentPostsHero
             eyebrow="HasaN CharT Result"
-            badge="🏆 نتائج وإنجازات يدوية"
+            badge="🏆 نتائج وإنجازات"
             title="HasaN CharT Result"
             subtitle="عرض احترافي للنتائج والأداء الذي ينشره فريق HasaN CharT World — مع تمييز اختياري للقيمة أو الإنجاز مثل +12%."
           />

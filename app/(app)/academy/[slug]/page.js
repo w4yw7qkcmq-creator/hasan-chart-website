@@ -9,12 +9,14 @@ import {
 } from "../../../../lib/seo";
 import { REVALIDATE_CONTENT_POSTS_PAGE } from "../../../../lib/public-cache-config";
 import { fetchPublishedContentPostBySlug } from "../../../../lib/content-posts";
+import { normalizeContentPostSlugParam } from "../../../../lib/content-post-public.js";
 
 export const revalidate = REVALIDATE_CONTENT_POSTS_PAGE;
 
 export async function generateMetadata({ params }) {
   const resolved = await params;
-  const post = await fetchPublishedContentPostBySlug("academy", resolved.slug).catch(() => null);
+  const slug = normalizeContentPostSlugParam(resolved.slug);
+  const post = await fetchPublishedContentPostBySlug("academy", slug).catch(() => null);
   if (!post) {
     return { title: "الدرس غير موجود | HasaN CharT World" };
   }
@@ -33,7 +35,8 @@ export async function generateMetadata({ params }) {
 
 export default async function AcademyDetailPage({ params }) {
   const resolved = await params;
-  const post = await fetchPublishedContentPostBySlug("academy", resolved.slug).catch(() => null);
+  const slug = normalizeContentPostSlugParam(resolved.slug);
+  const post = await fetchPublishedContentPostBySlug("academy", slug).catch(() => null);
   if (!post) notFound();
 
   const breadcrumbs = [

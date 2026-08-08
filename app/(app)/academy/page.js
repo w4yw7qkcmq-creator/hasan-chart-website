@@ -38,7 +38,7 @@ export default async function AcademyPage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-8">
           <ContentPostsHero
             eyebrow="HasaN CharT Academy"
-            badge="🎓 محتوى تعليمي يدوي"
+            badge="🎓 محتوى تعليمي"
             title="HasaN CharT Academy"
             subtitle="دروس ومحتوى تعليمي احترافي يُدار يدوياً من فريق HasaN CharT World — في التحليل الكلاسيكي، SMC، الموجي، الزمني، وإدارة المخاطر."
           />

@@ -42,6 +42,7 @@ const menuGroups = [
       { href: "/assets", icon: "🗂️", label: "الأصول والأسواق" },
       { href: "/order-book", icon: "📒", label: "دفتر الأوامر والسيولة" },
       { href: "/daily-analysis", icon: "📝", label: "التحليلات اليومية" },
+      { href: "/academy", icon: "🎓", label: "HasaN CharT Academy" },
       { href: "/results", icon: "🏆", label: "HasaN CharT Result" },
     ],
   },
@@ -58,7 +59,6 @@ const menuGroups = [
       { href: "/vip-futures", icon: "🔥", label: "توصيات VIP فيوتشر", auth: true, plan: "futures" },
       { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
       { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء" },
-      { href: "/academy", icon: "🎓", label: "HasaN CharT Academy" },
     ],
   },
   {
@@ -1258,6 +1258,7 @@ function RootLayoutShell({ children }) {
                 </button>
                 <Link
                   href="/"
+                  dir="ltr"
                   className="site-header-brand font-black flex min-w-0 flex-1 basis-0 items-center gap-1 overflow-hidden sm:gap-2 sm:text-lg md:flex-initial md:basis-auto md:overflow-visible"
                 >
                   <span aria-hidden="true" className="site-header-logo-badge shrink-0 font-black">

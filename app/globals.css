@@ -847,6 +847,8 @@ select:focus:not(:focus-visible) {
   flex: 1;
   justify-content: center;
   color: var(--header-brand-text, var(--header-text));
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .site-header-brand:visited {

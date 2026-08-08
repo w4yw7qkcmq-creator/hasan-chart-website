@@ -125,7 +125,7 @@ export default function ContentPostSelect({
             role="listbox"
             aria-label={ariaLabel || label}
             style={menuStyle}
-            className="content-post-admin__select-menu"
+            className="content-post-admin__select-menu content-post-admin__select-menu--portal"
           >
             {options.map((option, index) => {
               const isSelected = option.value === value;
