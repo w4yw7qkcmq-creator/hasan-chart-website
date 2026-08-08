@@ -67,6 +67,8 @@ assert.match(globals, /:root[\s\S]*--header-brand-text/);
 assert.match(shell, /site-top-header__actions/);
 assert.match(shell, /site-header-brand__text--primary/);
 assert.match(shell, /HasaN CharT/);
+assert.match(shell, /BrowserPushHeaderButton|browserPushBell/);
+assert.match(globals, /\.browserPushBell/);
 assert.match(shell, /topLoginBtn--compact/);
 assert.match(shell, /site-header-theme-btn--compact/);
 assert.match(globals, /@media \(max-width: 639px\)[\s\S]*site-top-header__actions/);

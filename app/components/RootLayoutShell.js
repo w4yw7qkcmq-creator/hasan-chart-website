@@ -13,6 +13,36 @@ import { useBootstrapLoadingOverlay } from "../hooks/useBootstrapLoadingOverlay"
 import { useClientMounted } from "../hooks/useClientMounted";
 import { useNotifications } from "./notifications/NotificationProvider";
 import { useTheme } from "./ThemeProvider";
+import {
+  PUSH_ENROLLMENT,
+  pushEnrollmentCompactUi,
+} from "../../lib/push-enrollment-state.js";
+
+function BrowserPushHeaderButton({ ui, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-label={ui.ariaLabel}
+      title={ui.title}
+      disabled={ui.disabled}
+      onClick={onClick}
+      className={`browserPushBell shrink-0 ${ui.active ? "browserPushBell--active" : ""} ${
+        ui.variant === "unsupported" ? "browserPushBell--unsupported" : ""
+      }`}
+    >
+      <span className="browserPushBell__icon" aria-hidden="true">
+        🔔
+      </span>
+      {ui.badge === "checking" ? (
+        <span className="browserPushBell__badge browserPushBell__badge--checking" aria-hidden="true" />
+      ) : ui.badge ? (
+        <span className={`browserPushBell__badge browserPushBell__badge--${ui.badge}`} aria-hidden="true">
+          {ui.badgeSymbol}
+        </span>
+      ) : null}
+    </button>
+  );
+}
 
 const NotificationBell = dynamic(
   () => import("./notifications/NotificationBell").then((mod) => mod.NotificationBell),
@@ -422,6 +452,8 @@ function RootLayoutShell({ children }) {
   const [globalNoticeHref, setGlobalNoticeHref] = useState("");
   const [notificationPermission, setNotificationPermission] = useState("default");
   const [webPushEnabled, setWebPushEnabled] = useState(false);
+  const [pushEnrollment, setPushEnrollment] = useState(null);
+  const [pushEnrollmentChecking, setPushEnrollmentChecking] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({
     markets: true,
@@ -437,32 +469,43 @@ function RootLayoutShell({ children }) {
   const authLoading = !mounted || !authResolved;
   const shellNotificationPermission = mounted ? notificationPermission : "default";
   const shellWebPushEnabled = mounted ? webPushEnabled : false;
+  const shellPushEnrollmentChecking = !mounted || pushEnrollmentChecking;
+  const browserPushCompactUi = pushEnrollmentCompactUi(
+    pushEnrollment || PUSH_ENROLLMENT.PROMPT,
+    { checking: shellPushEnrollmentChecking }
+  );
   const shellIsAdmin = mounted ? isAdmin : false;
   const shellUnreadAnalysisCount = mounted ? unreadAnalysisCount : 0;
   const shellThemeLabelSource = mounted ? theme : initialTheme;
   const mobileThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { mobile: true });
   const sidebarThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource);
   const headerThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { compact: true });
-  const browserNotificationsActive =
-    shellNotificationPermission === "granted" && shellWebPushEnabled;
-  const browserPushNeedsReenable =
-    shellNotificationPermission === "granted" && !shellWebPushEnabled;
-  const browserNotificationLabel = browserNotificationsActive
-    ? "🔔 إشعارات المتصفح مفعّلة ✅"
-    : browserPushNeedsReenable
-      ? "🔔 إشعارات المتصفح تحتاج إعادة تفعيل"
-      : "🔔 تفعيل إشعارات المتصفح";
-  const browserNotificationAriaLabel = browserNotificationsActive
-    ? "إشعارات المتصفح مفعّلة"
-    : browserPushNeedsReenable
-      ? "إعادة تفعيل إشعارات المتصفح"
-      : "تفعيل إشعارات المتصفح";
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const toggleMenuGroup = useCallback((groupId) => {
     setCollapsedGroups((current) => ({
       ...current,
       [groupId]: !current[groupId],
     }));
+  }, []);
+
+  const refreshPushEnrollmentState = useCallback(async () => {
+    if (typeof window === "undefined") return null;
+
+    const { resolvePushEnrollmentState, setStoredPushEndpoint } = await import("../../lib/push-client");
+    const browserState = await resolvePushEnrollmentState();
+
+    setPushEnrollment(browserState.enrollment);
+    setNotificationPermission(browserState.permission);
+    setWebPushEnabled(browserState.isEnrolled);
+
+    if (browserState.isEnrolled && browserState.subscription?.endpoint) {
+      setStoredPushEndpoint(browserState.subscription.endpoint);
+    } else {
+      setStoredPushEndpoint("");
+    }
+
+    setPushEnrollmentChecking(false);
+    return browserState;
   }, []);
 
   const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
@@ -499,7 +542,9 @@ function RootLayoutShell({ children }) {
           const browserState = await resolvePushEnrollmentState();
           if (!active) return;
 
+          setPushEnrollment(browserState.enrollment);
           setNotificationPermission(browserState.permission);
+          setPushEnrollmentChecking(false);
 
           if (browserState.isEnrolled) {
             setWebPushEnabled(true);
@@ -654,6 +699,7 @@ function RootLayoutShell({ children }) {
     }
 
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+      setPushEnrollment(PUSH_ENROLLMENT.UNSUPPORTED);
       showAppModal({
         type: "warning",
         title: "الإشعارات غير مدعومة",
@@ -671,9 +717,22 @@ function RootLayoutShell({ children }) {
       return;
     }
 
+    if (Notification.permission === "denied") {
+      setPushEnrollment(PUSH_ENROLLMENT.DENIED);
+      setNotificationPermission("denied");
+      setWebPushEnabled(false);
+      showAppModal({
+        type: "warning",
+        title: "إشعارات المتصفح محظورة",
+        message: "إشعارات المتصفح محظورة من إعدادات المتصفح. فعّلها يدوياً من إعدادات المتصفح ثم أعد المحاولة.",
+      });
+      return;
+    }
+
     try {
       const { resolvePushEnrollmentState, setStoredPushEndpoint } = await import("../../lib/push-client");
       const browserState = await resolvePushEnrollmentState();
+      setPushEnrollment(browserState.enrollment);
       setNotificationPermission(browserState.permission);
 
       if (browserState.isEnrolled) {
@@ -686,7 +745,7 @@ function RootLayoutShell({ children }) {
             await savePushSubscription({
               existingSubscription: browserState.subscription,
             });
-            setWebPushEnabled(true);
+            await refreshPushEnrollmentState();
             showAppModal({
               type: "success",
               title: "إشعارات المتصفح",
@@ -695,6 +754,7 @@ function RootLayoutShell({ children }) {
             return;
           } catch (syncError) {
             setWebPushEnabled(false);
+            setPushEnrollment(PUSH_ENROLLMENT.NEEDS_REENABLE);
             console.warn(
               "Push subscription sync failed:",
               syncError?.message || syncError
@@ -703,13 +763,13 @@ function RootLayoutShell({ children }) {
               type: "warning",
               title: "إشعارات المتصفح تحتاج إعادة تفعيل",
               message:
-                "الإذن مفعّل لكن الاشتراك غير محفوظ. اضغط «إعادة تفعيل إشعارات المتصفح» لإكمال الإعداد.",
+                "الإذن مفعّل لكن الاشتراك غير محفوظ. اضغط زر إشعارات المتصفح لإكمال الإعداد.",
             });
             return;
           }
         }
 
-        setWebPushEnabled(true);
+        await refreshPushEnrollmentState();
         showAppModal({
           type: "success",
           title: "إشعارات المتصفح",
@@ -720,12 +780,16 @@ function RootLayoutShell({ children }) {
 
       if (browserState.needsReenable) {
         setWebPushEnabled(false);
+        setPushEnrollment(PUSH_ENROLLMENT.NEEDS_REENABLE);
       }
 
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
 
       if (permission !== "granted") {
+        setPushEnrollment(
+          permission === "denied" ? PUSH_ENROLLMENT.DENIED : PUSH_ENROLLMENT.PROMPT
+        );
         showAppModal({
           type: "warning",
           title: "تم رفض الإشعارات",
@@ -750,6 +814,8 @@ function RootLayoutShell({ children }) {
       setGlobalNotice("🔔 تم حفظ اشتراك إشعارات المتصفح بنجاح");
       setGlobalNoticeHref("");
 
+      await refreshPushEnrollmentState();
+
       console.log(
         "push:ui:enabled",
         JSON.stringify({
@@ -758,6 +824,7 @@ function RootLayoutShell({ children }) {
       );
     } catch (error) {
       setWebPushEnabled(false);
+      setPushEnrollment(PUSH_ENROLLMENT.PROMPT);
       void import("../../lib/push-client").then(({ setStoredPushEndpoint }) => {
         setStoredPushEndpoint("");
       });
@@ -784,7 +851,9 @@ function RootLayoutShell({ children }) {
           const browserState = await resolvePushEnrollmentState();
           if (!active) return;
 
+          setPushEnrollment(browserState.enrollment);
           setNotificationPermission(browserState.permission);
+          setPushEnrollmentChecking(false);
 
           if (!browserState.isEnrolled) {
             setWebPushEnabled(false);
@@ -1110,17 +1179,14 @@ function RootLayoutShell({ children }) {
                     {mobileThemeLabel}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void enableBrowserNotifications();
-                    }}
-                    className={`browserPushBtn w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
-                      browserNotificationsActive ? "browserPushBtn--active" : ""
-                    }`}
-                  >
-                    {browserNotificationLabel}
-                  </button>
+                  <div className="flex items-center justify-center">
+                    <BrowserPushHeaderButton
+                      ui={browserPushCompactUi}
+                      onClick={() => {
+                        void enableBrowserNotifications();
+                      }}
+                    />
+                  </div>
 
                   {authLoading ? (
                     <AuthAccountSkeleton />
@@ -1288,21 +1354,12 @@ function RootLayoutShell({ children }) {
                     <span className="hidden sm:inline">{headerThemeLabel}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    aria-label={browserNotificationAriaLabel}
+                  <BrowserPushHeaderButton
+                    ui={browserPushCompactUi}
                     onClick={() => {
                       void enableBrowserNotifications();
                     }}
-                    className={`browserPushBtn browserPushBtn--compact inline-flex shrink-0 items-center justify-center rounded-2xl px-2 py-1.5 text-sm font-black transition sm:px-4 sm:py-2 ${
-                      browserNotificationsActive ? "browserPushBtn--active" : ""
-                    }`}
-                  >
-                    <span className="sm:hidden" aria-hidden="true">
-                      🔔
-                    </span>
-                    <span className="hidden sm:inline">{browserNotificationLabel}</span>
-                  </button>
+                  />
 
                   {authLoading ? (
                     <div

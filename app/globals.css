@@ -807,6 +807,96 @@ html[data-theme="light"] .bootstrapScreen__tagline {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.browserPushBell {
+  position: relative;
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 1rem;
+  border: 1px solid var(--header-border);
+  background: var(--header-surface);
+  color: var(--header-text);
+  box-shadow: 0 10px 30px rgba(0, 102, 255, 0.12);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.browserPushBell:hover:not(:disabled) {
+  background: var(--header-surface-hover);
+}
+
+.browserPushBell--active {
+  border-color: rgba(34, 211, 238, 0.38);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.browserPushBell--unsupported {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.browserPushBell__icon {
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.browserPushBell__badge {
+  position: absolute;
+  top: -0.2rem;
+  inset-inline-end: -0.2rem;
+  display: grid;
+  min-height: 1.125rem;
+  min-width: 1.125rem;
+  place-items: center;
+  border-radius: 9999px;
+  padding: 0 0.15rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  line-height: 1;
+  border: 2px solid var(--header-bg, #020817);
+}
+
+.browserPushBell__badge--success {
+  background: #22c55e;
+  color: #fff;
+}
+
+.browserPushBell__badge--warning {
+  background: #f59e0b;
+  color: #fff;
+}
+
+.browserPushBell__badge--blocked {
+  background: #ef4444;
+  color: #fff;
+}
+
+.browserPushBell__badge--checking {
+  min-height: 0.875rem;
+  min-width: 0.875rem;
+  padding: 0;
+  border: 2px solid rgba(148, 163, 184, 0.35);
+  border-top-color: var(--header-text);
+  background: transparent;
+  animation: browserPushBellSpin 0.75s linear infinite;
+}
+
+@keyframes browserPushBellSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+html[data-theme="light"] .browserPushBell__badge {
+  border-color: var(--header-bg, #f8fbff);
+}
+
+html[data-theme="light"] .browserPushBell--active {
+  border-color: rgba(14, 116, 144, 0.28);
+  background: rgba(14, 116, 144, 0.08);
+}
+
 /* ===== Accessibility (Phase 2.6) ===== */
 :focus-visible {
   outline: 2px solid #38bdf8;
