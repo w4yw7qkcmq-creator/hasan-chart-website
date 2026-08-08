@@ -8,6 +8,8 @@ const { NEWS_EVENTS, logNewsEvent } = require("./observability");
 
 const { buildTelegramPublicationRequest, buildStructuredEconomicPublicationRequest } = require("./adapters");
 
+const economicEditorial = require("./economic-editorial");
+
 module.exports = {
   createNewsPublisherGateway,
   buildCanonicalEventFromCandidate,
@@ -24,6 +26,7 @@ module.exports = {
   LEG_STATUS,
   buildTelegramPublicationRequest,
   buildStructuredEconomicPublicationRequest,
+  economicEditorial,
   PUBLICATION_TYPES,
   DESTINATIONS,
   SOURCE_TYPES,

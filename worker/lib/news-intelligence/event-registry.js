@@ -4,6 +4,8 @@ const EVENT_FAMILIES = {
   US_WEEKLY_LABOR_CLAIMS: new Set(["US_INITIAL_JOBLESS_CLAIMS", "US_CONTINUING_JOBLESS_CLAIMS"]),
 };
 
+const FAMILY_PUBLICATION_EVENT_TYPES = new Set(["US_WEEKLY_LABOR_CLAIMS"]);
+
 const ARABIC_ALIASES = {
   US_INITIAL_JOBLESS_CLAIMS: [
     /initial jobless claims/i,
@@ -65,11 +67,17 @@ function listNumericReleaseEventTypes() {
     .map(([key]) => key);
 }
 
+function isFamilyPublicationEventType(eventType) {
+  return FAMILY_PUBLICATION_EVENT_TYPES.has(eventType);
+}
+
 module.exports = {
   EVENT_FAMILIES,
+  FAMILY_PUBLICATION_EVENT_TYPES,
   ARABIC_ALIASES,
   normalizeAliasText,
   resolveEventTypeFromAliases,
   getEventFamily,
+  isFamilyPublicationEventType,
   listNumericReleaseEventTypes,
 };

@@ -13,6 +13,7 @@ const {
 } = require("../news-publish-state");
 const { createNewsPublisherGateway } = require("../news-intelligence/publisher-gateway");
 const { buildTelegramPublicationRequest } = require("../news-intelligence/adapters");
+const { maybeApplyPhase2Editorial } = require("../news-intelligence/economic-editorial/integration");
 
 let gatewayInstance = null;
 
@@ -205,8 +206,27 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   }
 
   const publication = buildTelegramPublicationRequest(candidate, validation, ctx);
+  const phase2Result = await maybeApplyPhase2Editorial(publication, deps);
+  if (!phase2Result.ok) {
+    releaseMemoryReservation(fingerprint);
+    publishStates.delete(fingerprint);
+    console.log(
+      "PHASE2_EDITORIAL_BLOCKED",
+      JSON.stringify({
+        reason: phase2Result.reason,
+        stage: phase2Result.stage,
+        sourceMessageId: candidate.post?.sourceMessageId,
+      })
+    );
+    return {
+      skipped: true,
+      reason: phase2Result.reason || "PHASE2_EDITORIAL_BLOCKED",
+      blocked: true,
+    };
+  }
+  const enrichedPublication = phase2Result.publication;
   const gateway = getAtomicPublishGateway(deps);
-  const gatewayResult = await gateway.publish(publication, {
+  const gatewayResult = await gateway.publish(enrichedPublication, {
     dryRun: deps.dryRun,
     deliverTelegramNews: deps.deliverTelegramNews,
     sendTelegramMessage: deps.sendTelegramMessage,

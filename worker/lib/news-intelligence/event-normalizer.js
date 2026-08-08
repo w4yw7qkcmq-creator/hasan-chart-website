@@ -3,7 +3,7 @@ const {
   buildIdempotencyKey,
   CANONICAL_EVENT_DEFINITIONS,
 } = require("../economic-releases/canonical-events");
-const { resolveEventTypeFromAliases, getEventFamily, normalizeAliasText } = require("./event-registry");
+const { resolveEventTypeFromAliases, getEventFamily, normalizeAliasText, isFamilyPublicationEventType } = require("./event-registry");
 
 function normalizeReleaseInstant(value) {
   if (!value) {
@@ -75,6 +75,9 @@ function buildCanonicalEventFromCandidate(candidate = {}) {
 function isNumericEconomicRelease(eventType) {
   if (!eventType) {
     return false;
+  }
+  if (isFamilyPublicationEventType(eventType)) {
+    return true;
   }
   const definition = CANONICAL_EVENT_DEFINITIONS[eventType];
   if (definition) {

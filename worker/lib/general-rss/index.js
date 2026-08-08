@@ -12,6 +12,11 @@ const {
   resetRssObservationStateForTests,
   getRssObservationSnapshot,
 } = require("./observation-state");
+const {
+  BLOCK_REASONS: RSS_EDITORIAL_BLOCK_REASONS,
+  validateGeneralRssEditorialOutput,
+  buildRawSourceText,
+} = require("./editorial-safety");
 
 module.exports = {
   GENERAL_RSS_FEEDS,
@@ -30,4 +35,7 @@ module.exports = {
   isRssItemAfterBaseline,
   resetRssObservationStateForTests,
   getRssObservationSnapshot,
+  RSS_EDITORIAL_BLOCK_REASONS,
+  validateGeneralRssEditorialOutput,
+  buildRawSourceText,
 };

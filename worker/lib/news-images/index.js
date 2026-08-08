@@ -55,7 +55,10 @@ async function switchToFallbackBackground(normalizedContext, registry, options, 
 }
 
 async function generatePremiumNewsImage(context = {}, options = {}) {
-  if (!context?.eventKey || !isPremiumImageEvent(context.eventKey)) {
+  if (!context?.eventKey) {
+    return null;
+  }
+  if (!options.forceEnabled && !isPremiumImageEvent(context.eventKey)) {
     return null;
   }
 
@@ -83,7 +86,7 @@ async function generatePremiumNewsImage(context = {}, options = {}) {
   };
 
   const profile = buildEditorialProfile(normalizedContext);
-  if (!resolveEditorialImageEligibility(profile, normalizedContext)) {
+  if (!options.skipEligibilityCheck && !resolveEditorialImageEligibility(profile, normalizedContext)) {
     const editorialDomain = resolveEditorialDomains(profile, normalizedContext);
     const syntheticEventKey = resolveSyntheticEventKey(profile, normalizedContext);
     const marketAngle = resolveMarketAngle(profile, normalizedContext, editorialDomain, syntheticEventKey);
@@ -240,10 +243,20 @@ async function resolvePremiumNewsImagePath(context = {}, options = {}) {
   return result?.filePath || null;
 }
 
+async function generateDeterministicBrandedFallbackImage(context = {}, options = {}) {
+  return generatePremiumNewsImage(context, {
+    ...options,
+    forceEnabled: true,
+    provider: "fallback",
+    skipEligibilityCheck: true,
+  });
+}
+
 module.exports = {
   OUTPUT_DIR,
   isPremiumImagesEnabled,
   generatePremiumNewsImage,
+  generateDeterministicBrandedFallbackImage,
   resolvePremiumNewsImagePath,
   inspectAndMaybeRejectOpenAiBackground,
   readRawBackground,

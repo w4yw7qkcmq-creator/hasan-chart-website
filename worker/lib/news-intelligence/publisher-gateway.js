@@ -170,6 +170,10 @@ function createNewsPublisherGateway(options = {}) {
       });
     }
 
+    if (publication.familyPublicationKey) {
+      canonical.eventKey = publication.familyPublicationKey;
+    }
+
     const numericEconomic = isNumericEconomicRelease(canonical.eventType || publication.eventType);
     const publicationType = publication.publicationType || PUBLICATION_TYPES.GENERAL_NEWS;
 

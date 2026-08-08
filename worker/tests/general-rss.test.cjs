@@ -14,6 +14,8 @@ const {
   initializeRssFeedBaselines,
   isRssItemAfterBaseline,
   RSS_FEED_DELAY_GRACE_MINUTES,
+  validateGeneralRssEditorialOutput,
+  RSS_EDITORIAL_BLOCK_REASONS,
 } = require(path.join(root, "lib/general-rss"));
 
 function assert(condition, message) {
@@ -248,6 +250,31 @@ function run() {
   assert(RSS_FEED_DELAY_GRACE_MINUTES === 30, "grace minutes constant");
 
   assert(!("premiumImageEligible" in gold), "publish path independent from premium images");
+
+  const rssCopyPaste = validateGeneralRssEditorialOutput({
+    title: "Gold slips as dollar rebounds",
+    body: "Gold slips as dollar rebounds from six-week lows in forex markets today with enough length to pass.",
+    rawSourceText: "Gold slips as dollar rebounds from six-week lows in forex markets today",
+  });
+  assert(rssCopyPaste.ok === false, "obvious RSS copy/paste should be blocked");
+  assert(
+    rssCopyPaste.reason === RSS_EDITORIAL_BLOCK_REASONS.RSS_COPY_SIMILARITY_TOO_HIGH,
+    "copy similarity reason"
+  );
+
+  const rssUrlBlocked = validateGeneralRssEditorialOutput({
+    title: "Market update",
+    body: "Read more at https://example.com/news with enough filler text to exceed minimum editorial length.",
+    rawSourceText: "Market update headline",
+  });
+  assert(rssUrlBlocked.ok === false, "RSS body with URL should be blocked");
+
+  const rssCompetitorBlocked = validateGeneralRssEditorialOutput({
+    title: "Market update",
+    body: "Follow ForexBreakingNews for more updates with enough filler text to exceed minimum editorial length.",
+    rawSourceText: "Market update headline",
+  });
+  assert(rssCompetitorBlocked.ok === false, "competitor channel mention should be blocked");
 
   console.log("general-rss tests passed");
 }
