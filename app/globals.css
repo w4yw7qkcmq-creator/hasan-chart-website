@@ -960,6 +960,60 @@ select:focus:not(:focus-visible) {
   color: var(--header-brand-muted, var(--header-text-muted));
 }
 
+:root {
+  --sidebar-blue-panel: linear-gradient(135deg, #58b8ff 0%, #3ea7ff 45%, #2997f2 100%);
+  --sidebar-surface: #020817;
+  --sidebar-surface-border: rgba(34, 211, 238, 0.2);
+  --sidebar-item-bg: rgba(255, 255, 255, 0.045);
+  --sidebar-item-border: rgba(34, 211, 238, 0.15);
+  --sidebar-item-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --sidebar-item-hover-border: rgba(34, 211, 238, 0.42);
+  --sidebar-item-hover-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.2),
+    0 6px 20px rgba(0, 102, 255, 0.16);
+  --sidebar-section-bg: rgba(255, 255, 255, 0.03);
+  --sidebar-section-border: rgba(34, 211, 238, 0.1);
+  --sidebar-section-expanded-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-section-expanded-border: rgba(34, 211, 238, 0.28);
+  --sidebar-chip-bg: rgba(34, 211, 238, 0.1);
+  --sidebar-chip-border: rgba(34, 211, 238, 0.2);
+  --sidebar-bottom-bg: rgba(255, 255, 255, 0.035);
+  --sidebar-bottom-border: rgba(34, 211, 238, 0.1);
+}
+
+html[data-theme="light"] {
+  --sidebar-item-bg: rgba(255, 255, 255, 0.24);
+  --sidebar-item-border: rgba(255, 255, 255, 0.42);
+  --sidebar-item-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 8px 22px rgba(41, 151, 242, 0.1);
+  --sidebar-item-hover-border: rgba(45, 150, 240, 0.58);
+  --sidebar-item-hover-shadow:
+    0 0 0 1px rgba(56, 168, 242, 0.2),
+    0 8px 24px rgba(56, 168, 242, 0.22);
+  --sidebar-section-bg: rgba(255, 255, 255, 0.2);
+  --sidebar-section-border: rgba(255, 255, 255, 0.34);
+  --sidebar-section-expanded-bg: rgba(255, 255, 255, 0.38);
+  --sidebar-section-expanded-border: rgba(45, 150, 240, 0.48);
+  --sidebar-chip-bg: rgba(255, 255, 255, 0.34);
+  --sidebar-chip-border: rgba(255, 255, 255, 0.52);
+  --sidebar-bottom-bg: rgba(255, 255, 255, 0.22);
+  --sidebar-bottom-border: rgba(255, 255, 255, 0.38);
+}
+
+.site-sidebar-panel {
+  background: var(--sidebar-surface);
+  border-color: var(--sidebar-surface-border);
+}
+
+html[data-theme="light"] .site-sidebar-panel {
+  background: var(--sidebar-blue-panel, var(--light-blue-panel)) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  box-shadow: 0 18px 65px rgba(41, 151, 242, 0.28) !important;
+}
+
+html[data-theme="light"] .site-sidebar-panel .site-sidebar-decor {
+  opacity: 0 !important;
+}
+
 .site-sidebar-brand-card {
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -982,15 +1036,11 @@ select:focus:not(:focus-visible) {
 }
 
 html[data-theme="light"] aside .site-sidebar-brand-card {
-  background: linear-gradient(
-    135deg,
-    rgba(230, 244, 255, 0.95),
-    rgba(203, 228, 248, 0.88)
-  ) !important;
-  border-color: rgba(255, 255, 255, 0.72) !important;
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.48) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 10px 28px rgba(15, 23, 42, 0.07) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 10px 28px rgba(41, 151, 242, 0.14) !important;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -1003,13 +1053,11 @@ html[data-theme="light"] aside .site-sidebar-brand-title {
 }
 
 html[data-theme="light"] aside .site-sidebar-brand-badge {
-  border-color: rgba(255, 255, 255, 0.78) !important;
-  background: linear-gradient(
-    145deg,
-    rgba(220, 239, 250, 0.96),
-    rgba(175, 198, 214, 0.88)
-  ) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(255, 255, 255, 0.58) !important;
+  background: rgba(255, 255, 255, 0.34) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 0 16px rgba(41, 151, 242, 0.12) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -1053,6 +1101,26 @@ html[data-theme="light"] aside .site-sidebar-brand-subtitle {
   transition: background-color 180ms ease, border-color 180ms ease;
 }
 
+html[data-theme="light"] .site-sidebar-panel .site-sidebar-close-btn {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.42) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .site-sidebar-panel .sidebarUserCard,
+html[data-theme="light"] .site-sidebar-panel .bg-white\/\[0\.035\] {
+  background: var(--sidebar-bottom-bg) !important;
+  border-color: var(--sidebar-bottom-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 10px 28px rgba(41, 151, 242, 0.12) !important;
+}
+
+html[data-theme="light"] .site-sidebar-panel .border-cyan-300\/20.bg-cyan-400\/10,
+html[data-theme="light"] .site-sidebar-panel button.border-cyan-300\/20 {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  color: #0f172a !important;
+}
+
 @media (max-width: 359px) {
   aside[aria-label="قائمة التنقل"] .site-sidebar-brand-copy .site-sidebar-brand-title {
     font-size: 0.875rem;
@@ -1061,9 +1129,9 @@ html[data-theme="light"] aside .site-sidebar-brand-subtitle {
 }
 
 .sidebar-nav-item {
-  border: 1px solid rgba(34, 211, 238, 0.15);
-  background: rgba(255, 255, 255, 0.045);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--sidebar-item-border);
+  background: var(--sidebar-item-bg);
+  box-shadow: var(--sidebar-item-shadow);
   transition:
     border-color 180ms ease,
     background 180ms ease,
@@ -1072,13 +1140,48 @@ html[data-theme="light"] aside .site-sidebar-brand-subtitle {
 }
 
 .sidebar-section-toggle {
-  border: 1px solid rgba(34, 211, 238, 0.1);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--sidebar-section-border);
+  background: var(--sidebar-section-bg);
   transition:
     border-color 180ms ease,
     background 180ms ease,
     box-shadow 180ms ease,
     transform 180ms ease;
+}
+
+aside .sidebar-section-toggle[aria-expanded="true"] {
+  border-color: var(--sidebar-section-expanded-border);
+  background: var(--sidebar-section-expanded-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+aside .sidebar-nav-item > span:first-child,
+aside .sidebar-section-toggle > span:first-child {
+  border: 1px solid var(--sidebar-chip-border) !important;
+  background: var(--sidebar-chip-bg) !important;
+  box-shadow: 0 0 14px rgba(0, 163, 255, 0.12);
+}
+
+html[data-theme="light"] aside .sidebar-nav-item,
+html[data-theme="light"] aside .sidebar-section-toggle,
+html[data-theme="light"] aside a.sidebar-nav-item {
+  background: var(--sidebar-item-bg) !important;
+  border-color: var(--sidebar-item-border) !important;
+  color: #0f172a !important;
+  box-shadow: var(--sidebar-item-shadow) !important;
+}
+
+html[data-theme="light"] aside .sidebar-section-toggle[aria-expanded="true"] {
+  background: var(--sidebar-section-expanded-bg) !important;
+  border-color: var(--sidebar-section-expanded-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 8px 20px rgba(41, 151, 242, 0.12) !important;
+}
+
+html[data-theme="light"] aside .sidebar-nav-item > span:first-child,
+html[data-theme="light"] aside .sidebar-section-toggle > span:first-child {
+  background: var(--sidebar-chip-bg) !important;
+  border-color: var(--sidebar-chip-border) !important;
+  box-shadow: 0 0 14px rgba(41, 151, 242, 0.12) !important;
 }
 
 .sidebar-nav-item:focus-visible,
@@ -1090,16 +1193,14 @@ html[data-theme="light"] aside .site-sidebar-brand-subtitle {
 
 @media (hover: hover) and (pointer: fine) {
   aside .sidebar-nav-item--interactive:hover {
-    border-color: rgba(34, 211, 238, 0.42);
+    border-color: var(--sidebar-item-hover-border);
     background: linear-gradient(
       to left,
       rgba(37, 99, 235, 0.72),
       rgba(6, 182, 212, 0.38),
       rgba(255, 255, 255, 0.08)
     );
-    box-shadow:
-      0 0 0 1px rgba(34, 211, 238, 0.2),
-      0 6px 20px rgba(0, 102, 255, 0.16);
+    box-shadow: var(--sidebar-item-hover-shadow);
     transform: translateY(-1px);
   }
 
@@ -1111,41 +1212,44 @@ html[data-theme="light"] aside .site-sidebar-brand-subtitle {
       0 4px 16px rgba(0, 102, 255, 0.12);
     transform: translateY(-1px);
   }
-}
 
-html[data-theme="light"] aside .sidebar-nav-item {
-  border-color: rgba(56, 168, 242, 0.18);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-}
-
-html[data-theme="light"] aside .sidebar-section-toggle {
-  border-color: rgba(56, 168, 242, 0.14);
-  background: rgba(255, 255, 255, 0.62);
+  aside .sidebar-section-toggle[aria-expanded="true"].sidebar-section-toggle--interactive:hover {
+    border-color: rgba(34, 211, 238, 0.42);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.18),
+      0 6px 18px rgba(0, 102, 255, 0.14);
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
   html[data-theme="light"] aside .sidebar-nav-item--interactive:hover {
-    border-color: rgba(56, 168, 242, 0.42);
+    border-color: var(--sidebar-item-hover-border) !important;
     background: linear-gradient(
-      to left,
-      rgba(56, 168, 242, 0.16),
-      rgba(125, 211, 252, 0.12),
-      rgba(255, 255, 255, 0.92)
-    );
-    box-shadow:
-      0 0 0 1px rgba(56, 168, 242, 0.22),
-      0 6px 18px rgba(56, 168, 242, 0.14);
+      135deg,
+      rgba(255, 255, 255, 0.62) 0%,
+      rgba(186, 230, 253, 0.48) 52%,
+      rgba(96, 165, 250, 0.34) 100%
+    ) !important;
+    box-shadow: var(--sidebar-item-hover-shadow) !important;
     transform: translateY(-1px);
   }
 
   html[data-theme="light"] aside .sidebar-section-toggle--interactive:hover {
-    border-color: rgba(56, 168, 242, 0.3);
-    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(45, 150, 240, 0.46) !important;
+    background: rgba(255, 255, 255, 0.34) !important;
     box-shadow:
       0 0 0 1px rgba(56, 168, 242, 0.16),
-      0 4px 14px rgba(56, 168, 242, 0.1);
+      0 6px 18px rgba(56, 168, 242, 0.16) !important;
     transform: translateY(-1px);
+  }
+
+  html[data-theme="light"] aside .sidebar-section-toggle[aria-expanded="true"].sidebar-section-toggle--interactive:hover {
+    border-color: rgba(45, 150, 240, 0.58) !important;
+    background: rgba(255, 255, 255, 0.46) !important;
+    box-shadow:
+      0 0 0 1px rgba(56, 168, 242, 0.2),
+      0 8px 22px rgba(56, 168, 242, 0.18) !important;
   }
 }
 
