@@ -42,6 +42,7 @@ const menuGroups = [
       { href: "/assets", icon: "🗂️", label: "الأصول والأسواق" },
       { href: "/order-book", icon: "📒", label: "دفتر الأوامر والسيولة" },
       { href: "/daily-analysis", icon: "📝", label: "التحليلات اليومية" },
+      { href: "/results", icon: "🏆", label: "HasaN CharT Result" },
     ],
   },
   {
@@ -57,6 +58,7 @@ const menuGroups = [
       { href: "/vip-futures", icon: "🔥", label: "توصيات VIP فيوتشر", auth: true, plan: "futures" },
       { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
       { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء" },
+      { href: "/academy", icon: "🎓", label: "HasaN CharT Academy" },
     ],
   },
   {
