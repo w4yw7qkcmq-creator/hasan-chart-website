@@ -1090,6 +1090,63 @@ html[data-theme="light"] .site-top-header__gradient {
   align-items: center;
 }
 
+@media (min-width: 640px) and (max-width: 1023px) {
+  .site-top-header__row {
+    gap: 0.75rem;
+  }
+
+  .site-top-header__actions {
+    gap: 0.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .site-top-header__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+
+  .site-top-header__row > .site-header-brand {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: none;
+    margin-inline-end: auto;
+  }
+
+  .site-top-header__actions {
+    gap: 0.75rem;
+    margin-inline-start: 1rem;
+  }
+
+  .site-top-header .site-header-theme-btn--compact,
+  .site-top-header .browserPushBtn--compact,
+  .site-top-header .topLoginBtn--compact,
+  .site-top-header .topUserChip,
+  .site-top-header .topLogoutBtn {
+    white-space: nowrap;
+  }
+
+  .site-top-header .topUserChip {
+    max-width: 14rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .site-top-header {
+    padding-inline: 1.75rem;
+  }
+
+  .site-top-header__row {
+    gap: 2rem;
+  }
+
+  .site-top-header__actions {
+    gap: 1rem;
+  }
+}
+
 @media (max-width: 639px) {
   .site-top-header__row {
     display: grid;
@@ -1148,12 +1205,6 @@ html[data-theme="light"] .site-top-header__gradient {
   .site-top-header .topLoginBtn--compact {
     white-space: nowrap;
   }
-}
-
-.site-top-header__actions {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
 }
 
 .browserPushBtn:hover {

@@ -14,14 +14,12 @@ import { CoverageBadge, NumericValue } from "./order-book-ui";
 import { ob } from "./order-book-theme";
 
 import OrderBlocksPanel, {
-  ORDER_BLOCKS_MOBILE_SCROLL_MAX,
   ORDER_BLOCKS_VISIBLE_ROWS,
 } from "./OrderBlocksPanel";
 
 export const ORDER_BOOK_VISIBLE_ROWS = ORDER_BLOCKS_VISIBLE_ROWS;
 export const ORDER_BOOK_ROW_HEIGHT = "h-[36rem]";
 export const ORDER_BOOK_ROW_HEIGHT_LG = "lg:h-[36rem]";
-export const ORDER_BOOK_MOBILE_SCROLL_MAX = ORDER_BLOCKS_MOBILE_SCROLL_MAX;
 
 function ExchangePills({ statuses = [] }) {
   const connected = statuses.filter((item) => item.status === "connected").length;

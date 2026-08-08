@@ -1,11 +1,10 @@
-export default function ContentPostsHero({ eyebrow, title, subtitle }) {
+export default function ContentPostsHero({ eyebrow, title, subtitle, badge }) {
   return (
     <header className="content-posts-hero">
-      {eyebrow ? (
-        <p className="mb-2 text-sm font-black tracking-wide text-cyan-300">{eyebrow}</p>
-      ) : null}
-      <h1 className="text-3xl font-black leading-tight md:text-4xl">{title}</h1>
-      {subtitle ? <p className="mt-3 max-w-3xl text-base leading-8 text-slate-300 md:text-lg">{subtitle}</p> : null}
+      {badge ? <div className="content-posts-hero__badge">{badge}</div> : null}
+      {eyebrow ? <p className="content-posts-hero__eyebrow">{eyebrow}</p> : null}
+      <h1 className="content-posts-hero__title">{title}</h1>
+      {subtitle ? <p className="content-posts-hero__subtitle">{subtitle}</p> : null}
     </header>
   );
 }

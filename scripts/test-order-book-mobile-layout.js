@@ -8,19 +8,14 @@ const read = (relativePath) => readFileSync(join(ROOT, relativePath), "utf8");
 
 const panel = read("app/components/order-book/OrderBookPanel.js");
 const blocks = read("app/components/order-book/OrderBlocksPanel.js");
-const page = read("app/components/order-book/OrderBookPageContent.js");
+const theme = read("app/(app)/order-book/order-book-theme.css");
 
-assert.doesNotMatch(panel, /flex h-full min-h-0 min-w-0 flex-col overflow-hidden/);
-assert.match(panel, /max-lg:h-auto max-lg:min-h-0 max-lg:overflow-visible lg:min-h-0 lg:h-full lg:overflow-hidden/);
+assert.match(blocks, /ob-order-blocks flex-none overflow-visible/);
+assert.doesNotMatch(blocks, /overflow-y-auto/);
+assert.doesNotMatch(blocks, /max-h-\[/);
+assert.doesNotMatch(blocks, /ORDER_BLOCKS_DESKTOP_SCROLL_MAX/);
+assert.match(theme, /\.ob-page \.ob-order-blocks[\s\S]*overflow-y: visible !important/);
+assert.match(theme, /\.ob-page \.ob-order-blocks \.ob-mid-row[\s\S]*position: static !important/);
 assert.match(panel, /OrderBlocksPanel/);
-
-assert.match(blocks, /ob-order-blocks/);
-assert.match(blocks, /ORDER_BLOCKS_DESKTOP_SCROLL_MAX|ORDER_BLOCKS_MOBILE_SCROLL_MAX/);
-assert.match(panel, /ORDER_BOOK_MOBILE_SCROLL_MAX = ORDER_BLOCKS_MOBILE_SCROLL_MAX/);
-
-assert.match(page, /header className=\{`mt-4 mb-6 p-4 sm:p-5 \$\{ob\.surface\}`\}/);
-assert.doesNotMatch(page, /<header className="mt-4 mb-6">/);
-
-assert.doesNotMatch(panel, /\/logo\.png/);
 
 console.log("test-order-book-mobile-layout: PASS");

@@ -316,27 +316,27 @@ html[data-theme="light"] .ob-page {
   border-top-color: var(--ob-text-strong);
 }
 
-/* Order Blocks — mobile/tablet: static layout, page scroll only */
+/* Order Blocks — all viewports: natural page flow, no inner scroll */
+.ob-page .ob-order-blocks {
+  max-height: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  overscroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+.ob-page .ob-order-blocks .ob-mid-row {
+  position: static !important;
+  top: auto !important;
+}
+
 @media (max-width: 1023px) {
   .ob-page section.grid > .lg\:col-span-8.flex.flex-col {
     min-height: auto;
     height: auto;
     overflow: visible;
-  }
-
-  .ob-page .ob-order-blocks {
-    max-height: none !important;
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-    overflow-y: visible !important;
-    overscroll-behavior: auto !important;
-    -webkit-overflow-scrolling: auto !important;
-  }
-
-  .ob-page .ob-order-blocks .ob-mid-row {
-    position: static !important;
-    top: auto !important;
   }
 }
 

@@ -1,8 +1,8 @@
 export default function ContentPostsEmptyState({ title, description }) {
   return (
     <div className="content-posts-empty">
-      <p className="text-xl font-black text-slate-100">{title}</p>
-      <p className="mt-2 text-sm leading-7">{description}</p>
+      <p className="content-posts-empty__title">{title}</p>
+      <p className="content-posts-empty__description">{description}</p>
     </div>
   );
 }

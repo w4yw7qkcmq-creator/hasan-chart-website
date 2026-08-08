@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ContentPostPreviewModal from "./ContentPostPreviewModal";
+import ContentPostSelect from "../../../components/content-posts/ContentPostSelect";
 import { getCategoriesForContentType } from "../../../../lib/content-post-categories";
 import { slugifyContentPostTitle } from "../../../../lib/content-post-slug-core";
+import "../../../components/content-posts/content-post-admin.css";
 
 const STATUS_OPTIONS = [
   { value: "", label: "كل الحالات" },
@@ -22,9 +25,6 @@ const EMPTY_FORM = {
   highlight_value: "",
 };
 
-const inputClassName =
-  "w-full rounded-2xl border border-cyan-300/15 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300/50";
-
 function statusLabel(status) {
   switch (status) {
     case "published":
@@ -37,11 +37,16 @@ function statusLabel(status) {
 }
 
 export default function ContentPostAdminPanel({ type = "academy" }) {
+  const router = useRouter();
   const isResult = type === "result";
   const publicHref = isResult ? "/results" : "/academy";
   const pageTitle = isResult ? "Result Management" : "Academy Management";
   const pageTitleAr = isResult ? "إدارة HasaN CharT Result" : "إدارة HasaN CharT Academy";
   const categories = useMemo(() => getCategoriesForContentType(type), [type]);
+  const categoryOptions = useMemo(
+    () => [{ value: "", label: "بدون تصنيف" }, ...categories.map((category) => ({ value: category, label: category }))],
+    [categories]
+  );
 
   const [posts, setPosts] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
@@ -55,6 +60,10 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewPost, setPreviewPost] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  const refreshSurfaces = useCallback(() => {
+    router.refresh();
+  }, [router]);
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -202,6 +211,7 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
 
       setFeedback({ type: "success", message: "تم حفظ المسودة" });
       await loadPosts();
+      refreshSurfaces();
       return post;
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "تعذر حفظ المسودة" });
@@ -225,6 +235,7 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
       }
       setFeedback({ type: "success", message: "تم نشر المنشور" });
       await loadPosts();
+      refreshSurfaces();
       return result.post;
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "تعذر نشر المنشور" });
@@ -251,6 +262,7 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
       setFeedback({ type: "success", message: "تم نشر المنشور" });
       resetForm();
       await loadPosts();
+      refreshSurfaces();
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "تعذر نشر المنشور" });
     } finally {
@@ -271,6 +283,7 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
       }
       setFeedback({ type: "success", message: "تمت الأرشفة" });
       await loadPosts();
+      refreshSurfaces();
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "تعذر أرشفة المنشور" });
     } finally {
@@ -293,6 +306,7 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
       if (editingId === postId) resetForm();
       setFeedback({ type: "success", message: "تم الحذف الناعم" });
       await loadPosts();
+      refreshSurfaces();
     } catch (error) {
       setFeedback({ type: "error", message: error.message || "تعذر حذف المنشور" });
     } finally {
@@ -332,12 +346,12 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
   };
 
   return (
-    <section className="admin-theme-page space-y-6">
+    <section className="content-post-admin content-post-admin__page space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="text-sm font-black text-cyan-300">{pageTitle}</p>
-          <h1 className="text-3xl font-black text-white">{pageTitleAr}</h1>
-          <p className="mt-2 text-slate-400">
+          <p className="content-post-admin__eyebrow text-sm font-black">{pageTitle}</p>
+          <h1 className="text-3xl font-black">{pageTitleAr}</h1>
+          <p className="content-post-admin__subtitle mt-2">
             إنشاء وتحرير ونشر {isResult ? "نتائج HasaN CharT Result" : "دروس HasaN CharT Academy"} يدوياً.
           </p>
         </div>
@@ -345,7 +359,7 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
           href={publicHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex rounded-2xl border border-cyan-300/20 px-5 py-3 text-sm font-black text-cyan-200 no-underline"
+          className="content-post-admin__btn content-post-admin__btn--ghost inline-flex no-underline"
         >
           عرض الصفحة العامة ↗
         </Link>
@@ -354,7 +368,9 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
       {feedback.message ? (
         <div
           className={`rounded-2xl px-4 py-3 text-sm font-bold ${
-            feedback.type === "success" ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
+            feedback.type === "success"
+              ? "content-post-admin__feedback--success"
+              : "content-post-admin__feedback--error"
           }`}
         >
           {feedback.message}
@@ -363,16 +379,16 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <form
-          className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-2xl"
+          className="content-post-admin__panel rounded-[30px] p-6"
           onSubmit={(event) => {
             event.preventDefault();
             saveDraft();
           }}
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black text-white">{editingId ? "تحرير منشور" : "منشور جديد"}</h2>
+            <h2 className="text-xl font-black">{editingId ? "تحرير منشور" : "منشور جديد"}</h2>
             {editingId ? (
-              <button type="button" className="text-sm font-black text-slate-400" onClick={resetForm}>
+              <button type="button" className="content-post-admin__btn content-post-admin__btn--muted" onClick={resetForm}>
                 إلغاء التحرير
               </button>
             ) : null}
@@ -380,37 +396,33 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
 
           <div className="grid gap-4">
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-300">العنوان</span>
-              <input className={inputClassName} value={form.title} onChange={(e) => updateField("title", e.target.value)} required />
+              <span className="content-post-admin__label text-sm font-bold">العنوان</span>
+              <input className="content-post-admin__input" value={form.title} onChange={(e) => updateField("title", e.target.value)} required />
             </label>
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-300">Slug</span>
-              <input className={inputClassName} value={form.slug} onChange={(e) => updateField("slug", e.target.value)} dir="ltr" />
+              <span className="content-post-admin__label text-sm font-bold">Slug</span>
+              <input className="content-post-admin__input" value={form.slug} onChange={(e) => updateField("slug", e.target.value)} dir="ltr" />
             </label>
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-300">الملخص</span>
-              <textarea className={inputClassName} rows={3} value={form.summary} onChange={(e) => updateField("summary", e.target.value)} />
+              <span className="content-post-admin__label text-sm font-bold">الملخص</span>
+              <textarea className="content-post-admin__textarea" rows={3} value={form.summary} onChange={(e) => updateField("summary", e.target.value)} />
             </label>
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-300">المحتوى</span>
-              <textarea className={inputClassName} rows={10} value={form.body} onChange={(e) => updateField("body", e.target.value)} required />
+              <span className="content-post-admin__label text-sm font-bold">المحتوى</span>
+              <textarea className="content-post-admin__textarea" rows={10} value={form.body} onChange={(e) => updateField("body", e.target.value)} required />
             </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-300">التصنيف</span>
-              <select className={inputClassName} value={form.category} onChange={(e) => updateField("category", e.target.value)}>
-                <option value="">بدون تصنيف</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ContentPostSelect
+              label="التصنيف"
+              value={form.category}
+              onChange={(value) => updateField("category", value)}
+              options={categoryOptions}
+              ariaLabel="تصنيف المنشور"
+            />
             {isResult ? (
               <label className="grid gap-2">
-                <span className="text-sm font-bold text-slate-300">Highlight (اختياري)</span>
+                <span className="content-post-admin__label text-sm font-bold">Highlight (اختياري)</span>
                 <input
-                  className={inputClassName}
+                  className="content-post-admin__input"
                   value={form.highlight_value}
                   onChange={(e) => updateField("highlight_value", e.target.value)}
                   placeholder="+12% / TP2 Hit / Weekly Performance"
@@ -418,40 +430,39 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
               </label>
             ) : null}
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-300">الصورة</span>
+              <span className="content-post-admin__label text-sm font-bold">الصورة</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                className={inputClassName}
+                className="content-post-admin__file"
                 onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
               />
             </label>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <button type="submit" disabled={submitting} className="rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-black text-slate-950">
+            <button type="submit" disabled={submitting} className="content-post-admin__btn content-post-admin__btn--primary">
               حفظ مسودة
             </button>
-            <button type="button" disabled={submitting} onClick={openPreview} className="rounded-2xl border border-cyan-300/20 px-5 py-3 text-sm font-black text-cyan-100">
+            <button type="button" disabled={submitting} onClick={openPreview} className="content-post-admin__btn content-post-admin__btn--ghost">
               معاينة
             </button>
-            <button type="button" disabled={submitting} onClick={publishPost} className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-white">
+            <button type="button" disabled={submitting} onClick={publishPost} className="content-post-admin__btn content-post-admin__btn--success">
               نشر
             </button>
           </div>
         </form>
 
-        <div className="rounded-[30px] border border-cyan-300/15 bg-white/[0.045] p-6">
+        <div className="content-post-admin__panel rounded-[30px] p-6">
           <div className="mb-4 grid gap-3 md:grid-cols-2">
-            <select className={inputClassName} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value || "all"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <ContentPostSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={STATUS_OPTIONS}
+              ariaLabel="تصفية الحالة"
+            />
             <input
-              className={inputClassName}
+              className="content-post-admin__input"
               placeholder="بحث بالعنوان"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -459,47 +470,49 @@ export default function ContentPostAdminPanel({ type = "academy" }) {
           </div>
 
           {loading ? (
-            <p className="text-slate-400">جاري التحميل...</p>
+            <p className="content-post-admin__subtitle">جاري التحميل...</p>
           ) : posts.length === 0 ? (
-            <p className="text-slate-400">لا توجد منشورات بعد.</p>
+            <p className="content-post-admin__subtitle">لا توجد منشورات بعد.</p>
           ) : (
             <div className="space-y-3">
               {posts.map((post) => (
-                <div key={post.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div key={post.id} className="content-post-admin__post-card rounded-2xl p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-black text-white">{post.title}</p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        {statusLabel(post.status)} · {post.slug}
+                      <p className="font-black">{post.title}</p>
+                      <p className="content-post-admin__post-meta mt-1 text-xs">
+                        <span className="content-post-admin__badge">{statusLabel(post.status)}</span>
+                        <span className="mx-2">·</span>
+                        {post.slug}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" className="rounded-xl border border-white/10 px-3 py-2 text-xs font-black" onClick={() => startEdit(post)}>
+                      <button type="button" className="content-post-admin__btn content-post-admin__btn--ghost px-3 py-2 text-xs" onClick={() => startEdit(post)}>
                         تحرير
                       </button>
                       {post.status !== "published" ? (
                         <button
                           type="button"
-                          className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-white"
+                          className="content-post-admin__btn content-post-admin__btn--success px-3 py-2 text-xs"
                           onClick={() => publishPostById(post.id)}
                         >
                           نشر
                         </button>
                       ) : (
-                        <button type="button" className="rounded-xl border border-amber-300/20 px-3 py-2 text-xs font-black text-amber-200" onClick={() => archivePost(post.id)}>
+                        <button type="button" className="content-post-admin__btn content-post-admin__btn--ghost px-3 py-2 text-xs" onClick={() => archivePost(post.id)}>
                           أرشفة
                         </button>
                       )}
                       {post.status === "archived" ? (
                         <button
                           type="button"
-                          className="rounded-xl bg-cyan-500 px-3 py-2 text-xs font-black text-slate-950"
+                          className="content-post-admin__btn content-post-admin__btn--primary px-3 py-2 text-xs"
                           onClick={() => publishPostById(post.id)}
                         >
                           إعادة نشر
                         </button>
                       ) : null}
-                      <button type="button" className="rounded-xl border border-rose-300/20 px-3 py-2 text-xs font-black text-rose-200" onClick={() => deletePost(post.id)}>
+                      <button type="button" className="content-post-admin__btn content-post-admin__btn--muted px-3 py-2 text-xs" onClick={() => deletePost(post.id)}>
                         حذف
                       </button>
                     </div>
