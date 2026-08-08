@@ -23,6 +23,7 @@ function createPublishLegState(initial = {}) {
     publishedNewsRecorded: Boolean(initial.publishedNewsRecorded),
     retryable: Boolean(initial.retryable),
     reason: initial.reason || null,
+    publicationRecord: initial.publicationRecord || null,
     updatedAt: new Date().toISOString(),
   };
 }

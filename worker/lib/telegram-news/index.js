@@ -48,7 +48,7 @@ function mapProcessedToNewsItems(processed) {
   return processed.map((item) => ({
     title: item.facts.title || item.post.rawText.slice(0, 160),
     contentSnippet: item.post.rawText,
-    summary: item.formattedMessage || item.post.rawText,
+    summary: item.formattedMessage || "",
     description: item.post.rawText,
     link: item.post.sourceUrl,
     isoDate: item.post.sourcePublishedAt,

@@ -71,6 +71,8 @@ enablePublishStateForTests("0");
 
   const deps = {
     dryRun: false,
+    runtimeMode: "test",
+    forceMemory: true,
     sendTelegramMessage: async () => {
       telegramCalls += 1;
       return { ok: true, message_id: 12345 };

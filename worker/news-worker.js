@@ -70,11 +70,59 @@ const {
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
 const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
+const {
+  createNewsPublisherGateway,
+  PUBLICATION_TYPES,
+  SOURCE_TYPES,
+} = require("./lib/news-intelligence");
+const { detectNumericEconomicReleaseCandidate } = require("./lib/news-intelligence/economic-event-detector");
+const { buildStructuredEconomicPublicationRequest } = require("./lib/news-intelligence/adapters");
+const { buildIdempotencyKey } = require("./lib/economic-releases/canonical-events");
 
 const parser = new Parser();
 
 let telegramMergeBufferInstance = null;
 const telegramMergePublishLog = [];
+let newsPublisherGatewayInstance = null;
+
+function getNewsPublisherGateway() {
+  if (!newsPublisherGatewayInstance) {
+    newsPublisherGatewayInstance = createNewsPublisherGateway({
+      supabase: getSupabaseClient(),
+      runtimeMode: NEWS_DRY_RUN ? "test" : undefined,
+    });
+  }
+  return newsPublisherGatewayInstance;
+}
+
+function blockRssNumericEconomicRelease(latestNews, aiResult, stats) {
+  if (latestNews?.isTelegramSource) {
+    return false;
+  }
+
+  const detected = detectNumericEconomicReleaseCandidate({
+    title: latestNews?.title,
+    text: `${latestNews?.contentSnippet || ""}\n${latestNews?.description || ""}\n${latestNews?.summary || ""}\n${aiResult?.message || ""}`,
+    releaseDate: latestNews?.isoDate || latestNews?.pubDate || null,
+  });
+
+  if (!detected.isNumericEconomicCandidate) {
+    return false;
+  }
+
+  stats.rejectedFilter += 1;
+  recordRejection(stats, "rss_economic_publish_forbidden", latestNews.title);
+  console.log(
+    "RSS_ECONOMIC_PUBLISH_FORBIDDEN",
+    JSON.stringify({
+      title: latestNews.title,
+      eventType: detected.eventType,
+      eventKey: detected.eventKey,
+      detection: "deterministic_numeric_economic",
+    })
+  );
+  return true;
+}
 
 function getNewsWorkerTelegramMergeBuffer(dryRun) {
   syncPublishingTransition();
@@ -135,6 +183,7 @@ async function publishTelegramMergeBufferItem(item, ctx = {}) {
     {
       dryRun: NEWS_DRY_RUN,
       memoryOnly: true,
+      supabase: getSupabaseClient(),
       ...dedupContext,
       deliverTelegramNews,
       sendTelegramMessage,
@@ -3370,8 +3419,10 @@ async function analyzeNewsWithAI(title, link, options = {}) {
     console.error("⚠️ AI Error:", error.response?.data || error.message);
 
     return {
-      message: `🚨 خبر اقتصادي عاجل\n\n📌 ${title}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi\n\n#Forex #Gold #Crypto #USD`,
+      message: null,
       imageTitle: title,
+      aiFailed: true,
+      reason: "EDITORIAL_OUTPUT_INVALID",
     };
   }
 }
@@ -3382,55 +3433,67 @@ async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
     return false;
   }
 
-  const message = result.message;
   const imageTitle = result.imageTitle || "خبر اقتصادي";
-  const sourceLink = result.sourceLink || `economic-release:${result.idempotencyKey}`;
+  const premiumImageContext = buildPremiumImageContextFromRelease(result);
+  const publication = buildStructuredEconomicPublicationRequest(result, {
+    sourceType: SOURCE_TYPES.TELEGRAM_ECONOMIC,
+    premiumImageContext,
+    rawSourceText: result.rawSourceText || null,
+  });
+  publication.title = imageTitle;
+  publication.metadata.premiumImageContext = premiumImageContext;
 
-  if (dryRun) {
-    console.log("NEWS_DRY_RUN economic release publish-ready:", imageTitle);
+  const gateway = getNewsPublisherGateway();
+  const photoPath = dryRun ? null : await createNewsCard(imageTitle, null, "HIGH", premiumImageContext);
+  if (photoPath) {
+    publication.image = photoPath;
+  }
+
+  const gatewayResult = await gateway.publish(publication, {
+    dryRun,
+    sendTelegramPhoto,
+    sendTelegramMessage,
+    saveNewsPostToSupabase,
+    savePublishedNewsToSupabase,
+    savePublishedNewsLink,
+    dispatchMarketNewsNotifications,
+  });
+
+  if (gatewayResult.blocked) {
+    console.log(
+      "ECONOMIC_RELEASE_PUBLISH_BLOCKED",
+      JSON.stringify({
+        reason: gatewayResult.reason,
+        eventKey: gatewayResult.eventKey,
+        idempotencyKey: result.idempotencyKey,
+      })
+    );
+    return false;
+  }
+
+  if (gatewayResult.failed) {
+    stats.telegramFailed += 1;
+    stats.lastErrorSafe = gatewayResult.reason;
+    return false;
+  }
+
+  if (dryRun || gatewayResult.published) {
     stats.economicEventsPublished += 1;
+    if (!dryRun) {
+      stats.telegramPublished += 1;
+      if (gatewayResult.siteInserted) {
+        stats.dbInserted += 1;
+      } else {
+        stats.dbFailed += 1;
+      }
+      if (result.idempotencyKey) {
+        getPendingQueue().markPublished(result.idempotencyKey);
+      }
+    }
     return true;
   }
 
-  const premiumImageContext = buildPremiumImageContextFromRelease(result);
-  const photoPath = await createNewsCard(imageTitle, null, "HIGH", premiumImageContext);
-  if (photoPath) {
-    await sendTelegramPhoto(message, photoPath);
-  } else {
-    await sendTelegramMessage(message);
-  }
-  stats.telegramPublished += 1;
-  stats.economicEventsPublished += 1;
-
-  const saveResult = await saveNewsPostToSupabase({
-    title: imageTitle,
-    content: message,
-    image_url: null,
-    impact_level: "HIGH",
-    source_link: sourceLink,
-  });
-  if (saveResult?.error) {
-    stats.dbFailed += 1;
-  } else {
-    stats.dbInserted += 1;
-  }
-
-  await dispatchMarketNewsNotifications({
-    title: imageTitle,
-    sourceLink,
-    impactLevel: "HIGH",
-  });
-
-  savePublishedNewsLink(sourceLink, `${imageTitle} ${message}`);
-  await savePublishedNewsToSupabase({
-    link: sourceLink,
-    title: `${imageTitle} ${message}`,
-    normalized_title: normalizeNewsTitle(`${imageTitle} ${message}`).slice(0, 500),
-    topic_cluster: getNewsTopicCluster(imageTitle),
-    published_at: new Date().toISOString(),
-  });
-
-  return true;
+  return false;
 }
 
 async function fetchForexNews(options = {}) {
@@ -3579,13 +3642,21 @@ async function fetchForexNews(options = {}) {
         }
 
         if (!dryRun) {
+          const canonical = processedItem.facts?.canonical || {};
+          const idempotencyKey =
+            buildIdempotencyKey({
+              country: canonical.country || "US",
+              eventKey: canonical.eventKey,
+              scheduledAt: processedItem.post.sourcePublishedAt,
+            }) || `TG|${processedItem.fingerprint}`;
+
           getPendingQueue().enqueue({
             title: processedItem.facts.title || processedItem.post.rawText.slice(0, 120),
             link: processedItem.post.sourceUrl,
-            canonical: processedItem.facts.canonical,
+            canonical,
             scheduledAt: processedItem.post.sourcePublishedAt,
             validation: processedItem.validation,
-            idempotencyKey: `TG|${processedItem.fingerprint}`,
+            idempotencyKey,
           });
         }
       }
@@ -3731,6 +3802,24 @@ async function fetchForexNews(options = {}) {
       if (aiResult.economicAnalysis?.validation?.complete) {
         stats.economicEventsComplete += 1;
       }
+
+      if (!latestNews.isTelegramSource) {
+        stats.rejectedFilter += 1;
+        recordRejection(stats, "rss_economic_publish_forbidden", latestNews.title);
+        console.log(
+          "RSS_ECONOMIC_PUBLISH_FORBIDDEN",
+          JSON.stringify({
+            title: latestNews.title,
+            idempotencyKey: aiResult.economicAnalysis?.idempotencyKey,
+            eventKey: aiResult.economicAnalysis?.canonical?.eventKey,
+          })
+        );
+        stats.cycleDurationMs = Date.now() - cycleStartedAt;
+        lastCycleStats = stats;
+        lastCycleCompletedAt = new Date().toISOString();
+        console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+        return stats;
+      }
     }
 
     if (!aiResult?.message) {
@@ -3744,6 +3833,14 @@ async function fetchForexNews(options = {}) {
 
     if (latestNews.isTelegramSource && !TELEGRAM_NEWS_PUBLISH_ENABLED) {
       console.log("TELEGRAM_NEWS_PUBLISH_DISABLED skip cycle publish:", latestNews.title);
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+      return stats;
+    }
+
+    if (blockRssNumericEconomicRelease(latestNews, aiResult, stats)) {
       stats.cycleDurationMs = Date.now() - cycleStartedAt;
       lastCycleStats = stats;
       lastCycleCompletedAt = new Date().toISOString();

@@ -11,6 +11,25 @@ const {
   transitionPublishLegState,
   resolveRetryLeg,
 } = require("../news-publish-state");
+const { createNewsPublisherGateway } = require("../news-intelligence/publisher-gateway");
+const { buildTelegramPublicationRequest } = require("../news-intelligence/adapters");
+
+let gatewayInstance = null;
+
+function getAtomicPublishGateway(deps = {}) {
+  if (!gatewayInstance) {
+    gatewayInstance = createNewsPublisherGateway({
+      supabase: deps.supabase || null,
+      runtimeMode: deps.runtimeMode || (deps.dryRun ? "test" : undefined),
+      forceMemory: deps.forceMemory === true,
+    });
+  }
+  return gatewayInstance;
+}
+
+function resetAtomicPublishGatewayForTests() {
+  gatewayInstance = null;
+}
 
 /** @type {Set<string>} */
 const memoryReservations = new Set();
@@ -185,69 +204,61 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
     };
   }
 
-  try {
-    if (deps.deliverTelegramNews) {
-      const delivery = await deps.deliverTelegramNews({ message, candidate, dryRun: deps.dryRun });
-      legState = transitionPublishLegState(legState, {
-        telegramSent: true,
-        telegramMessageId: delivery?.telegramMessageId || null,
-        state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
-      });
-      if (delivery?.premiumImage === true) {
-        legState.premiumImage = true;
-      }
-    } else {
-      const delivery = await deps.sendTelegramMessage(message);
-      if (delivery?.ok === false) {
-        throw new Error(delivery.error || "telegram_send_failed");
-      }
-      legState = transitionPublishLegState(legState, {
-        telegramSent: true,
-        telegramMessageId: delivery?.telegramMessageId || delivery?.message_id || null,
-        state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
-      });
-    }
-  } catch (error) {
+  const publication = buildTelegramPublicationRequest(candidate, validation, ctx);
+  const gateway = getAtomicPublishGateway(deps);
+  const gatewayResult = await gateway.publish(publication, {
+    dryRun: deps.dryRun,
+    deliverTelegramNews: deps.deliverTelegramNews,
+    sendTelegramMessage: deps.sendTelegramMessage,
+    sendTelegramPhoto: deps.sendTelegramPhoto,
+    saveNewsPostToSupabase: deps.saveNewsPostToSupabase,
+    savePublishedNewsToSupabase: deps.savePublishedNewsToSupabase,
+    savePublishedNewsLink: deps.savePublishedNewsLink,
+  });
+
+  if (gatewayResult.blocked) {
+    releaseMemoryReservation(fingerprint);
+    publishStates.delete(fingerprint);
+    console.log(
+      "FINAL_ATOMIC_PUBLISH_REJECTED",
+      JSON.stringify({
+        reasons: [gatewayResult.reason || "gateway_blocked"],
+        fingerprint,
+        eventKey: gatewayResult.eventKey,
+        sourceMessageId: candidate.post?.sourceMessageId,
+      })
+    );
+    return {
+      skipped: true,
+      reason: gatewayResult.reason || "gateway_blocked",
+      fingerprint,
+      eventKey: gatewayResult.eventKey,
+      stage: gatewayResult.stage,
+    };
+  }
+
+  if (gatewayResult.failed) {
     legState = transitionPublishLegState(legState, {
       state: PUBLISH_STATES.FAILED_RETRYABLE,
       retryable: true,
-      reason: error.message,
+      reason: gatewayResult.reason,
     });
     publishStates.set(fingerprint, legState);
     releaseMemoryReservation(fingerprint);
-    return { failed: true, state: legState.state, reason: error.message, fingerprint, legState };
+    return { failed: true, state: legState.state, reason: gatewayResult.reason, fingerprint, legState };
   }
 
-  const sourceLink = legState.sourceLink;
-  const dbTitle = validation.resolvedTitle || candidate.facts?.title || "خبر سوق";
-  const impactLevel = candidate.newsType === "economic" ? "HIGH" : "MEDIUM";
+  const telegramSent = gatewayResult.telegramSent !== false;
+  const dbInserted = gatewayResult.siteInserted !== false;
 
-  if (deps.savePublishedNewsToSupabase) {
-    await deps.savePublishedNewsToSupabase({
-      link: sourceLink,
-      title: `${dbTitle} ${message}`.slice(0, 500),
-      normalized_title: dbTitle.slice(0, 500),
-      topic_cluster: fingerprint.slice(0, 120),
-      published_at: new Date().toISOString(),
-      telegramFingerprint: fingerprint,
-    });
-    legState = transitionPublishLegState(legState, { publishedNewsRecorded: true });
-  }
-
-  const saveResult = await deps.saveNewsPostToSupabase({
-    title: dbTitle,
-    content: message,
-    image_url: null,
-    impact_level: impactLevel,
-    source_link: sourceLink,
-  });
-
-  if (saveResult?.error) {
+  if (telegramSent && !dbInserted) {
     legState = transitionPublishLegState(legState, {
+      telegramSent: true,
       siteInserted: false,
       state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
       retryable: true,
       reason: "db_insert_failed",
+      publicationRecord: gatewayResult.publicationRecord || null,
     });
     publishStates.set(fingerprint, legState);
     return {
@@ -263,30 +274,35 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   }
 
   legState = transitionPublishLegState(legState, {
-    siteInserted: true,
-    sitePostId: saveResult?.id || null,
+    telegramSent,
+    siteInserted: dbInserted,
     state: PUBLISH_STATES.COMPLETED,
     retryable: false,
+    publicationRecord: gatewayResult.publicationRecord || null,
+    storedPublication: gatewayResult.editorial
+      ? {
+          title: publication.title,
+          body: gatewayResult.editorial.body,
+          sourceLink: publication.sourceLink,
+          facts: publication.facts,
+          eventType: gatewayResult.eventKey ? publication.eventType : null,
+        }
+      : null,
   });
   publishStates.set(fingerprint, legState);
-
-  if (deps.savePublishedNewsLink) {
-    deps.savePublishedNewsLink(sourceLink, `${dbTitle} ${message}`);
-  }
-
   updateBaselineAfterPublish(candidate.post);
 
   return {
     published: true,
+    dryRun: gatewayResult.dryRun === true,
     state: legState.state,
     fingerprint,
-    sourceLink,
+    sourceLink: publication.sourceLink,
     resolvedTitle: validation.resolvedTitle,
     messageLength: message.length,
-    telegramSent: true,
-    dbInserted: true,
-    telegramMessageId: legState.telegramMessageId,
-    sitePostId: legState.sitePostId,
+    telegramSent,
+    dbInserted,
+    eventKey: gatewayResult.eventKey,
     legState,
   };
 }
@@ -297,57 +313,72 @@ async function retryPublishLeg(candidate, legState, ctx = {}, deps = {}) {
     return { skipped: true, reason: "nothing_to_retry", legState };
   }
 
-  const validation = validateCandidateForAtomicPublish(candidate, ctx);
-  const message = validation.sanitizedMessage || candidate.formattedMessage;
-  const dbTitle = validation.resolvedTitle || candidate.facts?.title || "خبر سوق";
-  const sourceLink = legState.sourceLink;
-  const impactLevel = candidate.newsType === "economic" ? "HIGH" : "MEDIUM";
-
-  let nextState = { ...legState };
-
-  if ((retryLeg === "telegram_only" || retryLeg === "full") && !legState.telegramSent) {
-    if (deps.deliverTelegramNews) {
-      await deps.deliverTelegramNews({ message, candidate, dryRun: deps.dryRun });
-    } else {
-      await deps.sendTelegramMessage(message);
-    }
-    nextState = transitionPublishLegState(nextState, { telegramSent: true, state: PUBLISH_STATES.TELEGRAM_PUBLISHED });
+  if (!legState.publicationRecord) {
+    return { skipped: true, reason: "retry_publication_record_missing", legState };
   }
 
-  if ((retryLeg === "site_only" || retryLeg === "full") && !legState.siteInserted) {
-    const saveResult = await deps.saveNewsPostToSupabase({
-      title: dbTitle,
-      content: message,
-      image_url: null,
-      impact_level: impactLevel,
-      source_link: sourceLink,
-    });
-    if (saveResult?.error) {
-      return {
-        partial: true,
-        reason: "db_insert_failed",
-        retryLeg,
-        legState: transitionPublishLegState(nextState, {
-          retryable: true,
-          reason: "db_insert_failed",
-          state: PUBLISH_STATES.TELEGRAM_PUBLISHED,
-        }),
-      };
+  const gateway = getAtomicPublishGateway(deps);
+  const gatewayResult = await gateway.retryDelivery(
+    legState.publicationRecord,
+    {
+      retryLeg: retryLeg === "telegram_only" ? "telegram_only" : retryLeg === "site_only" ? "site_only" : "full",
+      destination: "both",
+    },
+    {
+      dryRun: deps.dryRun,
+      deliverTelegramNews: deps.deliverTelegramNews,
+      sendTelegramMessage: deps.sendTelegramMessage,
+      sendTelegramPhoto: deps.sendTelegramPhoto,
+      saveNewsPostToSupabase: deps.saveNewsPostToSupabase,
+      savePublishedNewsToSupabase: deps.savePublishedNewsToSupabase,
+      savePublishedNewsLink: deps.savePublishedNewsLink,
     }
-    nextState = transitionPublishLegState(nextState, {
-      siteInserted: true,
-      sitePostId: saveResult?.id || null,
-      state: PUBLISH_STATES.COMPLETED,
+  );
+
+  if (gatewayResult.failed) {
+    const nextState = transitionPublishLegState(legState, {
+      retryable: true,
+      reason: gatewayResult.reason || "retry_failed",
+      telegramSent: gatewayResult.telegramSent === true,
+      siteInserted: gatewayResult.siteInserted === true,
+      state:
+        gatewayResult.telegramSent && !gatewayResult.siteInserted
+          ? PUBLISH_STATES.TELEGRAM_PUBLISHED
+          : legState.state,
     });
+    publishStates.set(legState.fingerprint, nextState);
+    return {
+      failed: true,
+      reason: gatewayResult.reason,
+      retryLeg,
+      legState: nextState,
+      partial: gatewayResult.partial === true,
+    };
   }
 
+  const nextState = transitionPublishLegState(legState, {
+    telegramSent: gatewayResult.telegramSent !== false,
+    siteInserted: gatewayResult.siteInserted !== false,
+    state: gatewayResult.published ? PUBLISH_STATES.COMPLETED : PUBLISH_STATES.TELEGRAM_PUBLISHED,
+    retryable: !gatewayResult.published,
+    publicationRecord: gatewayResult.publicationRecord || legState.publicationRecord,
+  });
   publishStates.set(legState.fingerprint, nextState);
-  return { published: nextState.state === PUBLISH_STATES.COMPLETED, retryLeg, legState: nextState };
+
+  return {
+    published: nextState.state === PUBLISH_STATES.COMPLETED,
+    partial: gatewayResult.partial === true,
+    retryLeg,
+    legState: nextState,
+    telegramSent: gatewayResult.telegramSent,
+    dbInserted: gatewayResult.siteInserted,
+  };
 }
 
 function resetAtomicPublishForTests() {
   memoryReservations.clear();
   publishStates.clear();
+  resetAtomicPublishGatewayForTests();
 }
 
 function getPublishStateForFingerprint(fingerprint) {
@@ -361,6 +392,7 @@ module.exports = {
   retryPublishLeg,
   extractResolvedTitle,
   resetAtomicPublishForTests,
+  resetAtomicPublishGatewayForTests,
   getPublishStateForFingerprint,
   releaseMemoryReservation,
   isFingerprintAlreadyPublished,
