@@ -28,8 +28,15 @@ export async function GET() {
 
     return NextResponse.json({ success: true, smartLinks });
   } catch (error) {
-    console.error("Partner smart links GET error");
-    return NextResponse.json({ success: false, error: "تعذر تحميل الروابط" }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Partner smart links GET error", {
+      errorKey: "internal_error",
+      message: message.slice(0, 200),
+    });
+    return NextResponse.json(
+      { success: false, error: "تعذر تحميل الروابط", errorKey: "internal_error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -76,7 +83,14 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, smartLink: result.smartLink, url: result.url });
   } catch (error) {
-    console.error("Partner smart links POST error");
-    return NextResponse.json({ success: false, error: "تعذر إنشاء الرابط" }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Partner smart links POST error", {
+      errorKey: "internal_error",
+      message: message.slice(0, 200),
+    });
+    return NextResponse.json(
+      { success: false, error: "تعذر إنشاء الرابط", errorKey: "internal_error" },
+      { status: 500 }
+    );
   }
 }

@@ -37,7 +37,14 @@ export async function GET() {
       growth,
     });
   } catch (error) {
-    console.error("Partner growth API error");
-    return NextResponse.json({ success: false, error: "تعذر تحميل بيانات النمو" }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Partner growth API error", {
+      errorKey: "internal_error",
+      message: message.slice(0, 200),
+    });
+    return NextResponse.json(
+      { success: false, error: "تعذر تحميل بيانات النمو", errorKey: "internal_error" },
+      { status: 500 }
+    );
   }
 }

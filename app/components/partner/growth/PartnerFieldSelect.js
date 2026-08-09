@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 export function PartnerFieldSelect({
   label,
@@ -14,11 +14,15 @@ export function PartnerFieldSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [openUpward, setOpenUpward] = useState(false);
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
   const listId = useId();
   const labelId = useId();
+  const errorId = useId();
 
   const selected = options.find((opt) => opt.value === value) || null;
+  const hasValue = Boolean(selected);
 
   useEffect(() => {
     const onDocClick = (event) => {
@@ -33,6 +37,16 @@ export function PartnerFieldSelect({
   useEffect(() => {
     if (!open) setActiveIndex(-1);
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open || !rootRef.current || !menuRef.current) return;
+
+    const triggerRect = rootRef.current.getBoundingClientRect();
+    const menuHeight = menuRef.current.offsetHeight || 256;
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
+    setOpenUpward(spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow);
+  }, [open, options.length]);
 
   const selectOption = (nextValue) => {
     onChange(nextValue);
@@ -87,15 +101,16 @@ export function PartnerFieldSelect({
       <span className="partner-label" id={labelId}>
         {label}
       </span>
-      <div className="partner-custom-select">
+      <div className={`partner-custom-select ${open ? "is-open" : ""}`}>
         <button
           type="button"
-          className={`partner-custom-select__trigger partner-input ${error ? "partner-input--error" : ""}`}
+          className={`partner-custom-select__trigger partner-input ${hasValue ? "partner-custom-select__trigger--filled" : ""} ${error ? "partner-input--error" : ""}`}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-labelledby={labelId}
           aria-controls={listId}
           aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           disabled={disabled}
           onClick={() => setOpen((v) => !v)}
           onKeyDown={onKeyDown}
@@ -106,7 +121,7 @@ export function PartnerFieldSelect({
                 {selected.icon}
               </span>
             ) : null}
-            <span>{selected?.label || placeholder}</span>
+            <span className="partner-custom-select__label">{selected?.label || placeholder}</span>
           </span>
           <span className="partner-custom-select__chevron" aria-hidden="true">
             ▾
@@ -115,8 +130,9 @@ export function PartnerFieldSelect({
         {open ? (
           <ul
             id={listId}
+            ref={menuRef}
             role="listbox"
-            className="partner-custom-select__menu"
+            className={`partner-custom-select__menu ${openUpward ? "partner-custom-select__menu--up" : ""}`}
             aria-labelledby={labelId}
           >
             {options.map((opt, index) => {
@@ -132,12 +148,19 @@ export function PartnerFieldSelect({
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => selectOption(opt.value)}
                   >
-                    {opt.icon ? (
-                      <span className="partner-custom-select__icon" aria-hidden="true">
-                        {opt.icon}
+                    <span className="partner-custom-select__option-main">
+                      {opt.icon ? (
+                        <span className="partner-custom-select__icon" aria-hidden="true">
+                          {opt.icon}
+                        </span>
+                      ) : null}
+                      <span className="partner-custom-select__option-label">{opt.label}</span>
+                    </span>
+                    {isSelected ? (
+                      <span className="partner-custom-select__check" aria-hidden="true">
+                        ✓
                       </span>
                     ) : null}
-                    <span>{opt.label}</span>
                   </button>
                 </li>
               );
@@ -146,7 +169,7 @@ export function PartnerFieldSelect({
         ) : null}
       </div>
       {error ? (
-        <p className="partner-field-error" role="alert">
+        <p className="partner-field-error" id={errorId} role="alert">
           {error}
         </p>
       ) : hint ? (

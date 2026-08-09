@@ -162,7 +162,11 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
 
       if (!res.ok || !json?.success) {
         const errorKey = json?.errorKey || json?.code || "";
-        const message = json?.error || "تعذر إنشاء الرابط الآن. حاول مرة أخرى.";
+        const rawMessage = json?.error || "";
+        const message =
+          errorKey === "internal_error" || rawMessage === "تعذر إنشاء الرابط"
+            ? "تعذر إنشاء الرابط الآن. حاول مرة أخرى."
+            : rawMessage || "تعذر إنشاء الرابط الآن. حاول مرة أخرى.";
         if (isSmartLinkCampaignError(errorKey)) {
           setCampaignFieldError(message);
         } else {
@@ -346,6 +350,7 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
                 onChange={(campaignCode) => {
                   setLinkForm((f) => ({ ...f, campaignCode }));
                   setCampaignFieldError("");
+                  setLinkFormError("");
                 }}
                 options={eligibleCampaignOptions}
                 placeholder="بدون حملة"

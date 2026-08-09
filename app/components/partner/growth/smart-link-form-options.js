@@ -1,10 +1,10 @@
-export const SMART_LINK_SOURCE_OPTIONS = [
-  { value: "telegram", label: "تيليغرام", icon: "✈️" },
-  { value: "x", label: "X", icon: "𝕏" },
-  { value: "youtube", label: "يوتيوب", icon: "▶️" },
-  { value: "whatsapp", label: "واتساب", icon: "💬" },
-  { value: "other", label: "أخرى", icon: "🔗" },
-];
+export {
+  SMART_LINK_SOURCE_OPTIONS,
+  SMART_LINK_SOURCES,
+  ALLOWED_SMART_LINK_SOURCES,
+  normalizeSmartLinkSource,
+  isAllowedSmartLinkSource,
+} from "../../../../lib/partner-center/smart-link-sources.js";
 
 export function buildEligibleCampaignOptions(campaigns = []) {
   const eligible = (campaigns || []).filter((c) => c.eligible);
