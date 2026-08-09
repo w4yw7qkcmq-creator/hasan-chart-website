@@ -4110,7 +4110,7 @@ async function fetchForexNews(options = {}) {
   } finally {
     isFetchingNews = false;
     observeCycleEnd(stats.cycleDurationMs || Date.now() - cycleStartedAt, stats);
-    flushObservability(getSupabaseClient).catch(() => {});
+    flushObservability(getSupabaseClient()).catch(() => {});
     const completedAt = new Date().toISOString();
     const cycleStatus =
       stats.lastErrorSafe && stats.cycleDurationMs > 0
@@ -4351,7 +4351,7 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
   }
 
   logWorkerEnvStatus();
-  loadSourceHealthStates(getSupabaseClient).then((result) => {
+  loadSourceHealthStates(getSupabaseClient()).then((result) => {
     if (result?.loaded) {
       console.log("NEWS_PHASE3_SOURCE_HEALTH_HYDRATED", JSON.stringify({ loaded: result.loaded }));
     }
