@@ -1,6 +1,58 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+const MENU_GAP = 6;
+const MENU_MAX_HEIGHT = 280;
+const MENU_MIN_HEIGHT = 120;
+
+function usePortalMenuPosition(open, triggerRef, menuRef, optionCount) {
+  const [style, setStyle] = useState(null);
+  const [openUpward, setOpenUpward] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) {
+      setStyle(null);
+      return undefined;
+    }
+
+    const update = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const measuredHeight = menuRef.current?.scrollHeight || MENU_MAX_HEIGHT;
+      const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP;
+      const spaceAbove = rect.top - MENU_GAP;
+      const shouldOpenUp = spaceBelow < MENU_MIN_HEIGHT && spaceAbove > spaceBelow;
+      const availableSpace = shouldOpenUp ? spaceAbove : spaceBelow;
+      const maxHeight = Math.max(MENU_MIN_HEIGHT, Math.min(MENU_MAX_HEIGHT, availableSpace - 4));
+
+      setOpenUpward(shouldOpenUp);
+      setStyle({
+        position: "fixed",
+        top: shouldOpenUp ? undefined : rect.bottom + MENU_GAP,
+        bottom: shouldOpenUp ? window.innerHeight - rect.top + MENU_GAP : undefined,
+        left: rect.left,
+        width: rect.width,
+        minWidth: rect.width,
+        maxHeight,
+        zIndex: 10000,
+      });
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, optionCount, triggerRef, menuRef]);
+
+  return { style, openUpward };
+}
 
 export function PartnerFieldSelect({
   label,
@@ -14,8 +66,8 @@ export function PartnerFieldSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [openUpward, setOpenUpward] = useState(false);
   const rootRef = useRef(null);
+  const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const listId = useId();
   const labelId = useId();
@@ -23,34 +75,32 @@ export function PartnerFieldSelect({
 
   const selected = options.find((opt) => opt.value === value) || null;
   const hasValue = Boolean(selected);
+  const { style: menuStyle, openUpward } = usePortalMenuPosition(
+    open,
+    triggerRef,
+    menuRef,
+    options.length
+  );
 
   useEffect(() => {
-    const onDocClick = (event) => {
-      if (!rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
 
   useEffect(() => {
     if (!open) setActiveIndex(-1);
   }, [open]);
 
-  useLayoutEffect(() => {
-    if (!open || !rootRef.current || !menuRef.current) return;
-
-    const triggerRect = rootRef.current.getBoundingClientRect();
-    const menuHeight = menuRef.current.offsetHeight || 256;
-    const spaceBelow = window.innerHeight - triggerRect.bottom;
-    const spaceAbove = triggerRect.top;
-    setOpenUpward(spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow);
-  }, [open, options.length]);
-
   const selectOption = (nextValue) => {
     onChange(nextValue);
     setOpen(false);
+    triggerRef.current?.focus();
   };
 
   const onKeyDown = (event) => {
@@ -92,47 +142,21 @@ export function PartnerFieldSelect({
     }
 
     if (event.key === "Escape") {
+      event.preventDefault();
       setOpen(false);
+      triggerRef.current?.focus();
     }
   };
 
-  return (
-    <label className="partner-field" ref={rootRef}>
-      <span className="partner-label" id={labelId}>
-        {label}
-      </span>
-      <div className={`partner-custom-select ${open ? "is-open" : ""}`}>
-        <button
-          type="button"
-          className={`partner-custom-select__trigger partner-input ${hasValue ? "partner-custom-select__trigger--filled" : ""} ${error ? "partner-input--error" : ""}`}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-labelledby={labelId}
-          aria-controls={listId}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? errorId : undefined}
-          disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
-          onKeyDown={onKeyDown}
-        >
-          <span className="partner-custom-select__value">
-            {selected?.icon ? (
-              <span className="partner-custom-select__icon" aria-hidden="true">
-                {selected.icon}
-              </span>
-            ) : null}
-            <span className="partner-custom-select__label">{selected?.label || placeholder}</span>
-          </span>
-          <span className="partner-custom-select__chevron" aria-hidden="true">
-            ▾
-          </span>
-        </button>
-        {open ? (
+  const menu =
+    open && menuStyle && typeof document !== "undefined"
+      ? createPortal(
           <ul
             id={listId}
             ref={menuRef}
             role="listbox"
-            className={`partner-custom-select__menu ${openUpward ? "partner-custom-select__menu--up" : ""}`}
+            className={`partner-custom-select__menu partner-custom-select__menu--portal ${openUpward ? "partner-custom-select__menu--up" : ""}`}
+            style={menuStyle}
             aria-labelledby={labelId}
           >
             {options.map((opt, index) => {
@@ -165,9 +189,45 @@ export function PartnerFieldSelect({
                 </li>
               );
             })}
-          </ul>
-        ) : null}
+          </ul>,
+          document.body
+        )
+      : null;
+
+  return (
+    <label className="partner-field" ref={rootRef}>
+      <span className="partner-label" id={labelId}>
+        {label}
+      </span>
+      <div className={`partner-custom-select ${open ? "is-open" : ""}`}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className={`partner-custom-select__trigger partner-input ${hasValue ? "partner-custom-select__trigger--filled" : ""} ${error ? "partner-input--error" : ""}`}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-labelledby={labelId}
+          aria-controls={listId}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          disabled={disabled}
+          onClick={() => setOpen((v) => !v)}
+          onKeyDown={onKeyDown}
+        >
+          <span className="partner-custom-select__value">
+            {selected?.icon ? (
+              <span className="partner-custom-select__icon" aria-hidden="true">
+                {selected.icon}
+              </span>
+            ) : null}
+            <span className="partner-custom-select__label">{selected?.label || placeholder}</span>
+          </span>
+          <span className="partner-custom-select__chevron" aria-hidden="true">
+            ▾
+          </span>
+        </button>
       </div>
+      {menu}
       {error ? (
         <p className="partner-field-error" id={errorId} role="alert">
           {error}

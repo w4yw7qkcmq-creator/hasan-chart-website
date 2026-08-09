@@ -60,6 +60,15 @@ function ProgressBar({ percent }) {
   );
 }
 
+function formatSmartLinkDisplay(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.host}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
 export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, growthEnabled: growthEnabledProp }) {
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(true);
@@ -185,6 +194,7 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
             id: json.smartLink?.id || `temp-${Date.now()}`,
             label: SMART_LINK_SOURCE_OPTIONS.find((s) => s.value === linkForm.source)?.label || linkForm.source,
             url: json.url,
+            shortCode: json.shortCode || json.smartLink?.short_code || null,
             source: linkForm.source,
             medium: json.smartLink?.medium || null,
             campaignCode: linkForm.campaignCode || null,
@@ -402,7 +412,9 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
                     {link.campaignCode ? (
                       <p className="partner-muted--sm">الحملة: {link.campaignName || link.campaignCode}</p>
                     ) : null}
-                    <p className="partner-muted--sm break-all">{link.url}</p>
+                    <p className="partner-smart-link-display" dir="ltr">
+                      {formatSmartLinkDisplay(link.url)}
+                    </p>
                     <p className="partner-muted--sm">
                       المصدر: {link.source || "—"} — نقرات: {link.clicks} — تسجيلات: {link.signups} — مؤهلون: {link.qualifiedReferrals ?? 0} — عملاء: {link.customers ?? 0}
                       {link.funnel ? ` — تحويل ${link.conversionRate ?? 0}%` : null}

@@ -81,7 +81,12 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json({ success: true, smartLink: result.smartLink, url: result.url });
+    return NextResponse.json({
+      success: true,
+      smartLink: result.smartLink,
+      shortCode: result.shortCode,
+      url: result.url,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("Partner smart links POST error", {

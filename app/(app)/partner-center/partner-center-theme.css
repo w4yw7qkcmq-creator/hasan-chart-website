@@ -344,10 +344,6 @@ html[data-theme="light"] .partner-custom-select__chevron {
 }
 
 .partner-custom-select__menu {
-  position: absolute;
-  z-index: 60;
-  inset-inline: 0;
-  top: calc(100% + 0.4rem);
   margin: 0;
   padding: 0.4rem;
   list-style: none;
@@ -355,14 +351,14 @@ html[data-theme="light"] .partner-custom-select__chevron {
   border: 1px solid rgba(56, 168, 242, 0.24);
   background: rgba(8, 18, 35, 0.98);
   box-shadow: 0 16px 40px rgba(2, 8, 23, 0.35);
-  max-height: 16rem;
-  overflow: auto;
-  min-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
-.partner-custom-select__menu--up {
-  top: auto;
-  bottom: calc(100% + 0.4rem);
+.partner-custom-select__menu--portal {
+  position: fixed;
 }
 
 html[data-theme="light"] .partner-custom-select__menu {
@@ -445,6 +441,18 @@ html[data-theme="light"] .partner-custom-select__option.is-selected:hover {
 
 .partner-smart-link-form {
   overflow: visible;
+}
+
+.partner-smart-link-display {
+  margin-top: 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #bae6fd;
+  letter-spacing: 0.01em;
+}
+
+html[data-theme="light"] .partner-smart-link-display {
+  color: #0f172a;
 }
 
 .partner-smart-link-form__grid {

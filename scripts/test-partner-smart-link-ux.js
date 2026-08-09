@@ -19,9 +19,18 @@ import {
 import { normalizePartnerSiteOrigin } from "../lib/partner-shared.js";
 import {
   buildSmartLinkUrl,
+  buildCanonicalSmartLinkUrl,
+  resolveSmartLinkPublicUrl,
   createSmartLink,
   validateSmartLinkInput,
+  resolveSmartLinkByShortCode,
 } from "../lib/partner-center/smart-link-service.js";
+import {
+  generateSmartLinkShortCode,
+  sanitizeSmartLinkShortCode,
+  isSmartLinkShortCode,
+  SMART_LINK_SHORT_CODE_LENGTH,
+} from "../lib/partner-center/smart-link-short-code.js";
 
 let passed = 0;
 let failed = 0;
@@ -114,6 +123,42 @@ async function run() {
     assert.match(url, /source=whatsapp/);
   });
 
+  await test("buildCanonicalSmartLinkUrl is query-param free", () => {
+    const url = buildCanonicalSmartLinkUrl("https://www.hasanchartworld.com", "Ab7K9xYz");
+    assert.equal(url, "https://www.hasanchartworld.com/r/Ab7K9xYz");
+    assert.doesNotMatch(url, /\?/);
+  });
+
+  await test("short code generator length and lowercase guard", () => {
+    const code = generateSmartLinkShortCode();
+    assert.equal(code.length, SMART_LINK_SHORT_CODE_LENGTH);
+    assert.match(code, /^[A-Za-z0-9]+$/);
+    assert.match(code, /[a-z]/);
+  });
+
+  await test("isSmartLinkShortCode distinguishes referral-only uppercase codes", () => {
+    assert.equal(isSmartLinkShortCode("Ab7K9xYz"), true);
+    assert.equal(isSmartLinkShortCode("GOKE2Q7CF"), false);
+  });
+
+  await test("resolveSmartLinkPublicUrl prefers short code", () => {
+    const url = resolveSmartLinkPublicUrl("https://www.hasanchartworld.com", {
+      short_code: "Ab7K9xYz",
+      token: "legacytoken",
+      source: "whatsapp",
+    }, "GOKE2Q7CF");
+    assert.equal(url, "https://www.hasanchartworld.com/r/Ab7K9xYz");
+  });
+
+  await test("resolveSmartLinkPublicUrl falls back to legacy long URL", () => {
+    const url = resolveSmartLinkPublicUrl("https://www.hasanchartworld.com", {
+      token: "abc123",
+      source: "whatsapp",
+      campaignCode: "summer",
+    }, "GOKE2Q7CF");
+    assert.match(url, /GOKE2Q7CF\?link=abc123/);
+  });
+
   await test("validateSmartLinkInput rejects invalid source", () => {
     const result = validateSmartLinkInput({ destinationPath: "/register", source: "instagram" });
     assert.equal(result.ok, false);
@@ -186,6 +231,26 @@ async function run() {
       });
       assert.equal(result.ok, true, `${source} should create`);
       assert.match(result.url, /^https:\/\//);
+      assert.doesNotMatch(result.url, /\?/);
+      assert.match(result.url, /\/r\/[A-Za-z0-9]{6,10}$/);
+      assert.ok(result.shortCode);
+    });
+  }
+
+  if (sb && partnerId) {
+    await test("resolveSmartLinkByShortCode returns DB metadata", async () => {
+      process.env.NEXT_PUBLIC_SITE_URL = "https://www.hasanchartworld.com";
+      const created = await createSmartLink(sb, {
+        partnerId,
+        referralCode,
+        tierKey: "partner",
+        input: { destinationPath: "/register", source: "whatsapp" },
+      });
+      assert.equal(created.ok, true);
+      const resolved = await resolveSmartLinkByShortCode(sb, created.shortCode);
+      assert.equal(resolved.ok, true);
+      assert.equal(resolved.source, "whatsapp");
+      assert.equal(resolved.destinationPath, "/register");
     });
   }
 
