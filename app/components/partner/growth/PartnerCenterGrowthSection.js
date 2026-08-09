@@ -54,21 +54,26 @@ function ProgressBar({ percent }) {
   );
 }
 
-export function PartnerCenterGrowthSection({ onCopyFeedback }) {
+export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, growthEnabled: growthEnabledProp }) {
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [growth, setGrowth] = useState(null);
-  const [growthEnabled, setGrowthEnabled] = useState(true);
+  const [growthEnabledState, setGrowthEnabledState] = useState(
+    typeof growthEnabledProp === "boolean" ? growthEnabledProp : false
+  );
+  const growthEnabled =
+    typeof growthEnabledProp === "boolean" ? growthEnabledProp : growthEnabledState;
   const [creatingLink, setCreatingLink] = useState(false);
   const [linkForm, setLinkForm] = useState({ source: "telegram", campaignCode: "", label: "" });
 
   useEffect(() => {
+    if (typeof growthEnabledProp === "boolean") return;
     fetch("/api/partner/feature-flags", { credentials: "include", cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => setGrowthEnabled(Boolean(j?.flags?.PARTNER_GROWTH_ENGINE)))
-      .catch(() => setGrowthEnabled(false));
-  }, []);
+      .then((j) => setGrowthEnabledState(Boolean(j?.flags?.PARTNER_GROWTH_ENGINE)))
+      .catch(() => setGrowthEnabledState(false));
+  }, [growthEnabledProp]);
 
   const load = useCallback(async () => {
     if (!growthEnabled) return;
@@ -91,7 +96,18 @@ export function PartnerCenterGrowthSection({ onCopyFeedback }) {
     else setLoading(false);
   }, [load, growthEnabled]);
 
-  if (!growthEnabled) return null;
+  if (!v2Mode) return null;
+
+  if (!growthEnabled) {
+    return (
+      <Panel
+        title="مركز النمو"
+        subtitle="واجهة الشركاء الجديدة"
+      >
+        <EmptyState message="محرك النمو غير مفعّل حاليًا — سيتم تفعيل المحتوى عند تشغيل Growth Engine." />
+      </Panel>
+    );
+  }
 
   const copyUrl = async (url) => {
     if (!url) return;
@@ -317,7 +333,10 @@ export function PartnerCenterGrowthSection({ onCopyFeedback }) {
       ) : null}
 
       {tab === "wallet" && growth?.wallet ? (
-        <Panel title="المحفظة والمعاملات">
+        <Panel
+          title="المحفظة والمعاملات"
+          subtitle="سجل مالي موحّد — المصدر الرسمي للحركات المالية في مركز الشركاء"
+        >
           <div className="grid gap-4 md:grid-cols-3 mb-4">
             <div className="partner-surface partner-surface--p4">
               <p className="partner-label">متاح للسحب</p>

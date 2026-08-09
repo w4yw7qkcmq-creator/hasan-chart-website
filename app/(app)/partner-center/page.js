@@ -137,6 +137,11 @@ export default function PartnerCenterPage() {
   const [withdrawNote, setWithdrawNote] = useState("");
   const [withdrawConfirmed, setWithdrawConfirmed] = useState(false);
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+  const [centerFlags, setCenterFlags] = useState({
+    v2: false,
+    growth: false,
+    admin: false,
+  });
   const loadInFlightRef = useRef(false);
 
   const loadDashboard = useCallback(async ({ silent = false } = {}) => {
@@ -151,7 +156,7 @@ export default function PartnerCenterPage() {
     }
 
     try {
-      const [centerResponse, walletResponse] = await Promise.all([
+      const [centerResponse, walletResponse, flagsResponse] = await Promise.all([
         fetch("/api/partner/center", {
           method: "GET",
           credentials: "include",
@@ -162,10 +167,24 @@ export default function PartnerCenterPage() {
           credentials: "include",
           cache: "no-store",
         }),
+        fetch("/api/partner/feature-flags", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        }),
       ]);
 
       const result = await centerResponse.json().catch(() => null);
       const walletResult = await walletResponse.json().catch(() => null);
+      const flagsResult = await flagsResponse.json().catch(() => null);
+
+      if (flagsResult?.flags) {
+        setCenterFlags({
+          v2: Boolean(flagsResult.flags.PARTNER_CENTER_V2_UI),
+          growth: Boolean(flagsResult.flags.PARTNER_GROWTH_ENGINE),
+          admin: Boolean(flagsResult.flags.PARTNER_ADMIN_MARKETING),
+        });
+      }
 
       if (!centerResponse.ok || !result?.success) {
         throw new Error(result?.error || "تعذر تحميل مركز الشركاء");
@@ -203,6 +222,7 @@ export default function PartnerCenterPage() {
   const partner = data?.partner;
   const wallet = data?.wallet;
   const tierProgress = data?.tierProgress;
+  const v2Ui = centerFlags.v2;
   const canRequestWithdrawal = Boolean(wallet?.canWithdraw);
   const referralLink = partner?.referralCode
     ? buildReferralLink(partner.referralCode, getPartnerSiteUrl())
@@ -341,20 +361,25 @@ export default function PartnerCenterPage() {
         </div>
       ) : partner ? (
         <>
-          <PartnerCenterGrowthSection
-            onCopyFeedback={(message, type = "success") =>
-              showAppModal({
-                type,
-                title: type === "error" ? "خطأ" : "تم",
-                message,
-              })
-            }
-          />
+          {v2Ui ? (
+            <PartnerCenterGrowthSection
+              v2Mode
+              growthEnabled={centerFlags.growth}
+              onCopyFeedback={(message, type = "success") =>
+                showAppModal({
+                  type,
+                  title: type === "error" ? "خطأ" : "تم",
+                  message,
+                })
+              }
+            />
+          ) : null}
 
-          <PartnerAnalyticsDashboard />
+          {!v2Ui ? <PartnerAnalyticsDashboard /> : null}
 
-          <PartnerRewardsPanel initialRewards={data?.rewards} />
+          {!v2Ui ? <PartnerRewardsPanel initialRewards={data?.rewards} /> : null}
 
+          {!v2Ui ? (
           <Panel
             title="مستوى الشريك"
             subtitle="تزداد نسبة العمولة 5% مع كل مستوى — الترقية تلقائية للأعلى فقط"
@@ -426,7 +451,9 @@ export default function PartnerCenterPage() {
               )}
             </div>
           </Panel>
+          ) : null}
 
+          {!v2Ui ? (
           <Panel title="محفظة الشريك" subtitle="أرصدتك وطلبات السحب — USDT">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <MetricCard
@@ -485,7 +512,10 @@ export default function PartnerCenterPage() {
               </div>
             ) : null}
           </Panel>
+          ) : null}
 
+          {!v2Ui ? (
+          <>
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard title="مشتركو VIP Signals" value={partner.vipSignalCount ?? 0} icon="⭐" tone="blue" />
             <MetricCard title="VIP Spot" value={partner.vipSpotCount ?? 0} icon="📈" tone="cyan" />
@@ -562,6 +592,8 @@ export default function PartnerCenterPage() {
               tone="cyan"
             />
           </section>
+          </>
+          ) : null}
 
           <Panel title="رابط الإحالة" subtitle="شارك هذا الرابط — الزائر يرى الصفحة الرئيسية بشكل طبيعي">
             <div className="grid gap-6 lg:grid-cols-[1fr_auto]">

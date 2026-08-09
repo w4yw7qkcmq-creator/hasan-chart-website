@@ -27,6 +27,8 @@ async function seed(db) {
   await query(db, `INSERT INTO partners (id, user_id, referral_code, status, tier_key, balance_withdrawable) VALUES ($1,$2,'MX1','active','partner',10) ON CONFLICT DO NOTHING`, [PARTNER_A, USER_A]);
 }
 
+process.env.PARTNER_GROWTH_ENGINE = "true";
+
 const db = await createPartnerTestDb();
 await seed(db);
 const supabase = createServiceSupabaseFromDb(db);

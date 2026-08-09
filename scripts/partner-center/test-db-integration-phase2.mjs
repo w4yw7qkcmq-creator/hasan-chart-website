@@ -139,6 +139,8 @@ t("refund disqualification processes without throw", async (db, supabase) => {
   assert.equal(r.processed, true);
 });
 
+process.env.PARTNER_GROWTH_ENGINE = "true";
+
 const db = await createPartnerTestDb();
 await seed(db);
 const supabase = createServiceSupabaseFromDb(db);
