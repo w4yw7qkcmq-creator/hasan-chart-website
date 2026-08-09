@@ -923,6 +923,9 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.create_partner_commission_atomic_test_fail(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_partner_commission_atomic_test_fail(text) TO service_role;
+
 -- ---------------------------------------------------------------------------
 -- EXECUTE grants — server-only (service_role)
 -- ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.create_partner_growth_reward_atomic_test_fail(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_partner_growth_reward_atomic_test_fail(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_partner_growth_reward_atomic_test_fail(text) TO service_role;
 
 -- ---------------------------------------------------------------------------
@@ -251,7 +251,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.create_partner_growth_reward_atomic_test_invoke(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_partner_growth_reward_atomic_test_invoke(uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_partner_growth_reward_atomic_test_invoke(uuid, text) TO service_role;
 
 -- Deny partner writes on definitions / entitlements (explicit — SELECT policies remain separate)
