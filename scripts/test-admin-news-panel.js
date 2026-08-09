@@ -24,10 +24,15 @@ assert.match(
   "AdminNewsPanel must import IAM_PERMISSIONS"
 );
 
-assert.match(adminNewsPanelSource, /IAM_PERMISSIONS\.NEWS_READ/);
-assert.match(adminNewsPanelSource, /IAM_PERMISSIONS\.NEWS_PUBLISH/);
 assert.match(adminNewsPanelSource, /NewsSystemStatusPanelBoundary/);
 assert.match(adminNewsPanelSource, /<NewsSystemStatusPanelBoundary>/);
+assert.match(adminNewsPanelSource, /IAM_PERMISSIONS\.NEWS_READ/);
+assert.match(adminNewsPanelSource, /IAM_PERMISSIONS\.NEWS_PUBLISH/);
+assert.match(adminNewsPanelSource, /admin-news-page__hero/);
+assert.match(adminNewsPanelSource, /admin-news-page__hero-title/);
+assert.match(adminNewsPanelSource, /admin-news-page__hero-back/);
+assert.match(adminNewsPanelSource, /مركز مراقبة وإدارة نظام الأخبار/);
+assert.doesNotMatch(adminNewsPanelSource, /admin-standalone-back-link/);
 
 assert.match(statusHookSource, /بيانات المراقبة غير متاحة مؤقتًا/);
 assert.match(statusPanelSource, /filterProductionSources/);

@@ -5,6 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  AI_COPY_POLISH_LABEL,
+  containsArabicIndicDigits,
   filterProductionIncidents,
   filterProductionSources,
   formatGregorianDateTime,
@@ -29,8 +31,15 @@ const formatted = formatGregorianDateTime("2026-08-09T04:35:03.000Z");
 assert.notEqual(formatted, "—");
 assert.ok(formatted.includes("\n") || formatted.includes(" - "));
 assert.doesNotMatch(formatted, /Invalid Date/);
+assert.match(formatted.replace(/\s/g, ""), /[0-9]/);
+assert.equal(containsArabicIndicDigits(formatted), false);
 
-assert.equal(formatGregorianDateTime("2026-08-09T04:35:03.000Z", { compact: true }).includes(" - "), true);
+const compact = formatGregorianDateTime("2026-08-09T04:35:03.000Z", { compact: true });
+assert.ok(compact.includes(" - "));
+assert.equal(containsArabicIndicDigits(compact), false);
+assert.match(compact, /[0-9]{2}\/[0-9]{2}\/[0-9]{4}/);
+
+assert.equal(AI_COPY_POLISH_LABEL, "تحسين الصياغة بالـ AI");
 assert.equal(formatLatencyMs(null), "—");
 assert.equal(formatLatencyMs(184), "184 ms");
 
@@ -65,6 +74,10 @@ assert.match(panelSource, /useNewsSystemStatus/);
 assert.match(panelSource, /formatGregorianDateTime/);
 assert.match(panelSource, /filterProductionSources/);
 assert.match(panelSource, /filterProductionIncidents/);
+assert.match(panelSource, /AI_COPY_POLISH_LABEL/);
+assert.match(panelSource, /غير مفعّل/);
+assert.doesNotMatch(panelSource, />\s*AI\s*</);
+assert.match(panelSource, /phase2\.phase2Ai/);
 assert.match(panelSource, /الحوادث المفتوحة/);
 assert.match(panelSource, /التكرارات المحظورة/);
 assert.match(panelSource, /متوسط زمن المعالجة/);

@@ -54,19 +54,30 @@ export default function AdminNewsPanel() {
   };
 
   return (
-    <div className="admin-standalone-page admin-standalone-page--calm">
-      <div className="admin-standalone-page__toolbar">
-        <Link href="/admin" className="admin-standalone-back-link">
-          ← العودة إلى لوحة الإدارة
-        </Link>
-      </div>
-
-      <header className="admin-news-page__header">
-        <p className="admin-user-hero__eyebrow">News Admin</p>
-        <h1 className="admin-news-page__title">إدارة الأخبار</h1>
-        <p className="admin-news-page__desc">
-          مراجعة ونشر الأخبار الاقتصادية العاجلة عبر القناة المعتمدة.
-        </p>
+    <div className="admin-standalone-page admin-standalone-page--calm admin-news-page">
+      <header className="admin-news-page__hero">
+        <div className="admin-news-page__hero-top">
+          <Link href="/admin" className="admin-news-page__hero-back">
+            ← العودة إلى لوحة الإدارة
+          </Link>
+        </div>
+        <div className="admin-news-page__hero-body">
+          <div className="admin-news-page__hero-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M6 5.5h12A1.5 1.5 0 0 1 19.5 7v10A1.5 1.5 0 0 1 18 18.5H6A1.5 1.5 0 0 1 4.5 17V7A1.5 1.5 0 0 1 6 5.5Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path d="M7.5 9h9M7.5 12h6.5M7.5 15h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div className="admin-news-page__hero-copy">
+            <span className="admin-news-page__hero-eyebrow">News Admin</span>
+            <h1 className="admin-news-page__hero-title">إدارة الأخبار</h1>
+            <p className="admin-news-page__hero-desc">مركز مراقبة وإدارة نظام الأخبار</p>
+          </div>
+        </div>
       </header>
 
       {error ? (

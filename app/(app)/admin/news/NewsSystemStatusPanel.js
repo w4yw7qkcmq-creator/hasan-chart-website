@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  AI_COPY_POLISH_HINT,
+  AI_COPY_POLISH_LABEL,
   filterProductionIncidents,
   filterProductionSources,
   formatGregorianDateTime,
@@ -164,8 +166,11 @@ export default function NewsSystemStatusPanel() {
           <ToggleBadge enabled={Boolean(runtime.phase3AutoQuarantine)} />
         </div>
         <div className="admin-news-system__overview-card">
-          <span className="admin-news-system__label">AI</span>
-          <ToggleBadge enabled={Boolean(phase2.phase2Ai)} />
+          <span className="admin-news-system__label admin-news-system__label--stacked">
+            {AI_COPY_POLISH_LABEL}
+            <span className="admin-news-system__label-hint">{AI_COPY_POLISH_HINT}</span>
+          </span>
+          <ToggleBadge enabled={Boolean(phase2.phase2Ai)} disabledLabel="غير مفعّل" />
         </div>
         <div className="admin-news-system__overview-card admin-news-system__overview-card--cycle">
           <span className="admin-news-system__label">آخر دورة</span>

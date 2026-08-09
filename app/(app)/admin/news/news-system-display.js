@@ -1,27 +1,46 @@
-const GREGORIAN_LOCALE = "ar-EG-u-ca-gregory";
+const GREGORIAN_LOCALE = "ar-EG-u-ca-gregory-nu-latn";
+const ARABIC_INDIC_DIGIT_PATTERN = /[٠-٩]/;
+const BIDI_MARK_PATTERN = /[\u200E\u200F\u202A-\u202E]/g;
 const SYNTHETIC_SOURCE_MARKERS = ["CANARY_SYNTHETIC_SOURCE", "CANARY_"];
 const SYNTHETIC_SOURCE_TYPES = new Set(["canary", "synthetic", "test"]);
+
+export const AI_COPY_POLISH_LABEL = "تحسين الصياغة بالـ AI";
+export const AI_COPY_POLISH_HINT = "اختياري";
+
+function normalizeFormattedDateTime(value) {
+  return String(value || "").replace(BIDI_MARK_PATTERN, "").trim();
+}
 
 export function formatGregorianDateTime(value, { compact = false } = {}) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
-  const datePart = date.toLocaleDateString(GREGORIAN_LOCALE, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    calendar: "gregory",
-  });
-  const timePart = date.toLocaleTimeString(GREGORIAN_LOCALE, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-    calendar: "gregory",
-  });
+  const datePart = normalizeFormattedDateTime(
+    date.toLocaleDateString(GREGORIAN_LOCALE, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      calendar: "gregory",
+      numberingSystem: "latn",
+    })
+  );
+  const timePart = normalizeFormattedDateTime(
+    date.toLocaleTimeString(GREGORIAN_LOCALE, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+      calendar: "gregory",
+      numberingSystem: "latn",
+    })
+  );
 
   return compact ? `${datePart} - ${timePart}` : `${datePart}\n${timePart}`;
+}
+
+export function containsArabicIndicDigits(value) {
+  return ARABIC_INDIC_DIGIT_PATTERN.test(String(value || ""));
 }
 
 export function formatRelativeAge(fromMs, nowMs = Date.now()) {
