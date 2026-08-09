@@ -89,10 +89,35 @@ const {
 } = require("./lib/news-intelligence/autonomy/integration");
 const { getPhase3RuntimeConfig } = require("./lib/news-intelligence/autonomy/feature-flags");
 const { getNewsSystemStatus } = require("./lib/news-intelligence/autonomy/diagnostic-service");
-const { loadSourceHealthStates } = require("./lib/news-intelligence/autonomy/source-health-persistence");
+const { loadSourceHealthStates, flushSourceHealthStates } = require("./lib/news-intelligence/autonomy/source-health-persistence");
 const { buildIdempotencyKey } = require("./lib/economic-releases/canonical-events");
+const {
+  hydrateFromDb: hydrateIngestionCheckpoints,
+  flushDirtyToDb: flushIngestionCheckpoints,
+  bootstrapAllRssSources,
+  normalizeLink,
+} = require("./lib/news-ingestion/checkpoint-store");
+const {
+  resetCycleFunnel,
+  getCycleFunnel,
+  mergeRssDiagnostics,
+  recordTelegramFunnel,
+  recordRssEconomicBlocked,
+  recordRssEditorialEvaluated,
+  recordPublicationAttempt,
+  recordPublicationSuccess,
+} = require("./lib/news-ingestion/cycle-funnel");
+const { markEligibleRssItemProcessed } = require("./lib/general-rss/pipeline");
+const { getSourceHealthEngine } = require("./lib/news-intelligence/autonomy/source-health");
+const { FAILURE_ATTRIBUTION } = require("./lib/news-intelligence/autonomy/failure-attribution");
 
 const parser = new Parser();
+
+let checkpointHydrationPromise = Promise.resolve({ loaded: 0, skipped: true });
+
+function ensureCheckpointsHydrated() {
+  return checkpointHydrationPromise;
+}
 
 let telegramMergeBufferInstance = null;
 const telegramMergePublishLog = [];
@@ -363,7 +388,13 @@ function summarizeTelegramPipelineStats(processed, parseStats = {}) {
 
 function logTelegramPublishCandidatesPreview(processed, options = {}) {
   const candidates = processed
-    .filter((item) => !item.skipPublish && item.formattedMessage)
+    .filter(
+      (item) =>
+        item.ingestionClassification === "NEW_MESSAGE" &&
+        !item.observabilityOnly &&
+        !item.skipPublish &&
+        item.formattedMessage
+    )
     .sort((a, b) => (b.newsValue?.score || 0) - (a.newsValue?.score || 0))
     .slice(0, 10)
     .map((item) => buildTelegramCandidatePreview(item, options));
@@ -3545,12 +3576,15 @@ async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
 }
 
 async function fetchForexNews(options = {}) {
+  await ensureCheckpointsHydrated();
   const dryRun = options.dryRun === true || NEWS_DRY_RUN;
   const skipScheduledAlerts = options.skipScheduledAlerts === true || dryRun;
   const cycleStartedAt = Date.now();
   const cycleStartedIso = new Date(cycleStartedAt).toISOString();
   const runId = createRunId();
   const stats = createEmptyCycleStats();
+  resetCycleFunnel();
+  resetCycleFunnel();
 
   const lock = acquireCycleLock();
   if (!lock.acquired) {
@@ -3644,6 +3678,23 @@ async function fetchForexNews(options = {}) {
 
     const allItems = [];
 
+    const localPublishedItems = readPublishedNewsRecords();
+    const supabasePublishedItems = await loadPublishedNewsFromSupabase();
+    const supabaseNewsPostItems = await loadNewsPostsFromSupabase();
+    const publishedItems = [
+      ...supabasePublishedItems,
+      ...supabaseNewsPostItems,
+      ...localPublishedItems,
+    ];
+    const publishedLinks = new Set(
+      publishedItems.map((entry) => normalizeLink(entry.link || entry.source_link || "")).filter(Boolean)
+    );
+    const telegramPublishedKeys = new Set(
+      publishedItems
+        .filter((entry) => entry.sourceChannel && entry.sourceMessageId)
+        .map((entry) => `${entry.sourceChannel}:${entry.sourceMessageId}`)
+    );
+
     try {
       const parseStats = {
         promoOnlySkipped: 0,
@@ -3663,6 +3714,11 @@ async function fetchForexNews(options = {}) {
         useMergeBuffer: true,
         mergeBuffer,
         flushImmediately: dryRun,
+        bootstrapOptions: {
+          nowMs: Date.now(),
+          maxAgeHours: MAX_NEWS_AGE_HOURS,
+          publishedKeys: telegramPublishedKeys,
+        },
       });
 
       stats.telegramFetched = telegramDiscovery.posts.length;
@@ -3680,6 +3736,20 @@ async function fetchForexNews(options = {}) {
       logTelegramPublishCandidatesPreview(telegramDiscovery.processed, {
         publishBlockedByKillSwitch: !TELEGRAM_NEWS_PUBLISH_ENABLED,
       });
+      if (telegramDiscovery.ingestionSummary) {
+        recordTelegramFunnel(telegramDiscovery.ingestionSummary);
+      }
+      for (const channel of ["ForexBreakingNews", "ForexNewspaper"]) {
+        getSourceHealthEngine().recordSample(
+          {
+            parseSuccess: 1,
+            attribution: FAILURE_ATTRIBUTION.EXPECTED_NO_DATA,
+            lastSuccessAt: new Date().toISOString(),
+          },
+          "telegram_economic",
+          channel
+        );
+      }
       observeTelegramPoll();
 
       if (dryRun) {
@@ -3749,14 +3819,11 @@ async function fetchForexNews(options = {}) {
       return dateB - dateA;
     });
 
-    const localPublishedItems = readPublishedNewsRecords();
-    const supabasePublishedItems = await loadPublishedNewsFromSupabase();
-    const supabaseNewsPostItems = await loadNewsPostsFromSupabase();
-    const publishedItems = [
-      ...supabasePublishedItems,
-      ...supabaseNewsPostItems,
-      ...localPublishedItems,
-    ];
+    bootstrapAllRssSources(rssFetchResult.items, {
+      nowMs: Date.now(),
+      maxAgeHours: MAX_NEWS_AGE_HOURS,
+      publishedLinks,
+    });
 
     const publishStats = getRecentPublishStats(publishedItems);
 
@@ -3792,6 +3859,7 @@ async function fetchForexNews(options = {}) {
     });
 
     stats.rss = rssPipeline.diagnostics;
+    mergeRssDiagnostics(rssPipeline.diagnostics);
     for (const feedReport of rssFetchResult.feedReports) {
       const feedEligible = rssPipeline.diagnostics.items.filter(
         (entry) =>
@@ -3806,246 +3874,248 @@ async function fetchForexNews(options = {}) {
     }
     stats.rssFeedReports = rssFetchResult.feedReports;
 
-    let latestNews = rssPipeline.selectedItem || null;
+    const eligibleQueue = rssPipeline.eligibleItems?.length
+      ? rssPipeline.eligibleItems
+      : rssPipeline.selectedItem
+        ? [rssPipeline.selectedItem]
+        : [];
 
-    if (!latestNews) {
+    if (!eligibleQueue.length) {
       console.log("⏭️ No new AI-approved important news found.");
       stats.cycleDurationMs = Date.now() - cycleStartedAt;
       lastCycleStats = stats;
       lastCycleCompletedAt = new Date().toISOString();
       consecutiveFailures += 1;
+      stats.funnel = getCycleFunnel();
       console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
       return stats;
     }
 
-    stats.eligible = 1;
-    const latestLink = latestNews.link;
+    stats.eligible = eligibleQueue.length;
+    let rssPublishedThisCycle = false;
 
-    const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link, {
-      dryRun,
-      telegramItem: latestNews,
-    });
-    stats.aiProcessed = 1;
-
-    if (aiResult?.economicAnalysis?.handled) {
-      stats.economicEventsDetected += 1;
-      mergeProviderMetricsIntoCycle(stats, economicRegistry.getAllMetrics());
-
-      if (aiResult.skipPublish) {
-        stats.economicEventsPending += 1;
-        if (aiResult.reason === "source_conflict") {
-          stats.economicEventsConflict += 1;
-        }
-        console.log(
-          "⏭️ Economic release incomplete. Queued for enrichment:",
-          latestNews.title,
-          JSON.stringify({
-            reason: aiResult.reason,
-            missingFields: aiResult.missingFields,
-            idempotencyKey: aiResult.economicAnalysis?.idempotencyKey,
-          })
-        );
-        stats.cycleDurationMs = Date.now() - cycleStartedAt;
-        lastCycleStats = stats;
-        lastCycleCompletedAt = new Date().toISOString();
-        console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
-        return stats;
+    eligibleLoop:
+    for (const latestNews of eligibleQueue) {
+      if (rssPublishedThisCycle) {
+        break eligibleLoop;
       }
 
-      if (aiResult.economicAnalysis?.validation?.complete) {
-        stats.economicEventsComplete += 1;
-      }
+      const latestLink = latestNews.link;
+      recordRssEditorialEvaluated();
+      recordPublicationAttempt();
 
-      if (!latestNews.isTelegramSource) {
-        stats.rejectedFilter += 1;
-        recordRejection(stats, "rss_economic_publish_forbidden", latestNews.title);
-        console.log(
-          "RSS_ECONOMIC_PUBLISH_FORBIDDEN",
-          JSON.stringify({
-            title: latestNews.title,
-            idempotencyKey: aiResult.economicAnalysis?.idempotencyKey,
-            eventKey: aiResult.economicAnalysis?.canonical?.eventKey,
-          })
-        );
-        stats.cycleDurationMs = Date.now() - cycleStartedAt;
-        lastCycleStats = stats;
-        lastCycleCompletedAt = new Date().toISOString();
-        console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
-        return stats;
-      }
-    }
-
-    if (!aiResult?.message) {
-      stats.aiFailed = 1;
-      stats.cycleDurationMs = Date.now() - cycleStartedAt;
-      lastCycleStats = stats;
-      lastCycleCompletedAt = new Date().toISOString();
-      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
-      return stats;
-    }
-
-    if (latestNews.isTelegramSource && !TELEGRAM_NEWS_PUBLISH_ENABLED) {
-      console.log("TELEGRAM_NEWS_PUBLISH_DISABLED skip cycle publish:", latestNews.title);
-      stats.cycleDurationMs = Date.now() - cycleStartedAt;
-      lastCycleStats = stats;
-      lastCycleCompletedAt = new Date().toISOString();
-      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
-      return stats;
-    }
-
-    if (blockRssNumericEconomicRelease(latestNews, aiResult, stats)) {
-      stats.cycleDurationMs = Date.now() - cycleStartedAt;
-      lastCycleStats = stats;
-      lastCycleCompletedAt = new Date().toISOString();
-      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
-      return stats;
-    }
-
-    const message = aiResult.message;
-    const combinedNewsIdentity = `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
-    const combinedTopicCluster = getNewsTopicCluster(combinedNewsIdentity);
-
-    if (!latestNews.isTelegramSource) {
-      const rssEditorialCheck = validateGeneralRssEditorialOutput({
-        title: latestNews.title,
-        body: message,
-        rawSourceText: buildRawSourceText(latestNews),
+      const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link, {
+        dryRun,
+        telegramItem: latestNews,
       });
-      if (!rssEditorialCheck.ok) {
-        stats.rejectedFilter += 1;
-        recordRejection(stats, rssEditorialCheck.reason, latestNews.title);
-        console.log(
-          "RSS_EDITORIAL_BLOCKED",
-          JSON.stringify({
-            reason: rssEditorialCheck.reason,
-            titlePreview: String(latestNews.title || "").slice(0, 80),
-            similarity: rssEditorialCheck.similarity || null,
-          })
-        );
-        stats.cycleDurationMs = Date.now() - cycleStartedAt;
-        lastCycleStats = stats;
-        lastCycleCompletedAt = new Date().toISOString();
-        console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
-        return stats;
-      }
-    }
+      stats.aiProcessed += 1;
 
-    if (combinedTopicCluster) {
-      const alreadyPublishedSameCluster = publishedItems.some((publishedItem) => {
-        const publishedCluster = publishedItem.topicCluster || getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
-        return (
-          publishedCluster === combinedTopicCluster &&
-          isRecentForTopicCluster(publishedItem, combinedTopicCluster)
-        );
-      });
+      if (aiResult?.economicAnalysis?.handled) {
+        stats.economicEventsDetected += 1;
+        mergeProviderMetricsIntoCycle(stats, economicRegistry.getAllMetrics());
 
-      if (alreadyPublishedSameCluster) {
-        stats.rejectedDuplicate += 1;
-        recordRejection(stats, "duplicate_after_ai_cluster", latestNews.title);
-        if (!dryRun) {
+        if (aiResult.skipPublish) {
+          stats.economicEventsPending += 1;
+          if (aiResult.reason === "source_conflict") {
+            stats.economicEventsConflict += 1;
+          }
           console.log(
-            "SITE_PUBLISH_DEDUPE_MARKER",
+            "⏭️ Economic release incomplete. Skipped RSS candidate:",
+            latestNews.title,
             JSON.stringify({
-              link: latestLink,
-              topicCluster: combinedTopicCluster,
-              titlePreview: String(latestNews.title || "").slice(0, 80),
+              reason: aiResult.reason,
+              missingFields: aiResult.missingFields,
+              idempotencyKey: aiResult.economicAnalysis?.idempotencyKey,
             })
           );
-          savePublishedNewsLink(latestLink, combinedNewsIdentity);
-          await savePublishedNewsToSupabase({
-            link: latestLink,
-            title: combinedNewsIdentity,
-            normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
-            topic_cluster: combinedTopicCluster,
-            published_at: new Date().toISOString(),
-          });
+          recordRssEconomicBlocked();
+          markEligibleRssItemProcessed(latestNews, "economic_incomplete", { dryRun });
+          continue eligibleLoop;
         }
-        stats.cycleDurationMs = Date.now() - cycleStartedAt;
-        lastCycleStats = stats;
-        lastCycleCompletedAt = new Date().toISOString();
-        console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
-        return stats;
+
+        if (aiResult.economicAnalysis?.validation?.complete) {
+          stats.economicEventsComplete += 1;
+        }
+
+        if (!latestNews.isTelegramSource) {
+          stats.rejectedFilter += 1;
+          recordRejection(stats, "rss_economic_publish_forbidden", latestNews.title);
+          recordRssEconomicBlocked();
+          console.log(
+            "RSS_ECONOMIC_PUBLISH_FORBIDDEN",
+            JSON.stringify({
+              title: latestNews.title,
+              idempotencyKey: aiResult.economicAnalysis?.idempotencyKey,
+              eventKey: aiResult.economicAnalysis?.canonical?.eventKey,
+            })
+          );
+          markEligibleRssItemProcessed(latestNews, "rss_economic_forbidden", { dryRun });
+          continue eligibleLoop;
+        }
       }
-    }
 
-    const imageTitle = aiResult.imageTitle || latestNews.title;
+      if (!aiResult?.message) {
+        stats.aiFailed += 1;
+        markEligibleRssItemProcessed(latestNews, "ai_failed", { dryRun });
+        continue eligibleLoop;
+      }
 
-    const veryImportantNews = [
-      "fed",
-      "fomc",
-      "powell",
-      "interest rate",
-      "rate decision",
-      "consumer confidence",
-      "consumer sentiment",
-      "ppi",
-      "pce",
-      "retail sales",
-      "jobless claims",
-      "weekly jobless claims",
-      "claims",
-      "labor market",
-      "job market",
-      "employment",
-      "initial claims",
-      "continuing claims",
-      "pmi",
-      "ism",
-      "unemployment",
-      "cpi",
-      "inflation",
-      "nfp",
-      "gdp",
-      "recession",
-      "bank crisis",
-      "forex",
-      "eurusd",
-      "gbpusd",
-      "usdjpy",
-      "audusd",
-      "currency",
-      "dollar",
-      "usd",
-      "bitcoin",
-      "btc",
-      "crypto",
-      "etf",
-      "war",
-      "iran",
-      "israel",
-      "russia",
-      "ukraine",
-      "oil",
-      "gold",
-      "nasdaq",
-      "dow",
-      "s&p",
-      "attack",
-      "missile",
-      "breaking",
-    ].some((keyword) =>
-      latestNews.title.toLowerCase().includes(keyword)
-    );
+      if (latestNews.isTelegramSource && !TELEGRAM_NEWS_PUBLISH_ENABLED) {
+        console.log("TELEGRAM_NEWS_PUBLISH_DISABLED skip cycle publish:", latestNews.title);
+        markEligibleRssItemProcessed(latestNews, "telegram_publish_disabled", { dryRun });
+        continue eligibleLoop;
+      }
 
-    let finalImage = null;
-    if (veryImportantNews || latestNews.impactLevel === "HIGH") {
-      const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
-      const articleImage = latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
-      finalImage = rssImage || articleImage || null;
-    }
+      if (blockRssNumericEconomicRelease(latestNews, aiResult, stats)) {
+        recordRssEconomicBlocked();
+        markEligibleRssItemProcessed(latestNews, "rss_numeric_economic_blocked", { dryRun });
+        continue eligibleLoop;
+      }
 
-    if (dryRun) {
-      console.log("NEWS_DRY_RUN eligible publish-ready item:", latestNews.title);
-    } else {
+      const message = aiResult.message;
+      const combinedNewsIdentity = `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
+      const combinedTopicCluster = getNewsTopicCluster(combinedNewsIdentity);
+
+      if (!latestNews.isTelegramSource) {
+        const rssEditorialCheck = validateGeneralRssEditorialOutput({
+          title: latestNews.title,
+          body: message,
+          rawSourceText: buildRawSourceText(latestNews),
+        });
+        if (!rssEditorialCheck.ok) {
+          stats.rejectedFilter += 1;
+          recordRejection(stats, rssEditorialCheck.reason, latestNews.title);
+          console.log(
+            "RSS_EDITORIAL_BLOCKED",
+            JSON.stringify({
+              reason: rssEditorialCheck.reason,
+              titlePreview: String(latestNews.title || "").slice(0, 80),
+              similarity: rssEditorialCheck.similarity || null,
+            })
+          );
+          markEligibleRssItemProcessed(latestNews, "editorial_blocked", { dryRun });
+          continue eligibleLoop;
+        }
+      }
+
+      if (combinedTopicCluster) {
+        const alreadyPublishedSameCluster = publishedItems.some((publishedItem) => {
+          const publishedCluster =
+            publishedItem.topicCluster ||
+            getNewsTopicCluster(`${publishedItem.title || ""} ${publishedItem.normalizedTitle || ""}`);
+          return (
+            publishedCluster === combinedTopicCluster &&
+            isRecentForTopicCluster(publishedItem, combinedTopicCluster)
+          );
+        });
+
+        if (alreadyPublishedSameCluster) {
+          stats.rejectedDuplicate += 1;
+          recordRejection(stats, "duplicate_after_ai_cluster", latestNews.title);
+          if (!dryRun) {
+            console.log(
+              "SITE_PUBLISH_DEDUPE_MARKER",
+              JSON.stringify({
+                link: latestLink,
+                topicCluster: combinedTopicCluster,
+                titlePreview: String(latestNews.title || "").slice(0, 80),
+              })
+            );
+            savePublishedNewsLink(latestLink, combinedNewsIdentity);
+            await savePublishedNewsToSupabase({
+              link: latestLink,
+              title: combinedNewsIdentity,
+              normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
+              topic_cluster: combinedTopicCluster,
+              published_at: new Date().toISOString(),
+            });
+          }
+          markEligibleRssItemProcessed(latestNews, "duplicate_cluster", { dryRun });
+          continue eligibleLoop;
+        }
+      }
+
+      const imageTitle = aiResult.imageTitle || latestNews.title;
+
+      const veryImportantNews = [
+        "fed",
+        "fomc",
+        "powell",
+        "interest rate",
+        "rate decision",
+        "consumer confidence",
+        "consumer sentiment",
+        "ppi",
+        "pce",
+        "retail sales",
+        "jobless claims",
+        "weekly jobless claims",
+        "claims",
+        "labor market",
+        "job market",
+        "employment",
+        "initial claims",
+        "continuing claims",
+        "pmi",
+        "ism",
+        "unemployment",
+        "cpi",
+        "inflation",
+        "nfp",
+        "gdp",
+        "recession",
+        "bank crisis",
+        "forex",
+        "eurusd",
+        "gbpusd",
+        "usdjpy",
+        "audusd",
+        "currency",
+        "dollar",
+        "usd",
+        "bitcoin",
+        "btc",
+        "crypto",
+        "etf",
+        "war",
+        "iran",
+        "israel",
+        "russia",
+        "ukraine",
+        "oil",
+        "gold",
+        "nasdaq",
+        "dow",
+        "s&p",
+        "attack",
+        "missile",
+        "breaking",
+      ].some((keyword) => latestNews.title.toLowerCase().includes(keyword));
+
+      let finalImage = null;
       if (veryImportantNews || latestNews.impactLevel === "HIGH") {
-        if (finalImage) {
-          const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
+        const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
+        const articleImage =
+          latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
+        finalImage = rssImage || articleImage || null;
+      }
 
-          if (photoPath) {
-            await sendTelegramPhoto(message, photoPath);
-            stats.telegramPublished += 1;
+      if (dryRun) {
+        console.log("NEWS_DRY_RUN eligible publish-ready item:", latestNews.title);
+      } else {
+        if (veryImportantNews || latestNews.impactLevel === "HIGH") {
+          if (finalImage) {
+            const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
+
+            if (photoPath) {
+              await sendTelegramPhoto(message, photoPath);
+              stats.telegramPublished += 1;
+            } else {
+              console.log("⏭️ Image rejected or unavailable. Sending text only.");
+              await sendTelegramMessage(message);
+              stats.telegramPublished += 1;
+            }
           } else {
-            console.log("⏭️ Image rejected or unavailable. Sending text only.");
             await sendTelegramMessage(message);
             stats.telegramPublished += 1;
           }
@@ -4053,40 +4123,51 @@ async function fetchForexNews(options = {}) {
           await sendTelegramMessage(message);
           stats.telegramPublished += 1;
         }
-      } else {
-        await sendTelegramMessage(message);
-        stats.telegramPublished += 1;
-      }
 
-      const saveResult = await saveNewsPostToSupabase({
-        title: latestNews.title || imageTitle,
-        content: message,
-        image_url: finalImage || null,
-        impact_level: latestNews.impactLevel || "MEDIUM",
-        source_link: latestLink,
-      });
-      if (saveResult?.error) {
-        stats.dbFailed += 1;
-      } else {
-        stats.dbInserted += 1;
-        if (stats.rss) {
-          stats.rss.published = 1;
+        const saveResult = await saveNewsPostToSupabase({
+          title: latestNews.title || imageTitle,
+          content: message,
+          image_url: finalImage || null,
+          impact_level: latestNews.impactLevel || "MEDIUM",
+          source_link: latestLink,
+        });
+        if (saveResult?.error) {
+          stats.dbFailed += 1;
+        } else {
+          stats.dbInserted += 1;
+          if (stats.rss) {
+            stats.rss.published = (stats.rss.published || 0) + 1;
+          }
         }
+
+        await dispatchMarketNewsNotifications({
+          title: latestNews.title || imageTitle,
+          sourceLink: latestLink,
+          impactLevel: latestNews.impactLevel || "MEDIUM",
+        });
+        savePublishedNewsLink(latestLink, combinedNewsIdentity);
+        await savePublishedNewsToSupabase({
+          link: latestLink,
+          title: combinedNewsIdentity,
+          normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
+          topic_cluster: combinedTopicCluster,
+          published_at: new Date().toISOString(),
+        });
+        recordPublicationSuccess();
       }
 
-      await dispatchMarketNewsNotifications({
-        title: latestNews.title || imageTitle,
-        sourceLink: latestLink,
-        impactLevel: latestNews.impactLevel || "MEDIUM",
-      });
-      savePublishedNewsLink(latestLink, combinedNewsIdentity);
-      await savePublishedNewsToSupabase({
-        link: latestLink,
-        title: combinedNewsIdentity,
-        normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
-        topic_cluster: combinedTopicCluster,
-        published_at: new Date().toISOString(),
-      });
+      markEligibleRssItemProcessed(latestNews, dryRun ? "dry_run_publish" : "published", { dryRun });
+      rssPublishedThisCycle = true;
+      break eligibleLoop;
+    }
+
+    if (!rssPublishedThisCycle) {
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      stats.funnel = getCycleFunnel();
+      console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
+      return stats;
     }
 
     lastSuccessfulFetchAt = new Date().toISOString();
@@ -4094,6 +4175,7 @@ async function fetchForexNews(options = {}) {
     stats.cycleDurationMs = Date.now() - cycleStartedAt;
     lastCycleStats = stats;
     lastCycleCompletedAt = lastSuccessfulFetchAt;
+    stats.funnel = getCycleFunnel();
     recordCycleSuccess(stats);
     console.log("NEWS_CYCLE_COMPLETE", JSON.stringify(stats));
     return stats;
@@ -4111,6 +4193,8 @@ async function fetchForexNews(options = {}) {
     isFetchingNews = false;
     observeCycleEnd(stats.cycleDurationMs || Date.now() - cycleStartedAt, stats);
     flushObservability(getSupabaseClient()).catch(() => {});
+    flushIngestionCheckpoints(getSupabaseClient()).catch(() => {});
+    flushSourceHealthStates(getSupabaseClient()).catch(() => {});
     const completedAt = new Date().toISOString();
     const cycleStatus =
       stats.lastErrorSafe && stats.cycleDurationMs > 0
@@ -4355,6 +4439,10 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
     if (result?.loaded) {
       console.log("NEWS_PHASE3_SOURCE_HEALTH_HYDRATED", JSON.stringify({ loaded: result.loaded }));
     }
+  });
+  checkpointHydrationPromise = hydrateIngestionCheckpoints(getSupabaseClient()).then((result) => {
+    console.log("NEWS_INGESTION_CHECKPOINTS_HYDRATED", JSON.stringify(result));
+    return result;
   });
   startHealthServer();
   maybeCleanupOldTelemetry(getSupabaseClient).then((result) => {

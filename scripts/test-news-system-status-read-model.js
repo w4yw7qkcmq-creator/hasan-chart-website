@@ -41,6 +41,8 @@ function createMockSupabase(config = {}) {
     decisions = [],
     counts = {},
     lastPublished = [],
+    publishedNews = [],
+    funnelSnapshots = [],
     heartbeat = null,
     errors = {},
   } = config;
@@ -67,6 +69,38 @@ function createMockSupabase(config = {}) {
 
       if (table === "news_incidents") {
         return createQueryBuilder({ data: incidents, error: null });
+      }
+
+      if (table === "published_news") {
+        let mode = "rows";
+        const builder = {
+          select(_cols, opts) {
+            if (opts?.head) mode = "count";
+            return builder;
+          },
+          gte() {
+            return builder;
+          },
+          order() {
+            return builder;
+          },
+          limit() {
+            if (mode === "count") {
+              return builder;
+            }
+            return Promise.resolve({ data: publishedNews.length ? publishedNews : lastPublished, error: null });
+          },
+          then(resolve, reject) {
+            if (mode === "count") {
+              return Promise.resolve({ count: countDefaults.published, data: null, error: null }).then(resolve, reject);
+            }
+            return Promise.resolve({ data: publishedNews.length ? publishedNews : lastPublished, error: null }).then(
+              resolve,
+              reject
+            );
+          },
+        };
+        return builder;
       }
 
       if (table === "news_decision_records") {
@@ -123,7 +157,39 @@ function createMockSupabase(config = {}) {
       }
 
       if (table === "news_system_metric_snapshots") {
-        return createQueryBuilder({ data: heartbeat, error: null });
+        let mode = "single";
+        const builder = {
+          select() {
+            return builder;
+          },
+          eq() {
+            return builder;
+          },
+          gte() {
+            return builder;
+          },
+          order() {
+            return builder;
+          },
+          limit(n) {
+            if (n === 1) {
+              mode = "single";
+              return builder;
+            }
+            mode = "many";
+            return Promise.resolve({ data: funnelSnapshots, error: null });
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: heartbeat, error: null });
+          },
+          then(resolve, reject) {
+            if (mode === "many") {
+              return Promise.resolve({ data: funnelSnapshots, error: null }).then(resolve, reject);
+            }
+            return Promise.resolve({ data: heartbeat, error: null }).then(resolve, reject);
+          },
+        };
+        return builder;
       }
 
       return createQueryBuilder({ data: [], error: null });
@@ -169,7 +235,15 @@ function createMockSupabase(config = {}) {
         },
       ],
       counts: { published: 3, duplicate: 1, quality: 0, copy: 0, imageFailure: 0, economicRelease: 1 },
-      lastPublished: [{ decision_at: "2026-08-08T10:00:00.000Z", event_type: "GENERAL", source_type: "rss" }],
+      publishedNews: [{ published_at: "2026-08-08T10:00:00.000Z", title: "Real story", link: "https://example.com/a" }],
+      funnelSnapshots: [
+        {
+          metrics: {
+            funnel: { rssNew: 4, telegramNew: 2, editorialEvaluated: 3, publicationsSuccess: 1 },
+          },
+        },
+      ],
+      lastPublished: [{ published_at: "2026-08-08T10:00:00.000Z", title: "Real story", link: "https://example.com/a" }],
       heartbeat: {
         metrics: {
           heartbeat: {
@@ -192,6 +266,8 @@ function createMockSupabase(config = {}) {
   assert.equal(status.sources.details.length, 1);
   assert.equal(status.openIncidents.length, 1);
   assert.equal(status.last24h.published, 3);
+  assert.equal(status.last24h.observed, 6);
+  assert.equal(status.last24h.evaluated, 3);
   assert.equal(status.last24h.averageLatencyMs, 1200);
   assert.equal(status.runtime.phase2.phase2Editorial, true);
   assert.equal(status.runtime.phase3.phase3Autonomy, true);

@@ -1,17 +1,15 @@
 const { evaluateGeneralNewsMarketRelevance } = require("./market-relevance");
 const { evaluateRssDuplicate } = require("./dedup");
 const { evaluateItemFreshness, getItemPublishedAt, getFeedDelayMinutes } = require("./age-policy");
-const {
-  initializeRssFeedBaselines,
-  isRssObservationReady,
-  isRssItemAfterBaseline,
-} = require("./observation-state");
+const { isRssItemNew, markRssItemSeen } = require("./observation-state");
 const { resolveFeedName } = require("./feed-fetch");
 
 function createEmptyRssDiagnostics() {
   return {
     fetched: 0,
     normalized: 0,
+    newItems: 0,
+    oldSeenSkipped: 0,
     structuredEconomicSkipped: 0,
     duplicateSkipped: 0,
     staleSkipped: 0,
@@ -74,6 +72,15 @@ function evaluateRateLimitForRss(relevance, publishStats = {}, limits = {}) {
   return { limited: false, reason: null };
 }
 
+function resolveSourceId(item = {}) {
+  return item.sourceName || resolveFeedName(item.feedUrl || "") || "unknown";
+}
+
+function finalizeRssItemObservation(sourceId, item, outcome, { dryRun, skipCheckpointAdvance } = {}) {
+  if (dryRun || skipCheckpointAdvance) return;
+  markRssItemSeen(sourceId, item, { outcome });
+}
+
 function processGeneralRssItems(items = [], context = {}) {
   const diagnostics = createEmptyRssDiagnostics();
   diagnostics.fetched = items.length;
@@ -84,167 +91,143 @@ function processGeneralRssItems(items = [], context = {}) {
     return { diagnostics, eligibleItems: [], selectedItem: null };
   }
 
-    if (!context.skipObservationInit && !isRssObservationReady()) {
-      initializeRssFeedBaselines(items);
-      logRssDiagnostic("RSS_OBSERVATION_BASELINE_INITIALIZED", {
-        feeds: diagnostics.feedReports.map((feed) => ({
-          name: feed.name,
-          fetched: feed.fetched,
-          normalized: feed.normalized,
-          newestPublishedAt: feed.newestPublishedAt,
-        })),
+  const publishedItems = context.publishedItems || [];
+  const recentTitles = publishedItems
+    .map((entry) => entry.title || entry.normalizedTitle || "")
+    .filter(Boolean);
+  const publishStats = context.publishStats || {};
+  const limits = context.limits || {};
+  const nowMs = context.nowMs || Date.now();
+  const dryRun = context.dryRun === true;
+  const skipCheckpointCheck = context.skipCheckpointCheck === true;
+  const skipCheckpointAdvance = context.skipCheckpointAdvance === true;
+
+  const eligibleItems = [];
+
+  for (const item of items) {
+    const sourceId = resolveSourceId(item);
+    const freshness = evaluateItemFreshness(item, nowMs);
+    const relevance = evaluateGeneralNewsMarketRelevance(item);
+
+    if (!skipCheckpointCheck && !dryRun && !isRssItemNew(sourceId, item)) {
+      diagnostics.oldSeenSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_OLD_SEEN_SKIPPED", "already_ingested", {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
       });
+      continue;
     }
 
-    const publishedItems = context.publishedItems || [];
-    const recentTitles = publishedItems
-      .map((entry) => entry.title || entry.normalizedTitle || "")
-      .filter(Boolean);
-    const publishStats = context.publishStats || {};
-    const limits = context.limits || {};
-    const nowMs = context.nowMs || Date.now();
-    const dryRun = context.dryRun === true;
-    const skipBacklogCheck = context.skipBacklogCheck === true;
+    diagnostics.newItems += 1;
 
-    const eligibleItems = [];
-
-    for (const item of items) {
-      const freshness = evaluateItemFreshness(item, nowMs);
-      const relevance = evaluateGeneralNewsMarketRelevance(item);
-
-      if (!skipBacklogCheck && !dryRun && isRssObservationReady() && !isRssItemAfterBaseline(item)) {
-        diagnostics.backlogSkipped += 1;
-        recordRejectedItem(diagnostics, item, "RSS_BACKLOG_SKIPPED", "backlog_before_baseline", {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-        });
-        continue;
-      }
-
-      if (relevance.rejectionReason === "structured_economic_release") {
-        diagnostics.structuredEconomicSkipped += 1;
-        recordRejectedItem(diagnostics, item, "RSS_STRUCTURED_ECONOMIC_SKIPPED", relevance.rejectionReason, {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-        });
-        continue;
-      }
-
-      if (relevance.rejectionReason === "evergreen_educational" || relevance.rejectionReason === "product_lifestyle_or_non_financial") {
-        diagnostics.lowValueSkipped += 1;
-        recordRejectedItem(diagnostics, item, "RSS_LOW_VALUE_SKIPPED", relevance.rejectionReason, {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-        });
-        continue;
-      }
-
-      if (!freshness.fresh) {
-        diagnostics.staleSkipped += 1;
-        recordRejectedItem(diagnostics, item, "RSS_STALE_SKIPPED", freshness.reason || "stale", {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: freshness.category || relevance.category,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-        });
-        continue;
-      }
-
-      const duplicate = evaluateRssDuplicate(item, publishedItems, recentTitles);
-      if (duplicate.duplicate) {
-        diagnostics.duplicateSkipped += 1;
-        recordRejectedItem(diagnostics, item, "RSS_DUPLICATE_SKIPPED", duplicate.reason, {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-          duplicateKey: duplicate.duplicateKey,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-        });
-        continue;
-      }
-
-      if (relevance.rejectionReason === "no_market_angle" || relevance.rejectionReason === "geopolitics_without_market_transmission" || relevance.rejectionReason === "asset_mention_without_investment_reflection" || relevance.rejectionReason === "politics_without_market_impact") {
-        diagnostics.noMarketAngleSkipped += 1;
-        recordRejectedItem(diagnostics, item, "RSS_NO_MARKET_ANGLE_SKIPPED", relevance.rejectionReason, {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-          marketAngle: relevance.marketAngle,
-        });
-        continue;
-      }
-
-      if (relevance.rejectionReason === "low_impact") {
-        diagnostics.lowValueSkipped += 1;
-        recordRejectedItem(diagnostics, item, "RSS_LOW_VALUE_SKIPPED", relevance.rejectionReason, {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-        });
-        continue;
-      }
-
-      if (!relevance.eligible) {
-        diagnostics.qualityRejected += 1;
-        recordRejectedItem(diagnostics, item, "RSS_QUALITY_REJECTED", relevance.rejectionReason || "quality_rejected", {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-          marketAngle: relevance.marketAngle,
-        });
-        continue;
-      }
-
-      const rateLimit = evaluateRateLimitForRss(relevance, publishStats, limits);
-      if (rateLimit.limited && !dryRun) {
-        diagnostics.rateLimited += 1;
-        recordRejectedItem(diagnostics, item, "RSS_RATE_LIMITED", rateLimit.reason, {
-          ageMinutes: freshness.ageMinutes,
-          feedDelayMinutes: freshness.feedDelayMinutes,
-          category: relevance.category,
-          impactLevel: relevance.impactLevel,
-          score: relevance.score,
-          marketAngle: relevance.marketAngle,
-          duplicateKey: duplicate.duplicateKey,
-        });
-        continue;
-      }
-
-      diagnostics.eligible += 1;
-      if (rateLimit.limited && dryRun) {
-        diagnostics.rateLimited += 1;
-      }
-
-      const enriched = {
-        ...item,
+    if (relevance.rejectionReason === "structured_economic_release") {
+      diagnostics.structuredEconomicSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_STRUCTURED_ECONOMIC_SKIPPED", relevance.rejectionReason, {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
         impactLevel: relevance.impactLevel,
-        marketAngle: relevance.marketAngle,
-        marketRelevanceScore: relevance.score,
-        newsCategory: relevance.category,
-        primaryMarket: relevance.primaryMarket,
-        affectedMarkets: relevance.affectedMarkets,
-        rssEventFingerprint: duplicate.fingerprint,
-        rssDuplicateKey: duplicate.duplicateKey,
-        publishedAtMs: getItemPublishedAt(item),
-      };
+        score: relevance.score,
+      });
+      finalizeRssItemObservation(sourceId, item, "structured_economic_skipped", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
 
-      eligibleItems.push(enriched);
-      recordRejectedItem(diagnostics, enriched, rateLimit.limited ? "RSS_WOULD_PUBLISH_RATE_LIMITED" : "RSS_ELIGIBLE", null, {
+    if (
+      relevance.rejectionReason === "evergreen_educational" ||
+      relevance.rejectionReason === "product_lifestyle_or_non_financial"
+    ) {
+      diagnostics.lowValueSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_LOW_VALUE_SKIPPED", relevance.rejectionReason, {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
+        impactLevel: relevance.impactLevel,
+        score: relevance.score,
+      });
+      finalizeRssItemObservation(sourceId, item, "low_value_skipped", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
+
+    if (!freshness.fresh) {
+      diagnostics.staleSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_STALE_SKIPPED", freshness.reason || "stale", {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: freshness.category || relevance.category,
+        impactLevel: relevance.impactLevel,
+        score: relevance.score,
+      });
+      finalizeRssItemObservation(sourceId, item, "stale_skipped", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
+
+    const duplicate = evaluateRssDuplicate(item, publishedItems, recentTitles);
+    if (duplicate.duplicate) {
+      diagnostics.duplicateSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_DUPLICATE_SKIPPED", duplicate.reason, {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
+        duplicateKey: duplicate.duplicateKey,
+        impactLevel: relevance.impactLevel,
+        score: relevance.score,
+      });
+      finalizeRssItemObservation(sourceId, item, "duplicate_skipped", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
+
+    if (
+      relevance.rejectionReason === "no_market_angle" ||
+      relevance.rejectionReason === "geopolitics_without_market_transmission" ||
+      relevance.rejectionReason === "asset_mention_without_investment_reflection" ||
+      relevance.rejectionReason === "politics_without_market_impact"
+    ) {
+      diagnostics.noMarketAngleSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_NO_MARKET_ANGLE_SKIPPED", relevance.rejectionReason, {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
+        impactLevel: relevance.impactLevel,
+        score: relevance.score,
+        marketAngle: relevance.marketAngle,
+      });
+      finalizeRssItemObservation(sourceId, item, "no_market_angle", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
+
+    if (relevance.rejectionReason === "low_impact") {
+      diagnostics.lowValueSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_LOW_VALUE_SKIPPED", relevance.rejectionReason, {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
+        impactLevel: relevance.impactLevel,
+        score: relevance.score,
+      });
+      finalizeRssItemObservation(sourceId, item, "low_impact", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
+
+    if (!relevance.eligible) {
+      diagnostics.qualityRejected += 1;
+      recordRejectedItem(diagnostics, item, "RSS_QUALITY_REJECTED", relevance.rejectionReason || "quality_rejected", {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
+        impactLevel: relevance.impactLevel,
+        score: relevance.score,
+        marketAngle: relevance.marketAngle,
+      });
+      finalizeRssItemObservation(sourceId, item, "quality_rejected", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
+
+    const rateLimit = evaluateRateLimitForRss(relevance, publishStats, limits);
+    if (rateLimit.limited && !dryRun) {
+      diagnostics.rateLimited += 1;
+      recordRejectedItem(diagnostics, item, "RSS_RATE_LIMITED", rateLimit.reason, {
         ageMinutes: freshness.ageMinutes,
         feedDelayMinutes: freshness.feedDelayMinutes,
         category: relevance.category,
@@ -253,14 +236,49 @@ function processGeneralRssItems(items = [], context = {}) {
         marketAngle: relevance.marketAngle,
         duplicateKey: duplicate.duplicateKey,
       });
+      finalizeRssItemObservation(sourceId, item, "rate_limited", { dryRun, skipCheckpointAdvance });
+      continue;
     }
+
+    diagnostics.eligible += 1;
+    if (rateLimit.limited && dryRun) {
+      diagnostics.rateLimited += 1;
+    }
+
+    const enriched = {
+      ...item,
+      impactLevel: relevance.impactLevel,
+      marketAngle: relevance.marketAngle,
+      marketRelevanceScore: relevance.score,
+      newsCategory: relevance.category,
+      primaryMarket: relevance.primaryMarket,
+      affectedMarkets: relevance.affectedMarkets,
+      rssEventFingerprint: duplicate.fingerprint,
+      rssDuplicateKey: duplicate.duplicateKey,
+      publishedAtMs: getItemPublishedAt(item),
+    };
+
+    eligibleItems.push(enriched);
+    recordRejectedItem(diagnostics, enriched, rateLimit.limited ? "RSS_WOULD_PUBLISH_RATE_LIMITED" : "RSS_ELIGIBLE", null, {
+      ageMinutes: freshness.ageMinutes,
+      feedDelayMinutes: freshness.feedDelayMinutes,
+      category: relevance.category,
+      impactLevel: relevance.impactLevel,
+      score: relevance.score,
+      marketAngle: relevance.marketAngle,
+      duplicateKey: duplicate.duplicateKey,
+    });
+  }
 
   eligibleItems.sort((a, b) => (b.publishedAtMs || 0) - (a.publishedAtMs || 0));
 
   const selectedItem = eligibleItems[0] || null;
   diagnostics.wouldPublish = selectedItem ? 1 : 0;
+  diagnostics.backlogSkipped = diagnostics.oldSeenSkipped;
 
   logRssDiagnostic("RSS_FETCHED", { count: diagnostics.fetched });
+  logRssDiagnostic("RSS_NEW", { count: diagnostics.newItems });
+  logRssDiagnostic("RSS_OLD_SEEN_SKIPPED", { count: diagnostics.oldSeenSkipped });
   logRssDiagnostic("RSS_NORMALIZED", { count: diagnostics.normalized });
   logRssDiagnostic("RSS_STRUCTURED_ECONOMIC_SKIPPED", { count: diagnostics.structuredEconomicSkipped });
   logRssDiagnostic("RSS_DUPLICATE_SKIPPED", { count: diagnostics.duplicateSkipped });
@@ -279,9 +297,15 @@ function processGeneralRssItems(items = [], context = {}) {
   };
 }
 
+function markEligibleRssItemProcessed(item, outcome, options = {}) {
+  finalizeRssItemObservation(resolveSourceId(item), item, outcome, options);
+}
+
 module.exports = {
   createEmptyRssDiagnostics,
   processGeneralRssItems,
   evaluateRateLimitForRss,
   logRssDiagnostic,
+  markEligibleRssItemProcessed,
+  resolveSourceId,
 };

@@ -1,21 +1,20 @@
 const { TELEGRAM_SOURCE_CHANNELS } = require("./sources");
+const { parseMessageId } = require("./message-id");
+const {
+  classifyTelegramMessage,
+  markTelegramMessageSeen,
+  bootstrapTelegramChannel,
+  isTelegramMessageNew,
+  isHydrated,
+  markCheckpointsHydrated,
+} = require("../news-ingestion/checkpoint-store");
 
 let newsWorkerStartedAt = new Date().toISOString();
 let publishingEnabledAt = null;
 let minimumPublishableSourceTime = null;
-let baselineInitialized = false;
-let baselineFetchDone = false;
-let firstFetchCompleted = false;
 let fetchCycleCount = 0;
 let lastPublishingEnabled = null;
 let onPublishingEnabledHook = null;
-
-function setOnPublishingEnabledHook(fn) {
-  onPublishingEnabledHook = typeof fn === "function" ? fn : null;
-}
-
-/** @type {Map<string, { latestMessageId: number, latestPublishedAt: string|null }>} */
-const channelBaselines = new Map();
 
 /** @type {Set<string>} */
 const observationOnlyKeys = new Set();
@@ -28,12 +27,6 @@ function isPublishingEnabled() {
     process.env.TELEGRAM_NEWS_PUBLISH_ENABLED !== "0" &&
     process.env.TELEGRAM_NEWS_PUBLISH_ENABLED !== "false"
   );
-}
-
-function parseMessageId(value) {
-  const raw = String(value || "").split(":")[0];
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function syncPublishingTransition() {
@@ -54,6 +47,10 @@ function syncPublishingTransition() {
   }
   lastPublishingEnabled = enabled;
   return enabled;
+}
+
+function setOnPublishingEnabledHook(fn) {
+  onPublishingEnabledHook = typeof fn === "function" ? fn : null;
 }
 
 function clearObservationBufferBeforeEnable() {
@@ -82,38 +79,31 @@ function wasObservationOnly(post) {
 }
 
 function initializeBaselinesFromPosts(posts = []) {
-  for (const post of posts) {
-    const channel = post.sourceChannel;
-    if (!channel) {
-      continue;
-    }
-    const messageId = parseMessageId(post.sourceMessageId);
-    const current = channelBaselines.get(channel);
-    if (!current || messageId > current.latestMessageId) {
-      channelBaselines.set(channel, {
-        latestMessageId: messageId,
-        latestPublishedAt: post.sourcePublishedAt || null,
-      });
-    }
-  }
+  bootstrapTelegramChannelForAll(posts);
+}
 
-  baselineInitialized = true;
+function bootstrapTelegramChannelForAll(posts = [], options = {}) {
+  const byChannel = new Map();
+  for (const post of posts) {
+    if (!post.sourceChannel) continue;
+    if (!byChannel.has(post.sourceChannel)) byChannel.set(post.sourceChannel, []);
+    byChannel.get(post.sourceChannel).push(post);
+  }
   for (const channel of TELEGRAM_SOURCE_CHANNELS) {
-    const baseline = channelBaselines.get(channel.name);
+    const channelPosts = byChannel.get(channel.name) || [];
+    bootstrapTelegramChannel(channel.name, channelPosts, options);
     console.log(
-      "TELEGRAM_SOURCE_BASELINE_INITIALIZED",
+      "TELEGRAM_SOURCE_CHECKPOINT_BOOTSTRAP",
       JSON.stringify({
         channel: channel.name,
-        latestMessageId: baseline?.latestMessageId ?? null,
-        latestPublishedAt: baseline?.latestPublishedAt ?? null,
+        posts: channelPosts.length,
       })
     );
   }
 }
 
 function completeBaselineFetch() {
-  baselineFetchDone = true;
-  firstFetchCompleted = true;
+  markCheckpointsHydrated();
 }
 
 function beginFetchCycle() {
@@ -122,18 +112,12 @@ function beginFetchCycle() {
 }
 
 function isBaselineReadyForPublish() {
-  return baselineFetchDone;
+  return isHydrated();
 }
 
 function isPostNewerThanBaseline(post) {
-  if (!baselineInitialized) {
-    return false;
-  }
-  const baseline = channelBaselines.get(post.sourceChannel);
-  if (!baseline) {
-    return true;
-  }
-  return parseMessageId(post.sourceMessageId) > baseline.latestMessageId;
+  if (!post?.sourceChannel) return false;
+  return isTelegramMessageNew(post.sourceChannel, post);
 }
 
 function isSourceTimePublishable(sourcePublishedAt) {
@@ -154,15 +138,22 @@ function isSourcePublishable(post) {
   }
 
   if (!isBaselineReadyForPublish()) {
-    return { ok: false, reason: "TELEGRAM_BASELINE_FETCH" };
+    return { ok: false, reason: "TELEGRAM_CHECKPOINT_NOT_READY" };
   }
 
   if (post && wasObservationOnly(post)) {
     return { ok: false, reason: "TELEGRAM_OBSERVATION_ONLY_DISCARDED" };
   }
 
-  if (post && !isPostNewerThanBaseline(post)) {
-    return { ok: false, reason: "TELEGRAM_NEWS_BACKLOG_SKIPPED" };
+  if (post) {
+    const classified = classifyTelegramMessage(post.sourceChannel, post);
+    if (!classified.new) {
+      return {
+        ok: false,
+        reason: classified.classification,
+        classification: classified.classification,
+      };
+    }
   }
 
   if (post && !isSourceTimePublishable(post.sourcePublishedAt)) {
@@ -173,29 +164,21 @@ function isSourcePublishable(post) {
 }
 
 function updateBaselineAfterPublish(post) {
-  if (!post?.sourceChannel) {
-    return;
-  }
-  const messageId = parseMessageId(post.sourceMessageId);
-  const current = channelBaselines.get(post.sourceChannel);
-  if (!current || messageId > current.latestMessageId) {
-    channelBaselines.set(post.sourceChannel, {
-      latestMessageId: messageId,
-      latestPublishedAt: post.sourcePublishedAt || new Date().toISOString(),
-    });
-  }
+  if (!post?.sourceChannel) return;
+  markTelegramMessageSeen(post.sourceChannel, post, { outcome: "published" });
 }
 
 function getPublishStateSnapshot() {
   syncPublishingTransition();
+  const { getCheckpointSnapshot } = require("../news-ingestion/checkpoint-store");
   return {
     newsWorkerStartedAt,
     publishingEnabledAt,
     minimumPublishableSourceTime,
-    baselineFetchDone,
+    checkpointHydrated: isHydrated(),
     fetchCycleCount,
     publishingEnabled: isPublishingEnabled(),
-    channelBaselines: Object.fromEntries(channelBaselines.entries()),
+    checkpoints: getCheckpointSnapshot(),
     observationOnlyCount: observationOnlyKeys.size,
     permanentlyDiscardedCount: permanentlyDiscardedKeys.size,
   };
@@ -205,12 +188,8 @@ function resetPublishStateForTests() {
   newsWorkerStartedAt = new Date().toISOString();
   publishingEnabledAt = null;
   minimumPublishableSourceTime = null;
-  baselineInitialized = false;
-  baselineFetchDone = false;
-  firstFetchCompleted = false;
   fetchCycleCount = 0;
   lastPublishingEnabled = null;
-  channelBaselines.clear();
   observationOnlyKeys.clear();
   permanentlyDiscardedKeys.clear();
 }
@@ -236,6 +215,7 @@ module.exports = {
   markObservationOnly,
   wasObservationOnly,
   initializeBaselinesFromPosts,
+  bootstrapTelegramChannelForAll,
   completeBaselineFetch,
   beginFetchCycle,
   isBaselineReadyForPublish,
@@ -248,4 +228,5 @@ module.exports = {
   parseMessageId,
   setOnPublishingEnabledHook,
   configurePublishWindowForTests,
+  classifyTelegramMessage,
 };

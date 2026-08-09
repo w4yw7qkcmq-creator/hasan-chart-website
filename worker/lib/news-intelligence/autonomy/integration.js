@@ -23,6 +23,7 @@ let lastTelegramPollAt = null;
 let lastTelegramPollSuccessAt = null;
 let lastRssPollAt = null;
 let lastRssPollSuccessAt = null;
+const pipelineStallWindow = [];
 
 function isEnabled(options = {}) {
   return isPhase3AutonomyEnabled(options) || isPhase3DiagnosticsOnly(options) || options.forcePhase3Diagnostics === true;
@@ -200,10 +201,26 @@ function observeCycleStart() {
 }
 
 function observeCycleEnd(durationMs, stats = {}) {
+  const funnel = stats.funnel || require("../../news-ingestion/cycle-funnel").getCycleFunnel();
+  pipelineStallWindow.push({
+    at: Date.now(),
+    eligible: (funnel.rssEligible || 0) + (funnel.telegramCandidates || 0),
+    editorialEvaluated: funnel.editorialEvaluated || 0,
+    published: (funnel.publicationsSuccess || 0) + (funnel.rssPublished || 0) + (funnel.telegramPublished || 0),
+    newObserved: (funnel.rssNew || 0) + (funnel.telegramNew || 0),
+  });
+  if (pipelineStallWindow.length > ANOMALY_THRESHOLDS.pipelineStallWindowCycles) {
+    pipelineStallWindow.shift();
+  }
+
   updateHeartbeat({
     lastCycleCompletedAt: new Date().toISOString(),
     lastCycleDurationMs: durationMs,
     lastErrorAt: stats.lastErrorSafe ? new Date().toISOString() : null,
+    lastSuccessfulPublicationAt:
+      funnel.publicationsSuccess > 0 || funnel.rssPublished > 0 || funnel.telegramPublished > 0
+        ? new Date().toISOString()
+        : undefined,
   });
   detectSilentFailures();
   syncSourceHealthCounts();
@@ -304,7 +321,39 @@ function detectSilentFailures() {
     }
   }
 
+  if (pipelineStallWindow.length >= ANOMALY_THRESHOLDS.pipelineStallWindowCycles) {
+    const eligibleSum = pipelineStallWindow.reduce((sum, entry) => sum + entry.eligible, 0);
+    const publishedSum = pipelineStallWindow.reduce((sum, entry) => sum + entry.published, 0);
+    const newSum = pipelineStallWindow.reduce((sum, entry) => sum + entry.newObserved, 0);
+    if (
+      eligibleSum >= ANOMALY_THRESHOLDS.pipelineStallEligibleMin &&
+      publishedSum <= ANOMALY_THRESHOLDS.pipelineStallPublicationMax
+    ) {
+      checks.push({
+        silent: true,
+        kind: "publication_pipeline_stall",
+        eligibleSum,
+        publishedSum,
+        newObservedSum: newSum,
+        windowCycles: pipelineStallWindow.length,
+      });
+    } else if (newSum === 0 && eligibleSum === 0) {
+      checks.push({ silent: false, kind: "quiet_market", newObservedSum: newSum });
+    }
+  }
+
   for (const check of checks) {
+    if (check.kind === "publication_pipeline_stall") {
+      openOrUpdateIncident({
+        type: INCIDENT_TYPES.NEWS_PUBLICATION_PIPELINE_STALL,
+        severity: SEVERITY.HIGH,
+        evidenceSummary: check,
+      });
+      continue;
+    }
+    if (check.kind === "quiet_market") {
+      continue;
+    }
     observeSilentFailure(check);
   }
 }
@@ -338,6 +387,7 @@ function resetPhase3IntegrationForTests() {
   lastTelegramPollSuccessAt = null;
   lastRssPollAt = null;
   lastRssPollSuccessAt = null;
+  pipelineStallWindow.length = 0;
 }
 
 module.exports = {

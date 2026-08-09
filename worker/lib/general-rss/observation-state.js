@@ -1,63 +1,41 @@
-const feedBaselines = new Map();
-let rssObservationReady = false;
-let workerStartedAt = Date.now();
+/**
+ * RSS ingestion checkpoint facade.
+ * Legacy restart-baseline logic removed — delegates to persisted checkpoint store.
+ */
+const {
+  isRssItemNew,
+  isRssItemSeen,
+  markRssItemSeen,
+  bootstrapRssSource,
+  bootstrapAllRssSources,
+  resetCheckpointStoreForTests,
+  isHydrated,
+} = require("../news-ingestion/checkpoint-store");
 
 function resetRssObservationStateForTests() {
-  feedBaselines.clear();
-  rssObservationReady = false;
-  workerStartedAt = Date.now();
+  resetCheckpointStoreForTests();
 }
 
 function markRssObservationReady() {
-  rssObservationReady = true;
+  // no-op: readiness is tied to checkpoint hydration + bootstrap
 }
 
 function isRssObservationReady() {
-  return rssObservationReady;
+  return isHydrated();
 }
 
-function initializeRssFeedBaselines(items = []) {
-  for (const item of items) {
-    const feedUrl = item.feedUrl || item.sourceFeed || "unknown";
-    const publishedAt = new Date(item.isoDate || item.pubDate || 0).getTime();
-    if (Number.isNaN(publishedAt) || !publishedAt) {
-      continue;
-    }
-
-    const current = feedBaselines.get(feedUrl);
-    if (!current || publishedAt > current.latestPublishedAt) {
-      feedBaselines.set(feedUrl, {
-        latestPublishedAt: publishedAt,
-        latestLink: item.link || null,
-      });
-    }
-  }
-
-  rssObservationReady = true;
+function initializeRssFeedBaselines(_items = []) {
+  // Legacy API retired — bootstrap via bootstrapAllRssSources during cycle setup.
 }
 
-function isRssItemAfterBaseline(item = {}) {
-  if (!rssObservationReady) {
-    return false;
-  }
-
-  const feedUrl = item.feedUrl || item.sourceFeed || "unknown";
-  const baseline = feedBaselines.get(feedUrl);
-  const publishedAt = new Date(item.isoDate || item.pubDate || 0).getTime();
-
-  if (!baseline || Number.isNaN(publishedAt) || !publishedAt) {
-    return true;
-  }
-
-  return publishedAt > baseline.latestPublishedAt;
+function isRssItemAfterBaseline(item = {}, sourceId = null) {
+  const resolvedSourceId = sourceId || item.sourceName || item.sourceFeed || "unknown";
+  return isRssItemNew(resolvedSourceId, item);
 }
 
 function getRssObservationSnapshot() {
-  return {
-    rssObservationReady,
-    workerStartedAt: new Date(workerStartedAt).toISOString(),
-    feedBaselines: Object.fromEntries(feedBaselines.entries()),
-  };
+  const { getCheckpointSnapshot } = require("../news-ingestion/checkpoint-store");
+  return getCheckpointSnapshot();
 }
 
 module.exports = {
@@ -67,4 +45,9 @@ module.exports = {
   initializeRssFeedBaselines,
   isRssItemAfterBaseline,
   getRssObservationSnapshot,
+  isRssItemNew,
+  isRssItemSeen,
+  markRssItemSeen,
+  bootstrapRssSource,
+  bootstrapAllRssSources,
 };

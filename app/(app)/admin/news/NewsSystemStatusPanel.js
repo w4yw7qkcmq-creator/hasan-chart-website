@@ -180,16 +180,21 @@ export default function NewsSystemStatusPanel() {
 
       <h3 className="admin-news-system__subtitle">آخر 24 ساعة</h3>
       <div className="admin-news-system__metric-grid">
-        <MetricCard label="معالج" value={last24h.processed ?? status?.metrics?.candidates_total ?? 0} />
+        <MetricCard label="مرصود" value={last24h.observed ?? status?.metrics?.candidates_total ?? 0} />
+        <MetricCard label="تم تقييمه" value={last24h.evaluated ?? status?.metrics?.editorial_evaluated ?? 0} />
         <MetricCard label="منشور" value={last24h.published ?? status?.metrics?.publications_success ?? 0} />
-        <MetricCard label="التكرارات المحظورة" value={last24h.duplicatesBlocked ?? status?.duplicateBlocksToday ?? 0} />
-        <MetricCard label="حظر الجودة" value={last24h.qualityBlocks ?? status?.qualityBlocksToday ?? 0} />
-        <MetricCard label="النسخ المحظور" value={last24h.copyBlocks ?? status?.copyBlocksToday ?? 0} />
+        <MetricCard label="التكرارات المحظورة" value={last24h.duplicatesBlocked ?? 0} />
+        <MetricCard label="حظر الجودة" value={last24h.qualityBlocks ?? 0} />
         <MetricCard
           label="متوسط زمن المعالجة"
           value={formatLatencyMs(last24h.averageLatencyMs ?? status?.averageIngestToPublishLatencyMs)}
         />
       </div>
+      {status?.lastRealPublication?.length ? (
+        <p className="admin-news-page__hint">
+          آخر منشور حقيقي: {formatGregorianDateTime(status.lastRealPublication[0]?.published_at, { compact: true })}
+        </p>
+      ) : null}
 
       <h3 className="admin-news-system__subtitle">المصادر</h3>
       {sources.length ? (

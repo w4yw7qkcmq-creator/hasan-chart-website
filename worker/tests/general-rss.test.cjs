@@ -189,10 +189,14 @@ function run() {
       link: "https://example.com/1",
       isoDate: new Date(now - 30 * 60 * 1000).toISOString(),
       feedUrl: "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+      sourceName: "CNBC",
     },
   ];
-  initializeRssFeedBaselines(baselineItems);
-  assert(isRssItemAfterBaseline(baselineItems[0]) === false, "baseline item should not republish");
+  const { bootstrapRssSource, isRssItemNew, markRssItemSeen, resetCheckpointStoreForTests } = require(path.join(root, "lib/news-ingestion/checkpoint-store"));
+  resetCheckpointStoreForTests();
+  bootstrapRssSource("CNBC", baselineItems, { nowMs: now, maxAgeHours: 24, publishedLinks: new Set() });
+  markRssItemSeen("CNBC", baselineItems[0], { outcome: "test" });
+  assert(isRssItemNew("CNBC", baselineItems[0]) === false, "seen item should not republish");
 
   const burstPipeline = processGeneralRssItems(
     [

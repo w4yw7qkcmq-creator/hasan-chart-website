@@ -9,9 +9,13 @@ const {
   initializeRssFeedBaselines,
   isRssObservationReady,
   isRssItemAfterBaseline,
+  isRssItemNew,
+  markRssItemSeen,
+  bootstrapAllRssSources,
   resetRssObservationStateForTests,
   getRssObservationSnapshot,
 } = require("./observation-state");
+const { markEligibleRssItemProcessed } = require("./pipeline");
 const {
   BLOCK_REASONS: RSS_EDITORIAL_BLOCK_REASONS,
   validateGeneralRssEditorialOutput,
@@ -33,6 +37,10 @@ module.exports = {
   initializeRssFeedBaselines,
   isRssObservationReady,
   isRssItemAfterBaseline,
+  isRssItemNew,
+  markRssItemSeen,
+  bootstrapAllRssSources,
+  markEligibleRssItemProcessed,
   resetRssObservationStateForTests,
   getRssObservationSnapshot,
   RSS_EDITORIAL_BLOCK_REASONS,

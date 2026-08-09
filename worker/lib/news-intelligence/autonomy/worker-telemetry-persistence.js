@@ -1,6 +1,7 @@
 const { logAutonomyEvent } = require("./structured-log");
 const { getHeartbeat } = require("./heartbeat");
 const { getMetricsAggregator } = require("./metrics-aggregator");
+const { getCycleFunnel } = require("../../news-ingestion/cycle-funnel");
 
 const HEARTBEAT_WINDOW_KEY = "worker_heartbeat";
 
@@ -21,6 +22,7 @@ async function flushWorkerTelemetrySnapshot(supabase) {
       heartbeat,
       global: metrics.global,
       latency: metrics.latency,
+      funnel: getCycleFunnel(),
     },
   };
 

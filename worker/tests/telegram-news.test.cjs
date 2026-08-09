@@ -58,6 +58,7 @@ const {
   markObservationOnly,
   configurePublishWindowForTests,
 } = require(path.join(root, "lib/telegram-news/publish-state"));
+const { resetCheckpointStoreForTests, hydrateFromDb } = require(path.join(root, "lib/news-ingestion/checkpoint-store"));
 const {
   validateCandidateForAtomicPublish,
   publishValidatedTelegramNewsCandidate,
@@ -113,6 +114,8 @@ function post(overrides = {}) {
 
 function enablePublishStateForTests(baselineMessageId = "0") {
   resetPublishStateForTests();
+  resetCheckpointStoreForTests();
+  hydrateFromDb(null);
   resetAtomicPublishForTests();
   process.env.TELEGRAM_NEWS_PUBLISH_ENABLED = "1";
   const baselineTime = "2026-08-01T12:00:00+00:00";
@@ -906,11 +909,12 @@ async function testFinalMessagePassesQualityGate() {
 
 function testBacklogSkippedBeforeBaselineReady() {
   resetPublishStateForTests();
+  resetCheckpointStoreForTests();
   process.env.TELEGRAM_NEWS_PUBLISH_ENABLED = "1";
   const oldPost = post({ sourceMessageId: "100", sourcePublishedAt: "2026-08-01T10:00:00+00:00" });
   const result = isSourcePublishable(oldPost);
   assert.strictEqual(result.ok, false);
-  assert.strictEqual(result.reason, "TELEGRAM_BASELINE_FETCH");
+  assert.strictEqual(result.reason, "TELEGRAM_CHECKPOINT_NOT_READY");
 }
 
 function testBacklogSkippedAfterBaseline() {
@@ -918,7 +922,7 @@ function testBacklogSkippedAfterBaseline() {
   const oldPost = post({ sourceMessageId: "100", sourcePublishedAt: "2026-08-01T10:00:00+00:00" });
   const result = isSourcePublishable(oldPost);
   assert.strictEqual(result.ok, false);
-  assert.strictEqual(result.reason, "TELEGRAM_NEWS_BACKLOG_SKIPPED");
+  assert.strictEqual(result.reason, "OLD_SEEN_MESSAGE");
 }
 
 function testKillSwitchObservationDiscarded() {

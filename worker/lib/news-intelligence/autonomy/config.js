@@ -34,6 +34,9 @@ const ANOMALY_THRESHOLDS = Object.freeze({
   imageFailureSpikeCount: 5,
   pollSilenceMs: 45 * 60_000,
   cycleIncompleteMs: 20 * 60_000,
+  pipelineStallEligibleMin: 3,
+  pipelineStallWindowCycles: 6,
+  pipelineStallPublicationMax: 0,
   latencyDegradationMs: 500,
   latencyDegradationStreak: 5,
 });
