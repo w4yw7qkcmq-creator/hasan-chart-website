@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
-  getClientIp,
-  loginIpLimiter,
-  RATE_LIMIT_ERROR,
-} from "../../../../lib/rate-limit";
+  enforceLoginFloodLimit,
+  peekLoginFailedAuthLimits,
+  recordLoginFailedAuthAttempt,
+  resetLoginFailedAuthCounters,
+  logLoginSuccess,
+  normalizeLoginEmail,
+} from "../../../../lib/auth-login-rate-limit";
 import { getSupabaseAdmin } from "../../../../lib/auth-session.js";
 import { resolveIamContext } from "../../../../lib/iam/resolve-permissions.js";
 import { startAdminSessionLog } from "../../../../lib/iam/session-log.js";
 import { recordAdminLoginEvent } from "../../../../lib/iam/auth-events.js";
+import { getClientIp } from "../../../../lib/rate-limit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -40,26 +44,40 @@ function getSafeUser(user) {
   };
 }
 
+function rateLimitResponse(payload) {
+  return NextResponse.json(payload.body, {
+    status: payload.status,
+    headers: payload.headers,
+  });
+}
+
 export async function POST(request) {
   try {
-    const clientIp = getClientIp(request);
-    const rateLimitResult = await loginIpLimiter(clientIp);
-
-    if (!rateLimitResult.success) {
-      return NextResponse.json({ error: RATE_LIMIT_ERROR }, { status: 429 });
+    const floodCheck = await enforceLoginFloodLimit(request);
+    if (floodCheck.limited) {
+      return rateLimitResponse(floodCheck);
     }
 
-    const { email, password } = await request.json();
+    const clientIp = floodCheck.clientIp || getClientIp(request);
+    const body = await request.json();
+    const { email, password } = body;
 
-    const normalizedEmail = String(email || "")
-      .trim()
-      .toLowerCase();
+    const normalizedEmail = normalizeLoginEmail(email);
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return NextResponse.json(
         { error: "يرجى إدخال البريد الإلكتروني وكلمة المرور" },
         { status: 400 }
       );
+    }
+
+    const failedAuthCheck = await peekLoginFailedAuthLimits({
+      clientIp,
+      email: normalizedEmail,
+    });
+
+    if (failedAuthCheck.limited) {
+      return rateLimitResponse(failedAuthCheck);
     }
 
     const supabase = createAuthClient();
@@ -70,17 +88,30 @@ export async function POST(request) {
     });
 
     if (error || !data?.session || !data?.user) {
+      await recordLoginFailedAuthAttempt({
+        clientIp,
+        email: normalizedEmail,
+      });
+
       const adminSupabase = getSupabaseAdmin();
       await recordAdminLoginEvent(adminSupabase, {
         success: false,
         email: normalizedEmail,
         request,
       });
+
       return NextResponse.json(
         { error: "بيانات الدخول غير صحيحة" },
         { status: 401 }
       );
     }
+
+    await resetLoginFailedAuthCounters({
+      clientIp,
+      email: normalizedEmail,
+    });
+
+    logLoginSuccess({ email: normalizedEmail, clientIp });
 
     const adminSupabase = getSupabaseAdmin();
     const iam = await resolveIamContext(adminSupabase, data.user);

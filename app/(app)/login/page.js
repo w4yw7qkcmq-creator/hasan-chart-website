@@ -76,6 +76,24 @@ async function loginWithApi(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
 
     const payload = await response.json().catch(() => ({}));
 
+    if (response.status === 429) {
+      const retryAfterHeader = Number(response.headers.get("Retry-After"));
+      const retryAfterSeconds = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+        ? retryAfterHeader
+        : Number(payload?.retryAfterSeconds) || 60;
+
+      return {
+        data: null,
+        error: {
+          code: payload?.code || "AUTH_RATE_LIMITED",
+          message:
+            payload?.error ||
+            "تم إجراء عدة محاولات تسجيل دخول خلال وقت قصير. حاول مجددًا بعد قليل.",
+          retryAfterSeconds,
+        },
+      };
+    }
+
     if (!response.ok) {
       return {
         data: null,
@@ -254,10 +272,18 @@ export default function LoginPage() {
       });
 
       if (error || !data?.session || !data?.user?.email) {
+        const rateLimitMessage =
+          error?.code === "AUTH_RATE_LIMITED" && error?.retryAfterSeconds
+            ? `${error.message} يمكنك المحاولة مجددًا بعد ${error.retryAfterSeconds} ثانية.`
+            : error?.message || "بيانات الدخول غير صحيحة";
+
         showAppModal({
           type: "error",
-          title: "فشل تسجيل الدخول",
-          message: error?.message || "بيانات الدخول غير صحيحة",
+          title:
+            error?.code === "AUTH_RATE_LIMITED"
+              ? "محاولات كثيرة"
+              : "فشل تسجيل الدخول",
+          message: rateLimitMessage,
         });
         setTurnstileToken("");
         if (window.turnstile && turnstileWidgetId.current !== null) {
