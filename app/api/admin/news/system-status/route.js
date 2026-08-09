@@ -1,14 +1,8 @@
-import { requireAdminPermission } from "../../../../../lib/admin-auth";
-import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
-import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
-import { adminReadLimiter } from "../../../../../lib/rate-limit";
-import {
-  getNewsSystemStatus,
-  getNewsSystemStatusFromDb,
-  buildDailyOperationalSummary,
-} from "../../../../../worker/lib/news-intelligence/autonomy/diagnostic-service";
-import { getPhase3RuntimeConfig } from "../../../../../worker/lib/news-intelligence/autonomy/feature-flags";
 import { createClient } from "@supabase/supabase-js";
+import {
+  buildDailyOperationalSummaryFromDb,
+  getNewsSystemStatusFromDb,
+} from "../../../../../lib/news-system-status";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +15,11 @@ function getServiceSupabase() {
 
 export async function GET(request) {
   try {
+    const { requireAdminPermission } = await import("../../../../../lib/admin-auth");
+    const { IAM_PERMISSIONS } = await import("../../../../../lib/iam/constants");
+    const { enforceRateLimit } = await import("../../../../../lib/enforce-rate-limit");
+    const { adminReadLimiter } = await import("../../../../../lib/rate-limit");
+
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.NEWS_READ, { request });
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
@@ -32,27 +31,37 @@ export async function GET(request) {
     );
     if (rateLimited) return rateLimited;
 
+    const supabase = getServiceSupabase();
+    if (!supabase) {
+      return Response.json(
+        {
+          success: false,
+          error: "News system telemetry database is not configured on the website service.",
+        },
+        { status: 503 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const view = String(searchParams.get("view") || "status").trim().toLowerCase();
-    const supabase = getServiceSupabase();
 
     if (view === "summary") {
+      const summary = await buildDailyOperationalSummaryFromDb(supabase);
       return Response.json({
         success: true,
-        summary: buildDailyOperationalSummary(),
-        runtime: getPhase3RuntimeConfig(),
+        summary,
+        runtime: summary.runtime,
+        dataSource: "persisted_telemetry",
       });
     }
 
-    const status = supabase
-      ? await getNewsSystemStatusFromDb(supabase)
-      : getNewsSystemStatus();
+    const status = await getNewsSystemStatusFromDb(supabase);
 
     return Response.json({
       success: true,
       status,
-      runtime: getPhase3RuntimeConfig(),
-      note: "Worker in-memory metrics are process-local; DB fields populate after Phase 3 migration.",
+      runtime: status.runtime,
+      dataSource: "persisted_telemetry",
     });
   } catch (error) {
     return Response.json(

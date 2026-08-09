@@ -2,6 +2,7 @@ const { logAutonomyEvent } = require("./structured-log");
 const { drainPendingDecisions } = require("./decision-record");
 const { flushIncidents } = require("./incident-persistence");
 const { flushSourceHealthStates } = require("./source-health-persistence");
+const { flushWorkerTelemetrySnapshot } = require("./worker-telemetry-persistence");
 
 async function flushDecisionRecords(supabase, limit = 100) {
   if (!supabase) return { flushed: 0, skipped: true };
@@ -46,12 +47,13 @@ async function flushDecisionRecords(supabase, limit = 100) {
 }
 
 async function flushObservability(supabase) {
-  const [decisions, incidents, sourceHealth] = await Promise.all([
+  const [decisions, incidents, sourceHealth, telemetry] = await Promise.all([
     flushDecisionRecords(supabase),
     flushIncidents(supabase),
     flushSourceHealthStates(supabase),
+    flushWorkerTelemetrySnapshot(supabase),
   ]);
-  return { decisions, incidents, sourceHealth, nonBlocking: true };
+  return { decisions, incidents, sourceHealth, telemetry, nonBlocking: true };
 }
 
 module.exports = {
