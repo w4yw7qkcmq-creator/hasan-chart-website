@@ -5,7 +5,7 @@ import {
   capturePartnerReferral,
   readReferralCookies,
 } from "../../../../lib/partner-referral-capture";
-import { sanitizeReferralCode } from "../../../../lib/partner-shared";
+import { sanitizeReferralCode, getPartnerSiteUrl } from "../../../../lib/partner-shared";
 import {
   resolveSmartLink,
   resolveSmartLinkByShortCode,
@@ -20,6 +20,18 @@ function attachSecurityHeaders(response) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   return response;
+}
+
+function resolvePublicOrigin(request) {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = (forwardedHost || request.headers.get("host") || "").split(",")[0].trim();
+  const proto = (request.headers.get("x-forwarded-proto") || "https").split(",")[0].trim();
+
+  if (host && !/localhost|127\.0\.0\.1/i.test(host)) {
+    return `${proto}://${host}`;
+  }
+
+  return getPartnerSiteUrl();
 }
 
 function readAttributionFromRequest(request) {
@@ -86,7 +98,7 @@ export async function GET(request, { params }) {
   }
 
   const safePath = sanitizeLandingPath(redirectPath) || "/";
-  const redirectUrl = new URL(safePath, request.url);
+  const redirectUrl = new URL(safePath, resolvePublicOrigin(request));
   const response = attachSecurityHeaders(NextResponse.redirect(redirectUrl, 302));
 
   const code = referralCode || sanitizeReferralCode(rawCode);
