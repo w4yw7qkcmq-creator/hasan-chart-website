@@ -104,9 +104,12 @@ const {
   recordTelegramFunnel,
   recordRssEconomicBlocked,
   recordRssEditorialEvaluated,
+  recordRssCopyBlocked,
   recordPublicationAttempt,
   recordPublicationSuccess,
 } = require("./lib/news-ingestion/cycle-funnel");
+const { recordDecision } = require("./lib/news-intelligence/autonomy/decision-record");
+const { createCorrelationId } = require("./lib/news-intelligence/autonomy/structured-log");
 const { markEligibleRssItemProcessed } = require("./lib/general-rss/pipeline");
 const { getSourceHealthEngine } = require("./lib/news-intelligence/autonomy/source-health");
 const { FAILURE_ATTRIBUTION } = require("./lib/news-intelligence/autonomy/failure-attribution");
@@ -114,6 +117,23 @@ const { FAILURE_ATTRIBUTION } = require("./lib/news-intelligence/autonomy/failur
 const parser = new Parser();
 
 let checkpointHydrationPromise = Promise.resolve({ loaded: 0, skipped: true });
+
+function recordRssCandidateDecision(latestNews, reasonCode, options = {}) {
+  recordDecision({
+    correlationId: createCorrelationId(),
+    sourceType: "rss",
+    sourceId: latestNews.sourceName || latestNews.feedUrl || "rss",
+    sourceLink: latestNews.link,
+    reasonCode,
+    importance: latestNews.impactLevel || null,
+    aiUsed: options.aiUsed === true,
+    metadata: {
+      titlePreview: String(latestNews.title || "").slice(0, 120),
+      subReason: options.subReason || reasonCode,
+      ...(options.metadata || {}),
+    },
+  });
+}
 
 function ensureCheckpointsHydrated() {
   return checkpointHydrationPromise;
@@ -3902,7 +3922,6 @@ async function fetchForexNews(options = {}) {
 
       const latestLink = latestNews.link;
       recordRssEditorialEvaluated();
-      recordPublicationAttempt();
 
       const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link, {
         dryRun,
@@ -3929,6 +3948,13 @@ async function fetchForexNews(options = {}) {
             })
           );
           recordRssEconomicBlocked();
+          recordRssCandidateDecision(latestNews, "ECONOMIC_RELEASE_INCOMPLETE", {
+            aiUsed: true,
+            metadata: {
+              missingFields: aiResult.missingFields || [],
+              economicReason: aiResult.reason || null,
+            },
+          });
           markEligibleRssItemProcessed(latestNews, "economic_incomplete", { dryRun });
           continue eligibleLoop;
         }
@@ -3941,6 +3967,12 @@ async function fetchForexNews(options = {}) {
           stats.rejectedFilter += 1;
           recordRejection(stats, "rss_economic_publish_forbidden", latestNews.title);
           recordRssEconomicBlocked();
+          recordRssCandidateDecision(latestNews, "RSS_ECONOMIC_PUBLISH_FORBIDDEN", {
+            aiUsed: true,
+            metadata: {
+              idempotencyKey: aiResult.economicAnalysis?.idempotencyKey || null,
+            },
+          });
           console.log(
             "RSS_ECONOMIC_PUBLISH_FORBIDDEN",
             JSON.stringify({
@@ -3956,6 +3988,10 @@ async function fetchForexNews(options = {}) {
 
       if (!aiResult?.message) {
         stats.aiFailed += 1;
+        recordRssCandidateDecision(latestNews, "EDITORIAL_OUTPUT_INVALID", {
+          aiUsed: true,
+          metadata: { aiReason: aiResult?.reason || "empty_message" },
+        });
         markEligibleRssItemProcessed(latestNews, "ai_failed", { dryRun });
         continue eligibleLoop;
       }
@@ -3985,6 +4021,16 @@ async function fetchForexNews(options = {}) {
         if (!rssEditorialCheck.ok) {
           stats.rejectedFilter += 1;
           recordRejection(stats, rssEditorialCheck.reason, latestNews.title);
+          if (rssEditorialCheck.reason === "RSS_COPY_SIMILARITY_TOO_HIGH") {
+            recordRssCopyBlocked();
+          }
+          recordRssCandidateDecision(latestNews, rssEditorialCheck.reason, {
+            aiUsed: true,
+            metadata: {
+              similarity: rssEditorialCheck.similarity || null,
+              coverage: rssEditorialCheck.coverage || null,
+            },
+          });
           console.log(
             "RSS_EDITORIAL_BLOCKED",
             JSON.stringify({
@@ -4012,6 +4058,10 @@ async function fetchForexNews(options = {}) {
         if (alreadyPublishedSameCluster) {
           stats.rejectedDuplicate += 1;
           recordRejection(stats, "duplicate_after_ai_cluster", latestNews.title);
+          recordRssCandidateDecision(latestNews, "DUPLICATE_BLOCKED", {
+            aiUsed: true,
+            metadata: { topicCluster: combinedTopicCluster },
+          });
           if (!dryRun) {
             console.log(
               "SITE_PUBLISH_DEDUPE_MARKER",
@@ -4103,6 +4153,7 @@ async function fetchForexNews(options = {}) {
       if (dryRun) {
         console.log("NEWS_DRY_RUN eligible publish-ready item:", latestNews.title);
       } else {
+        recordPublicationAttempt();
         if (veryImportantNews || latestNews.impactLevel === "HIGH") {
           if (finalImage) {
             const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
@@ -4154,6 +4205,7 @@ async function fetchForexNews(options = {}) {
           published_at: new Date().toISOString(),
         });
         recordPublicationSuccess();
+        recordRssCandidateDecision(latestNews, "PUBLISHED", { aiUsed: true });
       }
 
       markEligibleRssItemProcessed(latestNews, dryRun ? "dry_run_publish" : "published", { dryRun });

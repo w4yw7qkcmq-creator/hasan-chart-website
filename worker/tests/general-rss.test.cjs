@@ -271,7 +271,15 @@ function run() {
     body: "Read more at https://example.com/news with enough filler text to exceed minimum editorial length.",
     rawSourceText: "Market update headline",
   });
-  assert(rssUrlBlocked.ok === false, "RSS body with URL should be blocked");
+  assert(rssUrlBlocked.ok === false, "RSS body with external URL should be blocked");
+
+  const rssChannelFooterAllowed = validateGeneralRssEditorialOutput({
+    title: "Gold rises after Middle East tensions",
+    body:
+      "🚨 الذهب يرتفع وسط توترات\n\nشهد الذهب ارتفاعاً في التداولات مع ترقب المخاطر الجيوسياسية.\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+    rawSourceText: "Gold rises after Middle East tensions in forex and commodity markets today.",
+  });
+  assert(rssChannelFooterAllowed.ok === true, "official channel footer must not trigger RSS_SOURCE_URL_PRESENT");
 
   const rssCompetitorBlocked = validateGeneralRssEditorialOutput({
     title: "Market update",

@@ -21,6 +21,33 @@ const COMPETITOR_PATTERNS = [
 
 const PLACEHOLDER_PATTERNS = [/\bundefined\b/i, /\bnull\b/i, /\[object Object\]/i];
 
+const ALLOWED_CHANNEL_URL_PATTERNS = [/^https?:\/\/t\.me\/EconomicNewsi\/?$/i];
+const OFFICIAL_CHANNEL_FOOTER_PATTERN =
+  /\n\n📢 قناة الأخبار الرسمية:\nhttps?:\/\/t\.me\/EconomicNewsi\/?\s*$/i;
+
+function stripOfficialChannelFooter(body) {
+  return String(body || "").replace(OFFICIAL_CHANNEL_FOOTER_PATTERN, "").trim();
+}
+
+function extractUrls(value) {
+  return String(value || "").match(/https?:\/\/\S+/gi) || [];
+}
+
+function normalizeExtractedUrl(url) {
+  return String(url || "")
+    .replace(/[)\]},.!?]+$/g, "")
+    .trim();
+}
+
+function isAllowedChannelUrl(url) {
+  const normalized = normalizeExtractedUrl(url);
+  return ALLOWED_CHANNEL_URL_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function findDisallowedUrls(body) {
+  return extractUrls(body).filter((url) => !isAllowedChannelUrl(url));
+}
+
 function fail(reason, detail = {}) {
   return { ok: false, reason, ...detail };
 }
@@ -45,34 +72,37 @@ function validateGeneralRssEditorialOutput(input = {}) {
     return fail(BLOCK_REASONS.RSS_EDITORIAL_BLOCKED, { issue: "missing_title" });
   }
 
-  if (/https?:\/\//i.test(body)) {
-    return fail(BLOCK_REASONS.RSS_SOURCE_URL_PRESENT);
+  const disallowedUrls = findDisallowedUrls(body);
+  if (disallowedUrls.length) {
+    return fail(BLOCK_REASONS.RSS_SOURCE_URL_PRESENT, { url: disallowedUrls[0] });
   }
 
+  const editorialBody = stripOfficialChannelFooter(body);
+
   for (const pattern of COMPETITOR_PATTERNS) {
-    if (pattern.test(body)) {
+    if (pattern.test(editorialBody)) {
       return fail(BLOCK_REASONS.RSS_COMPETITOR_CHANNEL_PRESENT, { pattern: pattern.source });
     }
   }
 
-  if (/@\w+/.test(body)) {
+  if (/@\w+/.test(editorialBody)) {
     return fail(BLOCK_REASONS.RSS_EXTERNAL_MENTION_PRESENT);
   }
 
   for (const pattern of PLACEHOLDER_PATTERNS) {
-    if (pattern.test(body)) {
+    if (pattern.test(editorialBody)) {
       return fail(BLOCK_REASONS.RSS_PLACEHOLDER_PRESENT);
     }
   }
 
   if (rawSourceText) {
-    const normalizedBody = body.replace(/\s+/g, " ").trim();
+    const normalizedBody = editorialBody.replace(/\s+/g, " ").trim();
     const normalizedRaw = rawSourceText.replace(/\s+/g, " ").trim();
     if (normalizedBody === normalizedRaw || normalizedBody === normalizedRaw.slice(0, normalizedBody.length)) {
       return fail(BLOCK_REASONS.RSS_RAW_SOURCE_FALLBACK);
     }
 
-    const copyCheck = evaluateCopySimilarity(body, rawSourceText, input.copyGuard);
+    const copyCheck = evaluateCopySimilarity(editorialBody, rawSourceText, input.copyGuard);
     if (!copyCheck.ok) {
       return fail(BLOCK_REASONS.RSS_COPY_SIMILARITY_TOO_HIGH, {
         similarity: copyCheck.similarity,
@@ -86,6 +116,8 @@ function validateGeneralRssEditorialOutput(input = {}) {
 
 module.exports = {
   BLOCK_REASONS,
+  ALLOWED_CHANNEL_URL_PATTERNS,
   buildRawSourceText,
+  findDisallowedUrls,
   validateGeneralRssEditorialOutput,
 };
