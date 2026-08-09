@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "../../../../lib/admin-fetch";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { PermissionGate } from "../../../components/PermissionGate";
 import NewsSystemStatusPanel from "./NewsSystemStatusPanel";
+import NewsSystemStatusPanelBoundary from "./NewsSystemStatusPanelBoundary";
 
 const EMPTY_FORM = {
   title: "",
@@ -79,7 +81,9 @@ export default function AdminNewsPanel() {
       ) : null}
 
       <PermissionGate permission={IAM_PERMISSIONS.NEWS_READ}>
-        <NewsSystemStatusPanel />
+        <NewsSystemStatusPanelBoundary>
+          <NewsSystemStatusPanel />
+        </NewsSystemStatusPanelBoundary>
         <section className="admin-news-page__card" aria-labelledby="news-form-title">
           <h2 id="news-form-title" className="admin-news-page__card-title">
             نشر خبر اقتصادي

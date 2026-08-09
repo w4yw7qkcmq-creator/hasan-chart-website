@@ -47,12 +47,12 @@ export default function NewsSystemStatusPanel() {
       const statusJson = await statusRes.json().catch(() => ({}));
       const summaryJson = await summaryRes.json().catch(() => ({}));
       if (!statusRes.ok || !statusJson?.success) {
-        throw new Error(statusJson?.error || "تعذر تحميل حالة النظام");
+        throw new Error(statusJson?.error || "بيانات المراقبة غير متاحة مؤقتًا");
       }
       setStatus(statusJson.status || statusJson);
       setSummary(summaryJson.summary || null);
     } catch (loadError) {
-      setError(loadError?.message || "تعذر تحميل حالة النظام");
+      setError(loadError?.message || "بيانات المراقبة غير متاحة مؤقتًا");
     } finally {
       setLoading(false);
     }
