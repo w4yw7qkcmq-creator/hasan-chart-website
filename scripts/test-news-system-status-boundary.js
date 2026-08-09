@@ -10,12 +10,18 @@ import { permissionForRoute } from "../lib/iam/route-permissions.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 
-const ROUTE_FILE = path.join(repoRoot, "app/api/admin/news/system-status/route.js");
+const ROUTE_FILES = [path.join(repoRoot, "app/api/admin/news/system-status/route.js")];
+const WEBSITE_ENTRY_FILES = [
+  ...ROUTE_FILES,
+  path.join(repoRoot, "lib/news-intelligence/manual-publish.js"),
+];
 
 const FORBIDDEN_IMPORT_MARKERS = [
   "worker/lib/news-intelligence/autonomy/diagnostic-service",
-  "worker/lib/news-intelligence/economic-editorial",
+  "worker/lib/news-intelligence/economic-editorial/integration",
+  "worker/lib/news-intelligence/economic-editorial/index",
   "worker/lib/news-intelligence/autonomy/feature-flags",
+  "worker/lib/news-intelligence/index",
   "worker/lib/news-images",
   "worker/news-worker.js",
   "branded-fallback",
@@ -98,48 +104,58 @@ function traceLocalDependencyTree(entryFile, maxDepth = 12) {
   return { visited: [...visited], edges };
 }
 
-const routeSource = fs.readFileSync(ROUTE_FILE, "utf8");
-
-for (const marker of FORBIDDEN_IMPORT_MARKERS) {
-  assert.equal(
-    routeSource.includes(marker),
-    false,
-    `route must not reference forbidden marker: ${marker}`
+function isForbiddenWebsiteDependency(rel) {
+  const normalized = rel.toLowerCase();
+  return (
+    normalized.includes("worker/lib/news-images") ||
+    normalized.includes("branded-fallback") ||
+    normalized.includes("worker/lib/news-intelligence/economic-editorial/integration.js") ||
+    normalized.includes("worker/lib/news-intelligence/economic-editorial/index.js") ||
+    normalized.includes("worker/lib/news-intelligence/autonomy/diagnostic-service") ||
+    normalized.includes("worker/lib/news-intelligence/index.js") ||
+    normalized.includes("worker/news-worker.js")
   );
 }
 
-for (const marker of ALLOWED_IMPORT_MARKERS) {
-  assert.ok(routeSource.includes(marker), `route should use allowed boundary module: ${marker}`);
-}
+for (const routeFile of WEBSITE_ENTRY_FILES) {
+  const routeSource = fs.readFileSync(routeFile, "utf8");
 
-assert.equal(
-  permissionForRoute("GET", "/api/admin/news/system-status"),
-  IAM_PERMISSIONS.NEWS_READ,
-  "route must be protected by NEWS_READ"
-);
-
-const tree = traceLocalDependencyTree(ROUTE_FILE);
-const forbiddenHits = [];
-
-for (const filePath of tree.visited) {
-  const rel = path.relative(repoRoot, filePath).replace(/\\/g, "/");
-  const normalized = rel.toLowerCase();
-  if (
-    normalized.includes("worker/lib/news-images") ||
-    normalized.includes("worker/lib/news-intelligence/economic-editorial") ||
-    normalized.includes("worker/lib/news-intelligence/autonomy/diagnostic-service") ||
-    normalized.includes("worker/news-worker.js") ||
-    normalized.includes("branded-fallback")
-  ) {
-    forbiddenHits.push(rel);
+  for (const marker of FORBIDDEN_IMPORT_MARKERS) {
+    assert.equal(
+      routeSource.includes(marker),
+      false,
+      `${path.relative(repoRoot, routeFile)} must not reference forbidden marker: ${marker}`
+    );
   }
-}
 
-assert.deepEqual(
-  forbiddenHits,
-  [],
-  `admin status route dependency tree must stay off worker runtime modules: ${JSON.stringify(forbiddenHits)}`
-);
+  if (routeFile.endsWith("system-status/route.js")) {
+    for (const marker of ALLOWED_IMPORT_MARKERS) {
+      assert.ok(routeSource.includes(marker), `${path.relative(repoRoot, routeFile)} should use ${marker}`);
+    }
+  }
+
+  const tree = traceLocalDependencyTree(routeFile);
+  const forbiddenHits = [];
+
+  for (const filePath of tree.visited) {
+    const rel = path.relative(repoRoot, filePath).replace(/\\/g, "/");
+    if (routeFile.endsWith("system-status/route.js")) {
+      if (rel.startsWith("worker/")) {
+        forbiddenHits.push(rel);
+      }
+      continue;
+    }
+    if (isForbiddenWebsiteDependency(rel)) {
+      forbiddenHits.push(rel);
+    }
+  }
+
+  assert.deepEqual(
+    forbiddenHits,
+    [],
+    `${path.relative(repoRoot, routeFile)} dependency tree must stay off worker runtime modules: ${JSON.stringify(forbiddenHits)}`
+  );
+}
 
 const websiteLibFiles = walkFiles(path.join(repoRoot, "lib/news-system-status"));
 for (const filePath of websiteLibFiles) {
@@ -150,11 +166,15 @@ for (const filePath of websiteLibFiles) {
   assert.ok(!source.includes("news-images"), `${rel} must not import news-images`);
 }
 
+assert.equal(
+  permissionForRoute("GET", "/api/admin/news/system-status"),
+  IAM_PERMISSIONS.NEWS_READ,
+  "route must be protected by NEWS_READ"
+);
+
 console.log(
   "test-news-system-status-boundary.js: PASS",
   JSON.stringify({
-    routeFile: path.relative(repoRoot, ROUTE_FILE),
-    tracedLocalFiles: tree.visited.length,
-    forbiddenHits: forbiddenHits.length,
+    websiteEntryFiles: WEBSITE_ENTRY_FILES.map((filePath) => path.relative(repoRoot, filePath)),
   })
 );

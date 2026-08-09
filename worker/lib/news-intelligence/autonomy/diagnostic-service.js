@@ -1,5 +1,5 @@
 const { getPhase3RuntimeConfig } = require("./feature-flags");
-const { getPhase2RuntimeConfig } = require("../economic-editorial/integration");
+const { getPhase2RuntimeConfig } = require("../economic-editorial/runtime-config");
 const { getHeartbeat } = require("./heartbeat");
 const { getMetricsAggregator } = require("./metrics-aggregator");
 const { getSourceHealthEngine } = require("./source-health");

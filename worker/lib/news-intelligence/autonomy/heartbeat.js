@@ -1,4 +1,4 @@
-const { getPhase2RuntimeConfig } = require("../economic-editorial/integration");
+const { getPhase2RuntimeConfig } = require("../economic-editorial/runtime-config");
 const { getPhase3RuntimeConfig } = require("./feature-flags");
 
 let heartbeat = {
