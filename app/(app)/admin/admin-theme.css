@@ -6236,3 +6236,100 @@ html[data-theme="dark"] .admin-standalone-page--calm .admin-news-page__field tex
   font-weight: 800;
 }
 
+.admin-news-system {
+  margin-bottom: 1rem;
+}
+
+.admin-news-system__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-news-system__refresh {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.admin-news-system__subtitle {
+  margin: 1.25rem 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--admin-text, #0f172a);
+}
+
+.admin-news-system__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-news-system__stat {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.admin-news-system__label {
+  font-size: 0.78rem;
+  color: var(--admin-muted, #64748b);
+}
+
+.admin-news-system__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.admin-news-system__badge--ok {
+  background: rgba(52, 211, 153, 0.15);
+  color: #047857;
+}
+
+.admin-news-system__badge--warn {
+  background: rgba(251, 191, 36, 0.18);
+  color: #b45309;
+}
+
+.admin-news-system__badge--critical {
+  background: rgba(248, 113, 113, 0.18);
+  color: #b91c1c;
+}
+
+.admin-news-system__table-wrap {
+  overflow-x: auto;
+}
+
+.admin-news-system__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.admin-news-system__table th,
+.admin-news-system__table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  text-align: start;
+}
+
+html.dark .admin-news-system__stat,
+html[data-theme="dark"] .admin-news-system__stat {
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+html.dark .admin-news-system__subtitle,
+html[data-theme="dark"] .admin-news-system__subtitle {
+  color: #f8fafc;
+}
+

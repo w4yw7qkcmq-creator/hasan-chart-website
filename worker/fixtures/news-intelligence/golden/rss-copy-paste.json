@@ -1,0 +1,19 @@
+{
+  "name": "rss-copy-paste",
+  "publication": {
+    "eventType": null,
+    "publicationType": "GENERAL_NEWS",
+    "sourceType": "rss",
+    "sourceId": "forexnews",
+    "title": "Market update",
+    "body": "This is a long enough RSS article body copied directly from source without meaningful rewrite and includes enough words to pass minimum checks for general news publication path testing.",
+    "bodySource": "rss_rewrite",
+    "destination": "both",
+    "importance": "MEDIUM",
+    "rawSourceText": "This is a long enough RSS article body copied directly from source without meaningful rewrite and includes enough words to pass minimum checks for general news publication path testing."
+  },
+  "expected": {
+    "decision": "BLOCKED",
+    "publications": 0
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "unapproved-telegram-source",
+  "publication": {
+    "eventType": "US_INITIAL_JOBLESS_CLAIMS",
+    "publicationType": "RELEASE",
+    "sourceType": "telegram_economic",
+    "sourceId": "RandomPromoChannel",
+    "country": "US",
+    "releaseDate": "2026-08-06T12:30:00.000Z",
+    "title": "Initial Jobless Claims",
+    "body": "🚨 Initial Jobless Claims\nActual: 199K\nForecast: 203K\nPrevious: 197K",
+    "bodySource": "formatted",
+    "destination": "both",
+    "importance": "HIGH",
+    "facts": { "actual": "199K", "forecast": "203K", "previous": "197K" }
+  },
+  "expected": {
+    "decision": "BLOCKED",
+    "reasonCode": "SOURCE_NOT_ALLOWED",
+    "publications": 0
+  }
+}

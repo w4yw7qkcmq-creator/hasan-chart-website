@@ -80,6 +80,16 @@ const {
 const { detectNumericEconomicReleaseCandidate } = require("./lib/news-intelligence/economic-event-detector");
 const { buildStructuredEconomicPublicationRequest } = require("./lib/news-intelligence/adapters");
 const { maybeApplyPhase2Editorial, getPhase2RuntimeConfig } = require("./lib/news-intelligence/economic-editorial/integration");
+const {
+  observeCycleStart,
+  observeCycleEnd,
+  observeTelegramPoll,
+  observeRssPoll,
+  flushObservability,
+} = require("./lib/news-intelligence/autonomy/integration");
+const { getPhase3RuntimeConfig } = require("./lib/news-intelligence/autonomy/feature-flags");
+const { getNewsSystemStatus } = require("./lib/news-intelligence/autonomy/diagnostic-service");
+const { loadSourceHealthStates } = require("./lib/news-intelligence/autonomy/source-health-persistence");
 const { buildIdempotencyKey } = require("./lib/economic-releases/canonical-events");
 
 const parser = new Parser();
@@ -3598,6 +3608,7 @@ async function fetchForexNews(options = {}) {
 
   isFetchingNews = true;
   recordCycleStart();
+  observeCycleStart();
   try {
     console.log("🚀 Fetching forex news...", JSON.stringify({ dryRun }));
     if (!skipScheduledAlerts) {
@@ -3669,6 +3680,7 @@ async function fetchForexNews(options = {}) {
       logTelegramPublishCandidatesPreview(telegramDiscovery.processed, {
         publishBlockedByKillSwitch: !TELEGRAM_NEWS_PUBLISH_ENABLED,
       });
+      observeTelegramPoll();
 
       if (dryRun) {
         allItems.push(...telegramDiscovery.items.filter((item) => !item.skipPublish));
@@ -3707,6 +3719,9 @@ async function fetchForexNews(options = {}) {
     if (NEWS_FEEDS.length) {
       rssFetchResult = await fetchGeneralRssFeeds({ feeds: NEWS_FEEDS });
       for (const feedReport of rssFetchResult.feedReports) {
+        observeRssPoll(feedReport.ok !== false, feedReport.name, {
+          zeroArticles: feedReport.ok !== false && Number(feedReport.accepted || 0) === 0,
+        });
         if (!feedReport.ok) {
           stats.sourceErrors[feedReport.feedUrl] = feedReport.error || `HTTP ${feedReport.httpStatus}`;
           console.error(`⚠️ Feed failed: ${feedReport.name}`, stats.sourceErrors[feedReport.feedUrl]);
@@ -4094,6 +4109,8 @@ async function fetchForexNews(options = {}) {
     return stats;
   } finally {
     isFetchingNews = false;
+    observeCycleEnd(stats.cycleDurationMs || Date.now() - cycleStartedAt, stats);
+    flushObservability(getSupabaseClient).catch(() => {});
     const completedAt = new Date().toISOString();
     const cycleStatus =
       stats.lastErrorSafe && stats.cycleDurationMs > 0
@@ -4246,6 +4263,7 @@ function getNewsWorkerHealthSnapshot() {
     build: process.env.RAILWAY_GIT_COMMIT_SHA
       ? { commit: process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7) }
       : undefined,
+    phase3: getNewsSystemStatus(),
     timestamp: new Date().toISOString(),
   };
 }
@@ -4316,6 +4334,7 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
         pollingIntervalMs: getPollIntervalMs(),
         dryRun: NEWS_DRY_RUN,
         phase2: getPhase2RuntimeConfig(),
+        phase3: getPhase3RuntimeConfig(),
       })
     );
   } catch (error) {
@@ -4332,6 +4351,11 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
   }
 
   logWorkerEnvStatus();
+  loadSourceHealthStates(getSupabaseClient).then((result) => {
+    if (result?.loaded) {
+      console.log("NEWS_PHASE3_SOURCE_HEALTH_HYDRATED", JSON.stringify({ loaded: result.loaded }));
+    }
+  });
   startHealthServer();
   maybeCleanupOldTelemetry(getSupabaseClient).then((result) => {
     if (result?.cleaned) {

@@ -1,0 +1,24 @@
+{
+  "fixtures": [
+    "jobless-claims-structured-correct",
+    "jobless-claims-family-mixed",
+    "unapproved-telegram-source",
+    "rss-copy-paste",
+    "nfp-strong",
+    "nfp-weak",
+    "unemployment-rate",
+    "cpi-higher-than-forecast",
+    "cpi-lower-than-forecast",
+    "fomc-rate-decision",
+    "gdp-release",
+    "retail-sales",
+    "pmi-around-50",
+    "rss-professional-rewrite",
+    "competitor-promo-leakage",
+    "malformed-telegram-numeric",
+    "duplicate-storm",
+    "required-image-failure",
+    "delivery-partial-failure",
+    "unknown-economic-alias"
+  ]
+}

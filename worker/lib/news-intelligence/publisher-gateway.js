@@ -11,6 +11,13 @@ const {
 const { allowMemoryIdempotencyFallback, isProductionRuntime } = require("./runtime-mode");
 const { evaluateCopySimilarity } = require("./copy-similarity-guard");
 const { extractFactsFromTelegramPost } = require("../telegram-news/extractor");
+const phase3 = (() => {
+  try {
+    return require("./autonomy/integration");
+  } catch {
+    return null;
+  }
+})();
 
 const BLOCK_REASONS = {
   ...EDITORIAL_BLOCK_REASONS,
@@ -232,9 +239,35 @@ function createNewsPublisherGateway(options = {}) {
   }
 
   async function publish(publication, deps = {}) {
-    const evaluation = await evaluatePublication(publication, deps);
+    const ingestStartedAt = Date.now();
+    const correlationId = phase3?.observeCandidateReceived(publication, deps) || publication.correlationId;
+    const publicationWithCorrelation = correlationId
+      ? { ...publication, correlationId }
+      : publication;
+
+    const evaluation = await evaluatePublication(publicationWithCorrelation, deps);
     if (evaluation.blocked) {
+      phase3?.observeEvaluationBlocked(publicationWithCorrelation, evaluation, {
+        ...deps,
+        correlationId,
+        latency: { totalMs: Date.now() - ingestStartedAt },
+      });
       return evaluation;
+    }
+
+    const quarantine = phase3?.checkSourceQuarantine(publicationWithCorrelation, deps);
+    if (quarantine && !quarantine.allowed) {
+      const blocked = {
+        blocked: true,
+        reason: quarantine.reason,
+        stage: "source_quarantine",
+      };
+      phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+        ...deps,
+        correlationId,
+        latency: { totalMs: Date.now() - ingestStartedAt },
+      });
+      return blocked;
     }
 
     const { editorial, canonical, numericEconomic, publicationType } = evaluation;
@@ -257,13 +290,19 @@ function createNewsPublisherGateway(options = {}) {
             eventKey: canonical.eventKey,
             detail: identity.detail,
           });
-          return {
+          const blocked = {
             blocked: true,
             reason: identity.reason,
             stage: "idempotency",
             eventKey: canonical.eventKey,
             detail: identity.detail,
           };
+          phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+            ...deps,
+            correlationId,
+            latency: { totalMs: Date.now() - ingestStartedAt },
+          });
+          return blocked;
         }
 
         logNewsEvent(NEWS_EVENTS.DUPLICATE_BLOCKED, {
@@ -272,13 +311,19 @@ function createNewsPublisherGateway(options = {}) {
           publicationType,
           destination,
         });
-        return {
+        const duplicateBlocked = {
           blocked: true,
           reason: identity.reason || BLOCK_REASONS.DUPLICATE_BLOCKED,
           stage: "idempotency",
           eventKey: canonical.eventKey,
           publicationRecord: identity.record || null,
         };
+        phase3?.observeEvaluationBlocked(publicationWithCorrelation, duplicateBlocked, {
+          ...deps,
+          correlationId,
+          latency: { totalMs: Date.now() - ingestStartedAt },
+        });
+        return duplicateBlocked;
       }
 
       publicationRecord = identity.record;
@@ -300,7 +345,7 @@ function createNewsPublisherGateway(options = {}) {
     });
 
     if (deps.dryRun) {
-      return {
+      const dryRunResult = {
         dryRun: true,
         published: true,
         eventKey: canonical.eventKey,
@@ -308,16 +353,28 @@ function createNewsPublisherGateway(options = {}) {
         message: editorial.body,
         publicationRecord,
       };
+      phase3?.observePublicationResult(publicationWithCorrelation, dryRunResult, {
+        ...deps,
+        correlationId,
+        latency: { totalMs: Date.now() - ingestStartedAt },
+      });
+      return dryRunResult;
     }
 
     try {
       if (!publicationRecord && numericEconomic && publicationType === PUBLICATION_TYPES.RELEASE) {
-        return {
+        const blocked = {
           blocked: true,
           reason: BLOCK_REASONS.IDEMPOTENCY_STORE_UNAVAILABLE,
           stage: "idempotency",
           eventKey: canonical.eventKey,
         };
+        phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+          ...deps,
+          correlationId,
+          latency: { totalMs: Date.now() - ingestStartedAt },
+        });
+        return blocked;
       }
 
       if (!publicationRecord) {
@@ -352,7 +409,7 @@ function createNewsPublisherGateway(options = {}) {
         siteInserted: delivery.siteInserted,
       });
 
-      return {
+      const successResult = {
         published: delivery.telegramSent && delivery.siteInserted,
         partial: delivery.telegramSent && !delivery.siteInserted,
         eventKey: canonical.eventKey,
@@ -362,12 +419,19 @@ function createNewsPublisherGateway(options = {}) {
         publicationRecord,
         editorial,
       };
+      phase3?.observePublicationResult(publicationWithCorrelation, successResult, {
+        ...deps,
+        correlationId,
+        gateway: { retryDelivery },
+        latency: { totalMs: Date.now() - ingestStartedAt },
+      });
+      return successResult;
     } catch (error) {
       logNewsEvent(NEWS_EVENTS.PUBLICATION_FAILED, {
         eventKey: canonical.eventKey,
         reason: error.message,
       });
-      return {
+      const failedResult = {
         failed: true,
         reason: error.message,
         eventKey: canonical.eventKey,
@@ -377,6 +441,13 @@ function createNewsPublisherGateway(options = {}) {
         telegramSent: publicationRecord?.telegramLegStatus === LEG_STATUS.SUCCESS,
         siteInserted: publicationRecord?.siteLegStatus === LEG_STATUS.SUCCESS,
       };
+      phase3?.observePublicationResult(publicationWithCorrelation, failedResult, {
+        ...deps,
+        correlationId,
+        gateway: { retryDelivery },
+        latency: { totalMs: Date.now() - ingestStartedAt },
+      });
+      return failedResult;
     }
   }
 

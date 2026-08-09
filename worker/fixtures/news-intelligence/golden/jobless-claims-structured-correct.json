@@ -1,0 +1,26 @@
+{
+  "name": "jobless-claims-structured-correct",
+  "publication": {
+    "eventType": "US_INITIAL_JOBLESS_CLAIMS",
+    "eventFamily": "US_WEEKLY_LABOR_CLAIMS",
+    "publicationType": "RELEASE",
+    "sourceType": "telegram_economic",
+    "sourceId": "ForexBreakingNews",
+    "country": "US",
+    "releaseDate": "2026-08-06T12:30:00.000Z",
+    "receivedAt": "2026-08-06T12:30:01.000Z",
+    "title": "Initial Jobless Claims",
+    "body": "placeholder",
+    "bodySource": "formatted",
+    "destination": "both",
+    "importance": "HIGH",
+    "facts": { "actual": "199K", "forecast": "203K", "previous": "197K" },
+    "metadata": { "rawMessageId": "jc-001" }
+  },
+  "expected": {
+    "decision": "PUBLISHED",
+    "reasonCode": "PUBLISHED",
+    "publications": 1,
+    "eventFamily": "US_WEEKLY_LABOR_CLAIMS"
+  }
+}
