@@ -581,3 +581,35 @@ html[data-theme="light"] .partner-alert-warn {
 .partner-scroll-panel--table {
   max-height: 480px;
 }
+
+.partner-growth-tabs .partner-tab {
+  border: 1px solid rgba(56, 168, 242, 0.25);
+  background: var(--ud-panel-bg);
+  color: var(--ud-text);
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.875rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.partner-growth-tabs .partner-tab--active {
+  border-color: rgba(56, 168, 242, 0.55);
+  background: rgba(56, 168, 242, 0.12);
+}
+
+html[data-theme="light"] .partner-growth-tabs .partner-tab--active {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.partner-table th,
+.partner-table td {
+  padding: 0.65rem 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.partner-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}

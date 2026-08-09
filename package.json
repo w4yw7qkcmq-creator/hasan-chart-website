@@ -97,8 +97,10 @@
     "ws": "^8.20.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/react": "19.2.14",
     "autoprefixer": "^10.4.12",
+    "pg": "^8.23.0",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.52.0",
     "pngjs": "^7.0.0",

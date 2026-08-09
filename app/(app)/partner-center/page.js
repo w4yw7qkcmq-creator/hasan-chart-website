@@ -19,6 +19,14 @@ import {
   withdrawalStatusLabel,
 } from "../../../lib/partner-shared";
 
+const PartnerCenterGrowthSection = dynamic(
+  () =>
+    import("../../components/partner/growth/PartnerCenterGrowthSection").then(
+      (mod) => mod.default
+    ),
+  { ssr: false, loading: () => <PartnerMetricSkeletonGrid count={4} /> }
+);
+
 const PublicServiceLanding = dynamic(
   () =>
     import("../../components/public-seo/PublicServiceLanding").then(
@@ -333,6 +341,16 @@ export default function PartnerCenterPage() {
         </div>
       ) : partner ? (
         <>
+          <PartnerCenterGrowthSection
+            onCopyFeedback={(message, type = "success") =>
+              showAppModal({
+                type,
+                title: type === "error" ? "خطأ" : "تم",
+                message,
+              })
+            }
+          />
+
           <PartnerAnalyticsDashboard />
 
           <PartnerRewardsPanel initialRewards={data?.rewards} />

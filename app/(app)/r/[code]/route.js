@@ -6,6 +6,7 @@ import {
   readReferralCookies,
 } from "../../../../lib/partner-referral-capture";
 import { sanitizeReferralCode } from "../../../../lib/partner-shared";
+import { resolveSmartLink, sanitizeLandingPath } from "../../../../lib/partner-center/smart-link-service.js";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,36 @@ function attachSecurityHeaders(response) {
   return response;
 }
 
+function readAttributionFromRequest(request) {
+  const url = new URL(request.url);
+  return {
+    link: url.searchParams.get("link") || url.searchParams.get("sl"),
+    campaign: url.searchParams.get("campaign") || url.searchParams.get("utm_campaign"),
+    source: url.searchParams.get("source") || url.searchParams.get("utm_source"),
+    medium: url.searchParams.get("medium") || url.searchParams.get("utm_medium"),
+    landingPath: url.searchParams.get("landing") || "/",
+  };
+}
+
 export async function GET(request, { params }) {
   const code = sanitizeReferralCode(params?.code);
-  const redirectUrl = new URL("/", request.url);
+  const attribution = readAttributionFromRequest(request);
+  let redirectPath = "/";
+
+  if (attribution.link) {
+    try {
+      const supabase = getSupabaseAdmin();
+      const resolved = await resolveSmartLink(supabase, attribution.link);
+      if (resolved.ok && resolved.referralCode === code) {
+        redirectPath = resolved.destinationPath || "/";
+      }
+    } catch {
+      /* safe fallback to home */
+    }
+  }
+
+  const safePath = sanitizeLandingPath(redirectPath) || "/";
+  const redirectUrl = new URL(safePath, request.url);
   const response = attachSecurityHeaders(NextResponse.redirect(redirectUrl, 302));
 
   if (!code) {
@@ -32,6 +60,7 @@ export async function GET(request, { params }) {
       code,
       existingReferralCode,
       visitorId,
+      attribution,
     });
 
     applyReferralCaptureCookies(response, captureResult);
