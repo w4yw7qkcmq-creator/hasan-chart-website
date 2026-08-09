@@ -7,8 +7,13 @@ import { createPartnerTestDb, query } from "./test-db.mjs";
 
 const EXECUTE = process.argv.includes("--execute");
 
+if (EXECUTE) {
+  console.error("ABORT: --execute is not supported by dry-run script. Use backfill-commissions-execute.mjs");
+  process.exit(2);
+}
+
 export function classifyLegacyCommission(commission, existingLedger) {
-  const idempotencyKey = `legacy_commission:${commission.id}`;
+  const idempotencyKey = buildBackfillIdempotencyKey(commission.id);
 
   if (existingLedger) {
     const ledgerAmount = Number(existingLedger.amount || 0);
@@ -41,7 +46,8 @@ export function classifyLegacyCommission(commission, existingLedger) {
     status: "READY_TO_BACKFILL",
     idempotencyKey,
     suggestedLedgerStatus: mapLegacyStatusToLedger(commission.status),
-    suggestedBucket: commission.source_type === "signup_bonus" ? "bonus_pending" : "pending",
+    suggestedBucket: mapLegacyBucket(commission),
+    suggestedRow: buildBackfillLedgerRow(commission),
   };
 }
 
@@ -57,6 +63,43 @@ export function mapLegacyStatusToLedger(status) {
     default:
       return "pending";
   }
+}
+
+export function mapLegacyBucket(commission) {
+  if (commission.source_type === "signup_bonus") {
+    return "bonus_pending";
+  }
+  const status = String(commission.status || "").toLowerCase();
+  if (status === "withdrawable" || status === "approved") {
+    return "withdrawable";
+  }
+  if (status === "paid") {
+    return "paid_out";
+  }
+  return "pending";
+}
+
+export function buildBackfillIdempotencyKey(commissionId) {
+  return `legacy_commission:${commissionId}`;
+}
+
+export function buildBackfillLedgerRow(commission) {
+  return {
+    idempotencyKey: buildBackfillIdempotencyKey(commission.id),
+    balanceBucket: mapLegacyBucket(commission),
+    lifecycleStatus: mapLegacyStatusToLedger(commission.status),
+    entryType: "commission",
+    entryDirection: "credit",
+    metadata: {
+      source: "legacy_backfill",
+      legacy_commission_id: commission.id,
+      original_source_type: commission.source_type || null,
+      original_service_type: commission.service_type || null,
+      original_status: commission.status || null,
+      original_created_at: commission.created_at || null,
+      backfill_version: "20260811",
+    },
+  };
 }
 
 export async function dryRunBackfillCommissions(db) {
