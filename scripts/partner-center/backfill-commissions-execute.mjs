@@ -99,19 +99,40 @@ export async function executeBackfillCommissions(service, { approvedIds }) {
     .filter((item) => item.status === "READY_TO_BACKFILL")
     .map((item) => String(item.commissionId))
     .sort();
+  const mappedIds = dryRun.items
+    .filter((item) => item.status === "ALREADY_MAPPED")
+    .map((item) => String(item.commissionId))
+    .sort();
 
-  if (readyIds.length !== approvedIds.length) {
-    throw new Error(
-      `READY count ${readyIds.length} != approved count ${approvedIds.length}`
-    );
-  }
-
-  for (let i = 0; i < approvedIds.length; i += 1) {
-    if (readyIds[i] !== approvedIds[i]) {
-      throw new Error(
-        `Approved ID mismatch at index ${i}: expected ${approvedIds[i]}, got ${readyIds[i]}`
-      );
+  if (readyIds.length === approvedIds.length) {
+    for (let i = 0; i < approvedIds.length; i += 1) {
+      if (readyIds[i] !== approvedIds[i]) {
+        throw new Error(
+          `Approved ID mismatch at index ${i}: expected ${approvedIds[i]}, got ${readyIds[i]}`
+        );
+      }
     }
+  } else if (mappedIds.length === approvedIds.length) {
+    for (let i = 0; i < approvedIds.length; i += 1) {
+      if (mappedIds[i] !== approvedIds[i]) {
+        throw new Error(
+          `Mapped ID mismatch at index ${i}: expected ${approvedIds[i]}, got ${mappedIds[i]}`
+        );
+      }
+    }
+    return {
+      mode: "execute",
+      approvedCount: approvedIds.length,
+      processed: 0,
+      inserted: 0,
+      duplicates: approvedIds.length,
+      failures: [],
+      idempotentRerun: true,
+    };
+  } else {
+    throw new Error(
+      `READY count ${readyIds.length} != approved count ${approvedIds.length} (mapped=${mappedIds.length})`
+    );
   }
 
   const { data: commissions, error } = await service

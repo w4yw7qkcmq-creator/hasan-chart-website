@@ -7,7 +7,7 @@ import { createPartnerTestDb, query } from "./test-db.mjs";
 
 const EXECUTE = process.argv.includes("--execute");
 
-if (EXECUTE) {
+if (EXECUTE && import.meta.url === `file://${process.argv[1]}`) {
   console.error("ABORT: --execute is not supported by dry-run script. Use backfill-commissions-execute.mjs");
   process.exit(2);
 }
