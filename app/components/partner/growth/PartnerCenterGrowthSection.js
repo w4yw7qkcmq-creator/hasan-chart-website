@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { formatPartnerMoney } from "../../../../lib/partner-shared";
 import { PartnerMetricSkeletonGrid } from "../PartnerLoadingSkeleton";
+import { PartnerFieldSelect } from "./PartnerFieldSelect";
+import {
+  SMART_LINK_SOURCE_OPTIONS,
+  buildEligibleCampaignOptions,
+} from "./smart-link-form-options";
+import { isSmartLinkCampaignError } from "../../../../lib/partner-center/smart-link-errors.js";
 
 const PartnerQrCode = dynamic(
   () => import("../PartnerQrCode").then((m) => m.PartnerQrCode),
@@ -65,7 +71,10 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
   const growthEnabled =
     typeof growthEnabledProp === "boolean" ? growthEnabledProp : growthEnabledState;
   const [creatingLink, setCreatingLink] = useState(false);
-  const [linkForm, setLinkForm] = useState({ source: "telegram", campaignCode: "", label: "" });
+  const createInFlightRef = useRef(false);
+  const [linkForm, setLinkForm] = useState({ source: "telegram", campaignCode: "" });
+  const [linkFormError, setLinkFormError] = useState("");
+  const [campaignFieldError, setCampaignFieldError] = useState("");
 
   useEffect(() => {
     if (typeof growthEnabledProp === "boolean") return;
@@ -119,27 +128,80 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
     }
   };
 
+  const eligibleCampaignOptions = useMemo(
+    () => buildEligibleCampaignOptions(growth?.campaigns),
+    [growth?.campaigns]
+  );
+
   const createLink = async () => {
+    if (creatingLink || createInFlightRef.current) return;
+    if (!linkForm.source) {
+      setLinkFormError("يرجى اختيار المصدر.");
+      return;
+    }
+
+    createInFlightRef.current = true;
     setCreatingLink(true);
+    setLinkFormError("");
+    setCampaignFieldError("");
+
     try {
+      const payload = {
+        destinationPath: "/register",
+        source: linkForm.source,
+        campaignCode: linkForm.campaignCode || undefined,
+      };
+
       const res = await fetch("/api/partner/growth/smart-links", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destinationPath: "/register",
-          source: linkForm.source,
-          label: linkForm.label,
-          campaignCode: linkForm.campaignCode || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.success) throw new Error(json?.error || "تعذر إنشاء الرابط");
-      onCopyFeedback?.("تم إنشاء الرابط");
-      await load();
-    } catch (e) {
-      onCopyFeedback?.(e.message || "تعذر إنشاء الرابط", "error");
+
+      if (!res.ok || !json?.success) {
+        const errorKey = json?.errorKey || json?.code || "";
+        const message = json?.error || "تعذر إنشاء الرابط الآن. حاول مرة أخرى.";
+        if (isSmartLinkCampaignError(errorKey)) {
+          setCampaignFieldError(message);
+        } else {
+          setLinkFormError(message);
+        }
+        return;
+      }
+
+      onCopyFeedback?.("تم إنشاء الرابط بنجاح");
+      setLinkForm((current) => ({ ...current, campaignCode: "" }));
+
+      if (json.url) {
+        setGrowth((current) => {
+          if (!current) return current;
+          const created = {
+            id: json.smartLink?.id || `temp-${Date.now()}`,
+            label: SMART_LINK_SOURCE_OPTIONS.find((s) => s.value === linkForm.source)?.label || linkForm.source,
+            url: json.url,
+            source: linkForm.source,
+            medium: json.smartLink?.medium || null,
+            campaignCode: linkForm.campaignCode || null,
+            clicks: 0,
+            signups: 0,
+            qualifiedReferrals: 0,
+            customers: 0,
+            conversionRate: 0,
+          };
+          return {
+            ...current,
+            smartLinks: [created, ...(current.smartLinks || [])],
+          };
+        });
+      }
+
+      void load();
+    } catch {
+      setLinkFormError("تعذر إنشاء الرابط الآن. حاول مرة أخرى.");
     } finally {
+      createInFlightRef.current = false;
       setCreatingLink(false);
     }
   };
@@ -157,7 +219,7 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
       <Panel title="مركز النمو">
         <div className="user-dashboard-empty">
           <p>{error}</p>
-          <button type="button" className="partner-btn partner-btn--primary mt-4" onClick={() => load()}>
+          <button type="button" className="partner-btn-primary mt-4" onClick={() => load()}>
             إعادة المحاولة
           </button>
         </div>
@@ -266,39 +328,61 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
 
       {tab === "links" ? (
         <Panel title="الروابط التسويقية" subtitle="أنشئ روابط آمنة مع تتبع المصدر">
-          <div className="partner-surface partner-surface--p4 mb-4 grid gap-3 md:grid-cols-3">
-            <label className="partner-field">
-              <span className="partner-label">المصدر</span>
-              <select
-                className="partner-input"
+          <div className="partner-smart-link-form partner-surface partner-surface--p4 mb-4">
+            <div className="partner-smart-link-form__grid">
+              <PartnerFieldSelect
+                label="المصدر"
                 value={linkForm.source}
-                onChange={(e) => setLinkForm((f) => ({ ...f, source: e.target.value }))}
-              >
-                <option value="telegram">Telegram</option>
-                <option value="x">X</option>
-                <option value="youtube">YouTube</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-            <label className="partner-field">
-              <span className="partner-label">رمز الحملة (اختياري)</span>
-              <input
-                className="partner-input"
-                value={linkForm.campaignCode}
-                onChange={(e) => setLinkForm((f) => ({ ...f, campaignCode: e.target.value }))}
-              />
-            </label>
-            <div className="flex items-end">
-              <button
-                type="button"
-                className="partner-btn partner-btn--primary w-full"
+                onChange={(source) => {
+                  setLinkForm((f) => ({ ...f, source }));
+                  setLinkFormError("");
+                }}
+                options={SMART_LINK_SOURCE_OPTIONS}
                 disabled={creatingLink}
-                onClick={() => createLink()}
-              >
-                {creatingLink ? "جاري الإنشاء..." : "إنشاء رابط"}
-              </button>
+              />
+              <PartnerFieldSelect
+                label="الحملة (اختياري)"
+                value={linkForm.campaignCode}
+                onChange={(campaignCode) => {
+                  setLinkForm((f) => ({ ...f, campaignCode }));
+                  setCampaignFieldError("");
+                }}
+                options={eligibleCampaignOptions}
+                placeholder="بدون حملة"
+                disabled={creatingLink}
+                error={campaignFieldError}
+                hint={
+                  eligibleCampaignOptions.length <= 1
+                    ? "لا توجد حملات متاحة لحسابك حاليًا — يمكنك إنشاء رابط بدون حملة."
+                    : ""
+                }
+              />
+              <div className="partner-smart-link-form__action">
+                <button
+                  type="button"
+                  className="partner-btn-primary partner-smart-link-form__submit w-full"
+                  disabled={creatingLink || !linkForm.source}
+                  onClick={() => createLink()}
+                >
+                  {creatingLink ? (
+                    <span className="partner-smart-link-form__submit-inner">
+                      <span className="partner-spinner" aria-hidden="true" />
+                      جارٍ إنشاء الرابط...
+                    </span>
+                  ) : (
+                    <span className="partner-smart-link-form__submit-inner">
+                      <span aria-hidden="true">🔗</span>
+                      إنشاء رابط
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
+            {linkFormError ? (
+              <p className="partner-field-error mt-3" role="alert">
+                {linkFormError}
+              </p>
+            ) : null}
           </div>
           {!growth?.smartLinks?.length ? (
             <EmptyState message="لم تنشئ روابط تسويقية بعد" />
@@ -307,10 +391,15 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
               {growth.smartLinks.map((link) => (
                 <div key={link.id} className="partner-surface partner-surface--p4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="partner-title-md">{link.label}</p>
+                    <p className="partner-title-md">
+                      {link.label || link.source || "رابط"}
+                    </p>
+                    {link.campaignCode ? (
+                      <p className="partner-muted--sm">الحملة: {link.campaignName || link.campaignCode}</p>
+                    ) : null}
                     <p className="partner-muted--sm break-all">{link.url}</p>
                     <p className="partner-muted--sm">
-                      نقرات: {link.clicks} — تسجيلات: {link.signups} — مؤهلون: {link.qualifiedReferrals ?? 0} — عملاء: {link.customers ?? 0}
+                      المصدر: {link.source || "—"} — نقرات: {link.clicks} — تسجيلات: {link.signups} — مؤهلون: {link.qualifiedReferrals ?? 0} — عملاء: {link.customers ?? 0}
                       {link.funnel ? ` — تحويل ${link.conversionRate ?? 0}%` : null}
                     </p>
                     {link.funnel ? (
@@ -320,7 +409,7 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
                     ) : null}
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" className="partner-btn partner-btn--secondary" onClick={() => copyUrl(link.url)}>
+                    <button type="button" className="partner-btn-ghost" onClick={() => copyUrl(link.url)}>
                       نسخ الرابط
                     </button>
                     <PartnerQrCode url={link.url} size={72} />
