@@ -1,20 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { formatPartnerMoney } from "../../../../lib/partner-shared";
 import { PartnerMetricSkeletonGrid } from "../PartnerLoadingSkeleton";
 import { PartnerFieldSelect } from "./PartnerFieldSelect";
+import { PartnerSmartLinkCard } from "./PartnerSmartLinkCard";
 import {
   SMART_LINK_SOURCE_OPTIONS,
   buildEligibleCampaignOptions,
 } from "./smart-link-form-options";
 import { isSmartLinkCampaignError } from "../../../../lib/partner-center/smart-link-errors.js";
-
-const PartnerQrCode = dynamic(
-  () => import("../PartnerQrCode").then((m) => m.PartnerQrCode),
-  { ssr: false }
-);
 
 const TABS = [
   { id: "overview", label: "نظرة عامة" },
@@ -58,15 +53,6 @@ function ProgressBar({ percent }) {
       <div className="partner-progress__fill partner-progress__fill--cyan" style={{ width: `${Math.min(100, percent)}%` }} />
     </div>
   );
-}
-
-function formatSmartLinkDisplay(url) {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.host}${parsed.pathname}`;
-  } catch {
-    return url;
-  }
 }
 
 export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, growthEnabled: growthEnabledProp }) {
@@ -404,34 +390,21 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
           ) : (
             <div className="space-y-3">
               {growth.smartLinks.map((link) => (
-                <div key={link.id} className="partner-surface partner-surface--p4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="partner-title-md">
-                      {link.label || link.source || "رابط"}
-                    </p>
-                    {link.campaignCode ? (
-                      <p className="partner-muted--sm">الحملة: {link.campaignName || link.campaignCode}</p>
-                    ) : null}
-                    <p className="partner-smart-link-display" dir="ltr">
-                      {formatSmartLinkDisplay(link.url)}
-                    </p>
-                    <p className="partner-muted--sm">
-                      المصدر: {link.source || "—"} — نقرات: {link.clicks} — تسجيلات: {link.signups} — مؤهلون: {link.qualifiedReferrals ?? 0} — عملاء: {link.customers ?? 0}
-                      {link.funnel ? ` — تحويل ${link.conversionRate ?? 0}%` : null}
-                    </p>
-                    {link.funnel ? (
-                      <p className="partner-muted--xs">
-                        قمع: {link.funnel.clicks} → {link.funnel.signups} → {link.funnel.qualified} → {link.funnel.customers}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex gap-2">
-                    <button type="button" className="partner-btn-ghost" onClick={() => copyUrl(link.url)}>
-                      نسخ الرابط
-                    </button>
-                    <PartnerQrCode url={link.url} size={72} />
-                  </div>
-                </div>
+                <PartnerSmartLinkCard
+                  key={link.id}
+                  link={link}
+                  onCopy={copyUrl}
+                  onCopyFeedback={onCopyFeedback}
+                  onArchived={(linkId) => {
+                    setGrowth((current) => {
+                      if (!current) return current;
+                      return {
+                        ...current,
+                        smartLinks: (current.smartLinks || []).filter((item) => item.id !== linkId),
+                      };
+                    });
+                  }}
+                />
               ))}
             </div>
           )}

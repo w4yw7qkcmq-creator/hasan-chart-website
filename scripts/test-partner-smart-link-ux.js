@@ -24,6 +24,7 @@ import {
   createSmartLink,
   validateSmartLinkInput,
   resolveSmartLinkByShortCode,
+  archiveSmartLink,
 } from "../lib/partner-center/smart-link-service.js";
 import {
   generateSmartLinkShortCode,
@@ -31,6 +32,16 @@ import {
   isSmartLinkShortCode,
   SMART_LINK_SHORT_CODE_LENGTH,
 } from "../lib/partner-center/smart-link-short-code.js";
+import { generateReferralCode } from "../lib/partner-shared.js";
+import {
+  sanitizeReferralCode,
+  isLettersOnlyReferralCode,
+  NEW_REFERRAL_CODE_LENGTH,
+} from "../lib/partner-shared.js";
+import {
+  getSmartLinkSourceDisplayLabel,
+  SMART_LINK_CONVERSION_STEPS,
+} from "../lib/partner-center/smart-link-sources.js";
 
 let passed = 0;
 let failed = 0;
@@ -192,6 +203,37 @@ async function run() {
     assert.equal(result.source, "whatsapp");
   });
 
+  await test("new referral code is letters-only length 8", () => {
+    for (let i = 0; i < 20; i += 1) {
+      const code = generateReferralCode("testuser");
+      assert.equal(code.length, NEW_REFERRAL_CODE_LENGTH);
+      assert.match(code, /^[A-HJ-NP-Z]+$/);
+      assert.doesNotMatch(code, /[0-9]/);
+      assert.equal(isLettersOnlyReferralCode(code), true);
+    }
+  });
+
+  await test("legacy alphanumeric referral code still sanitizes", () => {
+    assert.equal(sanitizeReferralCode("GOKE2Q7CF"), "GOKE2Q7CF");
+    assert.equal(isLettersOnlyReferralCode("GOKE2Q7CF"), false);
+  });
+
+  await test("smart link short code does not match referral-only uppercase", () => {
+    assert.equal(isSmartLinkShortCode("GOKEZKPX"), false);
+    assert.equal(isSmartLinkShortCode("Ab7K9xYz"), true);
+  });
+
+  await test("conversion funnel step labels Arabic", () => {
+    assert.equal(SMART_LINK_CONVERSION_STEPS.length, 4);
+    assert.equal(SMART_LINK_CONVERSION_STEPS[0].label, "النقرات");
+    assert.equal(SMART_LINK_CONVERSION_STEPS[3].label, "العملاء");
+  });
+
+  await test("source display labels localized", () => {
+    assert.equal(getSmartLinkSourceDisplayLabel("whatsapp"), "واتساب");
+    assert.equal(getSmartLinkSourceDisplayLabel("youtube"), "يوتيوب");
+  });
+
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   let sb = null;
@@ -251,6 +293,56 @@ async function run() {
       assert.equal(resolved.ok, true);
       assert.equal(resolved.source, "whatsapp");
       assert.equal(resolved.destinationPath, "/register");
+    });
+
+    await test("owner can archive own smart link", async () => {
+      const created = await createSmartLink(sb, {
+        partnerId,
+        referralCode,
+        tierKey: "partner",
+        input: { destinationPath: "/register", source: "telegram" },
+      });
+      assert.equal(created.ok, true);
+      const archived = await archiveSmartLink(sb, {
+        partnerId,
+        smartLinkId: created.smartLink.id,
+      });
+      assert.equal(archived.ok, true);
+      const resolved = await resolveSmartLinkByShortCode(sb, created.shortCode);
+      assert.equal(resolved.ok, false);
+    });
+
+    await test("Partner A cannot archive Partner B link (IDOR)", async () => {
+      const created = await createSmartLink(sb, {
+        partnerId,
+        referralCode,
+        tierKey: "partner",
+        input: { destinationPath: "/register", source: "other" },
+      });
+      assert.equal(created.ok, true);
+      const fakePartnerId = "00000000-0000-4000-8000-000000000001";
+      const blocked = await archiveSmartLink(sb, {
+        partnerId: fakePartnerId,
+        smartLinkId: created.smartLink.id,
+      });
+      assert.equal(blocked.ok, false);
+      assert.equal(blocked.error, "ownership_blocked");
+      await archiveSmartLink(sb, { partnerId, smartLinkId: created.smartLink.id });
+    });
+
+    await test("archive is idempotent", async () => {
+      const created = await createSmartLink(sb, {
+        partnerId,
+        referralCode,
+        tierKey: "partner",
+        input: { destinationPath: "/register", source: "x" },
+      });
+      assert.equal(created.ok, true);
+      const first = await archiveSmartLink(sb, { partnerId, smartLinkId: created.smartLink.id });
+      const second = await archiveSmartLink(sb, { partnerId, smartLinkId: created.smartLink.id });
+      assert.equal(first.ok, true);
+      assert.equal(second.ok, true);
+      assert.equal(second.alreadyArchived, true);
     });
   }
 

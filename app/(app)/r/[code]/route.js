@@ -64,6 +64,7 @@ export async function GET(request, { params }) {
   let redirectPath = "/";
   let referralCode = null;
   let captureAttribution = queryAttribution;
+  let skipReferralCapture = false;
 
   try {
     const supabase = getSupabaseAdmin();
@@ -74,6 +75,9 @@ export async function GET(request, { params }) {
         redirectPath = shortResolved.destinationPath || "/";
         referralCode = shortResolved.referralCode;
         captureAttribution = buildAuthoritativeAttribution(shortResolved);
+      } else {
+        skipReferralCapture = true;
+        redirectPath = "/";
       }
     } else if (queryAttribution.link) {
       const sanitizedReferral = sanitizeReferralCode(rawCode);
@@ -101,7 +105,7 @@ export async function GET(request, { params }) {
   const redirectUrl = new URL(safePath, resolvePublicOrigin(request));
   const response = attachSecurityHeaders(NextResponse.redirect(redirectUrl, 302));
 
-  const code = referralCode || sanitizeReferralCode(rawCode);
+  const code = skipReferralCapture ? null : referralCode || sanitizeReferralCode(rawCode);
   if (!code) {
     return response;
   }
