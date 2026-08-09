@@ -385,4 +385,5 @@ module.exports = {
   getCheckpointSnapshot,
   getRssState,
   getTelegramState,
+  normalizeLink,
 };
