@@ -198,12 +198,27 @@ function createSourceHealthEngine(options = {}) {
     if (inStartupGrace()) return false;
     if (!hasMinimumSamples(stats)) return false;
     if (isNetworkOutageActive()) return false;
+    if (stats.healthyStreak >= thresholds.recoveryHealthyStreak && stats.sourceCausedConsecutive === 0) {
+      return false;
+    }
     const rate = parseSuccessRate(stats);
-    return (
+    const consecutiveOrStructure =
       stats.sourceCausedConsecutive >= thresholds.degraded.sourceCausedConsecutiveFailures ||
-      stats.sourceInvalidStructure >= thresholds.degraded.sourceCausedInvalidStructure ||
-      rate < thresholds.degraded.parseSuccessRateMin
-    );
+      stats.sourceInvalidStructure >= thresholds.degraded.sourceCausedInvalidStructure;
+    if (src.state === HEALTH_STATES.RECOVERING || src.state === HEALTH_STATES.QUARANTINED) {
+      return stats.sourceCausedConsecutive >= thresholds.degraded.sourceCausedConsecutiveFailures;
+    }
+    const rateBased = rate < thresholds.degraded.parseSuccessRateMin;
+    if (rateBased && !consecutiveOrStructure) {
+      if (stats.healthyStreak > 0) return false;
+      if (
+        stats.lastStateChangeAt &&
+        Date.now() - new Date(stats.lastStateChangeAt).getTime() < thresholds.hysteresisMs
+      ) {
+        return false;
+      }
+    }
+    return consecutiveOrStructure || rateBased;
   }
 
   function canEscalateToQuarantine(src) {
@@ -216,11 +231,13 @@ function createSourceHealthEngine(options = {}) {
       !src.stats.lastStateChangeAt ||
       Date.now() - new Date(src.stats.lastStateChangeAt).getTime() >= thresholds.quarantineCooldownMs;
     if (!cooledDown && src.state === HEALTH_STATES.DEGRADED) return false;
-    return (
+    const consecutiveOrStructure =
       stats.sourceCausedConsecutive >= thresholds.quarantined.sourceCausedConsecutiveFailures ||
-      stats.sourceInvalidStructure >= thresholds.quarantined.sourceCausedInvalidStructure ||
-      rate < thresholds.quarantined.parseSuccessRateMin
-    );
+      stats.sourceInvalidStructure >= thresholds.quarantined.sourceCausedInvalidStructure;
+    if (src.state === HEALTH_STATES.RECOVERING) {
+      return stats.sourceCausedConsecutive >= thresholds.quarantined.sourceCausedConsecutiveFailures;
+    }
+    return consecutiveOrStructure || rate < thresholds.quarantined.parseSuccessRateMin;
   }
 
   function evaluateState(src) {

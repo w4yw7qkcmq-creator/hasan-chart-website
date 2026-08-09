@@ -4,7 +4,12 @@
  * Usage: node scripts/news/production-phase3-canary.mjs
  */
 
-const path = require("path");
+import { createRequire } from "module";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 process.chdir(path.join(__dirname, "..", ".."));
 
