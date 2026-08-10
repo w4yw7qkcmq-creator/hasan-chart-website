@@ -12,6 +12,7 @@ const SECTIONS = [
   { id: "levels", label: "المستويات" },
   { id: "milestones", label: "المعالم" },
   { id: "bonuses", label: "مكافآت الأداء" },
+  { id: "qualified-reward", label: "مكافأة المستخدم المؤهل" },
   { id: "rewards", label: "المكافآت" },
   { id: "fraud", label: "مراجعة المخاطر" },
   { id: "audit", label: "التدقيق" },
@@ -92,6 +93,10 @@ export default function AdminPartnerMarketingCenter() {
   const [campaignPreview, setCampaignPreview] = useState(null);
   const [fraudReason, setFraudReason] = useState("");
   const [selectedEntitlement, setSelectedEntitlement] = useState(null);
+  const [qrrPolicy, setQrrPolicy] = useState(null);
+  const [qrrAmount, setQrrAmount] = useState("");
+  const [qrrEnabled, setQrrEnabled] = useState(false);
+  const [qrrSaving, setQrrSaving] = useState(false);
 
   const loadSection = useCallback(async () => {
     setLoading(true);
@@ -132,6 +137,14 @@ export default function AdminPartnerMarketingCenter() {
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setBonuses(json.rules || []);
+      }
+      if (section === "qualified-reward") {
+        const res = await adminFetch("/api/admin/partner-marketing/qualified-referral-reward");
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error);
+        setQrrPolicy(json.policy);
+        setQrrAmount(String(json.policy?.current?.amount ?? ""));
+        setQrrEnabled(Boolean(json.policy?.current?.isEnabled));
       }
       if (section === "rewards") {
         const res = await adminFetch("/api/admin/partner-marketing/rewards");
@@ -211,6 +224,36 @@ export default function AdminPartnerMarketingCenter() {
       setCampaignForm(EMPTY_CAMPAIGN);
       setCampaignPreview(null);
       void loadSection();
+    }
+  };
+
+  const saveQualifiedReward = async () => {
+    const currentAmount = qrrPolicy?.current?.amount;
+    const nextAmount = Number(qrrAmount);
+    if (
+      Number.isFinite(currentAmount) &&
+      Number.isFinite(nextAmount) &&
+      nextAmount >= currentAmount * 2 &&
+      !window.confirm(
+        `هل تريد تغيير المكافأة من ${formatPartnerMoney(currentAmount)} إلى ${formatPartnerMoney(nextAmount)}؟`
+      )
+    ) {
+      return;
+    }
+    setQrrSaving(true);
+    try {
+      const res = await adminFetch("/api/admin/partner-marketing/qualified-referral-reward", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: qrrAmount, isEnabled: qrrEnabled }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      void loadSection();
+    } catch (e) {
+      alert(e.message || "خطأ");
+    } finally {
+      setQrrSaving(false);
     }
   };
 
@@ -420,6 +463,76 @@ export default function AdminPartnerMarketingCenter() {
         </table>
       ) : null}
 
+      {!loading && section === "qualified-reward" && qrrPolicy ? (
+        <div className="space-y-6">
+          <div className="admin-panel space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">مكافأة المستخدم المؤهل</h3>
+              <p className="text-neutral-400 text-sm mt-1">
+                المبلغ الذي يحصل عليه الشريك مرة واحدة عندما يصبح المستخدم المدعو مؤهلاً بعد اجتياز شروط التحقق والجودة.
+              </p>
+              <p className="text-amber-400 text-sm mt-2">
+                ملاحظة: مكافأة التسجيل (Signup Bonus) منفصلة عن هذه المكافأة — كلاهما قد يُصرف عند التأهل حسب الإعدادات الحالية.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">القيمة الحالية</p>
+                <h3 className="admin-stat-card__value">
+                  {qrrPolicy.current?.isEnabled
+                    ? formatPartnerMoney(qrrPolicy.current.amount)
+                    : "معطّلة"}
+                </h3>
+              </div>
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">إصدار القاعدة</p>
+                <h3 className="admin-stat-card__value">v{qrrPolicy.current?.ruleVersion ?? "—"}</h3>
+              </div>
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">مكافآت مدفوعة</p>
+                <h3 className="admin-stat-card__value">{qrrPolicy.stats.creditedCount}</h3>
+              </div>
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">إجمالي التكلفة</p>
+                <h3 className="admin-stat-card__value">{formatPartnerMoney(qrrPolicy.stats.totalPaid)}</h3>
+              </div>
+            </div>
+            <Field label={`قيمة المكافأة (${qrrPolicy.constraints.min} – ${qrrPolicy.constraints.max} USD)`}>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="admin-input w-full max-w-xs"
+                value={qrrAmount}
+                onChange={(e) => setQrrAmount(e.target.value)}
+                placeholder="1.00"
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={qrrEnabled} onChange={(e) => setQrrEnabled(e.target.checked)} />
+              تفعيل مكافأة المستخدم المؤهل
+            </label>
+            {qrrPolicy.current ? (
+              <div className="admin-panel border border-cyan-500/30 p-4 text-sm space-y-1">
+                <p>معاينة قبل الحفظ:</p>
+                <p>القيمة الحالية: {formatPartnerMoney(qrrPolicy.current.amount)} ({qrrPolicy.current.isEnabled ? "مفعّلة" : "معطّلة"})</p>
+                <p>القيمة الجديدة: {formatPartnerMoney(qrrAmount || 0)} ({qrrEnabled ? "مفعّلة" : "معطّلة"})</p>
+                <p className="text-neutral-400">
+                  سيُطبق على المستخدمين الذين يصبحون مؤهلين بعد حفظ التغيير.
+                </p>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="admin-btn admin-btn--primary"
+              disabled={qrrSaving}
+              onClick={() => void saveQualifiedReward()}
+            >
+              {qrrSaving ? "جاري الحفظ..." : "حفظ قيمة المكافأة"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {!loading && section === "rewards" ? (
         <table className="admin-table w-full">
           <thead><tr><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>hold</th><th>v</th><th>تاريخ</th></tr></thead>
@@ -467,7 +580,7 @@ export default function AdminPartnerMarketingCenter() {
         </table>
       ) : null}
 
-      {!loading && !["overview", "missions", "campaigns", "levels", "milestones", "bonuses", "rewards", "fraud", "audit"].includes(section) ? (
+      {!loading && !["overview", "missions", "campaigns", "levels", "milestones", "bonuses", "qualified-reward", "rewards", "fraud", "audit"].includes(section) ? (
         <p>{sectionTitle}</p>
       ) : null}
     </div>

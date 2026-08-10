@@ -3,6 +3,8 @@ import { requireSessionUser } from "../../../../lib/auth-session";
 import { getPartnerDashboard } from "../../../../lib/partner-server";
 import { buildReferralLink, buildShortReferralLink, getPartnerSiteUrl } from "../../../../lib/partner-shared";
 
+import { getPartnerQualifiedReferralRewardOffer } from "../../../../lib/partner-center/qualified-referral-reward-policy.js";
+
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -27,6 +29,7 @@ export async function GET() {
       dashboard.partner.referral_code,
       siteOrigin
     );
+    const qualifiedReferralReward = await getPartnerQualifiedReferralRewardOffer(session.supabase);
 
     return NextResponse.json({
       success: true,
@@ -62,6 +65,7 @@ export async function GET() {
       referrals: dashboard.referrals,
       commissions: dashboard.commissions,
       withdrawals: dashboard.withdrawals,
+      qualifiedReferralReward,
     });
   } catch (error) {
     console.error("Partner center API error");

@@ -273,6 +273,17 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
               <p className="partner-title-md">{nba.message}</p>
             </div>
           ) : null}
+          {overview.qualifiedReferralReward?.active ? (
+            <div className="partner-surface partner-surface--p4 mb-4 border border-emerald-500/30">
+              <p className="partner-label">مكافأة المستخدم المؤهل</p>
+              <p className="partner-title-md">
+                {formatPartnerMoney(overview.qualifiedReferralReward.amount)} لكل مستخدم مؤهل
+              </p>
+              <p className="partner-muted--sm mt-1">
+                يصبح المستخدم مؤهلاً بعد تأكيد حسابه وإكمال نشاط حقيقي واجتياز فحوصات الجودة.
+              </p>
+            </div>
+          ) : null}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="partner-surface partner-surface--p4">
               <p className="partner-label">متاح للسحب</p>
