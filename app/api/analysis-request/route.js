@@ -439,6 +439,16 @@ export async function POST(req) {
       );
     }
 
+    const { emitTrustedQualificationActivity, ACTIVITY_EVENT_TYPES } = await import(
+      "../../../lib/partner-center/qualification-activity.js"
+    );
+    emitTrustedQualificationActivity(supabase, {
+      referredUserId: user.id,
+      activityType: ACTIVITY_EVENT_TYPES.ANALYSIS_REQUEST,
+      sourceEntityId: insertedRequest.id,
+      payload: { coin },
+    });
+
     return Response.json({
       success: true,
       message: "تم استلام طلب التحليل بنجاح ✅",

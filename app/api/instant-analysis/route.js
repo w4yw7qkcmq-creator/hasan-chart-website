@@ -104,6 +104,16 @@ export async function POST(request) {
 
       if (jobId) {
         await confirmInstantAnalysisJob(reservation.requestId, session.id, jobId);
+        const supabase = (await import("../../../lib/auth-session.js")).getSupabaseAdmin();
+        const { emitTrustedQualificationActivity, ACTIVITY_EVENT_TYPES } = await import(
+          "../../../lib/partner-center/qualification-activity.js"
+        );
+        emitTrustedQualificationActivity(supabase, {
+          referredUserId: session.id,
+          activityType: ACTIVITY_EVENT_TYPES.INSTANT_ANALYSIS,
+          sourceEntityId: jobId,
+          payload: { symbol },
+        });
       } else if (result.data?.result) {
         const inlineJobId = `inline:${reservation.requestId}`;
         const inlineConfirm = await confirmInstantAnalysisJob(
@@ -118,6 +128,16 @@ export async function POST(request) {
             session.id,
             "completed"
           );
+          const supabase = (await import("../../../lib/auth-session.js")).getSupabaseAdmin();
+          const { emitTrustedQualificationActivity, ACTIVITY_EVENT_TYPES } = await import(
+            "../../../lib/partner-center/qualification-activity.js"
+          );
+          emitTrustedQualificationActivity(supabase, {
+            referredUserId: session.id,
+            activityType: ACTIVITY_EVENT_TYPES.INSTANT_ANALYSIS,
+            sourceEntityId: inlineJobId,
+            payload: { symbol, inline: true },
+          });
         }
 
         const availabilityResult = await getInstantAnalysisAvailability(session.id);

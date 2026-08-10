@@ -9,6 +9,10 @@ import {
   registerIpLimiter,
   RATE_LIMIT_ERROR,
 } from "../../../../lib/rate-limit";
+import {
+  TURNSTILE_REGISTRATION_ERROR_AR,
+  verifyTurnstileTokenServer,
+} from "../../../../lib/turnstile-server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -38,7 +42,7 @@ export async function POST(request) {
       );
     }
 
-    const { email, password, username, telegram } = await request.json();
+    const { email, password, username, telegram, turnstileToken } = await request.json();
 
     const normalizedEmail = String(email || "")
       .trim()
@@ -53,6 +57,17 @@ export async function POST(request) {
           error: "يرجى إدخال اسم المستخدم والبريد الإلكتروني وكلمة المرور",
         },
         { status: 400 }
+      );
+    }
+
+    const captcha = await verifyTurnstileTokenServer({
+      token: turnstileToken,
+      remoteIp: clientIp,
+    });
+    if (!captcha.ok) {
+      return NextResponse.json(
+        { success: false, error: captcha.error || TURNSTILE_REGISTRATION_ERROR_AR },
+        { status: captcha.status || 403 }
       );
     }
 

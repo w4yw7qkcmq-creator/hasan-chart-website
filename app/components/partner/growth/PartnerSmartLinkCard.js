@@ -38,7 +38,16 @@ function ConversionPath({ funnel }) {
 
   return (
     <div className="partner-smart-link-path">
-      <p className="partner-smart-link-path__title">مسار التحويل</p>
+      <p className="partner-smart-link-path__title">
+        مسار التحويل
+        <span
+          className="partner-smart-link-path__info"
+          title="مستخدمون أكّدوا حساباتهم، وأكملوا نشاطًا حقيقيًا، واجتازوا فحوصات الجودة."
+          aria-label="مستخدمون أكّدوا حساباتهم، وأكملوا نشاطًا حقيقيًا، واجتازوا فحوصات الجودة."
+        >
+          ⓘ
+        </span>
+      </p>
       <div className="partner-smart-link-path__track" role="list" aria-label="مسار التحويل">
         {CONVERSION_STEPS.map((step, index) => (
           <div key={step.key} className="partner-smart-link-path__step" role="listitem">

@@ -237,6 +237,16 @@ export async function POST(req) {
       coin: data?.coin || coin,
     });
 
+    const { emitTrustedQualificationActivity, ACTIVITY_EVENT_TYPES } = await import(
+      "../../../lib/partner-center/qualification-activity.js"
+    );
+    emitTrustedQualificationActivity(supabase, {
+      referredUserId: session.id,
+      activityType: ACTIVITY_EVENT_TYPES.PRICE_ALERT,
+      sourceEntityId: data.id,
+      payload: { coin: data.coin },
+    });
+
     return Response.json({
       success: true,
       message: "تم إضافة التنبيه بنجاح ✅ وسيتم إرسال الإيميل فقط عند تحقق السعر.",

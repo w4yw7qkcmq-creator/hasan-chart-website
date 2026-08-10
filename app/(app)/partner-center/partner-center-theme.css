@@ -961,10 +961,26 @@ html[data-theme="light"] .partner-btn-danger:hover:not(:disabled) {
 }
 
 .partner-smart-link-path__title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   margin: 0 0 0.5rem;
   font-size: 0.8125rem;
   font-weight: 800;
   color: var(--ud-muted);
+}
+
+.partner-smart-link-path__info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  line-height: 1;
+  color: rgba(56, 168, 242, 0.95);
+  cursor: help;
 }
 
 .partner-smart-link-path__track {

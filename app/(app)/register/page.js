@@ -192,6 +192,7 @@ export default function RegisterPage() {
           password,
           username: cleanUsername,
           telegram: cleanTelegram,
+          turnstileToken,
         }),
       });
 

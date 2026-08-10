@@ -5,6 +5,7 @@ import { isAdminUser, normalizeEmail } from "../../../../lib/admin-emails";
 import { resolveIamContext } from "../../../../lib/iam/resolve-permissions.js";
 import { CACHE_PRIVATE_SHORT } from "../../../../lib/api-response";
 import { getSupabaseAdmin } from "../../../../lib/auth-session";
+import { scheduleReferralQualificationReevaluation } from "../../../../lib/partner-center/qualification-evaluator.js";
 import { withReadCache } from "../../../../lib/server-read-cache";
 
 function buildSessionPayload(session) {
@@ -185,6 +186,14 @@ export async function GET() {
         authenticated: false,
         user: null,
       });
+    }
+
+    if (resolved.user.email_confirmed_at) {
+      scheduleReferralQualificationReevaluation(
+        getSupabaseAdmin(),
+        resolved.user.id,
+        "session_email_confirmed"
+      );
     }
 
     return buildSessionResponse(resolved);
