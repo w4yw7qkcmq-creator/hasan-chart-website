@@ -11,6 +11,7 @@ import {
 import {
   SMART_LINK_SOURCE_OPTIONS,
   buildEligibleCampaignOptions,
+  shouldShowCampaignField,
 } from "../app/components/partner/growth/smart-link-form-options.js";
 import {
   normalizeSmartLinkSource,
@@ -98,6 +99,57 @@ async function run() {
     assert.equal(opts[0].label, "بدون حملة");
     assert.equal(opts.length, 2);
     assert.equal(opts[1].value, "summer");
+  });
+
+  await test("shouldShowCampaignField hidden when zero eligible campaigns", () => {
+    assert.equal(shouldShowCampaignField([]), false);
+    assert.equal(
+      shouldShowCampaignField([{ code: "old", name: "قديمة", eligible: false }]),
+      false
+    );
+  });
+
+  await test("shouldShowCampaignField visible when one or more eligible campaigns", () => {
+    assert.equal(
+      shouldShowCampaignField([{ code: "summer", name: "حملة الصيف", eligible: true }]),
+      true
+    );
+    assert.equal(
+      shouldShowCampaignField([
+        { code: "a", name: "A", eligible: true },
+        { code: "b", name: "B", eligible: true },
+      ]),
+      true
+    );
+  });
+
+  await test("create flow does not trigger full reload helpers", async () => {
+    const fs = await import("node:fs/promises");
+    const source = await fs.readFile(
+      new URL("../app/components/partner/growth/PartnerCenterGrowthSection.js", import.meta.url),
+      "utf8"
+    );
+    assert.doesNotMatch(source, /router\.refresh\s*\(/);
+    assert.doesNotMatch(source, /window\.location\.(reload|href|assign|replace)/);
+    assert.doesNotMatch(source, /location\.reload\s*\(/);
+    const createBlock = source.slice(source.indexOf("const createLink"), source.indexOf("if (loading)"));
+    assert.doesNotMatch(createBlock, /\bload\s*\(/);
+    assert.match(source, /setGrowth\(\(current\)/);
+    assert.match(source, /silent = false/);
+  });
+
+  await test("delete flow does not trigger full reload helpers", async () => {
+    const fs = await import("node:fs/promises");
+    const cardSource = await fs.readFile(
+      new URL("../app/components/partner/growth/PartnerSmartLinkCard.js", import.meta.url),
+      "utf8"
+    );
+    assert.doesNotMatch(cardSource, /router\.refresh\s*\(/);
+    assert.doesNotMatch(cardSource, /window\.location\.(reload|href|assign|replace)/);
+    assert.doesNotMatch(cardSource, /location\.reload\s*\(/);
+    assert.match(cardSource, /onArchived\?\.\(link\.id\)/);
+    assert.match(cardSource, /createPortal/);
+    assert.match(cardSource, /role="dialog"/);
   });
 
   await test("normalizeSmartLinkSource accepts lowercase canonical values", () => {

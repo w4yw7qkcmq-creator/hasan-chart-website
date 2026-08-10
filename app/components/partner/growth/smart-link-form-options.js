@@ -16,3 +16,8 @@ export function buildEligibleCampaignOptions(campaigns = []) {
     })),
   ];
 }
+
+/** True when at least one real campaign exists (not just the no-campaign default). */
+export function shouldShowCampaignField(campaigns = []) {
+  return buildEligibleCampaignOptions(campaigns).length > 1;
+}

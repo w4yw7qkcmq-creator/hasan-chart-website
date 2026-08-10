@@ -458,17 +458,45 @@ html[data-theme="light"] .partner-smart-link-display {
 .partner-smart-link-form__grid {
   display: grid;
   gap: 1rem;
+  align-items: end;
+}
+
+.partner-smart-link-form__field {
+  min-width: 0;
+}
+
+.partner-smart-link-form__field .partner-field,
+.partner-smart-link-form__field .partner-custom-select__trigger {
+  height: 100%;
+}
+
+.partner-smart-link-form__field .partner-custom-select__trigger {
+  min-height: 3rem;
 }
 
 @media (min-width: 768px) {
-  .partner-smart-link-form__grid {
+  .partner-smart-link-form__grid--with-campaign {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-    align-items: end;
+  }
+
+  .partner-smart-link-form__grid--no-campaign {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 
 .partner-smart-link-form__action {
   min-width: 11rem;
+}
+
+@media (max-width: 767px) {
+  .partner-smart-link-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .partner-smart-link-form__action {
+    min-width: 0;
+    width: 100%;
+  }
 }
 
 .partner-smart-link-form__submit {
@@ -999,14 +1027,26 @@ html[data-theme="light"] .partner-smart-link-path__arrow {
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  pointer-events: none;
 }
 
 .partner-smart-link-dialog__backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   border: none;
-  background: rgba(2, 8, 23, 0.55);
+  background: rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(1px);
   cursor: pointer;
+  pointer-events: auto;
+}
+
+html[data-theme="light"] .partner-smart-link-dialog__backdrop {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme="dark"] .partner-smart-link-dialog__backdrop,
+:root:not([data-theme="light"]) .partner-smart-link-dialog__backdrop {
+  background: rgba(2, 8, 23, 0.28);
 }
 
 .partner-smart-link-dialog__panel {
@@ -1016,8 +1056,9 @@ html[data-theme="light"] .partner-smart-link-path__arrow {
   border-radius: 1rem;
   border: 1px solid rgba(56, 168, 242, 0.22);
   background: rgba(8, 18, 35, 0.98);
-  box-shadow: 0 20px 48px rgba(2, 8, 23, 0.45);
+  box-shadow: 0 20px 48px rgba(2, 8, 23, 0.25);
   padding: 1.15rem 1.2rem;
+  pointer-events: auto;
 }
 
 html[data-theme="light"] .partner-smart-link-dialog__panel {

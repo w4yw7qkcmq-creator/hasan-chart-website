@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { getSmartLinkSourceDisplayLabel } from "../../../../lib/partner-center/smart-link-sources.js";
 import { SMART_LINK_SOURCE_OPTIONS } from "./smart-link-form-options";
@@ -57,13 +58,64 @@ function ConversionPath({ funnel }) {
   );
 }
 
-function ArchiveConfirmDialog({ open, onCancel, onConfirm, busy }) {
-  if (!open) return null;
+function ArchiveConfirmDialog({ open, onCancel, onConfirm, busy, returnFocusRef }) {
+  const panelRef = useRef(null);
+  const cancelRef = useRef(null);
 
-  return (
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const previousFocus = document.activeElement;
+    cancelRef.current?.focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancel();
+        return;
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+
+      const focusable = panelRef.current.querySelectorAll(
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (returnFocusRef?.current) {
+        returnFocusRef.current.focus();
+      } else if (previousFocus instanceof HTMLElement) {
+        previousFocus.focus();
+      }
+    };
+  }, [open, onCancel, returnFocusRef]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="partner-smart-link-dialog" role="presentation">
       <button type="button" className="partner-smart-link-dialog__backdrop" aria-label="إغلاق" onClick={onCancel} />
-      <div className="partner-smart-link-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="archive-link-title">
+      <div
+        ref={panelRef}
+        className="partner-smart-link-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="archive-link-title"
+      >
         <h3 id="archive-link-title" className="partner-smart-link-dialog__title">
           حذف الرابط؟
         </h3>
@@ -71,7 +123,7 @@ function ArchiveConfirmDialog({ open, onCancel, onConfirm, busy }) {
           سيتوقف هذا الرابط عن استقبال زيارات جديدة، وستبقى إحصائياته السابقة محفوظة.
         </p>
         <div className="partner-smart-link-dialog__actions">
-          <button type="button" className="partner-btn-ghost" onClick={onCancel} disabled={busy}>
+          <button ref={cancelRef} type="button" className="partner-btn-ghost" onClick={onCancel} disabled={busy}>
             إلغاء
           </button>
           <button type="button" className="partner-btn-danger" onClick={onConfirm} disabled={busy}>
@@ -79,13 +131,15 @@ function ArchiveConfirmDialog({ open, onCancel, onConfirm, busy }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 export function PartnerSmartLinkCard({ link, onCopy, onArchived, onCopyFeedback }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const deleteButtonRef = useRef(null);
 
   const sourceLabel = getSmartLinkSourceDisplayLabel(link.source);
 
@@ -103,8 +157,8 @@ export function PartnerSmartLinkCard({ link, onCopy, onArchived, onCopyFeedback 
         return;
       }
       onCopyFeedback?.("تم حذف الرابط");
-      onArchived?.(link.id);
       setConfirmOpen(false);
+      onArchived?.(link.id);
     } catch {
       onCopyFeedback?.("تعذر حذف الرابط الآن. حاول مرة أخرى.", "warning");
     } finally {
@@ -135,6 +189,7 @@ export function PartnerSmartLinkCard({ link, onCopy, onArchived, onCopyFeedback 
             نسخ الرابط
           </button>
           <button
+            ref={deleteButtonRef}
             type="button"
             className="partner-btn-danger partner-smart-link-card__delete"
             onClick={() => setConfirmOpen(true)}
@@ -147,6 +202,7 @@ export function PartnerSmartLinkCard({ link, onCopy, onArchived, onCopyFeedback 
       <ArchiveConfirmDialog
         open={confirmOpen}
         busy={archiving}
+        returnFocusRef={deleteButtonRef}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => void archiveLink()}
       />

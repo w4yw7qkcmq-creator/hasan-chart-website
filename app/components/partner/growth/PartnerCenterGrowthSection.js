@@ -8,6 +8,7 @@ import { PartnerSmartLinkCard } from "./PartnerSmartLinkCard";
 import {
   SMART_LINK_SOURCE_OPTIONS,
   buildEligibleCampaignOptions,
+  shouldShowCampaignField,
 } from "./smart-link-form-options";
 import { isSmartLinkCampaignError } from "../../../../lib/partner-center/smart-link-errors.js";
 
@@ -79,19 +80,25 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
       .catch(() => setGrowthEnabledState(false));
   }, [growthEnabledProp]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ silent = false } = {}) => {
     if (!growthEnabled) return;
-    setLoading(true);
-    setError("");
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const res = await fetch("/api/partner/growth", { credentials: "include", cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) throw new Error(json?.error || "تعذر التحميل");
       setGrowth(json.growth);
     } catch (e) {
-      setError(e.message || "تعذر تحميل بيانات النمو");
+      if (!silent) {
+        setError(e.message || "تعذر تحميل بيانات النمو");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [growthEnabled]);
 
@@ -99,6 +106,16 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
     if (growthEnabled) void load();
     else setLoading(false);
   }, [load, growthEnabled]);
+
+  const eligibleCampaignOptions = useMemo(
+    () => buildEligibleCampaignOptions(growth?.campaigns),
+    [growth?.campaigns]
+  );
+
+  const showCampaignField = useMemo(
+    () => shouldShowCampaignField(growth?.campaigns),
+    [growth?.campaigns]
+  );
 
   if (!v2Mode) return null;
 
@@ -122,11 +139,6 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
       onCopyFeedback?.("انسخ الرابط يدويًا", "warning");
     }
   };
-
-  const eligibleCampaignOptions = useMemo(
-    () => buildEligibleCampaignOptions(growth?.campaigns),
-    [growth?.campaigns]
-  );
 
   const createLink = async () => {
     if (creatingLink || createInFlightRef.current) return;
@@ -174,6 +186,9 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
       setLinkForm((current) => ({ ...current, campaignCode: "" }));
 
       if (json.url) {
+        const campaignMeta = showCampaignField
+          ? eligibleCampaignOptions.find((o) => o.value === linkForm.campaignCode)
+          : null;
         setGrowth((current) => {
           if (!current) return current;
           const created = {
@@ -184,11 +199,18 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
             source: linkForm.source,
             medium: json.smartLink?.medium || null,
             campaignCode: linkForm.campaignCode || null,
+            campaignName: campaignMeta?.label && campaignMeta.value ? campaignMeta.label : null,
             clicks: 0,
             signups: 0,
             qualifiedReferrals: 0,
             customers: 0,
             conversionRate: 0,
+            funnel: {
+              clicks: 0,
+              signups: 0,
+              qualified: 0,
+              customers: 0,
+            },
           };
           return {
             ...current,
@@ -196,8 +218,6 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
           };
         });
       }
-
-      void load();
     } catch {
       setLinkFormError("تعذر إنشاء الرابط الآن. حاول مرة أخرى.");
     } finally {
@@ -329,35 +349,39 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
       {tab === "links" ? (
         <Panel title="الروابط التسويقية" subtitle="أنشئ روابط آمنة مع تتبع المصدر">
           <div className="partner-smart-link-form partner-surface partner-surface--p4 mb-4">
-            <div className="partner-smart-link-form__grid">
-              <PartnerFieldSelect
-                label="المصدر"
-                value={linkForm.source}
-                onChange={(source) => {
-                  setLinkForm((f) => ({ ...f, source }));
-                  setLinkFormError("");
-                }}
-                options={SMART_LINK_SOURCE_OPTIONS}
-                disabled={creatingLink}
-              />
-              <PartnerFieldSelect
-                label="الحملة (اختياري)"
-                value={linkForm.campaignCode}
-                onChange={(campaignCode) => {
-                  setLinkForm((f) => ({ ...f, campaignCode }));
-                  setCampaignFieldError("");
-                  setLinkFormError("");
-                }}
-                options={eligibleCampaignOptions}
-                placeholder="بدون حملة"
-                disabled={creatingLink}
-                error={campaignFieldError}
-                hint={
-                  eligibleCampaignOptions.length <= 1
-                    ? "لا توجد حملات متاحة لحسابك حاليًا — يمكنك إنشاء رابط بدون حملة."
-                    : ""
-                }
-              />
+            <div
+              className={`partner-smart-link-form__grid ${showCampaignField ? "partner-smart-link-form__grid--with-campaign" : "partner-smart-link-form__grid--no-campaign"}`}
+            >
+              <div className="partner-smart-link-form__field">
+                <PartnerFieldSelect
+                  label="المصدر"
+                  value={linkForm.source}
+                  onChange={(source) => {
+                    setLinkForm((f) => ({ ...f, source }));
+                    setLinkFormError("");
+                  }}
+                  options={SMART_LINK_SOURCE_OPTIONS}
+                  disabled={creatingLink}
+                  error={linkFormError}
+                />
+              </div>
+              {showCampaignField ? (
+                <div className="partner-smart-link-form__field">
+                  <PartnerFieldSelect
+                    label="الحملة (اختياري)"
+                    value={linkForm.campaignCode}
+                    onChange={(campaignCode) => {
+                      setLinkForm((f) => ({ ...f, campaignCode }));
+                      setCampaignFieldError("");
+                      setLinkFormError("");
+                    }}
+                    options={eligibleCampaignOptions}
+                    placeholder="بدون حملة"
+                    disabled={creatingLink}
+                    error={campaignFieldError}
+                  />
+                </div>
+              ) : null}
               <div className="partner-smart-link-form__action">
                 <button
                   type="button"
@@ -379,9 +403,9 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
                 </button>
               </div>
             </div>
-            {linkFormError ? (
-              <p className="partner-field-error mt-3" role="alert">
-                {linkFormError}
+            {!showCampaignField && !growth?.smartLinks?.length ? (
+              <p className="partner-input-hint mt-2">
+                لا توجد حملات متاحة لحسابك حاليًا — يمكنك إنشاء رابط بدون حملة.
               </p>
             ) : null}
           </div>
