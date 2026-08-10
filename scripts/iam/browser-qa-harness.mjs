@@ -385,7 +385,13 @@ export async function gotoAndWait(page, base, path, readyOptions) {
   return waitForPageReady(page, { ...readyOptions, timeoutMs: remaining });
 }
 
-export function attachPageObservers(page, report) {
+export function attachPageObservers(page, report = {}) {
+  if (!report.consoleErrors) report.consoleErrors = [];
+  if (!report.pageErrors) report.pageErrors = [];
+  if (!report.networkFailures) report.networkFailures = [];
+  page.on("pageerror", (err) => {
+    report.pageErrors.push(String(err?.message || err).slice(0, 200));
+  });
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
     const t = msg.text();
@@ -406,6 +412,7 @@ export function attachPageObservers(page, report) {
       report.networkFailures.push({ url: url.split("?")[0], status: res.status() });
     }
   });
+  return report;
 }
 
 function isIamRelatedConsoleError(text) {

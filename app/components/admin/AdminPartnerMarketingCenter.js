@@ -13,6 +13,7 @@ const SECTIONS = [
   { id: "milestones", label: "المعالم" },
   { id: "bonuses", label: "مكافآت الأداء" },
   { id: "qualified-reward", label: "مكافأة المستخدم المؤهل" },
+  { id: "service-commissions", label: "عمولات الخدمات" },
   { id: "rewards", label: "المكافآت" },
   { id: "fraud", label: "مراجعة المخاطر" },
   { id: "audit", label: "التدقيق" },
@@ -97,6 +98,9 @@ export default function AdminPartnerMarketingCenter() {
   const [qrrAmount, setQrrAmount] = useState("");
   const [qrrEnabled, setQrrEnabled] = useState(false);
   const [qrrSaving, setQrrSaving] = useState(false);
+  const [scPolicy, setScPolicy] = useState(null);
+  const [scEdit, setScEdit] = useState(null);
+  const [scSaving, setScSaving] = useState(false);
 
   const loadSection = useCallback(async () => {
     setLoading(true);
@@ -145,6 +149,13 @@ export default function AdminPartnerMarketingCenter() {
         setQrrPolicy(json.policy);
         setQrrAmount(String(json.policy?.current?.amount ?? ""));
         setQrrEnabled(Boolean(json.policy?.current?.isEnabled));
+      }
+      if (section === "service-commissions") {
+        const res = await adminFetch("/api/admin/partner-marketing/service-commissions");
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error);
+        setScPolicy(json.policy);
+        setScEdit(null);
       }
       if (section === "rewards") {
         const res = await adminFetch("/api/admin/partner-marketing/rewards");
@@ -254,6 +265,53 @@ export default function AdminPartnerMarketingCenter() {
       alert(e.message || "خطأ");
     } finally {
       setQrrSaving(false);
+    }
+  };
+
+  const startEditServiceRule = (service) => {
+    setScEdit({
+      serviceType: service.serviceType,
+      displayNameAr: service.displayNameAr,
+      isEnabled: service.isEnabled,
+      tierPolicy: service.tierPolicy,
+      commissionPercent: String(service.commissionPercent ?? ""),
+      releasePolicy: service.releasePolicy,
+    });
+  };
+
+  const saveServiceCommissionRule = async () => {
+    if (!scEdit?.serviceType) return;
+    const current = scPolicy?.services?.find((s) => s.serviceType === scEdit.serviceType);
+    if (
+      current &&
+      Number(scEdit.commissionPercent) >= Number(current.commissionPercent || 0) * 2 &&
+      !window.confirm(
+        `تأكيد: تغيير نسبة ${scEdit.displayNameAr} من ${current.commissionPercent}% إلى ${scEdit.commissionPercent}%`
+      )
+    ) {
+      return;
+    }
+    setScSaving(true);
+    try {
+      const res = await adminFetch("/api/admin/partner-marketing/service-commissions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceType: scEdit.serviceType,
+          isEnabled: scEdit.isEnabled,
+          tierPolicy: scEdit.tierPolicy,
+          commissionPercent: scEdit.commissionPercent,
+          releasePolicy: scEdit.releasePolicy,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setScEdit(null);
+      void loadSection();
+    } catch (e) {
+      alert(e.message || "خطأ");
+    } finally {
+      setScSaving(false);
     }
   };
 
@@ -533,6 +591,138 @@ export default function AdminPartnerMarketingCenter() {
         </div>
       ) : null}
 
+      {!loading && section === "service-commissions" && scPolicy ? (
+        <div className="space-y-6">
+          <div className="admin-panel space-y-4">
+            <h3 className="text-lg font-semibold">عمولات الخدمات</h3>
+            <p className="text-neutral-400 text-sm">
+              نسبة الشريك الفعلية تعتمد على مستواه عندما تكون سياسة النسبة «حسب مستوى الشريك».
+            </p>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">إجمالي عمولات الخدمات</p>
+                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.serviceCommissionsTotal)}</h3>
+              </div>
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">قيد الانتظار</p>
+                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.pending)}</h3>
+              </div>
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">قابل للسحب</p>
+                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.withdrawable)}</h3>
+              </div>
+              <div className="admin-stat-card">
+                <p className="admin-stat-card__title">معكوسة</p>
+                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.reversed)}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="admin-panel space-y-3">
+            <h4 className="font-semibold">نسب مستويات الشركاء</h4>
+            <div className="flex flex-wrap gap-3 text-sm">
+              {(scPolicy.tiers || []).map((t) => (
+                <span key={t.tierKey} className="rounded border border-neutral-700 px-3 py-1">
+                  {t.tierName}: {t.commissionPercent}%
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <table className="admin-table w-full">
+            <thead>
+              <tr>
+                <th>الخدمة</th>
+                <th>الحالة</th>
+                <th>سياسة النسبة</th>
+                <th>النسبة/الوضع</th>
+                <th>التحرير</th>
+                <th>v</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(scPolicy.services || []).map((s) => (
+                <tr key={s.id || s.serviceType}>
+                  <td>
+                    <div className="font-medium">{s.displayNameAr}</div>
+                    <div className="text-xs text-neutral-500">{s.serviceType}</div>
+                    {s.serviceType === "account_management" && !s.isEnabled ? (
+                      <p className="text-amber-400 text-xs mt-1">معلّقة حتى توفر حدث اعتماد الأرباح</p>
+                    ) : null}
+                  </td>
+                  <td>{s.isEnabled ? "مفعّلة" : "متوقفة"}</td>
+                  <td>{s.tierPolicy === "use_partner_tier" ? "حسب مستوى الشريك" : "نسبة ثابتة للخدمة"}</td>
+                  <td>
+                    {s.tierPolicy === "use_partner_tier"
+                      ? `حسب المستوى (${s.commissionPercent}% مرجع)`
+                      : `${s.commissionPercent}%`}
+                    <div className="text-xs text-neutral-500">{s.commissionMode}</div>
+                  </td>
+                  <td>{s.releasePolicy}</td>
+                  <td>v{s.ruleVersion}</td>
+                  <td>
+                    <button type="button" className="admin-btn admin-btn--sm" onClick={() => startEditServiceRule(s)}>
+                      تعديل
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {scEdit ? (
+            <div className="admin-panel space-y-4 border border-cyan-500/30">
+              <h4 className="font-semibold">تعديل: {scEdit.displayNameAr}</h4>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={scEdit.isEnabled}
+                  onChange={(e) => setScEdit({ ...scEdit, isEnabled: e.target.checked })}
+                />
+                تفعيل عمولة هذه الخدمة
+              </label>
+              <Field label="سياسة النسبة">
+                <select
+                  className="admin-input"
+                  value={scEdit.tierPolicy}
+                  onChange={(e) => setScEdit({ ...scEdit, tierPolicy: e.target.value })}
+                >
+                  <option value="use_partner_tier">حسب مستوى الشريك</option>
+                  <option value="fixed_service_rate">نسبة ثابتة للخدمة</option>
+                </select>
+              </Field>
+              {scEdit.tierPolicy === "fixed_service_rate" ? (
+                <Field label={`نسبة ثابتة (0–${scPolicy.constraints.percentMax}%)`}>
+                  <input
+                    className="admin-input max-w-xs"
+                    value={scEdit.commissionPercent}
+                    onChange={(e) => setScEdit({ ...scEdit, commissionPercent: e.target.value })}
+                  />
+                </Field>
+              ) : null}
+              <Field label="سياسة التحرير">
+                <select
+                  className="admin-input"
+                  value={scEdit.releasePolicy}
+                  onChange={(e) => setScEdit({ ...scEdit, releasePolicy: e.target.value })}
+                >
+                  {scPolicy.constraints.releasePolicies.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </Field>
+              <div className="flex gap-2">
+                <button type="button" className="admin-btn admin-btn--primary" disabled={scSaving} onClick={() => void saveServiceCommissionRule()}>
+                  {scSaving ? "جاري الحفظ..." : "حفظ"}
+                </button>
+                <button type="button" className="admin-btn" onClick={() => setScEdit(null)}>إلغاء</button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {!loading && section === "rewards" ? (
         <table className="admin-table w-full">
           <thead><tr><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>hold</th><th>v</th><th>تاريخ</th></tr></thead>
@@ -580,7 +770,7 @@ export default function AdminPartnerMarketingCenter() {
         </table>
       ) : null}
 
-      {!loading && !["overview", "missions", "campaigns", "levels", "milestones", "bonuses", "qualified-reward", "rewards", "fraud", "audit"].includes(section) ? (
+      {!loading && !["overview", "missions", "campaigns", "levels", "milestones", "bonuses", "qualified-reward", "service-commissions", "rewards", "fraud", "audit"].includes(section) ? (
         <p>{sectionTitle}</p>
       ) : null}
     </div>
