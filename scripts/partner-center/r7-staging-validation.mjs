@@ -253,7 +253,9 @@ async function main() {
   await catalogVerification(service);
   await validationMatrix();
 
-  const actorId = crypto.randomUUID();
+  const { data: userList } = await service.auth.admin.listUsers({ perPage: 1 });
+  const actorId = userList?.users?.[0]?.id || null;
+  if (!actorId) throw new Error("no staging auth user for created_by FK");
   const { created: ruleV1 } = await adminUpdateQualifiedReferralRewardPolicy(service, {
     amount: QRR_AMOUNT_V1,
     isEnabled: true,
