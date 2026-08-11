@@ -11,4 +11,6 @@ export {
   PartnerAdminField,
   PartnerAdminSegmented,
 } from "./PartnerAdminToolbar.js";
+export { default as PartnerAdminOptionSelect } from "./PartnerAdminOptionSelect.js";
+export { default as PartnerAdminAuditDrawer } from "./PartnerAdminAuditDrawer.js";
 export * from "./partner-admin-labels.js";

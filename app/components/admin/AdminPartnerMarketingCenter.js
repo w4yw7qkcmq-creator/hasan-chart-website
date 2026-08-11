@@ -22,6 +22,12 @@ import {
   formatAuditDate,
   serviceLabel,
   riskLevelLabel,
+  tierPolicyLabel,
+  releasePolicyLabel,
+  TIER_POLICY_OPTIONS,
+  RELEASE_POLICY_OPTIONS,
+  PartnerAdminOptionSelect,
+  PartnerAdminAuditDrawer,
 } from "./partner-admin";
 
 
@@ -140,6 +146,10 @@ export default function AdminPartnerMarketingCenter({
   const [scPolicy, setScPolicy] = useState(null);
   const [scEdit, setScEdit] = useState(null);
   const [scSaving, setScSaving] = useState(false);
+  const [scSaveMessage, setScSaveMessage] = useState("");
+  const [scSaveError, setScSaveError] = useState("");
+  const [qrrSaveMessage, setQrrSaveMessage] = useState("");
+  const [selectedAuditRow, setSelectedAuditRow] = useState(null);
 
   const activeSection = forcedSection || section;
 
@@ -147,8 +157,8 @@ export default function AdminPartnerMarketingCenter({
     if (forcedSection) setSection(forcedSection);
   }, [forcedSection]);
 
-  const loadSection = useCallback(async () => {
-    setLoading(true);
+  const loadSection = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       if (activeSection === "overview") {
@@ -223,7 +233,7 @@ export default function AdminPartnerMarketingCenter({
     } catch (e) {
       setError(e.message || "خطأ");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [activeSection]);
 
@@ -253,7 +263,7 @@ export default function AdminPartnerMarketingCenter({
     else {
       setMissionForm(EMPTY_MISSION);
       setMissionPreview(null);
-      void loadSection();
+      void loadSection({ silent: true });
     }
   };
 
@@ -287,7 +297,7 @@ export default function AdminPartnerMarketingCenter({
         status: "draft",
       });
       setCampaignPreview(null);
-      void loadSection();
+      void loadSection({ silent: true });
     }
   };
 
@@ -305,7 +315,7 @@ export default function AdminPartnerMarketingCenter({
     });
     const json = await res.json();
     if (!json.success) alert(json.error || "تعذر تنفيذ الإجراء");
-    else void loadSection();
+    else void loadSection({ silent: true });
   };
 
   const campaignsByBucket = useMemo(() => {
@@ -342,7 +352,19 @@ export default function AdminPartnerMarketingCenter({
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
-      void loadSection();
+      setQrrPolicy((prev) =>
+        prev
+          ? {
+              ...prev,
+              current: {
+                ...prev.current,
+                amount: Number(qrrAmount),
+                isEnabled: qrrEnabled,
+              },
+            }
+          : prev
+      );
+      setQrrSaveMessage("تم حفظ قيمة المكافأة بنجاح");
     } catch (e) {
       alert(e.message || "خطأ");
     } finally {
@@ -351,6 +373,8 @@ export default function AdminPartnerMarketingCenter({
   };
 
   const startEditServiceRule = (service) => {
+    setScSaveMessage("");
+    setScSaveError("");
     setScEdit({
       serviceType: service.serviceType,
       displayNameAr: service.displayNameAr,
@@ -388,10 +412,29 @@ export default function AdminPartnerMarketingCenter({
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
+      setScPolicy((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          services: (prev.services || []).map((service) =>
+            service.serviceType === json.rule.serviceType
+              ? {
+                  ...service,
+                  isEnabled: json.rule.isEnabled,
+                  tierPolicy: json.rule.tierPolicy,
+                  commissionPercent: json.rule.commissionPercent,
+                  releasePolicy: json.rule.releasePolicy,
+                  ruleVersion: json.rule.ruleVersion,
+                }
+              : service
+          ),
+        };
+      });
       setScEdit(null);
-      void loadSection();
+      setScSaveError("");
+      setScSaveMessage("تم حفظ إعدادات العمولة بنجاح");
     } catch (e) {
-      alert(e.message || "خطأ");
+      setScSaveError(e.message || "تعذر حفظ إعدادات العمولة");
     } finally {
       setScSaving(false);
     }
@@ -405,7 +448,7 @@ export default function AdminPartnerMarketingCenter({
     });
     const json = await res.json();
     if (!json.success) alert(json.error);
-    else void loadSection();
+    else void loadSection({ silent: true });
   };
 
   const createMissionVersion = async (id) => {
@@ -418,7 +461,7 @@ export default function AdminPartnerMarketingCenter({
     });
     const json = await res.json();
     if (!json.success) alert(json.error);
-    else void loadSection();
+    else void loadSection({ silent: true });
   };
 
   const fraudAction = async (action) => {
@@ -436,7 +479,7 @@ export default function AdminPartnerMarketingCenter({
     else {
       setFraudReason("");
       setSelectedEntitlement(null);
-      void loadSection();
+      void loadSection({ silent: true });
     }
   };
 
@@ -480,7 +523,13 @@ export default function AdminPartnerMarketingCenter({
       ) : null}
 
       {error ? <p className="text-red-400">{error}</p> : null}
-      {loading ? <p>جاري التحميل...</p> : null}
+      {loading ? (
+        <div className="pa-skeleton-grid">
+          <div className="pa-skeleton" />
+          <div className="pa-skeleton" />
+          <div className="pa-skeleton" />
+        </div>
+      ) : null}
 
       {!loading && activeSection === "overview" && overview ? (
         <div className="grid gap-4 md:grid-cols-3">
@@ -660,7 +709,7 @@ export default function AdminPartnerMarketingCenter({
           <AdminCampaignMissionWizard
             open={wizardOpen}
             onClose={() => setWizardOpen(false)}
-            onSaved={() => void loadSection()}
+            onSaved={() => void loadSection({ silent: true })}
           />
         </div>
       ) : null}
@@ -791,6 +840,7 @@ export default function AdminPartnerMarketingCenter({
             >
               {qrrSaving ? "جاري الحفظ..." : "حفظ قيمة المكافأة"}
             </button>
+            {qrrSaveMessage ? <div className="pa-inline-success">{qrrSaveMessage}</div> : null}
           </div>
         </div>
       ) : null}
@@ -865,7 +915,7 @@ export default function AdminPartnerMarketingCenter({
                       : `${s.commissionPercent}%`}
                     <div className="text-xs text-neutral-500">{s.commissionMode}</div>
                   </td>
-                  <td>{s.releasePolicy}</td>
+                  <td>{releasePolicyLabel(s.releasePolicy)}</td>
                   <td>v{s.ruleVersion}</td>
                   <td>
                     <button type="button" className="pa-btn pa-btn--sm" onClick={() => startEditServiceRule(s)}>
@@ -877,9 +927,11 @@ export default function AdminPartnerMarketingCenter({
             </tbody>
           </PartnerAdminTable>
 
+          {scSaveMessage ? <div className="pa-inline-success">{scSaveMessage}</div> : null}
+          {scSaveError ? <div className="pa-inline-error">{scSaveError}</div> : null}
           {scEdit ? (
-            <div className="admin-panel space-y-4 border border-cyan-500/30">
-              <h4 className="font-semibold">تعديل: {scEdit.displayNameAr}</h4>
+            <div className="pa-settings-panel space-y-4">
+              <h4 className="pa-section__title">تعديل: {scEdit.displayNameAr}</h4>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -888,36 +940,40 @@ export default function AdminPartnerMarketingCenter({
                 />
                 تفعيل عمولة هذه الخدمة
               </label>
-              <Field label="سياسة النسبة">
-                <select
-                  className="pa-input"
-                  value={scEdit.tierPolicy}
-                  onChange={(e) => setScEdit({ ...scEdit, tierPolicy: e.target.value })}
-                >
-                  <option value="use_partner_tier">حسب مستوى الشريك</option>
-                  <option value="fixed_service_rate">نسبة ثابتة للخدمة</option>
-                </select>
-              </Field>
+              <PartnerAdminOptionSelect
+                label="سياسة النسبة"
+                name="tierPolicy"
+                value={scEdit.tierPolicy}
+                onChange={(value) => setScEdit({ ...scEdit, tierPolicy: value })}
+                options={TIER_POLICY_OPTIONS}
+              />
+              {scEdit.tierPolicy === "use_partner_tier" ? (
+                <div className="pa-tier-preview">
+                  {(scPolicy.tiers || []).map((tier) => (
+                    <span key={tier.tierKey} className="pa-tier-preview__chip">
+                      {tier.tierName} {tier.commissionPercent}%
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {scEdit.tierPolicy === "fixed_service_rate" ? (
                 <Field label={`نسبة ثابتة (0–${scPolicy.constraints.percentMax}%)`}>
                   <input
-                    className="pa-input max-w-xs"
+                    className="pa-input max-w-xs pa-ltr"
                     value={scEdit.commissionPercent}
                     onChange={(e) => setScEdit({ ...scEdit, commissionPercent: e.target.value })}
                   />
                 </Field>
               ) : null}
-              <Field label="سياسة التحرير">
-                <select
-                  className="pa-input"
-                  value={scEdit.releasePolicy}
-                  onChange={(e) => setScEdit({ ...scEdit, releasePolicy: e.target.value })}
-                >
-                  {scPolicy.constraints.releasePolicies.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </Field>
+              <PartnerAdminOptionSelect
+                label="متى تصبح العمولة قابلة للسحب؟"
+                name="releasePolicy"
+                value={scEdit.releasePolicy}
+                onChange={(value) => setScEdit({ ...scEdit, releasePolicy: value })}
+                options={RELEASE_POLICY_OPTIONS.filter((option) =>
+                  (scPolicy.constraints.releasePolicies || []).includes(option.value)
+                )}
+              />
               <div className="flex gap-2">
                 <button type="button" className="pa-btn pa-btn--primary" disabled={scSaving} onClick={() => void saveServiceCommissionRule()}>
                   {scSaving ? "جاري الحفظ..." : "حفظ"}
@@ -943,7 +999,7 @@ export default function AdminPartnerMarketingCenter({
       {!loading && activeSection === "fraud" ? (
         <PartnerAdminSection title="الاحتيال والمراجعة" description="مراجعة الحالات ذات المخاطر واتخاذ إجراء واضح مع توثيق السبب.">
           <div className="space-y-4">
-            <PartnerAdminField label="سبب الإجراء">
+            <PartnerAdminField label="سبب القرار" hint="يُحفظ السبب في سجل التدقيق عند اتخاذ إجراء.">
               <textarea
                 className="pa-textarea"
                 placeholder="اكتب سبب الموافقة أو الإبقاء على التعليق..."
@@ -952,10 +1008,10 @@ export default function AdminPartnerMarketingCenter({
               />
             </PartnerAdminField>
             <PartnerAdminToolbar>
-              <button type="button" className="pa-btn pa-btn--success" onClick={() => void fraudAction("release")}>
+              <button type="button" className="pa-btn pa-btn--success" disabled={!selectedEntitlement || !fraudReason.trim()} onClick={() => void fraudAction("release")}>
                 الموافقة
               </button>
-              <button type="button" className="pa-btn pa-btn--secondary" onClick={() => void fraudAction("keep_hold")}>
+              <button type="button" className="pa-btn pa-btn--secondary" disabled={!selectedEntitlement || !fraudReason.trim()} onClick={() => void fraudAction("keep_hold")}>
                 الإبقاء على التعليق
               </button>
             </PartnerAdminToolbar>
@@ -963,9 +1019,15 @@ export default function AdminPartnerMarketingCenter({
               <PartnerAdminEmptyState
                 icon="🛡️"
                 title="لا توجد حالات تحتاج مراجعة حاليًا"
-                description="عند وجود حالات معلّقة بسبب المخاطر ستظهر هنا."
+                description="ستظهر هنا تلقائيًا الحالات التي يضعها نظام مكافحة الاحتيال قيد المراجعة."
               />
             ) : (
+              <>
+              <div className="pa-fraud-summary">
+                <PartnerAdminBadge tone="warning">عالية: {fraudQueue.filter((row) => row.riskLevel === "HIGH").length}</PartnerAdminBadge>
+                <PartnerAdminBadge tone="danger">محظورة: {fraudQueue.filter((row) => row.riskLevel === "BLOCKED").length}</PartnerAdminBadge>
+                <span className="pa-count-badge">{fraudQueue.length.toLocaleString("ar")} حالة</span>
+              </div>
               <PartnerAdminTable>
                 <thead>
                   <tr>
@@ -1001,6 +1063,7 @@ export default function AdminPartnerMarketingCenter({
                   ))}
                 </tbody>
               </PartnerAdminTable>
+              </>
             )}
           </div>
         </PartnerAdminSection>
@@ -1012,20 +1075,26 @@ export default function AdminPartnerMarketingCenter({
             <PartnerAdminEmptyState icon="🧾" title="لا توجد سجلات" description="ستظهر هنا عمليات التحديث والتدقيق عند حدوثها." />
           ) : (
             <PartnerAdminTable>
-              <thead><tr><th>الإجراء</th><th>الكيان</th><th>المعرف</th><th>السبب</th><th>التاريخ</th></tr></thead>
+              <thead><tr><th>الإجراء</th><th>الكيان</th><th>المعرف</th><th>السبب</th><th>المسؤول</th><th>التاريخ</th></tr></thead>
               <tbody>
                 {audit.map((a) => (
-                  <tr key={a.id}>
+                  <tr
+                    key={a.id}
+                    className="pa-table-row-clickable"
+                    onClick={() => setSelectedAuditRow(a)}
+                  >
                     <td><PartnerAdminBadge tone="accent">{auditActionLabel(a.action)}</PartnerAdminBadge><span className="block text-xs text-[var(--pa-text-muted)] pa-ltr">{a.action}</span></td>
                     <td>{auditEntityLabel(a.entity_type)}<span className="block text-xs text-[var(--pa-text-muted)] pa-ltr">{a.entity_type}</span></td>
                     <td><span className="pa-code">{formatShortUuid(a.entity_id)}</span></td>
                     <td>{a.reason || "—"}</td>
+                    <td><span className="pa-code">{formatShortUuid(a.actor_user_id)}</span></td>
                     <td>{formatAuditDate(a.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
             </PartnerAdminTable>
           )}
+          <PartnerAdminAuditDrawer row={selectedAuditRow} onClose={() => setSelectedAuditRow(null)} />
         </PartnerAdminSection>
       ) : null}
 

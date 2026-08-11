@@ -695,9 +695,7 @@ export default function AdminPartnerCenterHub() {
       </div></PartnerAdminSection>
 
       <PartnerAdminSection title="تحليلات الشركاء" description="إحصائيات برنامج الشركاء — Aggregation عبر SQL RPC">
-        <h2 className="admin-heading">تحليلات الشركاء</h2>
-        <p className="admin-subheading">إحصائيات برنامج الشركاء — Aggregation عبر SQL RPC</p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="pa-stat-grid pa-stat-grid--5">
           <PartnerAdminStatCard title="عدد الشركاء" value={adminAnalytics?.totalPartners ?? 0} icon="🤝" />
           <PartnerAdminStatCard title="الشركاء النشطين" value={adminAnalytics?.activePartners ?? 0} icon="✅" />
           <PartnerAdminStatCard
@@ -721,9 +719,9 @@ export default function AdminPartnerCenterHub() {
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="pa-surface pa-surface--flat">
-            <h3 className="font-black">أعلى 10 شركاء</h3>
-            <div className="pa-rank-list mt-3">
+          <div className="pa-card">
+            <h3 className="pa-card__title">أعلى 10 شركاء</h3>
+            <div className="pa-rank-list pa-scroll-list mt-3">
               {topPartners.map((partner) => (
                 <Link
                   key={partner.partnerId}
@@ -737,9 +735,9 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-surface pa-surface--flat">
-            <h3 className="font-black">أكثر الخدمات مبيعاً</h3>
-            <div className="pa-rank-list mt-3">
+          <div className="pa-card">
+            <h3 className="pa-card__title">أكثر الخدمات مبيعاً</h3>
+            <div className="pa-rank-list pa-scroll-list mt-3">
               {(adminAnalytics?.topServices || []).map((item) => (
                 <div key={item.serviceType} className="pa-rank-item">
                   <span>{serviceLabel(item.serviceType)}<span className="block text-xs text-[var(--pa-text-muted)] pa-ltr">{item.serviceType}</span></span>
@@ -749,9 +747,9 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-surface pa-surface--flat">
-            <h3 className="font-black">أكثر المستويات انتشاراً</h3>
-            <div className="pa-rank-list mt-3">
+          <div className="pa-card">
+            <h3 className="pa-card__title">أكثر المستويات انتشاراً</h3>
+            <div className="pa-rank-list pa-scroll-list mt-3">
               {(adminAnalytics?.topTiers || []).map((item) => (
                 <div key={item.tierKey} className="pa-rank-item">
                   <span>{item.tierName}</span>
@@ -761,11 +759,11 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-surface pa-surface--flat">
-            <h3 className="font-black">آخر التسجيلات</h3>
-            <div className="pa-rank-list mt-3">
+          <div className="pa-card">
+            <h3 className="pa-card__title">آخر التسجيلات</h3>
+            <div className="pa-rank-list pa-scroll-list mt-3">
               {(adminAnalytics?.latestSignups || []).map((item) => (
-                <div key={item.id} className="admin-list-item text-sm">
+                <div key={item.id} className="pa-rank-item text-sm">
                   <p className="font-bold">{item.username || "عميل"}</p>
                   <p className="admin-muted">{formatDate(item.registeredAt)}</p>
                 </div>
@@ -773,11 +771,11 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-surface pa-surface--flat lg:col-span-2">
-            <h3 className="font-black">آخر عمليات السحب</h3>
-            <div className="pa-rank-list mt-3">
+          <div className="pa-card lg:col-span-2">
+            <h3 className="pa-card__title">آخر عمليات السحب</h3>
+            <div className="pa-rank-list pa-scroll-list mt-3">
               {(adminAnalytics?.latestWithdrawals || []).map((item) => (
-                <div key={item.id} className="admin-list-item text-sm">
+                <div key={item.id} className="pa-rank-item text-sm">
                   <span>
                     {formatPartnerMoney(item.amount)} {item.currency} · {item.network}
                   </span>
@@ -790,11 +788,11 @@ export default function AdminPartnerCenterHub() {
         </div>
       </PartnerAdminSection>
 
-      <PartnerAdminSection title="أبرز الشرkاء" description="ترتيب سريع حسب التسجيلات والأرباح.">
+      <PartnerAdminSection title="أبرز الشركاء" description="ترتيب سريع حسب التسجيلات والأرباح.">
         <div className="pa-panel-grid pa-panel-grid--2">
-        <div className="pa-surface pa-surface--flat">
-          <h2 className="admin-heading">أفضل الشركاء — التسجيلات</h2>
-          <div className="pa-rank-list mt-3">
+        <div className="pa-card">
+          <h3 className="pa-card__title">أفضل الشركاء — التسجيلات</h3>
+          <div className="pa-rank-list pa-scroll-list mt-3">
             {(summary?.topBySignups || []).map((partner) => (
               <Link
                 key={partner.id}
@@ -808,9 +806,9 @@ export default function AdminPartnerCenterHub() {
           </div>
         </div>
 
-        <div className="admin-surface p-5">
-          <h2 className="admin-heading">أفضل الشركاء — الأرباح</h2>
-          <div className="pa-rank-list mt-3">
+        <div className="pa-card">
+          <h3 className="pa-card__title">أفضل الشركاء — الأرباح</h3>
+          <div className="pa-rank-list pa-scroll-list mt-3">
             {(summary?.topByEarnings || []).map((partner) => (
               <Link
                 key={partner.id}
@@ -928,14 +926,12 @@ export default function AdminPartnerCenterHub() {
       ) : null}
 
       {activeTab === "withdrawals" ? (
-      <section className="admin-surface p-5">
+      <PartnerAdminSection
+        title="السحوبات والمحفظة"
+        description="إدارة طلبات السحب — الخصم من الرصيد يتم فقط عند تأكيد الدفع."
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="admin-heading">السحوبات والمحفظة</h2>
-            <p className="admin-subheading">
-              إدارة طلبات السحب — الخصم من الرصيد يتم فقط عند تأكيد الدفع
-            </p>
-          </div>
+          <div />
           <div className="flex flex-wrap gap-2">
             {WITHDRAWAL_STATUSES.map((status) => (
               <button
@@ -982,8 +978,14 @@ export default function AdminPartnerCenterHub() {
           />
         </div>
 
-        <div className="admin-scroll-panel admin-scroll-panel--table admin-table-wrap mt-4">
-          <table className="admin-table">
+        {withdrawals.length === 0 && !withdrawalsLoading ? (
+          <PartnerAdminEmptyState
+            icon="💳"
+            title="لا توجد طلبات سحب مطابقة للفلاتر الحالية"
+            description="جرّب تغيير الحالة أو البحث لعرض النتائج."
+          />
+        ) : (
+        <PartnerAdminTable>
             <thead>
               <tr>
                 <th>الشريك</th>
@@ -1058,9 +1060,9 @@ export default function AdminPartnerCenterHub() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
-      </section>
+        </PartnerAdminTable>
+        )}
+      </PartnerAdminSection>
       ) : null}
       </div>
     </PartnerAdminShell>

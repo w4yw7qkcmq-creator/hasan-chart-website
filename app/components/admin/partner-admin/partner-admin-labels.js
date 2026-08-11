@@ -8,21 +8,65 @@ export const AUDIT_ACTION_LABELS = Object.freeze({
   delete: "حذف",
   activate: "تفعيل",
   deactivate: "إيقاف",
+  pause: "إيقاف مؤقت",
+  resume: "استئناف",
+  complete: "إكمال",
+  cancel: "إلغاء",
   publish: "نشر",
   reverse: "عكس",
   approve: "موافقة",
   reject: "رفض",
+  hold: "تعليق",
+  release: "تحرير",
+  release_hold: "تحرير",
+  keep_hold: "إبقاء على التعليق",
 });
 
 export const AUDIT_ENTITY_LABELS = Object.freeze({
   qualified_referral_reward_rule: "قاعدة مكافأة المستخدم المؤهل",
   service_commission_rule: "قاعدة عمولة خدمة",
-  partner_commission_rule: "قاعدة عمولة",
+  partner_commission_rule: "قاعدة عمولة خدمة",
+  reward_entitlement: "استحقاق مكافأة",
   campaign: "حملة",
+  campaign_program: "حملة",
   mission: "مهمة",
   partner_tier: "مستوى شريك",
+  tier: "مستوى شريك",
   partner_reward: "مكافأة شريك",
+  milestone: "معلم",
+  performance_bonus_rule: "قاعدة مكافأة أداء",
 });
+
+export const TIER_POLICY_OPTIONS = Object.freeze([
+  {
+    value: "use_partner_tier",
+    label: "حسب مستوى الشريك",
+    description: "تُستخدم نسبة مستوى الشريك الحالية، مثل 10% للشريك و15% للفضي…",
+  },
+  {
+    value: "fixed_service_rate",
+    label: "نسبة ثابتة لهذه الخدمة",
+    description: "يتم استخدام نسبة ثابتة لهذه الخدمة بغض النظر عن مستوى الشريك.",
+  },
+]);
+
+export const RELEASE_POLICY_OPTIONS = Object.freeze([
+  {
+    value: "on_service_activation",
+    label: "عند تفعيل الخدمة",
+    description: "تصبح العمولة قابلة للتحرير وفق تدفق تفعيل الخدمة.",
+  },
+  {
+    value: "on_profit_approval",
+    label: "عند اعتماد الأرباح",
+    description: "تُحرر العمولة بعد اعتماد الربح الفعلي.",
+  },
+  {
+    value: "manual",
+    label: "تحرير يدوي",
+    description: "تبقى العمولة قيد الانتظار حتى يقوم مسؤول مخوّل بتحريرها.",
+  },
+]);
 
 export const TIER_VISUAL = Object.freeze({
   partner: { icon: "🤝", className: "pa-tier--partner", order: 1 },
@@ -75,4 +119,26 @@ export function serviceLabel(serviceType, displayNameAr) {
 export function riskLevelLabel(level) {
   const key = String(level || "").toLowerCase();
   return RISK_LEVEL_LABELS[key] || level || "—";
+}
+
+export function tierPolicyLabel(value) {
+  const key = String(value || "").toLowerCase();
+  return TIER_POLICY_OPTIONS.find((o) => o.value === key)?.label || value || "—";
+}
+
+export function releasePolicyLabel(value) {
+  const key = String(value || "").toLowerCase();
+  return RELEASE_POLICY_OPTIONS.find((o) => o.value === key)?.label || value || "—";
+}
+
+export function formatAuditStateSummary(state) {
+  if (!state || typeof state !== "object") return "—";
+  const parts = [];
+  if (state.commissionPercent != null) parts.push(`النسبة: ${state.commissionPercent}%`);
+  if (state.isEnabled != null) parts.push(state.isEnabled ? "مفعّلة" : "متوقفة");
+  if (state.tierPolicy) parts.push(tierPolicyLabel(state.tierPolicy));
+  if (state.releasePolicy) parts.push(releasePolicyLabel(state.releasePolicy));
+  if (state.amount != null) parts.push(`المبلغ: ${state.amount}`);
+  if (state.ruleVersion != null) parts.push(`v${state.ruleVersion}`);
+  return parts.length ? parts.join(" · ") : "—";
 }
