@@ -276,48 +276,54 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
   if (!open) return null;
 
   return (
-    <div className="admin-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" dir="rtl">
-      <div className="admin-panel max-h-[90vh] w-full max-w-3xl overflow-y-auto space-y-4 p-6">
+    <div className="pa-wizard-overlay" dir="rtl">
+      <div className="pa-wizard">
         <header className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold">معالج حملة ومهمات — Round 9</h2>
             <p className="text-neutral-400 text-sm">7 خطوات — بدون إعادة تحميل الصفحة</p>
           </div>
-          <button type="button" className="admin-btn admin-btn--secondary" onClick={handleClose}>
+          <button type="button" className="pa-btn pa-btn--secondary" onClick={handleClose}>
             إغلاق
           </button>
         </header>
 
-        <nav className="flex flex-wrap gap-2">
+        <nav className="pa-wizard-stepper" aria-label="خطوات معالج الحملة">
           {STEPS.map((s, i) => (
-            <button
+            <div
               key={s.id}
-              type="button"
-              className={`admin-tab text-xs ${i === stepIdx ? "admin-tab--active" : i < stepIdx ? "opacity-80" : "opacity-50"}`}
-              onClick={() => {
-                if (i <= stepIdx) setStepIdx(i);
-              }}
+              className={`pa-wizard-step ${i === stepIdx ? "pa-wizard-step--active" : i < stepIdx ? "pa-wizard-step--done" : ""}`}
             >
-              {i + 1}. {s.label}
-            </button>
+              <button
+                type="button"
+                className="pa-wizard-step__circle"
+                onClick={() => {
+                  if (i <= stepIdx) setStepIdx(i);
+                }}
+              >
+                {i + 1}
+              </button>
+              <span className="pa-wizard-step__label">{s.label}</span>
+            </div>
           ))}
         </nav>
+        <div className="pa-surface space-y-4">
 
         {error ? <p className="text-red-400 text-sm">{error}</p> : null}
 
         {step === "info" ? (
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="رمز الحملة *">
-              <input className="admin-input w-full" value={state.code} onChange={(e) => setState({ ...state, code: e.target.value })} />
+              <input className="pa-input w-full" value={state.code} onChange={(e) => setState({ ...state, code: e.target.value })} />
             </Field>
             <Field label="الاسم بالعربية (name_ar) *">
-              <input className="admin-input w-full" value={state.name_ar} onChange={(e) => setState({ ...state, name_ar: e.target.value })} />
+              <input className="pa-input w-full" value={state.name_ar} onChange={(e) => setState({ ...state, name_ar: e.target.value })} />
             </Field>
             <Field label="مسار الهبوط">
-              <input className="admin-input w-full" value={state.landing_path} onChange={(e) => setState({ ...state, landing_path: e.target.value })} />
+              <input className="pa-input w-full" value={state.landing_path} onChange={(e) => setState({ ...state, landing_path: e.target.value })} />
             </Field>
             <Field label="الوصف" hint="يظهر للشركاء">
-              <textarea className="admin-input w-full" value={state.description} onChange={(e) => setState({ ...state, description: e.target.value })} />
+              <textarea className="pa-input w-full" value={state.description} onChange={(e) => setState({ ...state, description: e.target.value })} />
             </Field>
           </div>
         ) : null}
@@ -326,7 +332,7 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
           <div className="space-y-4">
             <Field label="وضع الجمهور">
               <select
-                className="admin-input w-full"
+                className="pa-input w-full"
                 value={state.audience_mode}
                 onChange={(e) => setState({ ...state, audience_mode: e.target.value })}
               >
@@ -337,12 +343,12 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
             </Field>
             {state.audience_mode === "tier_min" ? (
               <Field label="المستوى الأدنى (min_tier_key)">
-                <input className="admin-input w-full" value={state.min_tier_key} onChange={(e) => setState({ ...state, min_tier_key: e.target.value })} placeholder="partner" />
+                <input className="pa-input w-full" value={state.min_tier_key} onChange={(e) => setState({ ...state, min_tier_key: e.target.value })} placeholder="partner" />
               </Field>
             ) : null}
             {state.audience_mode === "selected_partners" ? (
               <Field label="معرفات الشركاء (UUID مفصولة بفاصلة)">
-                <textarea className="admin-input w-full" value={state.partner_ids} onChange={(e) => setState({ ...state, partner_ids: e.target.value })} />
+                <textarea className="pa-input w-full" value={state.partner_ids} onChange={(e) => setState({ ...state, partner_ids: e.target.value })} />
               </Field>
             ) : null}
           </div>
@@ -351,16 +357,16 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
         {step === "duration" ? (
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="تاريخ البداية *">
-              <input type="datetime-local" className="admin-input w-full" value={state.start_at} onChange={(e) => setState({ ...state, start_at: e.target.value })} />
+              <input type="datetime-local" className="pa-input w-full" value={state.start_at} onChange={(e) => setState({ ...state, start_at: e.target.value })} />
             </Field>
             <Field label="تاريخ الانتهاء *">
-              <input type="datetime-local" className="admin-input w-full" value={state.end_at} onChange={(e) => setState({ ...state, end_at: e.target.value })} />
+              <input type="datetime-local" className="pa-input w-full" value={state.end_at} onChange={(e) => setState({ ...state, end_at: e.target.value })} />
             </Field>
             <Field label="مصادر مسموحة (اختياري)" hint="مفصولة بفاصلة">
-              <input className="admin-input w-full" value={state.allowed_sources} onChange={(e) => setState({ ...state, allowed_sources: e.target.value })} />
+              <input className="pa-input w-full" value={state.allowed_sources} onChange={(e) => setState({ ...state, allowed_sources: e.target.value })} />
             </Field>
             <Field label="وسائط مسموحة (اختياري)">
-              <input className="admin-input w-full" value={state.allowed_mediums} onChange={(e) => setState({ ...state, allowed_mediums: e.target.value })} />
+              <input className="pa-input w-full" value={state.allowed_mediums} onChange={(e) => setState({ ...state, allowed_mediums: e.target.value })} />
             </Field>
           </div>
         ) : null}
@@ -383,21 +389,21 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
                   <Field label="الرمز">
-                    <input className="admin-input w-full" value={m.code} onChange={(e) => {
+                    <input className="pa-input w-full" value={m.code} onChange={(e) => {
                       const missions = [...state.missions];
                       missions[idx] = { ...m, code: e.target.value };
                       setState({ ...state, missions });
                     }} />
                   </Field>
                   <Field label="الاسم بالعربية">
-                    <input className="admin-input w-full" value={m.name_ar} onChange={(e) => {
+                    <input className="pa-input w-full" value={m.name_ar} onChange={(e) => {
                       const missions = [...state.missions];
                       missions[idx] = { ...m, name_ar: e.target.value };
                       setState({ ...state, missions });
                     }} />
                   </Field>
                   <Field label="النوع">
-                    <select className="admin-input w-full" value={m.mission_type} onChange={(e) => {
+                    <select className="pa-input w-full" value={m.mission_type} onChange={(e) => {
                       const missions = [...state.missions];
                       missions[idx] = { ...m, mission_type: e.target.value };
                       setState({ ...state, missions });
@@ -408,14 +414,14 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
                     </select>
                   </Field>
                   <Field label="الهدف">
-                    <input type="number" className="admin-input w-full" value={m.target_value} onChange={(e) => {
+                    <input type="number" className="pa-input w-full" value={m.target_value} onChange={(e) => {
                       const missions = [...state.missions];
                       missions[idx] = { ...m, target_value: Number(e.target.value) };
                       setState({ ...state, missions });
                     }} />
                   </Field>
                   <Field label="مكافأة المهمة (USD)">
-                    <input type="number" className="admin-input w-full" value={m.reward_amount} onChange={(e) => {
+                    <input type="number" className="pa-input w-full" value={m.reward_amount} onChange={(e) => {
                       const missions = [...state.missions];
                       missions[idx] = { ...m, reward_amount: Number(e.target.value) };
                       setState({ ...state, missions });
@@ -426,7 +432,7 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
             ))}
             <button
               type="button"
-              className="admin-btn admin-btn--secondary"
+              className="pa-btn pa-btn--secondary"
               onClick={() => setState({ ...state, missions: [...state.missions, { ...EMPTY_MISSION, code: `${state.code || "M"}_${state.missions.length + 1}` }] })}
             >
               + إضافة مهمة
@@ -438,7 +444,7 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
           <div className="space-y-4">
             <Field label="تجاوز عمولة الحملة">
               <select
-                className="admin-input w-full"
+                className="pa-input w-full"
                 value={state.reward.mode}
                 onChange={(e) => setState({ ...state, reward: { ...state.reward, mode: e.target.value } })}
               >
@@ -509,25 +515,26 @@ export default function AdminCampaignMissionWizard({ open, onClose, onSaved, ini
             ) : null}
             <p className="text-neutral-400 text-sm">اختر كيفية حفظ الحملة:</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="admin-btn admin-btn--secondary" disabled={saving} onClick={() => void submit({ schedule: false, activate: false })}>
+              <button type="button" className="pa-btn pa-btn--secondary" disabled={saving} onClick={() => void submit({ schedule: false, activate: false })}>
                 حفظ كمسودة
               </button>
-              <button type="button" className="admin-btn admin-btn--secondary" disabled={saving} onClick={() => void submit({ schedule: true })}>
+              <button type="button" className="pa-btn pa-btn--secondary" disabled={saving} onClick={() => void submit({ schedule: true })}>
                 جدولة
               </button>
-              <button type="button" className="admin-btn admin-btn--primary" disabled={saving} onClick={() => void submit({ activate: true })}>
+              <button type="button" className="pa-btn pa-btn--primary" disabled={saving} onClick={() => void submit({ activate: true })}>
                 {saving ? "جاري النشر..." : "نشر وتفعيل"}
               </button>
             </div>
           </div>
         ) : null}
 
-        <footer className="flex justify-between gap-2 pt-2 border-t border-neutral-800">
-          <button type="button" className="admin-btn admin-btn--secondary" disabled={stepIdx === 0} onClick={goBack}>
+        </div>
+        <footer className="pa-wizard-footer">
+          <button type="button" className="pa-btn pa-btn--secondary" disabled={stepIdx === 0} onClick={goBack}>
             السابق
           </button>
           {step !== "publish" ? (
-            <button type="button" className="admin-btn admin-btn--primary" onClick={() => void goNext()}>
+            <button type="button" className="pa-btn pa-btn--primary" onClick={() => void goNext()}>
               التالي
             </button>
           ) : null}

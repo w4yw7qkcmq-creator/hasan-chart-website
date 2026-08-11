@@ -7,6 +7,19 @@ import { adminFetch } from "../../../lib/admin-fetch";
 import { formatPartnerMoney, WITHDRAWAL_NETWORKS } from "../../../lib/partner-shared";
 import StatusBadge from "../../(app)/admin/components/StatusBadge";
 import AdminPartnerMarketingCenter from "./AdminPartnerMarketingCenter";
+import {
+  PartnerAdminShell,
+  PartnerAdminHeader,
+  PartnerAdminTabs,
+  PartnerAdminSection,
+  PartnerAdminStatCard,
+  PartnerAdminEmptyState,
+  PartnerAdminBadge,
+  PartnerAdminTable,
+  PartnerAdminToolbar,
+  PartnerAdminSegmented,
+  serviceLabel,
+} from "./partner-admin";
 
 const WITHDRAWAL_STATUSES = ["all", "pending", "approved", "rejected", "paid"];
 
@@ -19,13 +32,13 @@ const WITHDRAWAL_STATUS_LABELS = {
 };
 
 const HUB_TABS = [
-  { id: "overview", label: "نظرة عامة" },
-  { id: "partners", label: "الشركاء" },
-  { id: "commissions", label: "العمولات والمكافآت" },
-  { id: "campaigns", label: "الحملات والمهمات" },
-  { id: "withdrawals", label: "السحوبات" },
-  { id: "fraud", label: "الاحتيال والمراجعة" },
-  { id: "audit", label: "السجل والتدقيق" },
+  { id: "overview", label: "نظرة عامة" , icon: "📊" },
+  { id: "partners", label: "الشركاء" , icon: "🤝" },
+  { id: "commissions", label: "العمولات والمكافآت" , icon: "💰" },
+  { id: "campaigns", label: "الحملات والمهمات" , icon: "🎯" },
+  { id: "withdrawals", label: "السحوبات" , icon: "💳" },
+  { id: "fraud", label: "الاحتيال والمراجعة" , icon: "🛡️" },
+  { id: "audit", label: "السجل والتدقيق" , icon: "🧾" },
 ];
 
 const HEALTH_CHECK_LABELS = {
@@ -34,22 +47,6 @@ const HEALTH_CHECK_LABELS = {
   commissionRules: "قواعد العمولات",
 };
 
-function AdminStatCard({ title, value, icon }) {
-  return (
-    <div className="admin-stat-card relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-400/10" />
-      <div className="relative z-10 flex items-start justify-between gap-4">
-        <div>
-          <p className="admin-stat-card__title">{title}</p>
-          <h3 className="admin-stat-card__value">{value}</h3>
-        </div>
-        <div className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/20 bg-black/25 text-xl">
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function formatDate(value) {
   if (!value) return "—";
@@ -113,6 +110,7 @@ export default function AdminPartnerCenterHub() {
   const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
   const [tiers, setTiers] = useState([]);
   const [tierFilter, setTierFilter] = useState("all");
+  const [partnerSearch, setPartnerSearch] = useState("");
   const [withdrawalStatus, setWithdrawalStatus] = useState("pending");
   const [withdrawalNetwork, setWithdrawalNetwork] = useState("all");
   const [withdrawalSearch, setWithdrawalSearch] = useState("");
@@ -420,12 +418,21 @@ export default function AdminPartnerCenterHub() {
   };
 
   const filteredPartners = useMemo(() => {
-    if (!tierFilter || tierFilter === "all") {
-      return partners;
+    let list = partners;
+    if (tierFilter && tierFilter !== "all") {
+      list = list.filter((partner) => partner.tierKey === tierFilter);
     }
-
-    return partners.filter((partner) => partner.tierKey === tierFilter);
-  }, [partners, tierFilter]);
+    const query = partnerSearch.trim().toLowerCase();
+    if (query) {
+      list = list.filter(
+        (partner) =>
+          String(partner.username || "").toLowerCase().includes(query) ||
+          String(partner.email || "").toLowerCase().includes(query) ||
+          String(partner.referralCode || "").toLowerCase().includes(query)
+      );
+    }
+    return list;
+  }, [partners, tierFilter, partnerSearch]);
 
   const runHealthCheck = async () => {
     setHealthModalOpen(true);
@@ -478,45 +485,22 @@ export default function AdminPartnerCenterHub() {
 
   if (initialLoading) {
     return (
-      <main className="admin-theme-page admin-panel p-6">
-        <p className="admin-muted">جاري تحميل Admin Partner Center...</p>
-      </main>
+      <PartnerAdminShell>
+        <div className="pa-skeleton-grid">
+          <div className="pa-skeleton" />
+          <div className="pa-skeleton" />
+          <div className="pa-skeleton" />
+        </div>
+        <p className="admin-muted text-sm">جاري تحميل مركز إدارة الشركاء...</p>
+      </PartnerAdminShell>
     );
   }
 
   return (
-    <main className="admin-theme-page admin-panel space-y-8 p-4 md:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-cyan-300">مركز إدارة الشركاء</p>
-          <h1 className="mt-2 text-3xl font-black">إدارة برنامج الشركاء</h1>
-          <p className="admin-subheading">
-            مركز موحد لإدارة الشركاء، العمولات، الحملات، السحوبات، والمراجعة.
-          </p>
-        </div>
-        <Link
-          href="/admin/partners/settings"
-          className="admin-btn admin-btn--ghost px-4 py-2 text-sm"
-        >
-          ⚙️ إعدادات الأتمتة
-        </Link>
-        <button
-          type="button"
-          onClick={() => void runHealthCheck()}
-          className="admin-btn admin-btn--ghost px-4 py-2 text-sm"
-        >
-          🩺 فحص النظام
-        </button>
-        <Link href="/admin" className="admin-btn admin-btn--ghost px-4 py-2 text-sm">
-          ← العودة للوحة الإدارة
-        </Link>
-      </header>
+    <PartnerAdminShell>
+      <PartnerAdminHeader onHealthCheck={() => void runHealthCheck()} />
 
-      {error ? (
-        <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-          {error}
-        </div>
-      ) : null}
+      {error ? <div className="pa-alert">{error}</div> : null}
 
       {healthModalOpen ? (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
@@ -698,59 +682,53 @@ export default function AdminPartnerCenterHub() {
         </div>
       ) : null}
 
-      <nav className="flex flex-wrap gap-2 border-b border-neutral-800 pb-4">
-        {HUB_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`admin-tab ${activeTab === tab.id ? "admin-tab--active" : ""}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <PartnerAdminTabs tabs={HUB_TABS} activeTab={activeTab} onChange={setActiveTab} />
+
+      <div className="pa-tab-content">
 
       {activeTab === "overview" ? (
         <>
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <PartnerAdminSection title="مؤشرات الأداء" description="نظرة سريعة على صحة برنامج الشركاء والأرقام الرئيسية."><div className="pa-stat-grid pa-stat-grid--6">
         {topCards.map((card) => (
-          <AdminStatCard key={card.title} title={card.title} value={card.value} icon={card.icon} />
+          <PartnerAdminStatCard key={card.title} title={card.title} value={card.value} icon={card.icon} money={typeof card.value === "string" && card.value.includes("$")} />
         ))}
-      </section>
+      </div></PartnerAdminSection>
 
-      <section className="admin-surface p-5">
+      <PartnerAdminSection title="تحليلات الشركاء" description="إحصائيات برنامج الشركاء — Aggregation عبر SQL RPC">
         <h2 className="admin-heading">تحليلات الشركاء</h2>
         <p className="admin-subheading">إحصائيات برنامج الشركاء — Aggregation عبر SQL RPC</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <AdminStatCard title="عدد الشركاء" value={adminAnalytics?.totalPartners ?? 0} icon="🤝" />
-          <AdminStatCard title="الشركاء النشطين" value={adminAnalytics?.activePartners ?? 0} icon="✅" />
-          <AdminStatCard
+          <PartnerAdminStatCard title="عدد الشركاء" value={adminAnalytics?.totalPartners ?? 0} icon="🤝" />
+          <PartnerAdminStatCard title="الشركاء النشطين" value={adminAnalytics?.activePartners ?? 0} icon="✅" />
+          <PartnerAdminStatCard
             title="إجمالي العمولات"
+            money
             value={formatPartnerMoney(adminAnalytics?.totalCommissions ?? 0)}
             icon="💼"
           />
-          <AdminStatCard
+          <PartnerAdminStatCard
             title="إجمالي السحوبات"
+            money
             value={formatPartnerMoney(adminAnalytics?.totalWithdrawals ?? 0)}
             icon="🏦"
           />
-          <AdminStatCard
+          <PartnerAdminStatCard
             title="إجمالي المبيعات"
+            money
             value={formatPartnerMoney(adminAnalytics?.totalSales ?? 0)}
             icon="📈"
           />
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="admin-surface p-4">
+          <div className="pa-surface pa-surface--flat">
             <h3 className="font-black">أعلى 10 شركاء</h3>
-            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
+            <div className="pa-rank-list mt-3">
               {topPartners.map((partner) => (
                 <Link
                   key={partner.partnerId}
                   href={`/admin/partners/${partner.partnerId}`}
-                  className="admin-list-item"
+                  className="pa-rank-item"
                 >
                   <span className="font-bold">{partner.username}</span>
                   <span className="font-black text-emerald-300">{formatPartnerMoney(partner.totalSales)}</span>
@@ -759,23 +737,23 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="admin-surface p-4">
+          <div className="pa-surface pa-surface--flat">
             <h3 className="font-black">أكثر الخدمات مبيعاً</h3>
-            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
+            <div className="pa-rank-list mt-3">
               {(adminAnalytics?.topServices || []).map((item) => (
-                <div key={item.serviceType} className="admin-list-item">
-                  <span className="font-mono">{item.serviceType}</span>
+                <div key={item.serviceType} className="pa-rank-item">
+                  <span>{serviceLabel(item.serviceType)}<span className="block text-xs text-[var(--pa-text-muted)] pa-ltr">{item.serviceType}</span></span>
                   <span className="font-black">{formatPartnerMoney(item.sales)}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="admin-surface p-4">
+          <div className="pa-surface pa-surface--flat">
             <h3 className="font-black">أكثر المستويات انتشاراً</h3>
-            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
+            <div className="pa-rank-list mt-3">
               {(adminAnalytics?.topTiers || []).map((item) => (
-                <div key={item.tierKey} className="admin-list-item">
+                <div key={item.tierKey} className="pa-rank-item">
                   <span>{item.tierName}</span>
                   <span className="font-black">{item.count}</span>
                 </div>
@@ -783,9 +761,9 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="admin-surface p-4">
+          <div className="pa-surface pa-surface--flat">
             <h3 className="font-black">آخر التسجيلات</h3>
-            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
+            <div className="pa-rank-list mt-3">
               {(adminAnalytics?.latestSignups || []).map((item) => (
                 <div key={item.id} className="admin-list-item text-sm">
                   <p className="font-bold">{item.username || "عميل"}</p>
@@ -795,9 +773,9 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="admin-surface p-4 lg:col-span-2">
+          <div className="pa-surface pa-surface--flat lg:col-span-2">
             <h3 className="font-black">آخر عمليات السحب</h3>
-            <div className="admin-scroll-panel admin-scroll-panel--list mt-3 space-y-2">
+            <div className="pa-rank-list mt-3">
               {(adminAnalytics?.latestWithdrawals || []).map((item) => (
                 <div key={item.id} className="admin-list-item text-sm">
                   <span>
@@ -810,17 +788,18 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
         </div>
-      </section>
+      </PartnerAdminSection>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="admin-surface p-5">
+      <PartnerAdminSection title="أبرز الشرkاء" description="ترتيب سريع حسب التسجيلات والأرباح.">
+        <div className="pa-panel-grid pa-panel-grid--2">
+        <div className="pa-surface pa-surface--flat">
           <h2 className="admin-heading">أفضل الشركاء — التسجيلات</h2>
-          <div className="admin-scroll-panel admin-scroll-panel--list mt-4 space-y-3">
+          <div className="pa-rank-list mt-3">
             {(summary?.topBySignups || []).map((partner) => (
               <Link
                 key={partner.id}
                 href={`/admin/partners/${partner.id}`}
-                className="admin-list-item"
+                className="pa-rank-item"
               >
                 <span className="font-bold">{partner.username}</span>
                 <span className="font-black text-cyan-300">{partner.signupCount} تسجيل</span>
@@ -831,12 +810,12 @@ export default function AdminPartnerCenterHub() {
 
         <div className="admin-surface p-5">
           <h2 className="admin-heading">أفضل الشركاء — الأرباح</h2>
-          <div className="admin-scroll-panel admin-scroll-panel--list mt-4 space-y-3">
+          <div className="pa-rank-list mt-3">
             {(summary?.topByEarnings || []).map((partner) => (
               <Link
                 key={partner.id}
                 href={`/admin/partners/${partner.id}`}
-                className="admin-list-item"
+                className="pa-rank-item"
               >
                 <span className="font-bold">{partner.username}</span>
                 <span className="font-black text-emerald-300">{formatPartnerMoney(partner.totalEarnings)}</span>
@@ -844,20 +823,28 @@ export default function AdminPartnerCenterHub() {
             ))}
           </div>
         </div>
-      </section>
+        </div>
+      </PartnerAdminSection>
         </>
       ) : null}
 
       {activeTab === "partners" ? (
-      <section className="admin-surface p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="admin-heading">جدول الشركاء</h2>
-          <label className="flex items-center gap-2 text-sm font-bold">
-            <span className="admin-muted">فلتر المستوى:</span>
+      <PartnerAdminSection title="جدول الشركاء" description="إدارة ومراقبة حسابات الشركاء، المستويات، والأرصدة.">
+        <PartnerAdminToolbar>
+          <span className="pa-count-badge">{filteredPartners.length.toLocaleString("ar")} شريك</span>
+          <input
+            type="search"
+            value={partnerSearch}
+            onChange={(event) => setPartnerSearch(event.target.value)}
+            placeholder="بحث بالاسم أو البريد أو رمز الإحالة..."
+            className="pa-input min-w-[240px] flex-1"
+          />
+          <label className="pa-field">
+            <span className="pa-field__label">المستوى</span>
             <select
               value={tierFilter}
               onChange={(event) => setTierFilter(event.target.value)}
-              className="admin-select"
+              className="pa-select min-w-[180px]"
             >
               <option value="all">الكل</option>
               {tiers.map((tier) => (
@@ -867,23 +854,29 @@ export default function AdminPartnerCenterHub() {
               ))}
             </select>
           </label>
-        </div>
-        <div className="admin-scroll-panel admin-scroll-panel--table admin-table-wrap mt-4">
-          <table className="admin-table">
+        </PartnerAdminToolbar>
+        {filteredPartners.length === 0 ? (
+          <PartnerAdminEmptyState
+            icon="🤝"
+            title="لا يوجد الشركاء مطابقون"
+            description="جرّب تغيير البحث أو فلتر المستوى لعرض النتائج."
+          />
+        ) : (
+        <PartnerAdminTable>
             <thead>
               <tr>
                 <th>الشريك</th>
                 <th>البريد</th>
-                <th>Referral Code</th>
+                <th>رمز الإحالة</th>
                 <th>المستوى</th>
-                <th>العمولة %</th>
-                <th>زيارات</th>
-                <th>تسجيلات</th>
-                <th>نشط</th>
+                <th>نسبة العمولة</th>
+                <th>الزيارات</th>
+                <th>التسجيلات</th>
+                <th>النشطون</th>
                 <th>قابل للسحب</th>
                 <th>معلق</th>
-                <th>مكافآت</th>
-                <th>إجمالي</th>
+                <th>المكافآت</th>
+                <th>الإجمالي</th>
                 <th>الحالة</th>
               </tr>
             </thead>
@@ -895,26 +888,26 @@ export default function AdminPartnerCenterHub() {
                       {partner.username}
                     </Link>
                   </td>
-                  <td>{partner.email}</td>
-                  <td className="font-mono">{partner.referralCode}</td>
+                  <td><span className="pa-ltr">{partner.email}</span></td>
+                  <td><span className="pa-code">{partner.referralCode}</span></td>
                   <td>{partner.tierName}</td>
                   <td>{partner.commissionPercent}%</td>
                   <td>{partner.visitCount}</td>
                   <td>{partner.signupCount}</td>
                   <td>{partner.activeAccountCount}</td>
-                  <td>{formatPartnerMoney(partner.balanceWithdrawable)}</td>
-                  <td>{formatPartnerMoney(partner.balancePending)}</td>
-                  <td>{formatPartnerMoney(partner.balanceBonusPending)}</td>
-                  <td>{formatPartnerMoney(partner.totalEarnings)}</td>
+                  <td className="pa-ltr">{formatPartnerMoney(partner.balanceWithdrawable)}</td>
+                  <td className="pa-ltr">{formatPartnerMoney(partner.balancePending)}</td>
+                  <td className="pa-ltr">{formatPartnerMoney(partner.balanceBonusPending)}</td>
+                  <td className="pa-ltr">{formatPartnerMoney(partner.totalEarnings)}</td>
                   <td>
                     <StatusBadge status={partner.status} variant="partner" />
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
-      </section>
+        </PartnerAdminTable>
+        )}
+      </PartnerAdminSection>
 
       ) : null}
 
@@ -1069,6 +1062,7 @@ export default function AdminPartnerCenterHub() {
         </div>
       </section>
       ) : null}
-    </main>
+      </div>
+    </PartnerAdminShell>
   );
 }

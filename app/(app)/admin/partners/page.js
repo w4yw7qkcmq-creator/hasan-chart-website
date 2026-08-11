@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import "../admin-theme.css";
+import "../partner-admin-theme.css";
 import AdminPartnerCenterHub from "../../../components/admin/AdminPartnerCenterHub";
 
 export default function AdminPartnersPage() {

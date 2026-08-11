@@ -6,6 +6,24 @@ import { adminFetch } from "../../../lib/admin-fetch";
 import { formatPartnerMoney } from "../../../lib/partner-shared";
 import { campaignStatusLabel } from "../../../lib/partner-center/ui-labels";
 import AdminCampaignMissionWizard from "./AdminCampaignMissionWizard";
+import {
+  PartnerAdminSection,
+  PartnerAdminStatCard,
+  PartnerAdminEmptyState,
+  PartnerAdminBadge,
+  PartnerAdminTable,
+  PartnerAdminToolbar,
+  PartnerAdminField,
+  PartnerAdminSegmented,
+  TIER_VISUAL,
+  auditActionLabel,
+  auditEntityLabel,
+  formatShortUuid,
+  formatAuditDate,
+  serviceLabel,
+  riskLevelLabel,
+} from "./partner-admin";
+
 
 const SECTIONS = [
   { id: "overview", label: "نظرة عامة" },
@@ -60,19 +78,18 @@ const CAMPAIGN_ACTION_LABELS = {
   delete_draft: "حذف المسودة",
 };
 
-function Field({ label, children }) {
+function Field({ label, children, hint }) {
   return (
-    <label className="block space-y-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
+    <PartnerAdminField label={label} hint={hint}>
       {children}
-    </label>
+    </PartnerAdminField>
   );
 }
 
 function PreviewPanel({ preview, warnings }) {
   if (!preview) return null;
   return (
-    <div className="admin-panel mt-4 space-y-2 border border-amber-500/30 p-4">
+    <div className="pa-surface mt-4 space-y-2 border border-amber-500/30 p-4">
       <h4 className="font-semibold">معاينة قبل الحفظ</h4>
       <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(preview, null, 2)}</pre>
       {(warnings || []).map((w) => (
@@ -433,7 +450,7 @@ export default function AdminPartnerMarketingCenter({
     activeSection === "levels" || activeSection === "commissions-bundle";
 
   return (
-    <div className="admin-page space-y-6" dir="rtl">
+    <div className={embedded ? "pa-embedded-root" : "admin-page space-y-6"} dir="rtl">
       {!embedded ? (
         <>
           <header className="flex flex-wrap items-center justify-between gap-4">
@@ -442,7 +459,7 @@ export default function AdminPartnerMarketingCenter({
           <h1 className="admin-page-title">مركز التسويق — الشركاء</h1>
           <p className="admin-page-subtitle">CRUD كامل — مهام، حملات، مستويات، معالم، مراجعة مخاطر</p>
         </div>
-        <Link href="/admin/partners" className="admin-btn admin-btn--secondary">
+        <Link href="/admin/partners" className="pa-btn pa-btn--secondary">
           ← إدارة برنامج الشركاء
         </Link>
       </header>
@@ -474,9 +491,9 @@ export default function AdminPartnerMarketingCenter({
             ["مكافآت معلقة", formatPartnerMoney(overview.pendingRewardsTotal)],
             ["قيد المراجعة", formatPartnerMoney(overview.heldRewardsTotal)],
           ].map(([title, value]) => (
-            <div key={title} className="admin-stat-card">
-              <p className="admin-stat-card__title">{title}</p>
-              <h3 className="admin-stat-card__value">{value}</h3>
+            <div key={title} className="pa-stat-card">
+              <p className="pa-stat-card__label">{title}</p>
+              <h3 className="pa-stat-card__value">{value}</h3>
             </div>
           ))}
         </div>
@@ -484,36 +501,36 @@ export default function AdminPartnerMarketingCenter({
 
       {!loading && activeSection === "missions" ? (
         <div className="space-y-6">
-          <div className="admin-panel grid gap-3 md:grid-cols-2">
+          <div className="pa-surface grid gap-3 md:grid-cols-2">
             <Field label="الرمز">
-              <input className="admin-input w-full" value={missionForm.code} onChange={(e) => setMissionForm({ ...missionForm, code: e.target.value })} />
+              <input className="pa-input w-full" value={missionForm.code} onChange={(e) => setMissionForm({ ...missionForm, code: e.target.value })} />
             </Field>
             <Field label="الاسم">
-              <input className="admin-input w-full" value={missionForm.name} onChange={(e) => setMissionForm({ ...missionForm, name: e.target.value })} />
+              <input className="pa-input w-full" value={missionForm.name} onChange={(e) => setMissionForm({ ...missionForm, name: e.target.value })} />
             </Field>
             <Field label="النوع">
-              <select className="admin-input w-full" value={missionForm.mission_type} onChange={(e) => setMissionForm({ ...missionForm, mission_type: e.target.value })}>
+              <select className="pa-input w-full" value={missionForm.mission_type} onChange={(e) => setMissionForm({ ...missionForm, mission_type: e.target.value })}>
                 {MISSION_TYPES.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </Field>
             <Field label="الهدف">
-              <input type="number" className="admin-input w-full" value={missionForm.target_value} onChange={(e) => setMissionForm({ ...missionForm, target_value: Number(e.target.value) })} />
+              <input type="number" className="pa-input w-full" value={missionForm.target_value} onChange={(e) => setMissionForm({ ...missionForm, target_value: Number(e.target.value) })} />
             </Field>
             <Field label="المكافأة">
-              <input type="number" className="admin-input w-full" value={missionForm.reward_amount} onChange={(e) => setMissionForm({ ...missionForm, reward_amount: Number(e.target.value) })} />
+              <input type="number" className="pa-input w-full" value={missionForm.reward_amount} onChange={(e) => setMissionForm({ ...missionForm, reward_amount: Number(e.target.value) })} />
             </Field>
             <Field label="الوصف">
-              <textarea className="admin-input w-full" value={missionForm.description} onChange={(e) => setMissionForm({ ...missionForm, description: e.target.value })} />
+              <textarea className="pa-input w-full" value={missionForm.description} onChange={(e) => setMissionForm({ ...missionForm, description: e.target.value })} />
             </Field>
             <div className="flex gap-2 md:col-span-2">
-              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void previewMission()}>معاينة</button>
-              <button type="button" className="admin-btn admin-btn--primary" onClick={() => void saveMission()}>إنشاء مسودة</button>
+              <button type="button" className="pa-btn pa-btn--secondary" onClick={() => void previewMission()}>معاينة</button>
+              <button type="button" className="pa-btn pa-btn--primary" onClick={() => void saveMission()}>إنشاء مسودة</button>
             </div>
             <PreviewPanel preview={missionPreview?.preview} warnings={missionPreview?.warnings} />
           </div>
-          <table className="admin-table w-full">
+          <PartnerAdminTable>
             <thead>
               <tr><th>الاسم</th><th>v</th><th>الهدف</th><th>المكافأة</th><th>الحالة</th><th>إجراءات</th></tr>
             </thead>
@@ -526,14 +543,14 @@ export default function AdminPartnerMarketingCenter({
                   <td>{formatPartnerMoney(m.reward_amount)}</td>
                   <td>{m.status}</td>
                   <td className="space-x-1">
-                    {m.status === "draft" ? <button type="button" className="admin-btn admin-btn--sm" onClick={() => void setMissionStatus(m.id, "active")}>تفعيل</button> : null}
-                    {m.status === "active" ? <button type="button" className="admin-btn admin-btn--sm" onClick={() => void setMissionStatus(m.id, "paused")}>إيقاف</button> : null}
-                    <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void createMissionVersion(m.id)}>إصدار جديد</button>
+                    {m.status === "draft" ? <button type="button" className="pa-btn pa-btn--sm" onClick={() => void setMissionStatus(m.id, "active")}>تفعيل</button> : null}
+                    {m.status === "active" ? <button type="button" className="pa-btn pa-btn--sm" onClick={() => void setMissionStatus(m.id, "paused")}>إيقاف</button> : null}
+                    <button type="button" className="pa-btn pa-btn--sm pa-btn--secondary" onClick={() => void createMissionVersion(m.id)}>إصدار جديد</button>
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </PartnerAdminTable>
         </div>
       ) : null}
 
@@ -552,13 +569,22 @@ export default function AdminPartnerMarketingCenter({
                 </button>
               ))}
             </div>
-            <button type="button" className="admin-btn admin-btn--primary" onClick={() => setWizardOpen(true)}>
+            <button type="button" className="pa-btn pa-btn--primary" onClick={() => setWizardOpen(true)}>
               + إنشاء حملة
             </button>
           </div>
 
           {!visibleCampaigns.length ? (
-            <p className="text-neutral-400">لا توجد حملات في هذا القسم.</p>
+            <PartnerAdminEmptyState
+              icon="🎯"
+              title="لا توجد حملات حتى الآن"
+              description="أنشئ أول حملة لتحفيز الشركاء بالمهمات والمكافآت قابلة للقياس."
+              action={
+                <button type="button" className="pa-btn pa-btn--primary" onClick={() => setWizardOpen(true)}>
+                  إنشاء أول حملة
+                </button>
+              }
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {visibleCampaigns.map((c) => (
@@ -584,32 +610,32 @@ export default function AdminPartnerMarketingCenter({
                   <div className="flex flex-wrap gap-1 pt-2">
                     {c.status === "draft" && c.tracking_metadata?.lifecycle !== "scheduled" ? (
                       <>
-                        <button type="button" className="admin-btn admin-btn--sm" onClick={() => setWizardOpen(true)}>تعديل مسودة</button>
-                        <button type="button" className="admin-btn admin-btn--sm" onClick={() => void runCampaignAction(c, "schedule")}>جدولة</button>
-                        <button type="button" className="admin-btn admin-btn--sm admin-btn--primary" onClick={() => void runCampaignAction(c, "activate")}>تفعيل</button>
-                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "delete_draft")}>حذف</button>
+                        <button type="button" className="pa-btn pa-btn--sm" onClick={() => setWizardOpen(true)}>تعديل مسودة</button>
+                        <button type="button" className="pa-btn pa-btn--sm" onClick={() => void runCampaignAction(c, "schedule")}>جدولة</button>
+                        <button type="button" className="pa-btn pa-btn--sm pa-btn--primary" onClick={() => void runCampaignAction(c, "activate")}>تفعيل</button>
+                        <button type="button" className="pa-btn pa-btn--sm pa-btn--secondary" onClick={() => void runCampaignAction(c, "delete_draft")}>حذف</button>
                       </>
                     ) : null}
                     {c.tracking_metadata?.lifecycle === "scheduled" || (c.status === "draft" && c.tracking_metadata?.scheduled) ? (
                       <>
-                        <button type="button" className="admin-btn admin-btn--sm admin-btn--primary" onClick={() => void runCampaignAction(c, "activate")}>تفعيل</button>
-                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "cancel")}>إلغاء</button>
+                        <button type="button" className="pa-btn pa-btn--sm pa-btn--primary" onClick={() => void runCampaignAction(c, "activate")}>تفعيل</button>
+                        <button type="button" className="pa-btn pa-btn--sm pa-btn--secondary" onClick={() => void runCampaignAction(c, "cancel")}>إلغاء</button>
                       </>
                     ) : null}
                     {c.status === "active" ? (
                       <>
-                        <button type="button" className="admin-btn admin-btn--sm" onClick={() => void runCampaignAction(c, "pause")}>إيقاف</button>
-                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "complete")}>إكمال</button>
+                        <button type="button" className="pa-btn pa-btn--sm" onClick={() => void runCampaignAction(c, "pause")}>إيقاف</button>
+                        <button type="button" className="pa-btn pa-btn--sm pa-btn--secondary" onClick={() => void runCampaignAction(c, "complete")}>إكمال</button>
                       </>
                     ) : null}
                     {c.status === "paused" ? (
                       <>
-                        <button type="button" className="admin-btn admin-btn--sm admin-btn--primary" onClick={() => void runCampaignAction(c, "resume")}>استئناف</button>
-                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "complete")}>إكمال</button>
+                        <button type="button" className="pa-btn pa-btn--sm pa-btn--primary" onClick={() => void runCampaignAction(c, "resume")}>استئناف</button>
+                        <button type="button" className="pa-btn pa-btn--sm pa-btn--secondary" onClick={() => void runCampaignAction(c, "complete")}>إكمال</button>
                       </>
                     ) : null}
                     {c.status === "ended" ? (
-                      <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "cancel")}>أرشفة/إلغاء</button>
+                      <button type="button" className="pa-btn pa-btn--sm pa-btn--secondary" onClick={() => void runCampaignAction(c, "cancel")}>أرشفة/إلغاء</button>
                     ) : null}
                   </div>
                 </article>
@@ -617,15 +643,15 @@ export default function AdminPartnerMarketingCenter({
             </div>
           )}
 
-          <details className="admin-panel p-4">
+          <details className="pa-surface p-4">
             <summary className="cursor-pointer font-medium">إنشاء سريع (النموذج القديم)</summary>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <Field label="الرمز"><input className="admin-input w-full" value={campaignForm.code} onChange={(e) => setCampaignForm({ ...campaignForm, code: e.target.value })} /></Field>
-              <Field label="الاسم"><input className="admin-input w-full" value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} /></Field>
-              <Field label="مسار الهبوط"><input className="admin-input w-full" value={campaignForm.landing_path} onChange={(e) => setCampaignForm({ ...campaignForm, landing_path: e.target.value })} /></Field>
+              <Field label="الرمز"><input className="pa-input w-full" value={campaignForm.code} onChange={(e) => setCampaignForm({ ...campaignForm, code: e.target.value })} /></Field>
+              <Field label="الاسم"><input className="pa-input w-full" value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} /></Field>
+              <Field label="مسار الهبوط"><input className="pa-input w-full" value={campaignForm.landing_path} onChange={(e) => setCampaignForm({ ...campaignForm, landing_path: e.target.value })} /></Field>
               <div className="flex gap-2 md:col-span-2">
-                <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void previewCampaign()}>معاينة</button>
-                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void saveCampaign()}>إنشاء مسودة</button>
+                <button type="button" className="pa-btn pa-btn--secondary" onClick={() => void previewCampaign()}>معاينة</button>
+                <button type="button" className="pa-btn pa-btn--primary" onClick={() => void saveCampaign()}>إنشاء مسودة</button>
               </div>
               <PreviewPanel preview={campaignPreview?.preview} warnings={campaignPreview?.warnings} />
             </div>
@@ -640,21 +666,23 @@ export default function AdminPartnerMarketingCenter({
       ) : null}
 
       {!loading && showTierLevels ? (
-        <div className="admin-panel space-y-3">
+        <div className="pa-surface space-y-3">
           <h3 className="text-lg font-semibold">مستويات الشركاء</h3>
           <p className="text-neutral-400 text-sm">نسب المستويات — للعرض فقط</p>
           {activeSection === "commissions-bundle" && scPolicy?.tiers?.length ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="pa-tier-grid">
               {scPolicy.tiers.map((t) => (
-                <div key={t.tierKey} className="rounded-xl border border-neutral-700 p-4">
-                  <p className="font-semibold">{t.tierName}</p>
-                  <p className="text-2xl font-black text-cyan-300 mt-1">{t.commissionPercent}%</p>
-                  <p className="text-xs text-neutral-500 mt-1">{t.tierKey}</p>
+                <div key={t.tierKey} className={`pa-tier-card ${TIER_VISUAL[t.tierKey]?.className || ""}`}>
+                  <div className="pa-tier-card__icon">{TIER_VISUAL[t.tierKey]?.icon || "🏅"}</div>
+                  <p className="pa-tier-card__name">{t.tierName}</p>
+                  <p className="pa-tier-card__percent pa-ltr">{t.commissionPercent}%</p>
+                  <p className="pa-tier-card__meta pa-ltr">{t.tierKey}</p>
+                  <PartnerAdminBadge tone="neutral">للعرض فقط</PartnerAdminBadge>
                 </div>
               ))}
             </div>
           ) : (
-            <table className="admin-table w-full">
+            <PartnerAdminTable>
               <thead><tr><th>المفتاح</th><th>الاسم</th><th>v</th><th>إحالات</th><th>عملاء</th><th>إيراد</th></tr></thead>
               <tbody>
                 {tiers.map((t) => (
@@ -665,68 +693,70 @@ export default function AdminPartnerMarketingCenter({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PartnerAdminTable>
           )}
         </div>
       ) : null}
 
       {!loading && activeSection === "milestones" ? (
-        <table className="admin-table w-full">
+        <PartnerAdminTable>
           <thead><tr><th>الاسم</th><th>المقياس</th><th>العتبة</th><th>المكافأة</th><th>الحالة</th></tr></thead>
           <tbody>
             {milestones.map((m) => (
               <tr key={m.id}><td>{m.name}</td><td>{m.metric}</td><td>{m.threshold_value}</td><td>{formatPartnerMoney(m.reward_amount)}</td><td>{m.status}</td></tr>
             ))}
           </tbody>
-        </table>
+        </PartnerAdminTable>
       ) : null}
 
       {!loading && activeSection === "bonuses" ? (
-        <table className="admin-table w-full">
+        <PartnerAdminTable>
           <thead><tr><th>الاسم</th><th>المقياس</th><th>العتبة</th><th>عينة</th><th>المكافأة</th><th>v</th></tr></thead>
           <tbody>
             {bonuses.map((b) => (
               <tr key={b.id}><td>{b.name}</td><td>{b.metric}</td><td>{b.threshold_value}</td><td>{b.minimum_sample_size}</td><td>{formatPartnerMoney(b.reward_amount)}</td><td>{b.rule_version}</td></tr>
             ))}
           </tbody>
-        </table>
+        </PartnerAdminTable>
       ) : null}
 
       {!loading && showQualifiedReward && qrrPolicy ? (
         <div className="space-y-6">
-          <div className="admin-panel space-y-4">
+          <div className="pa-surface space-y-4">
             <div>
               <h3 className="text-lg font-semibold">مكافأة المستخدم المؤهل</h3>
               <p className="text-neutral-400 text-sm mt-1">
                 المبلغ الذي يحصل عليه الشريك مرة واحدة عندما يصبح المستخدم المدعو مؤهلاً بعد اجتياز شروط التحقق والجودة.
               </p>
-              <p className="text-amber-400 text-sm mt-2">
-                ملاحظة: مكافأة التسجيل (Signup Bonus) منفصلة — مثال: QRR {formatPartnerMoney(qrrPolicy.current?.amount ?? 0.5)} + Signup {formatPartnerMoney(0.2)} = {formatPartnerMoney(Number(qrrPolicy.current?.amount ?? 0.5) + 0.2)} عند التأهل.
-              </p>
+              <div className="pa-warning-box mt-2">
+                <p className="text-sm">
+                  ملاحظة: مكافأة التسجيل ($0.20) منفصلة عن مكافأة المستخدم المؤهل ({formatPartnerMoney(qrrPolicy.current?.amount ?? 0.5)}).
+                </p>
+              </div>
               <p className="text-neutral-400 text-sm mt-1">
                 هذه المكافأة تُصرف فقط بعد تأهل المستخدم وفق سياسة التأهيل.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">القيمة الحالية</p>
-                <h3 className="admin-stat-card__value">
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">القيمة الحالية</p>
+                <h3 className="pa-stat-card__value">
                   {qrrPolicy.current?.isEnabled
                     ? formatPartnerMoney(qrrPolicy.current.amount)
                     : "معطّلة"}
                 </h3>
               </div>
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">إصدار القاعدة</p>
-                <h3 className="admin-stat-card__value">v{qrrPolicy.current?.ruleVersion ?? "—"}</h3>
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">إصدار القاعدة</p>
+                <h3 className="pa-stat-card__value">v{qrrPolicy.current?.ruleVersion ?? "—"}</h3>
               </div>
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">مكافآت مدفوعة</p>
-                <h3 className="admin-stat-card__value">{qrrPolicy.stats.creditedCount}</h3>
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">مكافآت مدفوعة</p>
+                <h3 className="pa-stat-card__value">{qrrPolicy.stats.creditedCount}</h3>
               </div>
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">إجمالي التكلفة</p>
-                <h3 className="admin-stat-card__value">{formatPartnerMoney(qrrPolicy.stats.totalPaid)}</h3>
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">إجمالي التكلفة</p>
+                <h3 className="pa-stat-card__value">{formatPartnerMoney(qrrPolicy.stats.totalPaid)}</h3>
               </div>
             </div>
             <Field label={`قيمة المكافأة (${qrrPolicy.constraints.min} – ${qrrPolicy.constraints.max} USD)`}>
@@ -755,7 +785,7 @@ export default function AdminPartnerMarketingCenter({
             ) : null}
             <button
               type="button"
-              className="admin-btn admin-btn--primary"
+              className="pa-btn pa-btn--primary"
               disabled={qrrSaving}
               onClick={() => void saveQualifiedReward()}
             >
@@ -767,33 +797,33 @@ export default function AdminPartnerMarketingCenter({
 
       {!loading && showServiceCommissions && scPolicy ? (
         <div className="space-y-6">
-          <div className="admin-panel space-y-4">
+          <div className="pa-surface space-y-4">
             <h3 className="text-lg font-semibold">عمولات الخدمات</h3>
             <p className="text-neutral-400 text-sm">
               نسبة الشريك الفعلية تعتمد على مستواه عندما تكون سياسة النسبة «حسب مستوى الشريك».
             </p>
             <div className="grid gap-4 md:grid-cols-4">
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">إجمالي عمولات الخدمات</p>
-                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.serviceCommissionsTotal)}</h3>
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">إجمالي عمولات الخدمات</p>
+                <h3 className="pa-stat-card__value">{formatPartnerMoney(scPolicy.metrics.serviceCommissionsTotal)}</h3>
               </div>
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">قيد الانتظار</p>
-                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.pending)}</h3>
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">قيد الانتظار</p>
+                <h3 className="pa-stat-card__value">{formatPartnerMoney(scPolicy.metrics.pending)}</h3>
               </div>
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">قابل للسحب</p>
-                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.withdrawable)}</h3>
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">قابل للسحب</p>
+                <h3 className="pa-stat-card__value">{formatPartnerMoney(scPolicy.metrics.withdrawable)}</h3>
               </div>
-              <div className="admin-stat-card">
-                <p className="admin-stat-card__title">معكوسة</p>
-                <h3 className="admin-stat-card__value">{formatPartnerMoney(scPolicy.metrics.reversed)}</h3>
+              <div className="pa-stat-card">
+                <p className="pa-stat-card__label">معكوسة</p>
+                <h3 className="pa-stat-card__value">{formatPartnerMoney(scPolicy.metrics.reversed)}</h3>
               </div>
             </div>
           </div>
 
           {activeSection !== "commissions-bundle" ? (
-          <div className="admin-panel space-y-3">
+          <div className="pa-surface space-y-3">
             <h4 className="font-semibold">نسب مستويات الشركاء</h4>
             <div className="flex flex-wrap gap-3 text-sm">
               {(scPolicy.tiers || []).map((t) => (
@@ -805,7 +835,7 @@ export default function AdminPartnerMarketingCenter({
           </div>
           ) : null}
 
-          <table className="admin-table w-full">
+          <PartnerAdminTable>
             <thead>
               <tr>
                 <th>الخدمة</th>
@@ -821,13 +851,13 @@ export default function AdminPartnerMarketingCenter({
               {(scPolicy.services || []).map((s) => (
                 <tr key={s.id || s.serviceType}>
                   <td>
-                    <div className="font-medium">{s.displayNameAr}</div>
-                    <div className="text-xs text-neutral-500">{s.serviceType}</div>
+                    <div className="font-medium">{serviceLabel(s.serviceType, s.displayNameAr)}</div>
+                    <div className="text-xs text-[var(--pa-text-muted)] pa-ltr">{s.serviceType}</div>
                     {s.serviceType === "account_management" && !s.isEnabled ? (
                       <p className="text-amber-400 text-xs mt-1">معلّقة حتى توفر حدث اعتماد الأرباح</p>
                     ) : null}
                   </td>
-                  <td>{s.isEnabled ? "مفعّلة" : "متوقفة"}</td>
+                  <td><PartnerAdminBadge tone={s.isEnabled ? "success" : "warning"}>{s.isEnabled ? "مفعّلة" : "متوقفة"}</PartnerAdminBadge></td>
                   <td>{s.tierPolicy === "use_partner_tier" ? "حسب مستوى الشريك" : "نسبة ثابتة للخدمة"}</td>
                   <td>
                     {s.tierPolicy === "use_partner_tier"
@@ -838,14 +868,14 @@ export default function AdminPartnerMarketingCenter({
                   <td>{s.releasePolicy}</td>
                   <td>v{s.ruleVersion}</td>
                   <td>
-                    <button type="button" className="admin-btn admin-btn--sm" onClick={() => startEditServiceRule(s)}>
+                    <button type="button" className="pa-btn pa-btn--sm" onClick={() => startEditServiceRule(s)}>
                       تعديل
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </PartnerAdminTable>
 
           {scEdit ? (
             <div className="admin-panel space-y-4 border border-cyan-500/30">
@@ -860,7 +890,7 @@ export default function AdminPartnerMarketingCenter({
               </label>
               <Field label="سياسة النسبة">
                 <select
-                  className="admin-input"
+                  className="pa-input"
                   value={scEdit.tierPolicy}
                   onChange={(e) => setScEdit({ ...scEdit, tierPolicy: e.target.value })}
                 >
@@ -871,7 +901,7 @@ export default function AdminPartnerMarketingCenter({
               {scEdit.tierPolicy === "fixed_service_rate" ? (
                 <Field label={`نسبة ثابتة (0–${scPolicy.constraints.percentMax}%)`}>
                   <input
-                    className="admin-input max-w-xs"
+                    className="pa-input max-w-xs"
                     value={scEdit.commissionPercent}
                     onChange={(e) => setScEdit({ ...scEdit, commissionPercent: e.target.value })}
                   />
@@ -879,7 +909,7 @@ export default function AdminPartnerMarketingCenter({
               ) : null}
               <Field label="سياسة التحرير">
                 <select
-                  className="admin-input"
+                  className="pa-input"
                   value={scEdit.releasePolicy}
                   onChange={(e) => setScEdit({ ...scEdit, releasePolicy: e.target.value })}
                 >
@@ -889,10 +919,10 @@ export default function AdminPartnerMarketingCenter({
                 </select>
               </Field>
               <div className="flex gap-2">
-                <button type="button" className="admin-btn admin-btn--primary" disabled={scSaving} onClick={() => void saveServiceCommissionRule()}>
+                <button type="button" className="pa-btn pa-btn--primary" disabled={scSaving} onClick={() => void saveServiceCommissionRule()}>
                   {scSaving ? "جاري الحفظ..." : "حفظ"}
                 </button>
-                <button type="button" className="admin-btn" onClick={() => setScEdit(null)}>إلغاء</button>
+                <button type="button" className="pa-btn pa-btn--ghost" onClick={() => setScEdit(null)}>إلغاء</button>
               </div>
             </div>
           ) : null}
@@ -900,50 +930,103 @@ export default function AdminPartnerMarketingCenter({
       ) : null}
 
       {!loading && activeSection === "rewards" ? (
-        <table className="admin-table w-full">
+        <PartnerAdminTable>
           <thead><tr><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>hold</th><th>v</th><th>تاريخ</th></tr></thead>
           <tbody>
             {rewards.map((r) => (
               <tr key={r.id}><td>{r.reward_type}</td><td>{formatPartnerMoney(r.amount)}</td><td>{r.status}</td><td>{r.payout_hold ? "نعم" : "لا"}</td><td>{r.rule_version}</td><td>{r.created_at}</td></tr>
             ))}
           </tbody>
-        </table>
+        </PartnerAdminTable>
       ) : null}
 
       {!loading && activeSection === "fraud" ? (
-        <div className="space-y-4">
-          <textarea className="admin-input w-full" placeholder="سبب الإجراء (مطلوب)" value={fraudReason} onChange={(e) => setFraudReason(e.target.value)} />
-          <div className="flex gap-2">
-            <button type="button" className="admin-btn admin-btn--primary" onClick={() => void fraudAction("release")}>موافقة — إطلاق</button>
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void fraudAction("keep_hold")}>الإبقاء على التعليق</button>
+        <PartnerAdminSection title="الاحتيال والمراجعة" description="مراجعة الحالات ذات المخاطر واتخاذ إجراء واضح مع توثيق السبب.">
+          <div className="space-y-4">
+            <PartnerAdminField label="سبب الإجراء">
+              <textarea
+                className="pa-textarea"
+                placeholder="اكتب سبب الموافقة أو الإبقاء على التعليق..."
+                value={fraudReason}
+                onChange={(e) => setFraudReason(e.target.value)}
+              />
+            </PartnerAdminField>
+            <PartnerAdminToolbar>
+              <button type="button" className="pa-btn pa-btn--success" onClick={() => void fraudAction("release")}>
+                الموافقة
+              </button>
+              <button type="button" className="pa-btn pa-btn--secondary" onClick={() => void fraudAction("keep_hold")}>
+                الإبقاء على التعليق
+              </button>
+            </PartnerAdminToolbar>
+            {fraudQueue.length === 0 ? (
+              <PartnerAdminEmptyState
+                icon="🛡️"
+                title="لا توجد حالات تحتاج مراجعة حاليًا"
+                description="عند وجود حالات معلّقة بسبب المخاطر ستظهر هنا."
+              />
+            ) : (
+              <PartnerAdminTable>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>الشريك</th>
+                    <th>المخاطر</th>
+                    <th>المبلغ</th>
+                    <th>التاريخ</th>
+                    <th>إشارات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fraudQueue.map((row) => (
+                    <tr key={row.entitlementId}>
+                      <td>
+                        <input
+                          type="radio"
+                          name="fraudPick"
+                          checked={selectedEntitlement === row.entitlementId}
+                          onChange={() => setSelectedEntitlement(row.entitlementId)}
+                        />
+                      </td>
+                      <td>
+                        <Link href={`/admin/partners/${row.partnerId}`}>{row.partnerLabel}</Link>
+                      </td>
+                      <td>
+                        <PartnerAdminBadge tone="warning">{riskLevelLabel(row.riskLevel)}</PartnerAdminBadge>
+                      </td>
+                      <td className="pa-ltr">{formatPartnerMoney(row.heldAmount)}</td>
+                      <td>{formatAuditDate(row.holdDate)}</td>
+                      <td>{(row.signals || []).length} إشارة</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </PartnerAdminTable>
+            )}
           </div>
-          <table className="admin-table w-full">
-            <thead><tr><th></th><th>الشريك</th><th>المخاطر</th><th>المبلغ</th><th>التاريخ</th><th>إشارات</th></tr></thead>
-            <tbody>
-              {fraudQueue.map((row) => (
-                <tr key={row.entitlementId}>
-                  <td><input type="radio" name="fraudPick" checked={selectedEntitlement === row.entitlementId} onChange={() => setSelectedEntitlement(row.entitlementId)} /></td>
-                  <td><Link href={`/admin/partners/${row.partnerId}`}>{row.partnerLabel}</Link></td>
-                  <td>{row.riskLevel}</td>
-                  <td>{formatPartnerMoney(row.heldAmount)}</td>
-                  <td>{row.holdDate}</td>
-                  <td>{(row.signals || []).length} إشارة</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        </PartnerAdminSection>
       ) : null}
 
       {!loading && activeSection === "audit" ? (
-        <table className="admin-table w-full">
-          <thead><tr><th>الإجراء</th><th>الكيان</th><th>المعرف</th><th>السبب</th><th>التاريخ</th></tr></thead>
-          <tbody>
-            {audit.map((a) => (
-              <tr key={a.id}><td>{a.action}</td><td>{a.entity_type}</td><td>{a.entity_id}</td><td>{a.reason || "—"}</td><td>{a.created_at}</td></tr>
-            ))}
-          </tbody>
-        </table>
+        <PartnerAdminSection title="السجل والتدقيق" description="سجل تغييرات سياسات الشركاء والحملات — للقراءة والمراجعة.">
+          {audit.length === 0 ? (
+            <PartnerAdminEmptyState icon="🧾" title="لا توجد سجلات" description="ستظهر هنا عمليات التحديث والتدقيق عند حدوثها." />
+          ) : (
+            <PartnerAdminTable>
+              <thead><tr><th>الإجراء</th><th>الكيان</th><th>المعرف</th><th>السبب</th><th>التاريخ</th></tr></thead>
+              <tbody>
+                {audit.map((a) => (
+                  <tr key={a.id}>
+                    <td><PartnerAdminBadge tone="accent">{auditActionLabel(a.action)}</PartnerAdminBadge><span className="block text-xs text-[var(--pa-text-muted)] pa-ltr">{a.action}</span></td>
+                    <td>{auditEntityLabel(a.entity_type)}<span className="block text-xs text-[var(--pa-text-muted)] pa-ltr">{a.entity_type}</span></td>
+                    <td><span className="pa-code">{formatShortUuid(a.entity_id)}</span></td>
+                    <td>{a.reason || "—"}</td>
+                    <td>{formatAuditDate(a.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </PartnerAdminTable>
+          )}
+        </PartnerAdminSection>
       ) : null}
 
       {!loading && !["overview", "missions", "campaigns", "levels", "milestones", "bonuses", "qualified-reward", "service-commissions", "rewards", "fraud", "audit"].includes(section) ? (
