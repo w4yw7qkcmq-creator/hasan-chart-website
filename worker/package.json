@@ -19,6 +19,7 @@
     "email-queue-cron": "EMAIL_QUEUE_WORKER_ONESHOT=true node email-queue-worker.js",
     "vip-status-delivery-worker": "VIP_STATUS_DELIVERY_WORKER_ONESHOT=false node vip-status-delivery-worker.js",
     "vip-status-delivery-cron": "VIP_STATUS_DELIVERY_WORKER_ONESHOT=true node vip-status-delivery-worker.js",
+    "profiles-last-sign-in-reconcile-cron": "node profiles-last-sign-in-reconcile-cron-caller.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:alert-logs": "node scripts/verify-alert-logs.js"
   },

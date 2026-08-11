@@ -1,6 +1,7 @@
 "use client";
 
 import "../admin-theme.css";
+import "../admin-users-theme.css";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../../components/AuthProvider";
 import AdminUserManagementPanel from "../components/AdminUserManagementPanel";

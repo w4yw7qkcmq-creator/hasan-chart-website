@@ -25,6 +25,11 @@ export async function GET(request) {
 
     const accountStatus = String(searchParams.get("accountStatus") || "").trim().toLowerCase();
     const activeService = String(searchParams.get("activeService") || "").trim().toLowerCase();
+    const registeredFrom = String(searchParams.get("registeredFrom") || "").trim();
+    const registeredTo = String(searchParams.get("registeredTo") || "").trim();
+    const lastLoginFrom = String(searchParams.get("lastLoginFrom") || "").trim();
+    const lastLoginTo = String(searchParams.get("lastLoginTo") || "").trim();
+    const plan = String(searchParams.get("plan") || "").trim();
 
     const listAll =
       searchParams.get("listAll") === "1" || String(searchParams.get("pageSize") || "") === "0";
@@ -38,6 +43,11 @@ export async function GET(request) {
       order: order === "asc" ? "asc" : "desc",
       accountStatus,
       activeService,
+      registeredFrom,
+      registeredTo,
+      lastLoginFrom,
+      lastLoginTo,
+      plan,
     });
 
     return Response.json(payload, {

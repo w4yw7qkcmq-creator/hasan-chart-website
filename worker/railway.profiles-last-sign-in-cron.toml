@@ -1,0 +1,10 @@
+# Profiles last_sign_in_at daily reconciliation — Railway Cron Job
+# Root Directory = worker | Config File = railway.profiles-last-sign-in-cron.toml
+# Schedule: 0 3 * * * (once daily, UTC)
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "node profiles-last-sign-in-reconcile-cron-caller.js"
+restartPolicyType = "NEVER"

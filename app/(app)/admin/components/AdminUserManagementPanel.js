@@ -1,37 +1,37 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVisibilityRefresh } from "../../../hooks/useVisibilityRefresh";
 import { createBackgroundRevalidationController } from "../../../../lib/admin-background-revalidation";
 import { adminFetch } from "../../../../lib/admin-fetch";
-import { fetchAdminUserList, postAdminUserAction } from "../../../../lib/admin-user-management-client";
+import { fetchAdminUserList, fetchAllAdminUserList, postAdminUserAction } from "../../../../lib/admin-user-management-client";
 import { sanitizeAdminUserFacingError } from "../../../../lib/admin-user-management-shared";
 import { notify } from "../../../../lib/notification-center";
 import AdminUserQuickPreviewDrawer from "./AdminUserQuickPreviewDrawer";
 import AdminUserBulkActionModal from "./AdminUserBulkActionModal";
 import AdminUserBulkActionsBar from "./AdminUserBulkActionsBar";
-import AdminUserManagementDashboard from "./AdminUserManagementDashboard";
-import AdminUserQuickActions from "./AdminUserQuickActions";
-import { useAdminScrollPanel } from "./useAdminScrollPanel";
+import AdminUsersHeader from "./admin-users/AdminUsersHeader.js";
+import AdminUsersKpiPanel from "./admin-users/AdminUsersKpiPanel.js";
+import AdminUsersRegistrationCohorts from "./admin-users/AdminUsersRegistrationCohorts.js";
+import AdminUsersFilterPanel from "./admin-users/AdminUsersFilterPanel.js";
+import AdminUsersResultsPanel from "./admin-users/AdminUsersResultsPanel.js";
 import {
   BULK_ACTIONS,
   DEFAULT_CLIENT_FILTERS,
   EXPIRED_SUBSCRIPTION_FILTER,
+  buildAdminUserListRequestParams,
   exportUsersToCsv,
   fetchDashboardStats,
-  fetchUsersForClientView,
   getDashboardCardFilterPreset,
   isExpiredSubscriptionFilterActive,
   resolveEffectiveAccountStatusFilter,
-  resolveExpiredServerActiveServiceFilter,
   resolveExpiredSubscriptionBadge,
   resolveUserSubscriptionStateLabel,
 } from "./admin-user-management-ux-helpers";
 
 const USERS_LIST_STATE_KEY = "hc:admin-users-list-state";
+const USERS_PAGE_SIZE = 25;
 
 function readSavedUsersListState() {
   if (typeof window === "undefined") return null;
@@ -47,31 +47,13 @@ function readSavedUsersListState() {
   }
 }
 
-function formatDateTime(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("ar");
-}
-
 function UserManagementSkeleton() {
   return (
-    <div className="animate-pulse space-y-5">
-      <div className="admin-user-dashboard admin-user-dashboard--skeleton h-40" />
-      <section className="admin-section p-4 md:p-5">
-        <div className="h-12 rounded-2xl bg-white/10" />
-      </section>
-      <div className="admin-section overflow-hidden p-0">
-        {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="flex items-center gap-4 border-b border-cyan-300/10 px-4 py-4">
-            <div className="h-11 w-11 rounded-full bg-white/10" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-40 rounded bg-white/15" />
-              <div className="h-3 w-56 rounded bg-white/10" />
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="au-shell animate-pulse">
+      <div className="au-panel" style={{ minHeight: "7rem" }} />
+      <div className="au-panel" style={{ minHeight: "12rem" }} />
+      <div className="au-panel" style={{ minHeight: "10rem" }} />
+      <div className="au-panel" style={{ minHeight: "24rem" }} />
     </div>
   );
 }
@@ -79,38 +61,33 @@ function UserManagementSkeleton() {
 function AccountStatusBadge({ status, label }) {
   const tone =
     status === "banned"
-      ? "admin-user-status--banned"
+      ? "au-status-badge--banned"
       : status === "suspended"
-      ? "admin-user-status--suspended"
+      ? "au-status-badge--suspended"
       : status === "deleted"
-      ? "admin-user-status--deleted"
-      : "admin-user-status--active";
+      ? "au-status-badge--deleted"
+      : "au-status-badge--active";
 
-  return <span className={`admin-user-status ${tone}`}>{label}</span>;
+  return <span className={`au-status-badge ${tone}`}>{label}</span>;
 }
 
 function SubscriptionStateBadge({ user, serviceFilter = "all" }) {
   const label = resolveUserSubscriptionStateLabel(user, { serviceFilter });
 
   if (label === "نشط + منتهي") {
-    return (
-      <span className="admin-subscription-state admin-subscription-state--mixed">
-        <span className="admin-subscription-state__part admin-subscription-state__part--active">نشط</span>
-        <span className="admin-subscription-state__part admin-subscription-state__part--expired">منتهي</span>
-      </span>
-    );
+    return <span className="au-subscription-badge au-subscription-badge--active">نشط + منتهي</span>;
   }
 
   const tone =
     label === "منتهي"
-      ? "admin-subscription-state--expired"
+      ? "au-subscription-badge--expired"
       : label === "نشط"
-      ? "admin-subscription-state--active"
+      ? "au-subscription-badge--active"
       : label === "خدمة غير نشطة"
-      ? "admin-subscription-state--inactive-service"
-      : "admin-subscription-state--none";
+      ? "au-subscription-badge--none"
+      : "au-subscription-badge--none";
 
-  return <span className={`admin-subscription-state ${tone}`}>{label}</span>;
+  return <span className={`au-subscription-badge ${tone}`}>{label}</span>;
 }
 
 function ExpiredSubscriptionBadge({ user, serviceFilter = "all" }) {
@@ -118,33 +95,11 @@ function ExpiredSubscriptionBadge({ user, serviceFilter = "all" }) {
   if (!badge) return null;
 
   return (
-    <div className="admin-expired-service-badge-wrap">
-      <span className="admin-expired-service-badge">{badge.countLabel}</span>
-      {badge.typesLabel ? <span className="admin-expired-service-badge__types">{badge.typesLabel}</span> : null}
+    <div className="au-user-cell__meta">
+      <span className="au-badge">{badge.countLabel}</span>
+      {badge.typesLabel ? <span className="au-user-cell__meta">{badge.typesLabel}</span> : null}
     </div>
   );
-}
-
-function UserAvatar({ name, avatarUrl }) {
-  const initials = String(name || "؟")
-    .trim()
-    .slice(0, 2)
-    .toUpperCase();
-
-  if (avatarUrl) {
-    return (
-      <Image
-        src={avatarUrl}
-        alt={name || "المستخدم"}
-        width={44}
-        height={44}
-        className="admin-user-avatar__image"
-        unoptimized
-      />
-    );
-  }
-
-  return <span className="admin-user-avatar__initials">{initials}</span>;
 }
 
 export default function AdminUserManagementPanel({
@@ -158,6 +113,9 @@ export default function AdminUserManagementPanel({
   const filterSignatureRef = useRef("");
   const [users, setUsers] = useState([]);
   const [listTotal, setListTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [tableLoading, setTableLoading] = useState(false);
   const [searchInput, setSearchInput] = useState(() => String(savedListStateRef.current?.searchInput || ""));
   const [searchQuery, setSearchQuery] = useState(() => String(savedListStateRef.current?.searchQuery || ""));
   const [sort, setSort] = useState(() => savedListStateRef.current?.sort || "created_at");
@@ -183,6 +141,9 @@ export default function AdminUserManagementPanel({
   const [activeDashboardKey, setActiveDashboardKey] = useState(
     () => savedListStateRef.current?.activeDashboardKey || ""
   );
+  const [registrationCohort, setRegistrationCohort] = useState(
+    () => savedListStateRef.current?.registrationCohort || ""
+  );
   const [currentAdminUserId, setCurrentAdminUserId] = useState("");
 
   const [selectedUserIds, setSelectedUserIds] = useState([]);
@@ -202,6 +163,8 @@ export default function AdminUserManagementPanel({
   const [bulkSummary, setBulkSummary] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [uxNotice, setUxNotice] = useState("");
+  const [lastLoginFilterAvailable, setLastLoginFilterAvailable] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const listAbortRef = useRef(null);
   const dashboardAbortRef = useRef(null);
@@ -209,54 +172,11 @@ export default function AdminUserManagementPanel({
   const listRequestRef = useRef(0);
   const backgroundRevalidationRef = useRef(createBackgroundRevalidationController());
 
-  const usersListScrollKey = useMemo(() => {
-    const filterKey = JSON.stringify({
-      searchQuery,
-      accountStatusFilter,
-      clientFilters,
-      sort,
-      order,
-      viewMode,
-    });
-    return `hc:admin-users-scroll:${filterKey}`;
-  }, [accountStatusFilter, clientFilters, order, searchQuery, sort, viewMode]);
-
-  const { panelRef, saveScrollPosition, restoreScrollPosition } = useAdminScrollPanel({
-    storageKey: usersListScrollKey,
-    enabled: !loading && users.length > 0,
-    restoreDeps: [usersListScrollKey, users.length, loading],
-  });
-
-  const resetListScroll = useCallback(() => {
-    if (panelRef.current) {
-      panelRef.current.scrollTop = 0;
-    }
-    try {
-      sessionStorage.removeItem(usersListScrollKey);
-    } catch {
-      // ignore
-    }
-  }, [panelRef, usersListScrollKey]);
-
   useEffect(() => {
     if (!openUserId) return;
     router.push(`/admin/users/${encodeURIComponent(openUserId)}`);
     onOpenUserHandled?.();
   }, [openUserId, onOpenUserHandled, router]);
-
-  const hasClientFilters = useMemo(() => {
-    return (
-      Boolean(searchQuery.trim()) ||
-      clientFilters.service !== "all" ||
-      Boolean(clientFilters.plan.trim()) ||
-      clientFilters.status !== "all" ||
-      clientFilters.subscriptionState !== "all" ||
-      Boolean(clientFilters.registeredFrom) ||
-      Boolean(clientFilters.registeredTo) ||
-      Boolean(clientFilters.lastLoginFrom) ||
-      Boolean(clientFilters.lastLoginTo)
-    );
-  }, [clientFilters, searchQuery]);
 
   const expiredFilterActive = isExpiredSubscriptionFilterActive(clientFilters);
   const selectedServiceFilter = clientFilters.service || "all";
@@ -264,9 +184,31 @@ export default function AdminUserManagementPanel({
     accountStatusFilter,
     clientFilters
   );
-  const expiredActiveService = expiredFilterActive
-    ? resolveExpiredServerActiveServiceFilter(selectedServiceFilter)
-    : "";
+
+  const listRequestParams = useMemo(
+    () =>
+      buildAdminUserListRequestParams({
+        page,
+        pageSize: USERS_PAGE_SIZE,
+        searchQuery,
+        sort,
+        order,
+        accountStatusFilter,
+        clientFilters,
+        registrationCohort,
+        effectiveAccountStatusFilter,
+      }),
+    [
+      accountStatusFilter,
+      clientFilters,
+      effectiveAccountStatusFilter,
+      order,
+      page,
+      registrationCohort,
+      searchQuery,
+      sort,
+    ]
+  );
 
   const loadDashboard = useCallback(async ({ background = false } = {}) => {
     dashboardAbortRef.current?.abort();
@@ -296,53 +238,24 @@ export default function AdminUserManagementPanel({
       const requestId = ++listRequestRef.current;
 
       if (background) setRefreshing(true);
+      else if (loaded) setTableLoading(true);
       else setLoading(true);
       setError("");
 
       try {
-        if (hasClientFilters) {
-          const result = await fetchUsersForClientView(adminFetch, {
-            search: searchQuery,
-            sort,
-            order,
-            accountStatus: accountStatusFilter,
-            clientFilters,
-            signal: controller.signal,
-          });
+        const result = await fetchAdminUserList(adminFetch, {
+          ...listRequestParams,
+          signal: controller.signal,
+        });
 
-          if (requestId !== listRequestRef.current) return;
+        if (requestId !== listRequestRef.current) return;
 
-          setUsers(result.users || []);
-          setListTotal(Number(result.pagination?.total || result.users?.length || 0));
-          setViewMode(result.mode || "client");
-          setUxNotice(
-            result.mode === "client"
-              ? `عرض ${result.users.length} نتيجة بعد البحث/الفلاتر`
-              : ""
-          );
-        } else {
-          const result = await fetchAdminUserList(adminFetch, {
-            listAll: true,
-            search: searchQuery,
-            sort,
-            order,
-            accountStatus: effectiveAccountStatusFilter,
-            activeService: expiredActiveService,
-            signal: controller.signal,
-          });
-
-          if (requestId !== listRequestRef.current) return;
-
-          setUsers(result.users || []);
-          setListTotal(Number(result.pagination?.total || result.users?.length || 0));
-          setViewMode("server");
-          setUxNotice(
-            result.truncation?.truncated
-              ? result.truncation.warning || "تم عرض جزء من النتائج بسبب الحد الأقصى للقائمة."
-              : ""
-          );
-        }
-
+        setUsers(result.users || []);
+        setListTotal(Number(result.pagination?.total || 0));
+        setTotalPages(Number(result.pagination?.totalPages || 1));
+        setViewMode("server");
+        setLastLoginFilterAvailable(result.capabilities?.lastSignInFilterAvailable !== false);
+        setUxNotice(result.truncation?.truncated ? result.truncation.warning || "" : "");
         setLoaded(true);
       } catch (fetchError) {
         if (fetchError?.name === "AbortError" || requestId !== listRequestRef.current) return;
@@ -358,10 +271,14 @@ export default function AdminUserManagementPanel({
         if (requestId === listRequestRef.current) {
           setLoading(false);
           setRefreshing(false);
+          setTableLoading(false);
         }
       }
     },
-    [accountStatusFilter, clientFilters, effectiveAccountStatusFilter, expiredActiveService, hasClientFilters, order, searchQuery, sort]
+    [
+      listRequestParams,
+      loaded,
+    ]
   );
 
   const refreshAll = useCallback(
@@ -427,7 +344,7 @@ export default function AdminUserManagementPanel({
 
   useEffect(() => {
     void loadUsers();
-  }, [hasClientFilters, loadUsers]);
+  }, [loadUsers]);
 
   useEffect(() => {
     if (!loaded) return undefined;
@@ -436,16 +353,17 @@ export default function AdminUserManagementPanel({
       searchQuery,
       accountStatusFilter,
       clientFilters,
+      registrationCohort,
       sort,
       order,
     });
 
     if (filterSignatureRef.current && filterSignatureRef.current !== signature) {
-      resetListScroll();
+      setPage(1);
     }
 
     filterSignatureRef.current = signature;
-  }, [accountStatusFilter, clientFilters, loaded, order, resetListScroll, searchQuery, sort]);
+  }, [accountStatusFilter, clientFilters, loaded, order, registrationCohort, searchQuery, sort]);
 
   useEffect(() => {
     return () => {
@@ -467,13 +385,6 @@ export default function AdminUserManagementPanel({
     };
   }, [searchInput]);
 
-  const sortLabel = useMemo(() => {
-    if (sort === "last_sign_in") {
-      return order === "asc" ? "آخر دخول: الأقدم" : "آخر دخول: الأحدث";
-    }
-    return order === "asc" ? "التسجيل: الأقدم" : "التسجيل: الأحدث";
-  }, [order, sort]);
-
   const allVisibleSelected =
     users.length > 0 && users.every((user) => selectedUserIds.includes(user.id));
 
@@ -491,37 +402,11 @@ export default function AdminUserManagementPanel({
     );
   };
 
-  useEffect(() => {
-    if (loading || users.length === 0) return;
-
-    const savedTop = Number(savedListStateRef.current?.scrollTop);
-    if (Number.isFinite(savedTop) && savedTop > 0) {
-      const el = panelRef.current;
-      if (el) {
-        el.scrollTop = savedTop;
-      } else {
-        restoreScrollPosition();
-      }
-      savedListStateRef.current = null;
-      try {
-        sessionStorage.removeItem(USERS_LIST_STATE_KEY);
-      } catch {
-        // ignore
-      }
-      return;
-    }
-
-    restoreScrollPosition();
-  }, [loading, users.length, restoreScrollPosition, panelRef]);
-
   const openUser = (userId) => {
-    const scrollTop = panelRef.current?.scrollTop || 0;
-
     try {
       sessionStorage.setItem(
         USERS_LIST_STATE_KEY,
         JSON.stringify({
-          scrollTop,
           searchInput,
           searchQuery,
           sort,
@@ -529,9 +414,9 @@ export default function AdminUserManagementPanel({
           accountStatusFilter,
           clientFilters,
           activeDashboardKey,
+          registrationCohort,
         })
       );
-      saveScrollPosition();
     } catch {
       // ignore
     }
@@ -550,6 +435,105 @@ export default function AdminUserManagementPanel({
     setPreviewUserId("");
   };
 
+
+  const buildResultSummary = useCallback(() => {
+    const total = Number(listTotal || 0);
+    if (searchQuery.trim()) {
+      return `${total.toLocaleString("ar")} نتائج مطابقة`;
+    }
+    if (registrationCohort === "today") {
+      return `${total.toLocaleString("ar")} مستخدمًا سجلوا اليوم`;
+    }
+    if (registrationCohort === "week") {
+      return `${total.toLocaleString("ar")} مستخدمًا سجلوا هذا الأسبوع`;
+    }
+    if (registrationCohort === "month") {
+      return `${total.toLocaleString("ar")} مستخدمًا سجلوا هذا الشهر`;
+    }
+    return `${total.toLocaleString("ar")} مستخدمًا مطابقًا`;
+  }, [listTotal, registrationCohort, searchQuery]);
+
+  const handleClearFilters = () => {
+    setSearchInput("");
+    setSearchQuery("");
+    setAccountStatusFilter("all");
+    setClientFilters(DEFAULT_CLIENT_FILTERS);
+    setRegistrationCohort("");
+    setActiveDashboardKey("");
+    setPage(1);
+    setUxNotice("");
+  };
+
+  const handleClientFiltersChange = (nextFilters) => {
+    if (
+      nextFilters.registeredFrom !== clientFilters.registeredFrom ||
+      nextFilters.registeredTo !== clientFilters.registeredTo
+    ) {
+      setRegistrationCohort("");
+      setActiveDashboardKey("");
+    }
+    setClientFilters(nextFilters);
+    setPage(1);
+  };
+
+  const handleRegistrationCohortChange = (cohortId) => {
+    setRegistrationCohort(cohortId);
+    setPage(1);
+
+    if (!cohortId) {
+      setClientFilters((current) => ({
+        ...current,
+        registeredFrom: "",
+        registeredTo: "",
+      }));
+      setActiveDashboardKey("");
+      return;
+    }
+
+    const cardKey =
+      cohortId === "today" ? "newToday" : cohortId === "week" ? "newThisWeek" : "newThisMonth";
+    const preset = getDashboardCardFilterPreset(cardKey);
+    if (!preset) return;
+
+    setActiveDashboardKey(cardKey);
+    setAccountStatusFilter(preset.accountStatus);
+    setClientFilters(preset.clientFilters);
+  };
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const result = await fetchAllAdminUserList(adminFetch, listRequestParams, {
+        pageSize: 100,
+      });
+      const exportRows = result.users || [];
+
+      exportUsersToCsv(exportRows, `users-export-${Date.now()}.csv`);
+      void notify({
+        key: "admin_user_export",
+        title: "تم التصدير",
+        body: result.truncated
+          ? `تم تصدير ${exportRows.length} مستخدم (جزء من ${Number(result.pagination?.total || exportRows.length).toLocaleString("ar")} نتيجة)`
+          : `تم تصدير ${exportRows.length} مستخدم من النتائج الحالية إلى CSV`,
+        persist: false,
+        skipSound: true,
+        source: "admin-user-management",
+      });
+    } catch {
+      void notify({
+        key: "admin_user_export_failed",
+        title: "تعذر التصدير",
+        body: "لم نتمكن من جلب النتائج المفلترة للتصدير",
+        persist: false,
+        skipSound: true,
+        source: "admin-user-management",
+        metadata: { type: "error" },
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const toggleSort = (nextSort) => {
     if (sort === nextSort) {
       setOrder((current) => (current === "desc" ? "asc" : "desc"));
@@ -566,11 +550,9 @@ export default function AdminUserManagementPanel({
     setActiveDashboardKey(cardKey);
     setAccountStatusFilter(preset.accountStatus);
     setClientFilters(preset.clientFilters);
-    setUxNotice(
-      cardKey === "expiredSubscriptions"
-        ? "تم تطبيق فلتر: الاشتراكات المنتهية"
-        : `تم تطبيق فلتر: ${cardKey === "total" ? "الكل" : cardKey}`
-    );
+    setRegistrationCohort(preset.registrationCohort || "");
+    setPage(1);
+    setUxNotice("");
   };
 
   const handleAccountStatusFilterClick = (statusId) => {
@@ -588,25 +570,6 @@ export default function AdminUserManagementPanel({
       status: "all",
     }));
     setUxNotice("تم تطبيق فلتر: الاشتراكات المنتهية");
-  };
-
-  const handleQuickAction = (actionId) => {
-    if (actionId === "refresh") {
-      refreshAll({ background: true });
-      return;
-    }
-    if (actionId === "export-csv") {
-      exportUsersToCsv(users, `users-export-${Date.now()}.csv`);
-      void notify({
-        key: "admin_user_export",
-        title: "تم التصدير",
-        body: `تم تصدير ${users.length} مستخدم إلى CSV`,
-        persist: false,
-        skipSound: true,
-        source: "admin-user-management",
-      });
-      return;
-    }
   };
 
   const requestBulkRun = () => {
@@ -735,43 +698,59 @@ export default function AdminUserManagementPanel({
 
   return (
     <>
-      <section className="space-y-5 scroll-mt-6">
-        {standalone ? (
-          <div className="admin-standalone-page__toolbar">
-            <Link href="/admin" className="admin-standalone-back-link">
-              ← العودة إلى لوحة الإدارة
-            </Link>
-          </div>
-        ) : null}
-        <header className={`admin-user-mgmt-hero ${standalone ? "admin-user-mgmt-hero--standalone" : ""}`}>
-          <div>
-            <p className="admin-user-hero__eyebrow">HasaN CharT · CRM</p>
-            <h2 className="admin-heading text-3xl">إدارة المستخدمين</h2>
-            <p className="admin-user-mgmt-hero__desc">
-              مركز CRM لإدارة المستخدمين — مؤشرات، فلاتر، إجراءات جماعية، وتفاصيل موسّعة.
-            </p>
-          </div>
-          <div className="admin-user-mgmt-hero__actions">
-            {refreshing ? (
-              <span className="admin-user-mgmt-hero__refresh-badge">⟳ تحديث</span>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => refreshAll({ background: true })}
-              className="admin-btn-surface px-4 py-2 text-sm font-black"
-            >
-              تحديث البيانات
-            </button>
-          </div>
-        </header>
+      <section className="au-shell scroll-mt-6">
+        <AdminUsersHeader
+          onRefresh={() => refreshAll({ background: true })}
+          onExportCsv={handleExportCsv}
+          refreshing={refreshing}
+          exporting={exporting}
+          exportDisabled={loading || tableLoading || users.length === 0}
+        />
 
-        <AdminUserManagementDashboard
+        <AdminUsersKpiPanel
           stats={dashboardStats}
           loading={dashboardLoading}
           activeCardKey={activeDashboardKey}
           onCardClick={handleDashboardCardClick}
         />
-        <AdminUserQuickActions onAction={handleQuickAction} disabled={loading || refreshing} />
+
+        <AdminUsersRegistrationCohorts
+          stats={dashboardStats}
+          activeCohort={registrationCohort}
+          onChange={handleRegistrationCohortChange}
+          loading={dashboardLoading}
+        />
+
+        <AdminUsersFilterPanel
+          searchInput={searchInput}
+          onSearchInputChange={(value) => {
+            setSearchInput(value);
+            setPage(1);
+          }}
+          onClearSearch={() => {
+            setSearchInput("");
+            setSearchQuery("");
+            setPage(1);
+          }}
+          searching={tableLoading && Boolean(searchInput.trim())}
+          clientFilters={clientFilters}
+          onClientFiltersChange={handleClientFiltersChange}
+          accountStatusFilter={accountStatusFilter}
+          onAccountStatusFilterClick={(statusId) => {
+            handleAccountStatusFilterClick(statusId);
+            setPage(1);
+          }}
+          expiredFilterActive={expiredFilterActive}
+          onExpiredSubscriptionFilterClick={() => {
+            handleExpiredSubscriptionFilterClick();
+            setPage(1);
+          }}
+          sort={sort}
+          order={order}
+          onToggleSort={toggleSort}
+          onClearFilters={handleClearFilters}
+          lastLoginFilterAvailable={lastLoginFilterAvailable}
+        />
 
         <AdminUserBulkActionsBar
           selectedCount={selectedUserIds.length}
@@ -787,284 +766,42 @@ export default function AdminUserManagementPanel({
           onClear={() => setSelectedUserIds([])}
         />
 
-        <div className="admin-section p-4 md:p-5 space-y-4">
-          <div>
-            <label className="text-xs font-bold text-slate-400">بحث ذكي</label>
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="الاسم، البريد، Telegram، UID..."
-              className="admin-field mt-2 font-bold"
-            />
-          </div>
-
-          <div className="admin-user-filters-grid">
-            <div>
-              <label className="text-xs font-bold text-slate-400">الخدمة</label>
-              <select
-                className="admin-field mt-2 text-sm"
-                value={clientFilters.service}
-                onChange={(event) =>
-                  setClientFilters((current) => ({ ...current, service: event.target.value }))
-                }
-              >
-                <option value="all">الكل</option>
-                <option value="vip">VIP</option>
-                <option value="account_management">إدارة الحسابات</option>
-                <option value="alerts">التنبيهات</option>
-                <option value="academy">الأكاديمية</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400">الخطة</label>
-              <input
-                className="admin-field mt-2 text-sm"
-                value={clientFilters.plan}
-                onChange={(event) =>
-                  setClientFilters((current) => ({ ...current, plan: event.target.value }))
-                }
-                placeholder="VIP Spot..."
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400">الحالة</label>
-              <select
-                className="admin-field mt-2 text-sm"
-                value={clientFilters.status}
-                onChange={(event) =>
-                  setClientFilters((current) => ({ ...current, status: event.target.value }))
-                }
-              >
-                <option value="all">الكل</option>
-                <option value="active">نشط</option>
-                <option value="suspended">معلق</option>
-                <option value="banned">محظور</option>
-                <option value="deleted">محذوف</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400">تاريخ التسجيل من</label>
-              <input
-                type="date"
-                className="admin-field mt-2 text-sm"
-                value={clientFilters.registeredFrom}
-                onChange={(event) =>
-                  setClientFilters((current) => ({ ...current, registeredFrom: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400">تاريخ التسجيل إلى</label>
-              <input
-                type="date"
-                className="admin-field mt-2 text-sm"
-                value={clientFilters.registeredTo}
-                onChange={(event) =>
-                  setClientFilters((current) => ({ ...current, registeredTo: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400">آخر دخول من</label>
-              <input
-                type="date"
-                className="admin-field mt-2 text-sm"
-                value={clientFilters.lastLoginFrom}
-                onChange={(event) =>
-                  setClientFilters((current) => ({ ...current, lastLoginFrom: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400">آخر دخول إلى</label>
-              <input
-                type="date"
-                className="admin-field mt-2 text-sm"
-                value={clientFilters.lastLoginTo}
-                onChange={(event) =>
-                  setClientFilters((current) => ({ ...current, lastLoginTo: event.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => toggleSort("created_at")}
-              className={`rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
-                sort === "created_at"
-                  ? "admin-filter-btn admin-filter-btn--active"
-                  : "admin-filter-btn admin-filter-btn--idle"
-              }`}
-            >
-              ترتيب حسب تاريخ التسجيل {sort === "created_at" ? (order === "desc" ? "↓" : "↑") : ""}
-            </button>
-            <button
-              type="button"
-              onClick={() => toggleSort("last_sign_in")}
-              className={`rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
-                sort === "last_sign_in"
-                  ? "admin-filter-btn admin-filter-btn--active"
-                  : "admin-filter-btn admin-filter-btn--idle"
-              }`}
-            >
-              ترتيب حسب آخر دخول {sort === "last_sign_in" ? (order === "desc" ? "↓" : "↑") : ""}
-            </button>
-            <span className="self-center text-xs font-bold text-slate-500">{sortLabel}</span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: "all", label: "الكل" },
-              { id: "active", label: "نشط" },
-              { id: "suspended", label: "معلق" },
-              { id: "banned", label: "محظور" },
-              { id: "deleted", label: "محذوف" },
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleAccountStatusFilterClick(item.id)}
-                className={`rounded-2xl border px-4 py-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
-                  !expiredFilterActive && accountStatusFilter === item.id
-                    ? "admin-filter-btn admin-filter-btn--active"
-                    : "admin-filter-btn admin-filter-btn--idle"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleExpiredSubscriptionFilterClick}
-              className={`rounded-2xl border px-4 py-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 ${
-                expiredFilterActive
-                  ? "admin-filter-btn admin-filter-btn--expired-active"
-                  : "admin-filter-btn admin-filter-btn--expired-idle"
-              }`}
-            >
-              الاشتراكات المنتهية
-            </button>
-          </div>
-
-          {uxNotice ? <p className="text-xs font-bold text-cyan-200/80">{uxNotice}</p> : null}
-        </div>
+        {uxNotice ? <p className="au-notice">{uxNotice}</p> : null}
 
         {error ? (
-          <div className="admin-section p-6 text-center">
+          <div className="au-panel au-empty">
             <p className="font-black text-red-200">{error}</p>
-            <button
-              type="button"
-              className="admin-btn-surface mt-4 px-5 py-3"
-              onClick={() => void loadUsers()}
-            >
+            <button type="button" className="au-btn au-btn--primary mt-4" onClick={() => void loadUsers()}>
               إعادة المحاولة
             </button>
           </div>
         ) : users.length === 0 ? (
-          <div className="admin-section admin-card--dashed p-10 text-center">
-            <div className="admin-empty-icon">👥</div>
-            <h3 className="admin-heading text-2xl">لا يوجد مستخدمون مطابقون</h3>
+          <div className="au-panel au-empty">
+            <div className="au-panel__icon" aria-hidden="true">
+              👥
+            </div>
+            <h3 className="au-panel__title">لا يوجد مستخدمون مطابقون</h3>
           </div>
         ) : (
-          <div
-            ref={panelRef}
-            className="admin-section admin-table-wrap admin-scroll-panel admin-scroll-panel--table admin-scroll-panel--interactive p-0"
-          >
-            <table className="admin-user-table">
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleSelectAll}
-                      aria-label="تحديد الكل"
-                    />
-                  </th>
-                  <th>المستخدم</th>
-                  <th>البريد</th>
-                  <th>Telegram / UID</th>
-                  <th>تاريخ التسجيل</th>
-                  <th>آخر دخول</th>
-                  <th>الحالة</th>
-                  <th>حالة الاشتراك</th>
-                  <th>اشتراكات نشطة</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr
-                    key={user.id}
-                    className={`admin-user-table__row ${selectedUserIds.includes(user.id) ? "is-selected" : ""}`}
-                    onClick={() => openUser(user.id)}
-                  >
-                    <td onClick={(event) => event.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.includes(user.id)}
-                        onChange={() => toggleSelectUser(user.id)}
-                        aria-label={`تحديد ${user.username || user.email}`}
-                      />
-                    </td>
-                    <td>
-                      <div className="admin-user-table__identity">
-                        <div className="admin-user-avatar">
-                          <UserAvatar name={user.username || user.email} avatarUrl={user.avatarUrl} />
-                        </div>
-                        <div>
-                          <p className="font-black">{user.username || "—"}</p>
-                          {user.role === "admin" ? (
-                            <span className="text-xs font-bold text-cyan-300">مدير</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </td>
-                    <td>{user.email || "—"}</td>
-                    <td className="text-xs">
-                      <p>{user.telegram || "—"}</p>
-                      <p className="text-slate-500">{user.uid || user.id}</p>
-                    </td>
-                    <td>{formatDateTime(user.createdAt)}</td>
-                    <td>{formatDateTime(user.lastSignInAt)}</td>
-                    <td>
-                      <div className="admin-user-table__status-stack">
-                        <AccountStatusBadge status={user.accountStatus} label={user.accountStatusLabel} />
-                        <ExpiredSubscriptionBadge user={user} serviceFilter={selectedServiceFilter} />
-                      </div>
-                    </td>
-                    <td>
-                      <SubscriptionStateBadge user={user} serviceFilter={selectedServiceFilter} />
-                    </td>
-                    <td>{user.activeSubscriptionsCount}</td>
-                    <td onClick={(event) => event.stopPropagation()}>
-                      <div className="admin-user-table__actions">
-                        <button type="button" className="admin-user-manage-btn" onClick={() => openUser(user.id)}>
-                          فتح CRM
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-user-preview-btn"
-                          onClick={(event) => openQuickPreview(user.id, event)}
-                        >
-                          معاينة سريعة
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdminUsersResultsPanel
+            summary={buildResultSummary()}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(nextPage) => setPage(Math.max(nextPage, 1))}
+            users={users}
+            selectedUserIds={selectedUserIds}
+            onToggleSelectAll={toggleSelectAll}
+            onToggleSelectUser={toggleSelectUser}
+            onOpenUser={openUser}
+            onOpenQuickPreview={openQuickPreview}
+            allVisibleSelected={allVisibleSelected}
+            loading={tableLoading}
+            AccountStatusBadge={AccountStatusBadge}
+            SubscriptionStateBadge={SubscriptionStateBadge}
+            ExpiredSubscriptionBadge={ExpiredSubscriptionBadge}
+            selectedServiceFilter={selectedServiceFilter}
+          />
         )}
-
-        {!error && users.length > 0 ? (
-          <p className="px-1 text-sm font-bold text-slate-500">
-            عرض {users.length} مستخدم{listTotal > users.length ? ` من ${listTotal}` : ""}
-          </p>
-        ) : null}
       </section>
 
       <AdminUserBulkActionModal

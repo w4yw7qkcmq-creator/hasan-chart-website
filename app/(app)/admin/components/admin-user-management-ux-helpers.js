@@ -1,4 +1,12 @@
-import { fetchAdminUserList, fetchAdminUserDashboardStats } from "../../../../lib/admin-user-management-client";
+import { fetchAdminUserList, fetchAdminUserDashboardStats } from "../../../../lib/admin-user-management-client.js";
+import {
+  buildAdminUserListRequestParams,
+  resolveServerActiveServiceFilter,
+} from "../../../../lib/admin-user-list-request.js";
+import {
+  getRegistrationCohortRange,
+  resolveRegistrationDateBounds,
+} from "../../../../lib/admin-user-registration-cohorts.js";
 import {
   countDistinctUsersWithExpiredSubscriptions,
   EXPIRED_SUBSCRIPTION_FILTER,
@@ -116,33 +124,40 @@ function matchesSubscriptionState(user, subscriptionState, service = "all") {
 }
 
 export function getDashboardCardFilterPreset(cardKey) {
-  const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const todayRange = getRegistrationCohortRange("today");
+  const weekRange = getRegistrationCohortRange("week");
+  const monthRange = getRegistrationCohortRange("month");
 
   const presets = {
     total: {
       accountStatus: "all",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS },
+      registrationCohort: "",
     },
     active: {
       accountStatus: "active",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS, status: "active" },
+      registrationCohort: "",
     },
     suspended: {
       accountStatus: "suspended",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS, status: "suspended" },
+      registrationCohort: "",
     },
     banned: {
       accountStatus: "banned",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS, status: "banned" },
+      registrationCohort: "",
     },
     deleted: {
       accountStatus: "deleted",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS, status: "deleted" },
+      registrationCohort: "",
     },
     vipActive: {
       accountStatus: "all",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS, service: "vip", subscriptionState: "active_vip" },
+      registrationCohort: "",
     },
     accountManagementActive: {
       accountStatus: "all",
@@ -151,22 +166,44 @@ export function getDashboardCardFilterPreset(cardKey) {
         service: "account_management",
         subscriptionState: "active_am",
       },
+      registrationCohort: "",
     },
     priceAlertsActive: {
       accountStatus: "all",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS, service: "alerts", subscriptionState: "active_alerts" },
+      registrationCohort: "",
     },
     expiredSubscriptions: {
       accountStatus: "all",
       clientFilters: { ...DEFAULT_CLIENT_FILTERS, subscriptionState: EXPIRED_SUBSCRIPTION_FILTER },
+      registrationCohort: "",
     },
     newToday: {
       accountStatus: "all",
-      clientFilters: { ...DEFAULT_CLIENT_FILTERS, registeredFrom: today, registeredTo: today },
+      clientFilters: {
+        ...DEFAULT_CLIENT_FILTERS,
+        registeredFrom: todayRange?.dateFrom || "",
+        registeredTo: todayRange?.dateTo || "",
+      },
+      registrationCohort: "today",
     },
     newThisWeek: {
       accountStatus: "all",
-      clientFilters: { ...DEFAULT_CLIENT_FILTERS, registeredFrom: weekAgo, registeredTo: today },
+      clientFilters: {
+        ...DEFAULT_CLIENT_FILTERS,
+        registeredFrom: weekRange?.dateFrom || "",
+        registeredTo: weekRange?.dateTo || "",
+      },
+      registrationCohort: "week",
+    },
+    newThisMonth: {
+      accountStatus: "all",
+      clientFilters: {
+        ...DEFAULT_CLIENT_FILTERS,
+        registeredFrom: monthRange?.dateFrom || "",
+        registeredTo: monthRange?.dateTo || "",
+      },
+      registrationCohort: "month",
     },
   };
 
@@ -277,11 +314,27 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
   const statusTotals = {};
 
-  const [serviceStats, ...statusResults] = await Promise.all([
+  async function countCohort(cohort) {
+    const bounds = resolveRegistrationDateBounds({ cohort });
+    const result = await fetchAdminUserList(adminFetch, {
+      page: 1,
+      pageSize: 1,
+      registeredFrom: bounds.registeredFromIso,
+      registeredTo: bounds.registeredToIso,
+      signal,
+    });
+    return Number(result.pagination?.total || 0);
+  }
+
+  const [serviceStats, cohortToday, cohortWeek, cohortMonth, ...statusResults] = await Promise.all([
     fetchAdminUserDashboardStats(adminFetch, { signal }),
+    countCohort("today"),
+    countCohort("week"),
+    countCohort("month"),
     ...statusKeys.map(async ({ key, status }) => {
       const result = await fetchAdminUserList(adminFetch, {
         page: 1,
+        pageSize: 1,
         accountStatus: status === "all" ? "" : status,
         signal,
       });
@@ -292,49 +345,26 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
   void statusResults;
 
-  const scannedUsers = [];
-  let totalPages = 1;
-
-  for (let page = 1; page <= DASHBOARD_SCAN_MAX_PAGES; page += 1) {
-    const result = await fetchAdminUserList(adminFetch, {
-      page,
-      sort: "created_at",
-      order: "desc",
-      signal,
-    });
-
-    scannedUsers.push(...(result.users || []));
-    totalPages = Number(result.pagination?.totalPages || 1);
-    if (page >= totalPages) break;
-  }
-
-  const derived = computeStatsFromUsers(scannedUsers);
-
   return {
     ...statusTotals,
     vipActive: Number(serviceStats.vipActive || 0),
     accountManagementActive: Number(serviceStats.accountManagementActive || 0),
-    priceAlertsActive: Number(serviceStats.priceAlertsActive ?? derived.priceAlertsActive ?? 0),
-    expiredSubscriptions: Number(serviceStats.expiredSubscriptions || derived.expiredSubscriptions || 0),
-    newToday: derived.newToday,
-    newThisWeek: derived.newThisWeek,
-    scannedSampleSize: scannedUsers.length,
-    scanComplete: totalPages <= DASHBOARD_SCAN_MAX_PAGES,
+    priceAlertsActive: Number(serviceStats.priceAlertsActive || 0),
+    expiredSubscriptions: Number(serviceStats.expiredSubscriptions || 0),
+    newToday: cohortToday,
+    newThisWeek: cohortWeek,
+    newThisMonth: cohortMonth,
+    registrationCohorts: {
+      today: cohortToday,
+      week: cohortWeek,
+      month: cohortMonth,
+    },
+    scanComplete: true,
     serviceStatsSources: serviceStats.sources || null,
   };
 }
 
-function resolveServerActiveServiceFilter(clientFilters = {}) {
-  const { service = "all", subscriptionState = "all" } = clientFilters;
-  if (subscriptionState === "expired") {
-    if (service === "all") return "";
-    return resolveExpiredServerActiveServiceFilter(service);
-  }
-  if (subscriptionState === "active_vip" && service === "vip") return "vip";
-  if (subscriptionState === "active_am" && service === "account_management") return "account_management";
-  if (subscriptionState === "active_alerts" && service === "alerts") return "alerts";
-  return "";
-}
+export { buildAdminUserListRequestParams, resolveServerActiveServiceFilter } from "../../../../lib/admin-user-list-request.js";
 
 export async function fetchUsersForClientView(
   adminFetch,
@@ -344,41 +374,29 @@ export async function fetchUsersForClientView(
     order = "desc",
     accountStatus = "all",
     clientFilters = {},
+    registrationCohort = "",
+    page = 1,
+    pageSize = 25,
     maxPages = DASHBOARD_SCAN_MAX_PAGES,
     signal,
   } = {}
 ) {
   const effectiveAccountStatus = resolveEffectiveAccountStatusFilter(accountStatus, clientFilters);
   const serverActiveService = resolveServerActiveServiceFilter(clientFilters);
+  const bounds = resolveRegistrationDateBounds({
+    cohort: registrationCohort,
+    registeredFrom: clientFilters.registeredFrom,
+    registeredTo: clientFilters.registeredTo,
+  });
 
   const needsClientPass =
-    !serverActiveService &&
-    (Boolean(search.trim()) ||
-      clientFilters.service !== "all" ||
-      Boolean(clientFilters.plan?.trim()) ||
-      clientFilters.status !== "all" ||
-      (clientFilters.subscriptionState && clientFilters.subscriptionState !== "all") ||
-      Boolean(clientFilters.registeredFrom) ||
-      Boolean(clientFilters.registeredTo) ||
-      Boolean(clientFilters.lastLoginFrom) ||
-      Boolean(clientFilters.lastLoginTo));
-
-  if (!needsClientPass) {
-    const result = await fetchAdminUserList(adminFetch, {
-      listAll: true,
-      search,
-      sort,
-      order,
-      accountStatus: effectiveAccountStatus,
-      activeService: serverActiveService,
-      signal,
-    });
-    return {
-      users: result.users || [],
-      pagination: result.pagination,
-      mode: serverActiveService ? "server-active-service" : "server",
-    };
-  }
+    Boolean(clientFilters.plan?.trim()) ||
+    Boolean(clientFilters.lastLoginFrom) ||
+    Boolean(clientFilters.lastLoginTo) ||
+    (clientFilters.subscriptionState &&
+      clientFilters.subscriptionState !== "all" &&
+      !serverActiveService) ||
+    (clientFilters.status !== "all" && clientFilters.status !== accountStatus);
 
   const result = await fetchAdminUserList(adminFetch, {
     listAll: true,
@@ -386,6 +404,9 @@ export async function fetchUsersForClientView(
     sort,
     order,
     accountStatus: effectiveAccountStatus,
+    activeService: serverActiveService,
+    registeredFrom: bounds.registeredFromIso,
+    registeredTo: bounds.registeredToIso,
     signal,
   });
 
@@ -400,16 +421,21 @@ export async function fetchUsersForClientView(
   }
 
   const filtered = applyClientUserFilters(deduped, clientFilters);
+  const total = filtered.length;
+  const pageNumber = Math.max(Number(page) || 1, 1);
+  const resolvedPageSize = Math.min(Math.max(Number(pageSize) || 25, 1), 100);
+  const from = (pageNumber - 1) * resolvedPageSize;
+  const pageRows = filtered.slice(from, from + resolvedPageSize);
 
   return {
-    users: filtered,
+    users: pageRows,
     pagination: {
-      page: 1,
-      pageSize: filtered.length,
-      total: filtered.length,
-      totalPages: 1,
+      page: pageNumber,
+      pageSize: resolvedPageSize,
+      total,
+      totalPages: Math.max(Math.ceil(total / resolvedPageSize), 1),
     },
-    mode: "client",
+    mode: needsClientPass ? "client" : "client-server-bounds",
     scannedPages: 1,
   };
 }
