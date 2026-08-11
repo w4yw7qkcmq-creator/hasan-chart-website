@@ -283,8 +283,16 @@ function seedPartnerContext() {
         status: "registered",
       },
     ],
-    partner_campaigns: [
-      { id: "camp-1", partner_id: PARTNER_A, slug: "analysis", is_active: true },
+    partner_campaign_programs: [
+      {
+        id: "camp-prog-1",
+        code: "analysis",
+        name: "Analysis Campaign",
+        status: "active",
+        start_at: new Date(Date.now() - 86400000).toISOString(),
+        end_at: new Date(Date.now() + 86400000 * 30).toISOString(),
+        rule_version: 1,
+      },
     ],
   };
 }

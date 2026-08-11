@@ -15,7 +15,7 @@ import { isSmartLinkCampaignError } from "../../../../lib/partner-center/smart-l
 const TABS = [
   { id: "overview", label: "نظرة عامة" },
   { id: "missions", label: "المهام" },
-  { id: "campaigns", label: "الحملات" },
+  { id: "campaigns", label: "الحملات والمهمات" },
   { id: "links", label: "الروابط" },
   { id: "wallet", label: "المحفظة" },
   { id: "analytics", label: "التحليلات" },
@@ -337,16 +337,44 @@ export function PartnerCenterGrowthSection({ onCopyFeedback, v2Mode = false, gro
       ) : null}
 
       {tab === "campaigns" ? (
-        <Panel title="مركز الحملات">
+        <Panel title="الحملات والمهمات" subtitle="حملات نشطة مع تقدم المهمات والعد التنازلي">
           {!growth?.campaigns?.length ? (
             <EmptyState message="لا توجد حملات نشطة" />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {growth.campaigns.map((c) => (
                 <article key={c.id} className="partner-surface partner-surface--p4">
-                  <h3 className="partner-title-md">{c.name}</h3>
+                  <div className="flex justify-between gap-2">
+                    <h3 className="partner-title-md">{c.nameAr || c.name}</h3>
+                    <span className="partner-badge">{c.statusLabel}</span>
+                  </div>
                   <p className="partner-muted--sm">{c.description || c.landingPath}</p>
-                  <p className="partner-muted--sm mt-2">الحالة: {c.statusLabel}</p>
+                  {c.countdown ? (
+                    <p className="partner-muted--sm mt-2">
+                      {c.countdown.kind === "starts_in" ? "تبدأ خلال: " : c.countdown.kind === "ends_in" ? "تنتهي خلال: " : ""}
+                      {c.countdown.label}
+                    </p>
+                  ) : null}
+                  {c.missionsSummary ? (
+                    <p className="partner-muted--sm mt-2">
+                      المهمات: {c.missionsSummary.completed}/{c.missionsSummary.total} مكتملة
+                      {c.missionsSummary.inProgress ? ` — ${c.missionsSummary.inProgress} قيد التنفيذ` : ""}
+                    </p>
+                  ) : null}
+                  {c.missions?.length ? (
+                    <ul className="mt-3 space-y-2 border-t border-neutral-800 pt-2">
+                      {c.missions.map((m) => (
+                        <li key={m.id} className="text-sm">
+                          <div className="flex justify-between gap-2">
+                            <span>{m.title}</span>
+                            <span className="partner-badge text-xs">{m.uiStatus?.label}</span>
+                          </div>
+                          <ProgressBar percent={m.progressPercent} />
+                          <p className="partner-muted--sm">{m.currentValue} / {m.targetValue}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   {!c.eligible ? (
                     <p className="text-amber-400 text-sm mt-2">غير مؤهل لهذه الحملة</p>
                   ) : null}

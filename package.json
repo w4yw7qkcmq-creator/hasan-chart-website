@@ -75,7 +75,8 @@
     "test:forex-subscriptions": "node --test scripts/test-forex-subscriptions.js",
     "test:financial-center-cursor": "node scripts/test-financial-center-cursor.js",
     "test:subscription-plan-security": "node --test scripts/test-subscription-plan-security.js",
-    "test:partner:migration-history": "node --test scripts/test-partner-migration-history-guard.js && node scripts/partner-center/verify-production-migration-history.mjs"
+    "test:partner:migration-history": "node --test scripts/test-partner-migration-history-guard.js && node scripts/partner-center/verify-production-migration-history.mjs",
+    "test:partner:r9-staging": "node scripts/partner-center/r9-staging-validation.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

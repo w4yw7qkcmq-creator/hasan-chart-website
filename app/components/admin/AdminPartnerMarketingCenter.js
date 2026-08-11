@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "../../../lib/admin-fetch";
 import { formatPartnerMoney } from "../../../lib/partner-shared";
+import AdminCampaignMissionWizard from "./AdminCampaignMissionWizard";
 
 const SECTIONS = [
   { id: "overview", label: "نظرة عامة" },
@@ -41,14 +42,21 @@ const EMPTY_MISSION = {
   status: "draft",
 };
 
-const EMPTY_CAMPAIGN = {
-  code: "",
-  name: "",
-  description: "",
-  landing_path: "/",
-  allowed_sources: [],
-  allowed_mediums: [],
-  status: "draft",
+const CAMPAIGN_BUCKETS = [
+  { id: "active", label: "نشطة" },
+  { id: "scheduled", label: "مجدولة" },
+  { id: "paused", label: "متوقفة" },
+  { id: "completed", label: "مكتملة" },
+];
+
+const CAMPAIGN_ACTION_LABELS = {
+  schedule: "جدولة",
+  activate: "تفعيل",
+  pause: "إيقاف",
+  resume: "استئناف",
+  complete: "إكمال",
+  cancel: "إلغاء",
+  delete_draft: "حذف المسودة",
 };
 
 function Field({ label, children }) {
@@ -89,7 +97,17 @@ export default function AdminPartnerMarketingCenter() {
   const [fraudQueue, setFraudQueue] = useState([]);
   const [audit, setAudit] = useState([]);
   const [missionForm, setMissionForm] = useState(EMPTY_MISSION);
-  const [campaignForm, setCampaignForm] = useState(EMPTY_CAMPAIGN);
+  const [campaignForm, setCampaignForm] = useState({
+    code: "",
+    name: "",
+    description: "",
+    landing_path: "/",
+    allowed_sources: [],
+    allowed_mediums: [],
+    status: "draft",
+  });
+  const [campaignBucket, setCampaignBucket] = useState("active");
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [missionPreview, setMissionPreview] = useState(null);
   const [campaignPreview, setCampaignPreview] = useState(null);
   const [fraudReason, setFraudReason] = useState("");
@@ -119,7 +137,7 @@ export default function AdminPartnerMarketingCenter() {
         setMissions(json.missions || []);
       }
       if (section === "campaigns") {
-        const res = await adminFetch("/api/admin/partner-marketing/campaigns");
+        const res = await adminFetch("/api/admin/partner-marketing/campaigns?metrics=1");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setCampaigns(json.campaigns || []);
@@ -232,11 +250,48 @@ export default function AdminPartnerMarketingCenter() {
     const json = await res.json();
     if (!json.success) alert(json.error);
     else {
-      setCampaignForm(EMPTY_CAMPAIGN);
+      setCampaignForm({
+        code: "",
+        name: "",
+        description: "",
+        landing_path: "/",
+        allowed_sources: [],
+        allowed_mediums: [],
+        status: "draft",
+      });
       setCampaignPreview(null);
       void loadSection();
     }
   };
+
+  const runCampaignAction = async (campaign, action) => {
+    const label = CAMPAIGN_ACTION_LABELS[action] || action;
+    if (!window.confirm(`تأكيد: ${label} — "${campaign.displayNameAr || campaign.name}"؟`)) return;
+    const res = await adminFetch("/api/admin/partner-marketing/campaigns", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: campaign.id,
+        action,
+        expected_updated_at: campaign.updated_at,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) alert(json.error || "تعذر تنفيذ الإجراء");
+    else void loadSection();
+  };
+
+  const campaignsByBucket = useMemo(() => {
+    const grouped = { active: [], scheduled: [], paused: [], completed: [], draft: [] };
+    for (const c of campaigns) {
+      const bucket = c.dashboardBucket || (c.status === "ended" ? "completed" : c.status);
+      if (grouped[bucket]) grouped[bucket].push(c);
+      else grouped.draft.push(c);
+    }
+    return grouped;
+  }, [campaigns]);
+
+  const visibleCampaigns = campaignsByBucket[campaignBucket] || [];
 
   const saveQualifiedReward = async () => {
     const currentAmount = qrrPolicy?.current?.amount;
@@ -463,24 +518,103 @@ export default function AdminPartnerMarketingCenter() {
 
       {!loading && section === "campaigns" ? (
         <div className="space-y-6">
-          <div className="admin-panel grid gap-3 md:grid-cols-2">
-            <Field label="الرمز"><input className="admin-input w-full" value={campaignForm.code} onChange={(e) => setCampaignForm({ ...campaignForm, code: e.target.value })} /></Field>
-            <Field label="الاسم"><input className="admin-input w-full" value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} /></Field>
-            <Field label="مسار الهبوط"><input className="admin-input w-full" value={campaignForm.landing_path} onChange={(e) => setCampaignForm({ ...campaignForm, landing_path: e.target.value })} /></Field>
-            <div className="flex gap-2 md:col-span-2">
-              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void previewCampaign()}>معاينة</button>
-              <button type="button" className="admin-btn admin-btn--primary" onClick={() => void saveCampaign()}>إنشاء مسودة</button>
-            </div>
-            <PreviewPanel preview={campaignPreview?.preview} warnings={campaignPreview?.warnings} />
-          </div>
-          <table className="admin-table w-full">
-            <thead><tr><th>الاسم</th><th>v</th><th>المسار</th><th>الحالة</th></tr></thead>
-            <tbody>
-              {campaigns.map((c) => (
-                <tr key={c.id}><td>{c.name}</td><td>{c.rule_version}</td><td>{c.landing_path}</td><td>{c.status}</td></tr>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {CAMPAIGN_BUCKETS.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={`admin-tab ${campaignBucket === b.id ? "admin-tab--active" : ""}`}
+                  onClick={() => setCampaignBucket(b.id)}
+                >
+                  {b.label} ({campaignsByBucket[b.id]?.length || 0})
+                </button>
               ))}
-            </tbody>
-          </table>
+            </div>
+            <button type="button" className="admin-btn admin-btn--primary" onClick={() => setWizardOpen(true)}>
+              + معالج حملة جديدة
+            </button>
+          </div>
+
+          {!visibleCampaigns.length ? (
+            <p className="text-neutral-400">لا توجد حملات في هذا القسم.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {visibleCampaigns.map((c) => (
+                <article key={c.id} className="admin-panel space-y-2 p-4">
+                  <div className="flex justify-between gap-2">
+                    <h3 className="font-semibold">{c.displayNameAr || c.name}</h3>
+                    <span className="text-xs text-neutral-400">v{c.rule_version}</span>
+                  </div>
+                  <p className="text-neutral-400 text-sm">{c.code} — {c.landing_path}</p>
+                  <p className="text-sm">الحالة: {c.status} {c.tracking_metadata?.lifecycle ? `(${c.tracking_metadata.lifecycle})` : ""}</p>
+                  {c.metrics ? (
+                    <div className="grid grid-cols-2 gap-2 text-xs text-neutral-300">
+                      <span>مشاركون: {c.metrics.participants}</span>
+                      <span>مهمات مكتملة: {c.metrics.missionsCompleted}</span>
+                      <span>مكافآت معلقة: {formatPartnerMoney(c.metrics.rewardsPending)}</span>
+                      <span>مكافآت مضافة: {formatPartnerMoney(c.metrics.rewardsCredited)}</span>
+                      <span>تكلفة تقديرية: {formatPartnerMoney(c.metrics.estimatedMissionCost)}</span>
+                      {c.metrics.maxExposureUsd != null ? (
+                        <span>حد التعرض: {formatPartnerMoney(c.metrics.maxExposureUsd)}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-1 pt-2">
+                    {c.status === "draft" && c.tracking_metadata?.lifecycle !== "scheduled" ? (
+                      <>
+                        <button type="button" className="admin-btn admin-btn--sm" onClick={() => setWizardOpen(true)}>تعديل مسودة</button>
+                        <button type="button" className="admin-btn admin-btn--sm" onClick={() => void runCampaignAction(c, "schedule")}>جدولة</button>
+                        <button type="button" className="admin-btn admin-btn--sm admin-btn--primary" onClick={() => void runCampaignAction(c, "activate")}>تفعيل</button>
+                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "delete_draft")}>حذف</button>
+                      </>
+                    ) : null}
+                    {c.tracking_metadata?.lifecycle === "scheduled" || (c.status === "draft" && c.tracking_metadata?.scheduled) ? (
+                      <>
+                        <button type="button" className="admin-btn admin-btn--sm admin-btn--primary" onClick={() => void runCampaignAction(c, "activate")}>تفعيل</button>
+                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "cancel")}>إلغاء</button>
+                      </>
+                    ) : null}
+                    {c.status === "active" ? (
+                      <>
+                        <button type="button" className="admin-btn admin-btn--sm" onClick={() => void runCampaignAction(c, "pause")}>إيقاف</button>
+                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "complete")}>إكمال</button>
+                      </>
+                    ) : null}
+                    {c.status === "paused" ? (
+                      <>
+                        <button type="button" className="admin-btn admin-btn--sm admin-btn--primary" onClick={() => void runCampaignAction(c, "resume")}>استئناف</button>
+                        <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "complete")}>إكمال</button>
+                      </>
+                    ) : null}
+                    {c.status === "ended" ? (
+                      <button type="button" className="admin-btn admin-btn--sm admin-btn--secondary" onClick={() => void runCampaignAction(c, "cancel")}>أرشفة/إلغاء</button>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          <details className="admin-panel p-4">
+            <summary className="cursor-pointer font-medium">إنشاء سريع (النموذج القديم)</summary>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <Field label="الرمز"><input className="admin-input w-full" value={campaignForm.code} onChange={(e) => setCampaignForm({ ...campaignForm, code: e.target.value })} /></Field>
+              <Field label="الاسم"><input className="admin-input w-full" value={campaignForm.name} onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })} /></Field>
+              <Field label="مسار الهبوط"><input className="admin-input w-full" value={campaignForm.landing_path} onChange={(e) => setCampaignForm({ ...campaignForm, landing_path: e.target.value })} /></Field>
+              <div className="flex gap-2 md:col-span-2">
+                <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void previewCampaign()}>معاينة</button>
+                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void saveCampaign()}>إنشاء مسودة</button>
+              </div>
+              <PreviewPanel preview={campaignPreview?.preview} warnings={campaignPreview?.warnings} />
+            </div>
+          </details>
+
+          <AdminCampaignMissionWizard
+            open={wizardOpen}
+            onClose={() => setWizardOpen(false)}
+            onSaved={() => void loadSection()}
+          />
         </div>
       ) : null}
 
