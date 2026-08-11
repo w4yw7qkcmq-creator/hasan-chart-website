@@ -1,6 +1,4 @@
 import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
-import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
-import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
 import { requireAllPermissions } from "../../../../../../lib/iam/require-permission.js";
 import { sendVipRecommendationStatusUpdate } from "../../../../../../lib/vip-recommendation-status-dispatch.js";
 import { VIP_STATUS_EVENT_TYPES } from "../../../../../../lib/vip-recommendation-status-copy.js";
@@ -35,12 +33,6 @@ export async function POST(request, { params }) {
         { status: adminCheck.status }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const recommendationId = String(params?.id || "").trim();
     if (!recommendationId) {

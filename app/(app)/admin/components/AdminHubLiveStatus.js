@@ -33,7 +33,12 @@ const LIVE_STATUS_ITEMS = [
   },
 ];
 
-export default function AdminHubLiveStatus({ stats = {}, loading = false }) {
+export default function AdminHubLiveStatus({
+  stats = {},
+  loading = false,
+  unavailable = false,
+  unavailableMessage = "",
+}) {
   if (loading) {
     return (
       <section className="admin-hub-live-status admin-section" aria-label="الحالة اللحظية">
@@ -41,6 +46,19 @@ export default function AdminHubLiveStatus({ stats = {}, loading = false }) {
           {LIVE_STATUS_ITEMS.map((item) => (
             <div key={item.id} className="admin-hub-live-status__chip admin-hub-live-status__chip--skeleton animate-pulse" />
           ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (unavailable) {
+    return (
+      <section className="admin-hub-live-status admin-section" aria-label="الحالة اللحظية">
+        <div className="admin-hub-live-status__head">
+          <h2 className="admin-heading text-lg">الحالة اللحظية</h2>
+          <p className="admin-hub-live-status__desc admin-premium-empty__desc">
+            {unavailableMessage || "تعذر تحديث هذه البيانات مؤقتًا"}
+          </p>
         </div>
       </section>
     );

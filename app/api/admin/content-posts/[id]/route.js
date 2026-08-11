@@ -1,8 +1,6 @@
 import { requireAdminPermission } from "../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../../lib/api-response";
-import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
-import { adminMutationLimiter, adminReadLimiter } from "../../../../../lib/rate-limit";
 import {
   getAdminContentPostById,
   softDeleteAdminContentPost,
@@ -17,12 +15,6 @@ export async function GET(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const post = await getAdminContentPostById(adminCheck.supabase, params.id);
@@ -44,12 +36,6 @@ export async function PATCH(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const body = await request.json().catch(() => ({}));
@@ -80,12 +66,6 @@ export async function DELETE(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const post = await softDeleteAdminContentPost(adminCheck.supabase, {

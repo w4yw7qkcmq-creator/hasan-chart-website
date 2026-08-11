@@ -2,8 +2,6 @@ import { requireAdminPermission } from "../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../../lib/api-response";
 import { loadAdminUserDashboardStats } from "../../../../../lib/admin-user-dashboard-stats";
-import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
-import { adminReadLimiter } from "../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +15,6 @@ export async function GET(request) {
         { status: adminCheck.status }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const stats = await loadAdminUserDashboardStats(adminCheck.supabase);
 

@@ -74,7 +74,12 @@ export default function AdminHubOverview({
         notificationsButtonRef={notificationsButtonRef}
       />
 
-      <AdminHubLiveStatus stats={enrichedStats} loading={statsPending} />
+      <AdminHubLiveStatus
+        stats={enrichedStats}
+        loading={statsPending}
+        unavailable={Boolean(statsError)}
+        unavailableMessage={statsError}
+      />
 
       {statsError ? (
         <div className="admin-premium-empty admin-premium-empty--warn admin-section">
@@ -86,7 +91,10 @@ export default function AdminHubOverview({
         </div>
       ) : null}
 
-      <AdminHubNavigation stats={enrichedStats} onNavigateTab={onNavigateTab} />
+      <AdminHubNavigation
+        stats={statsError ? {} : enrichedStats}
+        onNavigateTab={onNavigateTab}
+      />
 
       <AdminHubUrgentQueue items={urgentItems} loading={urgentLoading} onOpenItem={onOpenUrgentItem} />
 

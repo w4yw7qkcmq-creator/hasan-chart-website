@@ -1,9 +1,7 @@
 import { requireAdminPermission } from "../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../lib/iam/constants";
 import { dispatchAnalysisReplyAlerts } from "../../../lib/analysis-reply-dispatch";
-import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { requireValidUuid } from "../../../lib/partner-security";
-import { adminMutationLimiter } from "../../../lib/rate-limit";
 import { invalidateReadCache } from "../../../lib/server-read-cache";
 import { trimText } from "../../../lib/text-sanitize";
 
@@ -20,12 +18,6 @@ export async function POST(req) {
         { status: adminCheck.status }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const body = await req.json().catch(() => null);
 

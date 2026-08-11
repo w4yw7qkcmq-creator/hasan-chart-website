@@ -4,8 +4,6 @@ import {
   ADMIN_NOTIFICATION_TEST_TYPES,
   runAdminNotificationTest,
 } from "../../../../lib/admin-notification-test-center.js";
-import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
-import { adminMutationLimiter } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -39,13 +37,6 @@ export async function POST(request) {
         { status: adminCheck.status }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-
-    if (rateLimited) return rateLimited;
 
     const body = await request.json().catch(() => null);
     const type = String(body?.type || "").trim();

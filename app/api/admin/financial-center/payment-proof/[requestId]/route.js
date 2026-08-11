@@ -1,8 +1,6 @@
 import { requireAdminPermission } from "../../../../../../lib/admin-auth.js";
 import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants.js";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response.js";
-import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit.js";
-import { adminReadLimiter } from "../../../../../../lib/rate-limit.js";
 import {
   buildInlineDataUrlPaymentProofResponse,
   buildInlinePaymentProofResponse,
@@ -66,21 +64,6 @@ export async function GET(request, { params }) {
         error: adminCheck.error,
       });
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
-    }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) {
-      logPaymentProofEvent("PAYMENT_PROOF_FETCH_FAILED", {
-        requestId,
-        stage: "rate-limit",
-        durationMs: Date.now() - startedAt,
-        statusCode: 429,
-        error: "rate-limited",
-      });
-      return rateLimited;
     }
 
     stage = "db";

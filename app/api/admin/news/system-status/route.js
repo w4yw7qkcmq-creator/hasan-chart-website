@@ -17,19 +17,11 @@ export async function GET(request) {
   try {
     const { requireAdminPermission } = await import("../../../../../lib/admin-auth");
     const { IAM_PERMISSIONS } = await import("../../../../../lib/iam/constants");
-    const { enforceRateLimit } = await import("../../../../../lib/enforce-rate-limit");
-    const { adminReadLimiter } = await import("../../../../../lib/rate-limit");
 
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.NEWS_READ, { request });
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const supabase = getServiceSupabase();
     if (!supabase) {

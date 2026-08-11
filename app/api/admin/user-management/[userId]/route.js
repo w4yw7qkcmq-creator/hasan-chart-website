@@ -5,8 +5,6 @@ import {
 import { requireAdminPermission } from "../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../../lib/api-response";
-import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
-import { adminReadLimiter } from "../../../../../lib/rate-limit";
 import {
   buildUnavailableSectionPayload,
   isMissingDatabaseResourceError,
@@ -25,12 +23,6 @@ export async function GET(request, context) {
         { status: adminCheck.status }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const userId = String(params?.userId || "").trim();

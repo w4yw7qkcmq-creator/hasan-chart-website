@@ -140,6 +140,12 @@ export default function AdminPartnerCenterHub() {
     const result = await response.json().catch(() => ({}));
 
     if (!response.ok || !result?.success) {
+      if (response.status === 429) {
+        throw new Error(
+          result?.error ||
+            "تم إرسال عدد كبير من الطلبات خلال وقت قصير. سنعيد المحاولة بعد لحظات."
+        );
+      }
       throw new Error(result?.error || "تعذر تحميل بيانات الشركاء");
     }
 

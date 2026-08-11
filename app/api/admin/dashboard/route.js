@@ -3,15 +3,10 @@ import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../lib/api-response";
 import { dispatchAnalysisReplyAlerts, resolveAnalysisReplyRecipientEmail } from "../../../../lib/analysis-reply-dispatch";
 import { dispatchUnifiedSiteAlerts } from "../../../../lib/site-notification-dispatch.js";
-import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { getSiteUrl, buildEmailLayout } from "../../../../lib/email";
 import { buildEmailParagraph } from "../../../../lib/email-layout.js";
 import { dispatchTransactionalEmail } from "../../../../lib/email-dispatch.js";
 import { activateSubscriptionRequest } from "../../../../lib/admin-subscription-request-activate.js";
-import {
-  adminMutationLimiter,
-  adminReadLimiter,
-} from "../../../../lib/rate-limit";
 import { invalidateReadCache, withReadCache } from "../../../../lib/server-read-cache";
 import {
   ADMIN_DASHBOARD_PAGE_SIZE,
@@ -37,17 +32,20 @@ export async function GET(request) {
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.DASHBOARD_READ, { request });
 
     if (!adminCheck.ok) {
+      const headers = {};
+      if (adminCheck.status === 429 && adminCheck.retryAfterSeconds) {
+        headers["Retry-After"] = String(adminCheck.retryAfterSeconds);
+      }
       return Response.json(
-        { success: false, error: adminCheck.error },
-        { status: adminCheck.status }
+        {
+          success: false,
+          error: adminCheck.error,
+          ...(adminCheck.code ? { code: adminCheck.code } : {}),
+          ...(adminCheck.retryAfterSeconds ? { retryAfterSeconds: adminCheck.retryAfterSeconds } : {}),
+        },
+        { status: adminCheck.status, headers }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const adminEmail = String(adminCheck.user?.email || "admin").toLowerCase();
     const { searchParams } = new URL(request.url);
@@ -225,17 +223,20 @@ export async function POST(request) {
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.DASHBOARD_MUTATIONS, { request });
 
     if (!adminCheck.ok) {
+      const headers = {};
+      if (adminCheck.status === 429 && adminCheck.retryAfterSeconds) {
+        headers["Retry-After"] = String(adminCheck.retryAfterSeconds);
+      }
       return Response.json(
-        { success: false, error: adminCheck.error },
-        { status: adminCheck.status }
+        {
+          success: false,
+          error: adminCheck.error,
+          ...(adminCheck.code ? { code: adminCheck.code } : {}),
+          ...(adminCheck.retryAfterSeconds ? { retryAfterSeconds: adminCheck.retryAfterSeconds } : {}),
+        },
+        { status: adminCheck.status, headers }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const supabase = adminCheck.supabase;
     const adminUser = adminCheck.user;

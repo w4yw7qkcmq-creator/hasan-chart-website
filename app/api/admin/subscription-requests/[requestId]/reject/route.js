@@ -7,8 +7,6 @@ import {
 import { requireValidSubscriptionRequestId } from "../../../../../../lib/id-validation.js";
 import { rejectSubscriptionRequest } from "../../../../../../lib/admin-subscription-request-reject.js";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
-import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
-import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -37,20 +35,6 @@ export async function POST(request, context) {
     stage = "auth";
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.SUBSCRIPTIONS_MANAGE, { request });
     assertAdminSubscriptionRejectAuthorized(adminCheck);
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) {
-      console.error("SUBSCRIPTION_REJECT_FAILED", {
-        stage: "rate-limit",
-        requestId,
-        statusCode: 429,
-        error: "rate-limited",
-      });
-      return rateLimited;
-    }
 
     stage = "validation";
     const params = await context.params;

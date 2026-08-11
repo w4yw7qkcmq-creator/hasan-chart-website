@@ -1,7 +1,5 @@
 import { requireAdminPermission } from "../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
-import { enforceRateLimit } from "../../../../../lib/enforce-rate-limit";
-import { adminReadLimiter } from "../../../../../lib/rate-limit";
 import { listCompletedVipRecommendations } from "../../../../../lib/vip-recommendation-status-dispatch.js";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +22,6 @@ export async function GET(request) {
         { status: adminCheck.status, headers: NO_CACHE_HEADERS }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const result = await listCompletedVipRecommendations(adminCheck.supabase);
 

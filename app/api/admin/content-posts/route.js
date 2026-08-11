@@ -1,8 +1,6 @@
 import { requireAdminPermission } from "../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../lib/api-response";
-import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
-import { adminMutationLimiter, adminReadLimiter } from "../../../../lib/rate-limit";
 import { normalizeContentType } from "../../../../lib/content-post-validation";
 import {
   createAdminContentPost,
@@ -17,12 +15,6 @@ export async function GET(request) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const { searchParams } = new URL(request.url);
     const contentType = normalizeContentType(searchParams.get("type"));
@@ -55,12 +47,6 @@ export async function POST(request) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const body = await request.json().catch(() => ({}));
     const contentType = normalizeContentType(body?.content_type);

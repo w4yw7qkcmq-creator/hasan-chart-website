@@ -1,6 +1,5 @@
 import { requireAdminPermission } from "../../../../../../lib/admin-auth";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
-import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
 import {
   handleAdminUserManagementAction,
   isSelfTargetAction,
@@ -8,7 +7,6 @@ import {
 } from "../../../../../../lib/admin-user-management-action-handler";
 import { permissionForLifecycleAction } from "../../../../../../lib/iam/action-permissions";
 import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
-import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +20,6 @@ export async function POST(request, context) {
         { status: adminCheck.status }
       );
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const userId = String(params?.userId || "").trim();

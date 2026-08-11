@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import { applySecurityHeaders } from "./lib/security-headers";
 import {
-  adminMutationLimiter,
-  adminReadLimiter,
-  getClientIp,
-  RATE_LIMIT_ERROR,
-} from "./lib/rate-limit";
-import {
   REFERRAL_COOKIE_MAX_AGE_SECONDS,
   REFERRAL_COOKIE_NAME,
   VISITOR_COOKIE_MAX_AGE_SECONDS,
@@ -77,24 +71,6 @@ export async function middleware(request) {
         { status: 401 }
       )
     );
-  }
-
-  if (isAdminApi) {
-    const isReadMethod = request.method === "GET" || request.method === "HEAD";
-    const limiter = isReadMethod ? adminReadLimiter : adminMutationLimiter;
-    const rateLimitResult = await limiter(`admin-ip:${getClientIp(request)}`);
-
-    if (!rateLimitResult.success) {
-      return applySecurityHeaders(
-        NextResponse.json(
-          {
-            success: false,
-            error: RATE_LIMIT_ERROR,
-          },
-          { status: 429 }
-        )
-      );
-    }
   }
 
   if (pathname.startsWith("/admin")) {

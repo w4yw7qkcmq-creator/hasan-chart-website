@@ -2,14 +2,12 @@ import { requireAdminPermission } from "../../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
 import { writeAdminAuditLog } from "../../../../../../lib/admin-audit-log";
-import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
 import { loadAdminUserNotesSection } from "../../../../../../lib/admin-user-management-sections";
 import {
   buildUnavailableSectionPayload,
   isMissingDatabaseResourceError,
   sanitizeAdminUserFacingError,
 } from "../../../../../../lib/admin-user-management-shared";
-import { adminMutationLimiter, adminReadLimiter } from "../../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +17,6 @@ export async function GET(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const userId = String(params?.userId || "").trim();
@@ -59,12 +51,6 @@ export async function POST(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const userId = String(params?.userId || "").trim();
@@ -114,12 +100,6 @@ export async function PATCH(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const userId = String(params?.userId || "").trim();
@@ -189,12 +169,6 @@ export async function DELETE(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const userId = String(params?.userId || "").trim();

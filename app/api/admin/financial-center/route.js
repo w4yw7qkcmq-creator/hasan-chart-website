@@ -1,8 +1,6 @@
 import { requireAdminPermission } from "../../../../lib/admin-auth.js";
 import { IAM_PERMISSIONS } from "../../../../lib/iam/constants.js";
 import { CACHE_NO_STORE } from "../../../../lib/api-response.js";
-import { enforceRateLimit } from "../../../../lib/enforce-rate-limit.js";
-import { adminReadLimiter } from "../../../../lib/rate-limit.js";
 import { withReadCache } from "../../../../lib/server-read-cache.js";
 import { FINANCIAL_OVERVIEW_CACHE_MS, exportRowsToCsv, sanitizeFinancialError } from "../../../../lib/financial-center/financial-center-shared.js";
 import { FINANCIAL_CENTER_SECTIONS } from "../../../../lib/financial-center/financial-types.js";
@@ -45,12 +43,6 @@ export async function GET(request) {
     if (!access.ok) {
       return jsonResponse({ success: false, error: access.error }, access.status);
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminReadLimiter,
-      String(access.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const { searchParams } = new URL(request.url);
     const section = String(searchParams.get("section") || "overview").trim().toLowerCase();

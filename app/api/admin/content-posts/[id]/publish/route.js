@@ -1,7 +1,5 @@
 import { requireAdminPermission } from "../../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
-import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
-import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
 import { publishAdminContentPost } from "../../../../../../lib/content-posts-admin";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +10,6 @@ export async function POST(request, context) {
     if (!adminCheck.ok) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) return rateLimited;
 
     const params = await context.params;
     const post = await publishAdminContentPost(adminCheck.supabase, {

@@ -5,8 +5,6 @@ import { requireValidSubscriptionRequestId } from "../../../../../../lib/id-vali
 import { removeSubscriptionRequest } from "../../../../../../lib/admin-subscription-request-remove.js";
 import { validateSubscriptionRemovePayload } from "../../../../../../lib/admin-subscription-request-remove-shared.js";
 import { CACHE_NO_STORE } from "../../../../../../lib/api-response";
-import { enforceRateLimit } from "../../../../../../lib/enforce-rate-limit";
-import { adminMutationLimiter } from "../../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -35,14 +33,6 @@ export async function POST(request, context) {
     stage = "auth";
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.SUBSCRIPTIONS_MANAGE, { request });
     assertAdminSubscriptionRemoveAuthorized(adminCheck);
-
-    const rateLimited = await enforceRateLimit(
-      adminMutationLimiter,
-      String(adminCheck.user?.email || "admin").toLowerCase()
-    );
-    if (rateLimited) {
-      return rateLimited;
-    }
 
     stage = "validation";
     const params = await context.params;
