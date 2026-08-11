@@ -11,6 +11,9 @@ import {
 const ADMIN_API_PREFIX = "/api/admin";
 const IAM_API_PREFIX = "/api/iam";
 const ADMIN_REPLY_API = "/api/admin-reply";
+const MACHINE_AUTH_ADMIN_PATHS = new Set([
+  "/api/admin/reconcile-profiles-last-sign-in",
+]);
 const PUBLIC_API_ROUTES = new Set([
   "/api/market-pulse",
   "/api/market-stream",
@@ -21,6 +24,15 @@ const PUBLIC_API_ROUTES = new Set([
 
 function hasAccessToken(request) {
   return Boolean(request.cookies.get("hc_access_token")?.value);
+}
+
+function hasMachineAuthHeaders(request) {
+  return Boolean(
+    request.headers.get("x-service-account-id")?.trim() ||
+      request.headers.get("x-iam-service-id")?.trim() ||
+      request.headers.get("x-service-account-secret")?.trim() ||
+      request.headers.get("x-iam-service-secret")?.trim()
+  );
 }
 
 function isProtectedAdminApi(pathname) {
@@ -62,15 +74,19 @@ export async function middleware(request) {
   const isAdminApi = isProtectedAdminApi(pathname);
 
   if (isAdminApi && !hasAccessToken(request)) {
-    return applySecurityHeaders(
-      NextResponse.json(
-        {
-          success: false,
-          error: "يجب تسجيل الدخول أولاً",
-        },
-        { status: 401 }
-      )
-    );
+    const allowsMachineAuth =
+      MACHINE_AUTH_ADMIN_PATHS.has(pathname) && hasMachineAuthHeaders(request);
+    if (!allowsMachineAuth) {
+      return applySecurityHeaders(
+        NextResponse.json(
+          {
+            success: false,
+            error: "يجب تسجيل الدخول أولاً",
+          },
+          { status: 401 }
+        )
+      );
+    }
   }
 
   if (pathname.startsWith("/admin")) {
