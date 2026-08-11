@@ -728,12 +728,60 @@ html[data-theme="light"] .au-date {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(2px);
+  background: rgba(248, 250, 252, 0.72);
+  backdrop-filter: blur(1px);
   border-radius: var(--au-radius-lg);
   font-size: 0.875rem;
   font-weight: 800;
   color: var(--au-text-primary);
+}
+
+.au-btn.is-loading {
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.au-classification-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 900;
+  border: 1px solid var(--au-border);
+  background: var(--au-accent-soft);
+  color: var(--au-text-secondary);
+}
+
+.au-classification-badge--real {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.au-classification-badge--test,
+.au-classification-badge--e2e {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.au-classification-badge--internal {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.au-classification-badge--suspected {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+}
+
+.au-classification-badge--unknown {
+  border-color: rgba(100, 116, 139, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+  color: #475569;
 }
 
 .au-table-shell {

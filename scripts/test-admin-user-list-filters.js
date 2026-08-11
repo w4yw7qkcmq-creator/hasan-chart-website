@@ -115,6 +115,30 @@ describe("admin user list filter contract", () => {
     assert.equal(ADMIN_USER_LIST_ALL_CAP, 1000);
   });
 
+  it("maps user classification filter to server param", () => {
+    const params = buildAdminUserListRequestParams({
+      clientFilters: {
+        ...DEFAULT_ADMIN_USER_CLIENT_FILTERS,
+        userClassification: "real",
+      },
+    });
+    assert.equal(params.userClassification, "real");
+  });
+
+  it("composes search + classification + cohort", () => {
+    const params = buildAdminUserListRequestParams({
+      searchQuery: "ahmad",
+      registrationCohort: "month",
+      clientFilters: {
+        ...DEFAULT_ADMIN_USER_CLIENT_FILTERS,
+        userClassification: "test",
+      },
+    });
+    assert.equal(params.search, "ahmad");
+    assert.equal(params.userClassification, "test");
+    assert.ok(params.registeredFrom);
+  });
+
   it("pagination retains active filters via stable request params", () => {
     const base = buildAdminUserListRequestParams({
       page: 1,

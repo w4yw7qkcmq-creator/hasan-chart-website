@@ -27,6 +27,7 @@ import {
   matchesAdminServiceFilter,
   normalizeAdminUserServiceType,
 } from "../../../../lib/admin-user-service-classifier.js";
+import { getUserClassificationLabel } from "../../../../lib/user-classification.js";
 
 export const DASHBOARD_SCAN_MAX_PAGES = 10;
 
@@ -83,6 +84,7 @@ export const DEFAULT_CLIENT_FILTERS = {
   lastLoginFrom: "",
   lastLoginTo: "",
   subscriptionState: "all",
+  userClassification: "all",
 };
 
 function readActiveServices(user) {
@@ -326,11 +328,17 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
     return Number(result.pagination?.total || 0);
   }
 
-  const [serviceStats, cohortToday, cohortWeek, cohortMonth, ...statusResults] = await Promise.all([
+  const [serviceStats, cohortToday, cohortWeek, cohortMonth, realUsersResult, ...statusResults] = await Promise.all([
     fetchAdminUserDashboardStats(adminFetch, { signal }),
     countCohort("today"),
     countCohort("week"),
     countCohort("month"),
+    fetchAdminUserList(adminFetch, {
+      page: 1,
+      pageSize: 1,
+      userClassification: "real",
+      signal,
+    }),
     ...statusKeys.map(async ({ key, status }) => {
       const result = await fetchAdminUserList(adminFetch, {
         page: 1,
@@ -345,8 +353,29 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
   void statusResults;
 
+  const classificationKeys = ["test", "e2e", "internal", "suspected", "unknown"];
+  const classificationCounts = {};
+  await Promise.all(
+    classificationKeys.map(async (key) => {
+      const result = await fetchAdminUserList(adminFetch, {
+        page: 1,
+        pageSize: 1,
+        userClassification: key,
+        signal,
+      });
+      classificationCounts[key] = Number(result.pagination?.total || 0);
+    })
+  );
+
   return {
     ...statusTotals,
+    totalUsers: statusTotals.total,
+    realUsers: Number(realUsersResult.pagination?.total || 0),
+    testUsers: classificationCounts.test || 0,
+    e2eUsers: classificationCounts.e2e || 0,
+    internalUsers: classificationCounts.internal || 0,
+    suspectedUsers: classificationCounts.suspected || 0,
+    unknownUsers: classificationCounts.unknown || 0,
     vipActive: Number(serviceStats.vipActive || 0),
     accountManagementActive: Number(serviceStats.accountManagementActive || 0),
     priceAlertsActive: Number(serviceStats.priceAlertsActive || 0),
@@ -447,6 +476,7 @@ export function exportUsersToCsv(users, filename = "users-export.csv") {
     "email",
     "telegram",
     "accountStatus",
+    "نوع الحساب",
     "subscriptionPlan",
     "subscriptionStatus",
     "activeSubscriptionsCount",
@@ -467,6 +497,8 @@ export function exportUsersToCsv(users, filename = "users-export.csv") {
       user.email,
       user.telegram,
       user.accountStatusLabel || user.accountStatus,
+      user.userClassificationLabel ||
+        getUserClassificationLabel(user.userClassification || "unknown", { short: false }),
       user.subscriptionPlan,
       user.subscriptionStatus,
       user.activeSubscriptionsCount,

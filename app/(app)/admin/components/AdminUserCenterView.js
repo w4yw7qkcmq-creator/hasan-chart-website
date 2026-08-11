@@ -3,10 +3,18 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { useEffect, useId, useRef } from "react";
-import { useAdminUserCenter } from "../../../../lib/use-admin-user-center";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAdminUserCenter, USER_CENTER_TABS } from "../../../../lib/use-admin-user-center";
 import AdminUserDrawerShell from "./AdminUserDrawerShell";
 import SubscriptionRemoveModal from "./SubscriptionRemoveModal";
+import {
+  buildClassificationBanner,
+  getUserClassificationLabel,
+  USER_CLASSIFICATION_LABELS_AR,
+} from "../../../../lib/user-classification";
+import { useAuth } from "../../../components/AuthProvider";
+import { IAM_PERMISSIONS } from "../../../../lib/iam/constants";
 
 const ACTION_ICONS = {
   suspend_user: "⏸️",
@@ -170,6 +178,90 @@ export default function AdminUserActionConfirmModal({
   );
 }
 
+function AdminUserClassificationConfirmModal({
+  pendingChange,
+  user,
+  actionLoading,
+  onCancel,
+  onConfirm,
+}) {
+  const titleId = useId();
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!pendingChange) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancel?.();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onCancel, pendingChange]);
+
+  if (!pendingChange) return null;
+
+  const fromLabel =
+    USER_CLASSIFICATION_LABELS_AR[pendingChange.from] ||
+    getUserClassificationLabel(pendingChange.from);
+  const toLabel =
+    USER_CLASSIFICATION_LABELS_AR[pendingChange.to] ||
+    getUserClassificationLabel(pendingChange.to);
+
+  return createPortal(
+    <div className="admin-crm-action-modal" role="presentation">
+      <button type="button" className="admin-crm-action-modal__backdrop" aria-label="إغلاق" onClick={onCancel} />
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="admin-crm-action-modal__dialog admin-crm-action-modal__dialog--neutral"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <header className="admin-crm-action-modal__header">
+          <div className="admin-crm-action-modal__header-main">
+            <span className="admin-crm-action-modal__icon" aria-hidden="true">🏷️</span>
+            <div>
+              <p className="admin-crm-action-modal__eyebrow">تأكيد التصنيف</p>
+              <h3 id={titleId} className="admin-crm-action-modal__title">
+                هل تريد تغيير تصنيف هذا الحساب؟
+              </h3>
+            </div>
+          </div>
+          <button type="button" className="admin-crm-action-modal__close" onClick={onCancel} aria-label="إغلاق">
+            ×
+          </button>
+        </header>
+        <div className="admin-crm-action-modal__body">
+          <p className="admin-crm-action-modal__description">
+            {user?.email || user?.username || "—"}
+          </p>
+          <p className="font-black">
+            {fromLabel} → {toLabel}
+          </p>
+        </div>
+        <footer className="admin-crm-action-modal__footer">
+          <button type="button" className="admin-crm-action-modal__btn admin-crm-action-modal__btn--cancel" onClick={onCancel}>
+            إلغاء
+          </button>
+          <button
+            type="button"
+            disabled={Boolean(actionLoading)}
+            className="admin-crm-action-modal__btn admin-crm-action-modal__btn--confirm"
+            onClick={onConfirm}
+          >
+            {actionLoading ? "جاري الحفظ..." : "تأكيد التصنيف"}
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function AdminUserCenterView({
   userId,
   currentAdminUserId = "",
@@ -178,6 +270,16 @@ export function AdminUserCenterView({
   onClose,
   onUserUpdated,
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { iam } = useAuth();
+  const urlTab = String(searchParams?.get("tab") || "").trim();
+  const [pendingClassification, setPendingClassification] = useState(null);
+
+  const canManageClassification = Boolean(
+    iam?.permissions?.includes?.(IAM_PERMISSIONS.USERS_MANAGE) || iam?.isAdmin
+  );
+
   const center = useAdminUserCenter({
     userId,
     enabled: Boolean(userId),
@@ -186,12 +288,82 @@ export function AdminUserCenterView({
     onUserUpdated,
   });
 
+  useEffect(() => {
+    if (!urlTab) return;
+    if (!USER_CENTER_TABS.some((tab) => tab.id === urlTab)) return;
+    if (center.activeTab !== urlTab) {
+      center.setActiveTab(urlTab);
+    }
+  }, [urlTab, userId]);
+
+  const handleTabChange = useCallback(
+    (tabId) => {
+      center.setActiveTab(tabId);
+      if (layoutMode === "page") {
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.set("tab", tabId);
+        router.replace(`?${params.toString()}`, { scroll: false });
+      }
+    },
+    [center, layoutMode, router, searchParams]
+  );
+
+  const handleConfirmClassification = useCallback(() => {
+    if (!pendingClassification) return;
+    void center.runAction("update_user_classification", {
+      payload: { classification: pendingClassification.to },
+      refresh: ["overview", "management", "audit"],
+    }).then(() => setPendingClassification(null));
+  }, [center, pendingClassification]);
+
+  const sharedShellProps = {
+    layoutMode,
+    activeTab: center.activeTab,
+    tabs: center.tabs,
+    onTabChange: handleTabChange,
+    onClose,
+    overview: center.sectionData.overview,
+    services: center.sectionData.services,
+    subscriptions: center.sectionData.subscriptions,
+    payments: center.sectionData.payments,
+    notifications: center.sectionData.notifications,
+    emails: center.sectionData.emails,
+    activity: center.sectionData.activity,
+    notes: center.sectionData.notes,
+    management: center.sectionData.management,
+    audit: center.sectionData.audit,
+    sectionState: center.sectionState,
+    pages: center.pages,
+    actionLoading: center.actionLoading,
+    subscriptionRemoveLoading: center.subscriptionRemoveLoading,
+    currentAdminUserId,
+    onPageChange: center.handlePageChange,
+    onRefreshSection: (section) => center.refreshSections([section]),
+    onRequestAction: center.setPendingAction,
+    onRunAction: center.runAction,
+    onRequestSubscriptionRemove: center.requestSubscriptionRemove,
+    onAddNote: center.noteHandlers.onAddNote,
+    onUpdateNote: center.noteHandlers.onUpdateNote,
+    onDeleteNote: center.noteHandlers.onDeleteNote,
+    onTogglePinNote: center.noteHandlers.onTogglePinNote,
+    activityFilter: center.activityFilter,
+    onActivityFilterChange: center.handleActivityFilterChange,
+    canManageClassification,
+    onRequestClassificationChange: setPendingClassification,
+  };
+
   const user = center.sectionData.overview?.user;
+  const classificationBanner = buildClassificationBanner(user?.userClassification);
 
   return (
     <>
       {layoutMode === "page" ? (
         <div className="admin-standalone-page admin-user-center-page">
+          {classificationBanner ? (
+            <p className="crm-classification-banner" role="status">
+              {classificationBanner}
+            </p>
+          ) : null}
           <div className="admin-user-center-page__sticky-toolbar">
             <div className="admin-user-center-page__sticky-toolbar-nav">
               <Link href="/admin/users" className="admin-user-center-page__sticky-btn admin-user-center-page__sticky-btn--primary">
@@ -252,6 +424,12 @@ export function AdminUserCenterView({
                           {user.accountStatusIcon} {user.accountStatusLabel}
                         </span>
                       ) : null}
+                      {user?.userClassification ? (
+                        <span className={`au-classification-badge au-classification-badge--${user.userClassification}`}>
+                          {user.userClassificationLabel ||
+                            getUserClassificationLabel(user.userClassification, { short: true })}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="admin-user-center-page__email">{user?.email || "—"}</p>
                     <p className="admin-user-center-page__uid">{user?.uid || user?.id || ""}</p>
@@ -309,75 +487,19 @@ export function AdminUserCenterView({
             </div>
           </header>
 
-          <AdminUserDrawerShell
-            layoutMode={layoutMode}
-            activeTab={center.activeTab}
-            tabs={center.tabs}
-            onTabChange={center.setActiveTab}
-            onClose={onClose}
-            overview={center.sectionData.overview}
-            services={center.sectionData.services}
-            subscriptions={center.sectionData.subscriptions}
-            payments={center.sectionData.payments}
-            notifications={center.sectionData.notifications}
-            emails={center.sectionData.emails}
-            activity={center.sectionData.activity}
-            notes={center.sectionData.notes}
-            management={center.sectionData.management}
-            audit={center.sectionData.audit}
-            sectionState={center.sectionState}
-            pages={center.pages}
-            actionLoading={center.actionLoading}
-            subscriptionRemoveLoading={center.subscriptionRemoveLoading}
-            currentAdminUserId={currentAdminUserId}
-            onPageChange={center.handlePageChange}
-            onRefreshSection={(section) => center.refreshSections([section])}
-            onRequestAction={center.setPendingAction}
-            onRunAction={center.runAction}
-            onRequestSubscriptionRemove={center.requestSubscriptionRemove}
-            onAddNote={center.noteHandlers.onAddNote}
-            onUpdateNote={center.noteHandlers.onUpdateNote}
-            onDeleteNote={center.noteHandlers.onDeleteNote}
-            onTogglePinNote={center.noteHandlers.onTogglePinNote}
-            activityFilter={center.activityFilter}
-            onActivityFilterChange={center.handleActivityFilterChange}
-          />
+          <AdminUserDrawerShell {...sharedShellProps} />
         </div>
       ) : (
-        <AdminUserDrawerShell
-          layoutMode={layoutMode}
-          activeTab={center.activeTab}
-          tabs={center.tabs}
-          onTabChange={center.setActiveTab}
-          onClose={onClose}
-          overview={center.sectionData.overview}
-          services={center.sectionData.services}
-          subscriptions={center.sectionData.subscriptions}
-          payments={center.sectionData.payments}
-          notifications={center.sectionData.notifications}
-          emails={center.sectionData.emails}
-          activity={center.sectionData.activity}
-          notes={center.sectionData.notes}
-          management={center.sectionData.management}
-          audit={center.sectionData.audit}
-          sectionState={center.sectionState}
-          pages={center.pages}
-          actionLoading={center.actionLoading}
-          subscriptionRemoveLoading={center.subscriptionRemoveLoading}
-          currentAdminUserId={currentAdminUserId}
-          onPageChange={center.handlePageChange}
-          onRefreshSection={(section) => center.refreshSections([section])}
-          onRequestAction={center.setPendingAction}
-          onRunAction={center.runAction}
-          onRequestSubscriptionRemove={center.requestSubscriptionRemove}
-          onAddNote={center.noteHandlers.onAddNote}
-          onUpdateNote={center.noteHandlers.onUpdateNote}
-          onDeleteNote={center.noteHandlers.onDeleteNote}
-          onTogglePinNote={center.noteHandlers.onTogglePinNote}
-          activityFilter={center.activityFilter}
-          onActivityFilterChange={center.handleActivityFilterChange}
-        />
+        <AdminUserDrawerShell {...sharedShellProps} />
       )}
+
+      <AdminUserClassificationConfirmModal
+        pendingChange={pendingClassification}
+        user={user}
+        actionLoading={center.actionLoading === "update_user_classification"}
+        onCancel={() => setPendingClassification(null)}
+        onConfirm={handleConfirmClassification}
+      />
 
       <AdminUserActionConfirmModal
         pendingAction={center.pendingAction}

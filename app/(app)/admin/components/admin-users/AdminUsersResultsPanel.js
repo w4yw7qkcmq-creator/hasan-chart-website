@@ -14,6 +14,7 @@ export default function AdminUsersResultsPanel({
   onToggleSelectUser,
   onOpenUser,
   onOpenQuickPreview,
+  openingCrmUserId = "",
   allVisibleSelected,
   loading = false,
   AccountStatusBadge,
@@ -37,6 +38,7 @@ export default function AdminUsersResultsPanel({
         onToggleSelectUser={onToggleSelectUser}
         onOpenUser={onOpenUser}
         onOpenQuickPreview={onOpenQuickPreview}
+        openingCrmUserId={openingCrmUserId}
         allVisibleSelected={allVisibleSelected}
         loading={loading}
         AccountStatusBadge={AccountStatusBadge}

@@ -1,7 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 import AdminUsersUuidChip from "./AdminUsersUuidChip.js";
+
+function ClassificationBadge({ classification, label }) {
+  const tone = String(classification || "unknown");
+  return <span className={`au-classification-badge au-classification-badge--${tone}`}>{label || "غير مصنف"}</span>;
+}
 
 function splitDateTime(value) {
   if (!value) return { date: "—", time: "" };
@@ -42,6 +48,7 @@ export default function AdminUsersTable({
   onToggleSelectUser,
   onOpenUser,
   onOpenQuickPreview,
+  openingCrmUserId = "",
   allVisibleSelected,
   loading = false,
   AccountStatusBadge,
@@ -70,6 +77,7 @@ export default function AdminUsersTable({
               <th>تاريخ التسجيل</th>
               <th>آخر دخول</th>
               <th>الحالة</th>
+              <th>نوع الحساب</th>
               <th>حالة الاشتراك</th>
               <th>إجراءات</th>
             </tr>
@@ -131,6 +139,12 @@ export default function AdminUsersTable({
                     </div>
                   </td>
                   <td>
+                    <ClassificationBadge
+                      classification={user.userClassification}
+                      label={user.userClassificationLabel}
+                    />
+                  </td>
+                  <td>
                     <div style={{ display: "grid", gap: "0.35rem" }}>
                       {user.subscriptionPlan ? (
                         <span className="au-user-cell__meta">{user.subscriptionPlan}</span>
@@ -140,9 +154,14 @@ export default function AdminUsersTable({
                   </td>
                   <td onClick={(event) => event.stopPropagation()}>
                     <div className="au-toolbar">
-                      <button type="button" className="au-btn au-btn--primary" onClick={() => onOpenUser(user.id)}>
-                        فتح CRM
-                      </button>
+                      <Link
+                        href={`/admin/users/${encodeURIComponent(user.id)}`}
+                        prefetch
+                        className={`au-btn au-btn--primary ${openingCrmUserId === user.id ? "is-loading" : ""}`}
+                        onClick={() => onOpenUser(user.id)}
+                      >
+                        {openingCrmUserId === user.id ? "جارٍ الفتح..." : "فتح CRM"}
+                      </Link>
                       <button
                         type="button"
                         className="au-btn"

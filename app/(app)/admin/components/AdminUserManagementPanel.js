@@ -164,6 +164,8 @@ export default function AdminUserManagementPanel({
   const [actionLoading, setActionLoading] = useState(false);
   const [uxNotice, setUxNotice] = useState("");
   const [lastLoginFilterAvailable, setLastLoginFilterAvailable] = useState(true);
+  const [userClassificationFilterAvailable, setUserClassificationFilterAvailable] = useState(true);
+  const [openingCrmUserId, setOpeningCrmUserId] = useState("");
   const [exporting, setExporting] = useState(false);
 
   const listAbortRef = useRef(null);
@@ -255,6 +257,7 @@ export default function AdminUserManagementPanel({
         setTotalPages(Number(result.pagination?.totalPages || 1));
         setViewMode("server");
         setLastLoginFilterAvailable(result.capabilities?.lastSignInFilterAvailable !== false);
+        setUserClassificationFilterAvailable(result.capabilities?.userClassificationFilterAvailable !== false);
         setUxNotice(result.truncation?.truncated ? result.truncation.warning || "" : "");
         setLoaded(true);
       } catch (fetchError) {
@@ -403,6 +406,7 @@ export default function AdminUserManagementPanel({
   };
 
   const openUser = (userId) => {
+    setOpeningCrmUserId(userId);
     try {
       sessionStorage.setItem(
         USERS_LIST_STATE_KEY,
@@ -750,6 +754,7 @@ export default function AdminUserManagementPanel({
           onToggleSort={toggleSort}
           onClearFilters={handleClearFilters}
           lastLoginFilterAvailable={lastLoginFilterAvailable}
+          userClassificationFilterAvailable={userClassificationFilterAvailable}
         />
 
         <AdminUserBulkActionsBar
@@ -794,6 +799,7 @@ export default function AdminUserManagementPanel({
             onToggleSelectUser={toggleSelectUser}
             onOpenUser={openUser}
             onOpenQuickPreview={openQuickPreview}
+            openingCrmUserId={openingCrmUserId}
             allVisibleSelected={allVisibleSelected}
             loading={tableLoading}
             AccountStatusBadge={AccountStatusBadge}

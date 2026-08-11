@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ADMIN_SECTION_EMPTY_MESSAGE,
   ADMIN_SECTION_NOT_ENABLED_MESSAGE,
@@ -18,6 +18,123 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString("ar");
+}
+
+function UuidCopy({ value }) {
+  const [copied, setCopied] = useState(false);
+  if (!value) return <span>—</span>;
+  return (
+    <span className="crm-uuid-copy">
+      <span>{String(value).slice(0, 8)}…{String(value).slice(-4)}</span>
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard?.writeText(String(value)).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          });
+        }}
+      >
+        {copied ? "✓" : "نسخ"}
+      </button>
+    </span>
+  );
+}
+
+function CrmOverviewPanel({ user, stats, onRequestClassificationChange, canManageClassification }) {
+  const [draftClassification, setDraftClassification] = useState(user?.userClassification || "unknown");
+
+  useEffect(() => {
+    setDraftClassification(user?.userClassification || "unknown");
+  }, [user?.userClassification, user?.id]);
+
+  if (!user) return null;
+
+  return (
+    <div className="space-y-4">
+      <section className="crm-info-panel">
+        <h4 className="admin-heading text-lg">معلومات الحساب</h4>
+        <dl className="grid gap-2">
+          <div className="crm-info-panel__row">
+            <dt>البريد</dt>
+            <dd>{user.email || "—"}</dd>
+          </div>
+          <div className="crm-info-panel__row">
+            <dt>UUID</dt>
+            <dd><UuidCopy value={user.uid || user.id} /></dd>
+          </div>
+          <div className="crm-info-panel__row">
+            <dt>Telegram</dt>
+            <dd>{user.telegram || "—"}</dd>
+          </div>
+          <div className="crm-info-panel__row">
+            <dt>الدور</dt>
+            <dd>{user.role || "user"}</dd>
+          </div>
+          <div className="crm-info-panel__row">
+            <dt>تاريخ التسجيل</dt>
+            <dd>{formatDateTime(user.createdAt)}</dd>
+          </div>
+          <div className="crm-info-panel__row">
+            <dt>آخر تسجيل دخول</dt>
+            <dd>{formatDateTime(user.lastSignInAt)}</dd>
+          </div>
+          {user.statusReason ? (
+            <div className="crm-info-panel__row">
+              <dt>سبب الحالة</dt>
+              <dd>{user.statusReason}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </section>
+
+      {stats ? (
+        <div className="admin-user-stat-grid admin-user-stat-grid--premium">
+          <article className="admin-user-stat-card admin-user-stat-card--premium">
+            <span className="admin-user-stat-card__icon" aria-hidden="true">🔔</span>
+            <p className="admin-user-stat-card__label">آخر نشاط</p>
+            <p className="admin-user-stat-card__value">{stats.recentActivityCount ?? stats.alertsCount ?? 0}</p>
+          </article>
+        </div>
+      ) : null}
+
+      {canManageClassification ? (
+        <section className="crm-classification-panel">
+          <h4 className="admin-heading text-base">تصنيف الحساب (إداري)</h4>
+          <select
+            className="crm-classification-panel__select admin-field"
+            value={draftClassification}
+            onChange={(event) => setDraftClassification(event.target.value)}
+          >
+            <option value="real">مستخدم حقيقي</option>
+            <option value="test">حساب اختبار</option>
+            <option value="e2e">حساب آلي للاختبارات</option>
+            <option value="internal">حساب داخلي</option>
+            <option value="suspected">مشتبه</option>
+            <option value="unknown">غير مصنف</option>
+          </select>
+          <button
+            type="button"
+            className="admin-user-action-btn"
+            disabled={draftClassification === user.userClassification}
+            onClick={() =>
+              onRequestClassificationChange?.({
+                from: user.userClassification,
+                to: draftClassification,
+              })
+            }
+          >
+            تحديث التصنيف
+          </button>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function TabPanel({ isPageLayout, children }) {
+  if (!isPageLayout) return children;
+  return <div className="crm-tab-panel">{children}</div>;
 }
 
 function AccountStatusBadge({ status, label, icon }) {
@@ -290,6 +407,8 @@ export default function AdminUserDrawerShell({
   activityFilter = "all",
   onActivityFilterChange,
   onRequestSubscriptionRemove,
+  canManageClassification = false,
+  onRequestClassificationChange,
 }) {
   const user = overview?.user;
   const [noteDraft, setNoteDraft] = useState("");
@@ -398,7 +517,20 @@ export default function AdminUserDrawerShell({
             data: overview,
             onRefreshSection,
             skeletonRows: 8,
-            children: <UserHeroCard user={user} stats={overview?.stats} />,
+            children: (
+              <TabPanel isPageLayout={isPageLayout}>
+                {isPageLayout ? (
+                  <CrmOverviewPanel
+                    user={user}
+                    stats={overview?.stats}
+                    canManageClassification={canManageClassification}
+                    onRequestClassificationChange={onRequestClassificationChange}
+                  />
+                ) : (
+                  <UserHeroCard user={user} stats={overview?.stats} />
+                )}
+              </TabPanel>
+            ),
           })}
 
         {activeTab === "services" &&
@@ -408,7 +540,8 @@ export default function AdminUserDrawerShell({
             onRefreshSection,
             children:
               (services?.services || []).length > 0 ? (
-                <div className="admin-user-services-grid">
+                <TabPanel isPageLayout={isPageLayout}>
+                <div className={`admin-user-services-grid ${isPageLayout ? "crm-scroll-panel" : ""}`}>
                   {(services?.services || []).map((service) => (
                 <article key={service.key} className="admin-user-service-tile">
                   <div className="admin-user-service-tile__head">
@@ -467,8 +600,11 @@ export default function AdminUserDrawerShell({
                 </article>
               ))}
                 </div>
+                </TabPanel>
               ) : (
+                <TabPanel isPageLayout={isPageLayout}>
                 <SectionEmptyDataState icon="🧩" />
+                </TabPanel>
               ),
           })}
 

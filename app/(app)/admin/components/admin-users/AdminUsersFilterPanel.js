@@ -24,6 +24,7 @@ export default function AdminUsersFilterPanel({
   onToggleSort,
   onClearFilters,
   lastLoginFilterAvailable = true,
+  userClassificationFilterAvailable = true,
 }) {
   return (
     <section className="au-panel au-filter-panel">
@@ -78,7 +79,37 @@ export default function AdminUsersFilterPanel({
           </label>
         </div>
 
-        <div className="au-filter-row au-filter-row--3">
+        {!userClassificationFilterAvailable ? (
+        <p className="au-notice au-notice--warning">
+          فلتر نوع الحساب غير متاح حتى تطبيق migration العمود `profiles.user_classification`.
+        </p>
+      ) : null}
+
+      <div className="au-filter-row au-filter-row--3">
+        <label className="au-field">
+          <span className="au-field__label">نوع الحساب</span>
+          <div className="au-select-wrap">
+            <select
+              className="au-select"
+              value={clientFilters.userClassification || "all"}
+              disabled={!userClassificationFilterAvailable}
+              onChange={(event) =>
+                onClientFiltersChange({ ...clientFilters, userClassification: event.target.value })
+              }
+            >
+              <option value="all">الكل</option>
+              <option value="real">المستخدمون الحقيقيون</option>
+              <option value="test">حسابات الاختبار</option>
+              <option value="e2e">حسابات E2E</option>
+              <option value="internal">الحسابات الداخلية</option>
+              <option value="suspected">المشتبه بها</option>
+              <option value="unknown">غير المصنفة</option>
+            </select>
+          </div>
+        </label>
+      </div>
+
+      <div className="au-filter-row au-filter-row--3">
           <label className="au-field">
             <span className="au-field__label">الخدمة</span>
             <div className="au-select-wrap">

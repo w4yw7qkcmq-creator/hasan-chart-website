@@ -1,16 +1,19 @@
 "use client";
 
 import "../../admin-theme.css";
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import "../../admin-crm-theme.css";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../../components/AuthProvider";
 import { AdminUserCenterView } from "../../components/AdminUserCenterView";
 
-export default function AdminUserDetailPage() {
+function AdminUserDetailPageInner() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [currentAdminUserId, setCurrentAdminUserId] = useState("");
   const userId = String(params?.userId || "").trim();
+  const initialTab = String(searchParams?.get("tab") || "overview").trim();
 
   useEffect(() => {
     setCurrentAdminUserId(String(user?.id || ""));
@@ -26,7 +29,26 @@ export default function AdminUserDetailPage() {
 
   return (
     <div className="admin-standalone-page admin-standalone-page--calm">
-      <AdminUserCenterView userId={userId} currentAdminUserId={currentAdminUserId} layoutMode="page" />
+      <AdminUserCenterView
+        userId={userId}
+        currentAdminUserId={currentAdminUserId}
+        layoutMode="page"
+        initialTab={initialTab}
+      />
     </div>
+  );
+}
+
+export default function AdminUserDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="admin-standalone-page p-6">
+          <p className="font-black">جاري تحميل CRM...</p>
+        </div>
+      }
+    >
+      <AdminUserDetailPageInner />
+    </Suspense>
   );
 }

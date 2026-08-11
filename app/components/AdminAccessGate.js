@@ -48,6 +48,7 @@ export function AdminAccessGate({ children }) {
     iamError,
   } = useAuth();
   const redirectStartedRef = useRef(false);
+  const adminSessionEstablishedRef = useRef(false);
 
   const isAuthenticated = status === "authenticated" && Boolean(user?.email);
 
@@ -83,6 +84,12 @@ export function AdminAccessGate({ children }) {
   );
 
   useEffect(() => {
+    if (phase === "authenticated" && pathname.startsWith("/admin")) {
+      adminSessionEstablishedRef.current = true;
+    }
+  }, [phase, pathname]);
+
+  useEffect(() => {
     redirectStartedRef.current = false;
   }, [pathname]);
 
@@ -106,6 +113,13 @@ export function AdminAccessGate({ children }) {
   }, [phase, router]);
 
   if (phase === "loading") {
+    if (
+      adminSessionEstablishedRef.current &&
+      pathname.startsWith("/admin") &&
+      isAuthenticated
+    ) {
+      return children;
+    }
     return <AdminAccessLoading />;
   }
 

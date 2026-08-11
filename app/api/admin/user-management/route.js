@@ -30,6 +30,7 @@ export async function GET(request) {
     const lastLoginFrom = String(searchParams.get("lastLoginFrom") || "").trim();
     const lastLoginTo = String(searchParams.get("lastLoginTo") || "").trim();
     const plan = String(searchParams.get("plan") || "").trim();
+    const userClassification = String(searchParams.get("userClassification") || "all").trim().toLowerCase();
 
     const listAll =
       searchParams.get("listAll") === "1" || String(searchParams.get("pageSize") || "") === "0";
@@ -48,6 +49,7 @@ export async function GET(request) {
       lastLoginFrom,
       lastLoginTo,
       plan,
+      userClassification,
     });
 
     return Response.json(payload, {

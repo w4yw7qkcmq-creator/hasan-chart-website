@@ -47,6 +47,7 @@ export async function POST(request, context) {
     };
 
     const { data: targetProfile } = await adminCheck.supabase
+      .from("profiles")
       .select("email")
       .eq("id", userId)
       .maybeSingle();

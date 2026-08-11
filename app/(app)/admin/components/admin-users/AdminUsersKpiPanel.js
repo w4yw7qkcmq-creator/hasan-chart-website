@@ -2,6 +2,7 @@
 
 const STAT_CARDS = [
   { key: "total", label: "إجمالي المستخدمين", icon: "👥", tone: "neutral" },
+  { key: "realUsers", label: "المستخدمون الحقيقيون", icon: "✓", tone: "success" },
   { key: "active", label: "المستخدمون النشطون", icon: "🟢", tone: "success" },
   { key: "suspended", label: "المعلقون", icon: "🟡", tone: "warning" },
   { key: "banned", label: "المحظورون", icon: "🔴", tone: "danger" },
