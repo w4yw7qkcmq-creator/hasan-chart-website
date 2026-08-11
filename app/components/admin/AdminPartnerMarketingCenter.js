@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "../../../lib/admin-fetch";
 import { formatPartnerMoney } from "../../../lib/partner-shared";
+import { campaignStatusLabel } from "../../../lib/partner-center/ui-labels";
 import AdminCampaignMissionWizard from "./AdminCampaignMissionWizard";
 
 const SECTIONS = [
@@ -83,8 +84,11 @@ function PreviewPanel({ preview, warnings }) {
   );
 }
 
-export default function AdminPartnerMarketingCenter() {
-  const [section, setSection] = useState("overview");
+export default function AdminPartnerMarketingCenter({
+  embedded = false,
+  forcedSection = null,
+} = {}) {
+  const [section, setSection] = useState(forcedSection || "overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [overview, setOverview] = useState(null);
@@ -120,47 +124,53 @@ export default function AdminPartnerMarketingCenter() {
   const [scEdit, setScEdit] = useState(null);
   const [scSaving, setScSaving] = useState(false);
 
+  const activeSection = forcedSection || section;
+
+  useEffect(() => {
+    if (forcedSection) setSection(forcedSection);
+  }, [forcedSection]);
+
   const loadSection = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      if (section === "overview") {
+      if (activeSection === "overview") {
         const res = await adminFetch("/api/admin/partner-marketing/overview");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setOverview(json.overview);
       }
-      if (section === "missions") {
-        const res = await adminFetch("/api/admin/partner-marketing/missions");
-        const json = await res.json();
-        if (!json.success) throw new Error(json.error);
-        setMissions(json.missions || []);
+      if (activeSection === "missions" || activeSection === "campaigns") {
+        const missionsRes = await adminFetch("/api/admin/partner-marketing/missions");
+        const missionsJson = await missionsRes.json();
+        if (!missionsJson.success) throw new Error(missionsJson.error);
+        setMissions(missionsJson.missions || []);
       }
-      if (section === "campaigns") {
+      if (activeSection === "campaigns") {
         const res = await adminFetch("/api/admin/partner-marketing/campaigns?metrics=1");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setCampaigns(json.campaigns || []);
       }
-      if (section === "levels") {
+      if (activeSection === "levels" || activeSection === "commissions-bundle") {
         const res = await adminFetch("/api/admin/partner-marketing/levels");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setTiers(json.tiers || []);
       }
-      if (section === "milestones") {
+      if (activeSection === "milestones") {
         const res = await adminFetch("/api/admin/partner-marketing/milestones");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setMilestones(json.milestones || []);
       }
-      if (section === "bonuses") {
+      if (activeSection === "bonuses") {
         const res = await adminFetch("/api/admin/partner-marketing/performance-bonuses");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setBonuses(json.rules || []);
       }
-      if (section === "qualified-reward") {
+      if (activeSection === "qualified-reward" || activeSection === "commissions-bundle") {
         const res = await adminFetch("/api/admin/partner-marketing/qualified-referral-reward");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
@@ -168,26 +178,26 @@ export default function AdminPartnerMarketingCenter() {
         setQrrAmount(String(json.policy?.current?.amount ?? ""));
         setQrrEnabled(Boolean(json.policy?.current?.isEnabled));
       }
-      if (section === "service-commissions") {
+      if (activeSection === "service-commissions" || activeSection === "commissions-bundle") {
         const res = await adminFetch("/api/admin/partner-marketing/service-commissions");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setScPolicy(json.policy);
         setScEdit(null);
       }
-      if (section === "rewards") {
+      if (activeSection === "rewards") {
         const res = await adminFetch("/api/admin/partner-marketing/rewards");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setRewards(json.rows || []);
       }
-      if (section === "fraud") {
+      if (activeSection === "fraud") {
         const res = await adminFetch("/api/admin/partner-marketing/fraud-review");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
         setFraudQueue(json.rows || []);
       }
-      if (section === "audit") {
+      if (activeSection === "audit") {
         const res = await adminFetch("/api/admin/partner-marketing/audit");
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
@@ -198,7 +208,7 @@ export default function AdminPartnerMarketingCenter() {
     } finally {
       setLoading(false);
     }
-  }, [section]);
+  }, [activeSection]);
 
   useEffect(() => {
     void loadSection();
@@ -413,18 +423,27 @@ export default function AdminPartnerMarketingCenter() {
     }
   };
 
-  const sectionTitle = useMemo(() => SECTIONS.find((s) => s.id === section)?.label, [section]);
+  const sectionTitle = useMemo(() => SECTIONS.find((s) => s.id === activeSection)?.label, [activeSection]);
+
+  const showQualifiedReward =
+    activeSection === "qualified-reward" || activeSection === "commissions-bundle";
+  const showServiceCommissions =
+    activeSection === "service-commissions" || activeSection === "commissions-bundle";
+  const showTierLevels =
+    activeSection === "levels" || activeSection === "commissions-bundle";
 
   return (
     <div className="admin-page space-y-6" dir="rtl">
-      <header className="flex flex-wrap items-center justify-between gap-4">
+      {!embedded ? (
+        <>
+          <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="admin-eyebrow">Partner Center Phase 3</p>
           <h1 className="admin-page-title">مركز التسويق — الشركاء</h1>
           <p className="admin-page-subtitle">CRUD كامل — مهام، حملات، مستويات، معالم، مراجعة مخاطر</p>
         </div>
         <Link href="/admin/partners" className="admin-btn admin-btn--secondary">
-          ← الشركاء
+          ← إدارة برنامج الشركاء
         </Link>
       </header>
 
@@ -440,11 +459,13 @@ export default function AdminPartnerMarketingCenter() {
           </button>
         ))}
       </nav>
+        </>
+      ) : null}
 
       {error ? <p className="text-red-400">{error}</p> : null}
       {loading ? <p>جاري التحميل...</p> : null}
 
-      {!loading && section === "overview" && overview ? (
+      {!loading && activeSection === "overview" && overview ? (
         <div className="grid gap-4 md:grid-cols-3">
           {[
             ["شركاء نشطون", overview.activePartners],
@@ -461,7 +482,7 @@ export default function AdminPartnerMarketingCenter() {
         </div>
       ) : null}
 
-      {!loading && section === "missions" ? (
+      {!loading && activeSection === "missions" ? (
         <div className="space-y-6">
           <div className="admin-panel grid gap-3 md:grid-cols-2">
             <Field label="الرمز">
@@ -516,7 +537,7 @@ export default function AdminPartnerMarketingCenter() {
         </div>
       ) : null}
 
-      {!loading && section === "campaigns" ? (
+      {!loading && activeSection === "campaigns" ? (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
@@ -532,7 +553,7 @@ export default function AdminPartnerMarketingCenter() {
               ))}
             </div>
             <button type="button" className="admin-btn admin-btn--primary" onClick={() => setWizardOpen(true)}>
-              + معالج حملة جديدة
+              + إنشاء حملة
             </button>
           </div>
 
@@ -547,7 +568,7 @@ export default function AdminPartnerMarketingCenter() {
                     <span className="text-xs text-neutral-400">v{c.rule_version}</span>
                   </div>
                   <p className="text-neutral-400 text-sm">{c.code} — {c.landing_path}</p>
-                  <p className="text-sm">الحالة: {c.status} {c.tracking_metadata?.lifecycle ? `(${c.tracking_metadata.lifecycle})` : ""}</p>
+                  <p className="text-sm">الحالة: {campaignStatusLabel(c.status, { lifecycle: c.tracking_metadata?.lifecycle })}</p>
                   {c.metrics ? (
                     <div className="grid grid-cols-2 gap-2 text-xs text-neutral-300">
                       <span>مشاركون: {c.metrics.participants}</span>
@@ -618,22 +639,38 @@ export default function AdminPartnerMarketingCenter() {
         </div>
       ) : null}
 
-      {!loading && section === "levels" ? (
-        <table className="admin-table w-full">
-          <thead><tr><th>المفتاح</th><th>الاسم</th><th>v</th><th>إحالات</th><th>عملاء</th><th>إيراد</th></tr></thead>
-          <tbody>
-            {tiers.map((t) => (
-              <tr key={t.tier_key}>
-                <td>{t.tier_key}</td><td>{t.tier_name}</td><td>{t.rule_version}</td>
-                <td>{t.min_qualified_referrals ?? t.min_active_referrals}</td>
-                <td>{t.min_customers}</td><td>{t.min_confirmed_revenue ?? t.min_total_sales}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {!loading && showTierLevels ? (
+        <div className="admin-panel space-y-3">
+          <h3 className="text-lg font-semibold">مستويات الشركاء</h3>
+          <p className="text-neutral-400 text-sm">نسب المستويات — للعرض فقط</p>
+          {activeSection === "commissions-bundle" && scPolicy?.tiers?.length ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {scPolicy.tiers.map((t) => (
+                <div key={t.tierKey} className="rounded-xl border border-neutral-700 p-4">
+                  <p className="font-semibold">{t.tierName}</p>
+                  <p className="text-2xl font-black text-cyan-300 mt-1">{t.commissionPercent}%</p>
+                  <p className="text-xs text-neutral-500 mt-1">{t.tierKey}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <table className="admin-table w-full">
+              <thead><tr><th>المفتاح</th><th>الاسم</th><th>v</th><th>إحالات</th><th>عملاء</th><th>إيراد</th></tr></thead>
+              <tbody>
+                {tiers.map((t) => (
+                  <tr key={t.tier_key}>
+                    <td>{t.tier_key}</td><td>{t.tier_name}</td><td>{t.rule_version}</td>
+                    <td>{t.min_qualified_referrals ?? t.min_active_referrals}</td>
+                    <td>{t.min_customers}</td><td>{t.min_confirmed_revenue ?? t.min_total_sales}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       ) : null}
 
-      {!loading && section === "milestones" ? (
+      {!loading && activeSection === "milestones" ? (
         <table className="admin-table w-full">
           <thead><tr><th>الاسم</th><th>المقياس</th><th>العتبة</th><th>المكافأة</th><th>الحالة</th></tr></thead>
           <tbody>
@@ -644,7 +681,7 @@ export default function AdminPartnerMarketingCenter() {
         </table>
       ) : null}
 
-      {!loading && section === "bonuses" ? (
+      {!loading && activeSection === "bonuses" ? (
         <table className="admin-table w-full">
           <thead><tr><th>الاسم</th><th>المقياس</th><th>العتبة</th><th>عينة</th><th>المكافأة</th><th>v</th></tr></thead>
           <tbody>
@@ -655,7 +692,7 @@ export default function AdminPartnerMarketingCenter() {
         </table>
       ) : null}
 
-      {!loading && section === "qualified-reward" && qrrPolicy ? (
+      {!loading && showQualifiedReward && qrrPolicy ? (
         <div className="space-y-6">
           <div className="admin-panel space-y-4">
             <div>
@@ -664,7 +701,10 @@ export default function AdminPartnerMarketingCenter() {
                 المبلغ الذي يحصل عليه الشريك مرة واحدة عندما يصبح المستخدم المدعو مؤهلاً بعد اجتياز شروط التحقق والجودة.
               </p>
               <p className="text-amber-400 text-sm mt-2">
-                ملاحظة: مكافأة التسجيل (Signup Bonus) منفصلة عن هذه المكافأة — كلاهما قد يُصرف عند التأهل حسب الإعدادات الحالية.
+                ملاحظة: مكافأة التسجيل (Signup Bonus) منفصلة — مثال: QRR {formatPartnerMoney(qrrPolicy.current?.amount ?? 0.5)} + Signup {formatPartnerMoney(0.2)} = {formatPartnerMoney(Number(qrrPolicy.current?.amount ?? 0.5) + 0.2)} عند التأهل.
+              </p>
+              <p className="text-neutral-400 text-sm mt-1">
+                هذه المكافأة تُصرف فقط بعد تأهل المستخدم وفق سياسة التأهيل.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -725,7 +765,7 @@ export default function AdminPartnerMarketingCenter() {
         </div>
       ) : null}
 
-      {!loading && section === "service-commissions" && scPolicy ? (
+      {!loading && showServiceCommissions && scPolicy ? (
         <div className="space-y-6">
           <div className="admin-panel space-y-4">
             <h3 className="text-lg font-semibold">عمولات الخدمات</h3>
@@ -752,6 +792,7 @@ export default function AdminPartnerMarketingCenter() {
             </div>
           </div>
 
+          {activeSection !== "commissions-bundle" ? (
           <div className="admin-panel space-y-3">
             <h4 className="font-semibold">نسب مستويات الشركاء</h4>
             <div className="flex flex-wrap gap-3 text-sm">
@@ -762,6 +803,7 @@ export default function AdminPartnerMarketingCenter() {
               ))}
             </div>
           </div>
+          ) : null}
 
           <table className="admin-table w-full">
             <thead>
@@ -857,7 +899,7 @@ export default function AdminPartnerMarketingCenter() {
         </div>
       ) : null}
 
-      {!loading && section === "rewards" ? (
+      {!loading && activeSection === "rewards" ? (
         <table className="admin-table w-full">
           <thead><tr><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>hold</th><th>v</th><th>تاريخ</th></tr></thead>
           <tbody>
@@ -868,7 +910,7 @@ export default function AdminPartnerMarketingCenter() {
         </table>
       ) : null}
 
-      {!loading && section === "fraud" ? (
+      {!loading && activeSection === "fraud" ? (
         <div className="space-y-4">
           <textarea className="admin-input w-full" placeholder="سبب الإجراء (مطلوب)" value={fraudReason} onChange={(e) => setFraudReason(e.target.value)} />
           <div className="flex gap-2">
@@ -893,7 +935,7 @@ export default function AdminPartnerMarketingCenter() {
         </div>
       ) : null}
 
-      {!loading && section === "audit" ? (
+      {!loading && activeSection === "audit" ? (
         <table className="admin-table w-full">
           <thead><tr><th>الإجراء</th><th>الكيان</th><th>المعرف</th><th>السبب</th><th>التاريخ</th></tr></thead>
           <tbody>
