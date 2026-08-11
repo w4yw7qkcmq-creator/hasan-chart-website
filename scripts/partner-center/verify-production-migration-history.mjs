@@ -31,6 +31,7 @@ export const PARTNER_CENTER_MIGRATION_VERSIONS = [
   "20260819",
   "20260820",
   "20260821",
+  "20260823",
 ];
 
 /** Staging-only fixture version — must never appear in Production history/catalog. */
@@ -82,6 +83,7 @@ const PARTNER_FILE_PATTERNS = [
   /^2026081[0-9]_partner_/,
   /^20260820_partner_/,
   /^20260821_partner_/,
+  /^20260823_partner_/,
   /^20260810_news_source_ingestion_checkpoints\.sql$/,
 ];
 

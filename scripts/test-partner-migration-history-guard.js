@@ -57,7 +57,7 @@ test("wrong linked project fails", () => {
 
 test("staging-only 20260822 excluded from expected production list", () => {
   assert.equal(PARTNER_CENTER_MIGRATION_VERSIONS.includes(STAGING_ONLY_VERSION), false);
-  assert.equal(PARTNER_CENTER_MIGRATION_VERSIONS.at(-1), "20260821");
+  assert.equal(PARTNER_CENTER_MIGRATION_VERSIONS.at(-1), "20260823");
 });
 
 test("staging artifact table in production fails guard", () => {
