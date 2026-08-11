@@ -36,6 +36,48 @@ export const PARTNER_CENTER_MIGRATION_VERSIONS = [
 /** Staging-only fixture version — must never appear in Production history/catalog. */
 export const STAGING_ONLY_VERSION = "20260822";
 
+/** Catalog patterns that must never exist in Production. */
+export const STAGING_ARTIFACT_SQL = `
+SELECT kind, name FROM (
+  SELECT 'table'::text AS kind, tablename AS name
+  FROM pg_tables
+  WHERE schemaname = 'public'
+    AND (
+      tablename ILIKE '%partner_center_staging%'
+      OR tablename ILIKE '%staging_test%'
+      OR tablename ILIKE '%test_fail%'
+      OR tablename ILIKE '%fail_after%'
+      OR tablename ILIKE '%purge_run%'
+      OR tablename ILIKE '%failure_injection%'
+    )
+  UNION ALL
+  SELECT 'function', p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND (
+      p.proname ILIKE '%partner_center_staging%'
+      OR p.proname ILIKE '%staging_test%'
+      OR p.proname ILIKE '%test_fail%'
+      OR p.proname ILIKE '%fail_after%'
+      OR p.proname ILIKE '%purge_run%'
+      OR p.proname ILIKE '%failure_injection%'
+    )
+  UNION ALL
+  SELECT 'view', viewname
+  FROM pg_views
+  WHERE schemaname = 'public'
+    AND (
+      viewname ILIKE '%partner_center_staging%'
+      OR viewname ILIKE '%staging_test%'
+      OR viewname ILIKE '%test_fail%'
+      OR viewname ILIKE '%fail_after%'
+      OR viewname ILIKE '%purge_run%'
+    )
+) artifacts
+ORDER BY kind, name;
+`;
+
 const PARTNER_FILE_PATTERNS = [
   /^2026081[0-9]_partner_/,
   /^20260820_partner_/,
@@ -128,17 +170,24 @@ function remoteHistoryVersions() {
 function productionStagingArtifactCheck() {
   const payload = runLinkedSql(
     `SELECT jsonb_build_object(
-      'staging_flags_table', to_regclass('public.partner_center_staging_test_flags') IS NOT NULL,
-      'staging_purge_fn', EXISTS (
-        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'partner_center_staging_purge_run_commissions'
-      ),
       'history_20260822', EXISTS (
         SELECT 1 FROM supabase_migrations.schema_migrations WHERE version = '${STAGING_ONLY_VERSION}'
-      )
+      ),
+      'artifacts', coalesce((
+        SELECT jsonb_agg(jsonb_build_object('kind', kind, 'name', name) ORDER BY kind, name)
+        FROM (${STAGING_ARTIFACT_SQL.replace(/\n/g, " ")}) scan
+      ), '[]'::jsonb)
     ) AS staging_probe;`
   );
-  return payload.rows?.[0]?.staging_probe || {};
+  const probe = payload.rows?.[0]?.staging_probe || {};
+  const artifacts = Array.isArray(probe.artifacts) ? probe.artifacts : [];
+  return {
+    history_20260822: Boolean(probe.history_20260822),
+    artifacts,
+    artifact_count: artifacts.length,
+    staging_flags_table: artifacts.some((a) => a.name === "partner_center_staging_test_flags"),
+    staging_purge_fn: artifacts.some((a) => String(a.name || "").startsWith("partner_center_staging_purge_run_commissions")),
+  };
 }
 
 export function evaluateMigrationHistoryGuard(options = {}) {
@@ -171,6 +220,10 @@ export function evaluateMigrationHistoryGuard(options = {}) {
   const missingInRemote = expected.filter((v) => !remoteSet.has(v));
   const extraInRemote = [...remoteSet].filter((v) => !expected.includes(v) && v !== STAGING_ONLY_VERSION);
 
+  if (remoteSet.has(STAGING_ONLY_VERSION)) {
+    errors.push("staging_version_in_history:20260822");
+  }
+
   if (missingInRemote.length) {
     errors.push(`missing_remote_history:${missingInRemote.join(",")}`);
   }
@@ -185,6 +238,13 @@ export function evaluateMigrationHistoryGuard(options = {}) {
 
   if (stagingProbe) {
     if (stagingProbe.history_20260822) errors.push("staging_version_in_history:20260822");
+    if (requireProduction && Number(stagingProbe.artifact_count || 0) > 0) {
+      const names = (stagingProbe.artifacts || [])
+        .slice(0, 8)
+        .map((a) => `${a.kind}:${a.name}`)
+        .join("; ");
+      errors.push(`staging_artifacts_present_in_production:${stagingProbe.artifact_count}:${names}`);
+    }
     if (requireProduction && stagingProbe.staging_flags_table) {
       errors.push("staging_test_flags_table_present_in_production");
     }
