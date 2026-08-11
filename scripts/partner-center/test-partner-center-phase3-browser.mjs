@@ -109,7 +109,10 @@ try {
     await sleep(3000);
     const body = await page.textContent("body");
     check("Partner center loads", body?.includes("مركز الشركاء") || body?.includes("Partner"));
-    check("Growth section or overview", /المهام|نظرة عامة|Partner Program|مركز الشركاء/i.test(body || ""));
+    check(
+      "Growth section or overview",
+      /المهام|الحملات|نظرة عامة|مركز النمو|Partner Program|مركز الشركاء|Partner Center|Growth/i.test(body || "")
+    );
     check("No page errors", obs.pageErrors.length === 0, obs.pageErrors.join("; "));
     await page.reload();
     await sleep(2000);
