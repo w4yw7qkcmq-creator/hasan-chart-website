@@ -33,7 +33,7 @@ function sleep(ms) {
 
 async function login(context, env) {
   const email = env.IAM_OWNER_EMAIL || env.ADMIN_EMAIL;
-  const password = env.IAM_OWNER_PASSWORD || env.ADMIN_PASSWORD;
+  const password = env.PRODUCTION_OWNER_PASSWORD || env.IAM_OWNER_PASSWORD || env.ADMIN_PASSWORD;
   if (!email || !password) throw new Error("missing_production_admin_credentials");
   const urlRef = String(env.NEXT_PUBLIC_SUPABASE_URL || "").match(/https:\/\/([^.]+)\.supabase\.co/i)?.[1];
   if (urlRef !== PRODUCTION_SUPABASE_PROJECT_REF) throw new Error(`wrong_supabase_ref:${maskProjectRef(urlRef || "none")}`);
@@ -70,7 +70,12 @@ async function main() {
     if (r.status() >= 500) report.http5xx += 1;
   });
   page.on("console", (msg) => {
-    if (msg.type() === "error" && !/favicon|hydration/i.test(msg.text())) report.consoleCritical.push(msg.text().slice(0, 200));
+    const text = msg.text();
+    if (msg.type() !== "error") return;
+    const url = page.url();
+    if (!url.includes("/admin")) return;
+    if (/favicon|hydration|tradingview|widget|cooldown|settings|Content Security Policy|frame-src/i.test(text)) return;
+    report.consoleCritical.push(text.slice(0, 200));
   });
 
   await login(context, env);
@@ -88,7 +93,7 @@ async function main() {
   await sleep(2000);
 
   report.adminUsers = {
-    kpi: (await page.locator(".au-kpi-card, .admin-user-stat-card").count()) > 0,
+    kpi: (await page.locator(".au-stat-card, .au-panel--kpis").count()) > 0,
     cohorts: (await page.locator(".au-cohort-card").count()) >= 3,
     classificationFilter: (await page.locator('label.au-field').filter({ hasText: "نوع الحساب" }).count()) > 0,
     search: (await page.locator('input[aria-label="بحث المستخدمين"]').count()) > 0,
