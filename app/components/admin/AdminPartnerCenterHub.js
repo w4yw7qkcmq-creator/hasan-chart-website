@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminFetch } from "../../../lib/admin-fetch";
-import { formatPartnerMoney, WITHDRAWAL_NETWORKS } from "../../../lib/partner-shared";
+import { formatPartnerMoney, partnerDisplayInitial, WITHDRAWAL_NETWORKS } from "../../../lib/partner-shared";
 import StatusBadge from "../../(app)/admin/components/StatusBadge";
 import AdminPartnerMarketingCenter from "./AdminPartnerMarketingCenter";
 import {
@@ -53,12 +53,32 @@ function formatDate(value) {
 
   try {
     return new Intl.DateTimeFormat("ar", {
-      dateStyle: "medium",
+      dateStyle: "long",
       timeStyle: "short",
     }).format(new Date(value));
   } catch {
     return value;
   }
+}
+
+function OverviewWithdrawalRow({ item }) {
+  const ownerName = item.partner?.displayName || "شريك";
+
+  return (
+    <div className="pa-withdrawal-row">
+      <span className="pa-withdrawal-row__avatar" aria-hidden="true">
+        {partnerDisplayInitial(ownerName)}
+      </span>
+      <div className="pa-withdrawal-row__main">
+        <p className="pa-withdrawal-row__owner">{ownerName}</p>
+        <p className="pa-withdrawal-row__amount pa-ltr">
+          {formatPartnerMoney(item.amount)} · {item.currency} · {item.network}
+        </p>
+        <p className="pa-withdrawal-row__date">{formatDate(item.createdAt)}</p>
+      </div>
+      <StatusBadge status={item.status} variant="partner" />
+    </div>
+  );
 }
 
 function patchWithdrawalFromApi(existing, raw) {
@@ -688,13 +708,27 @@ export default function AdminPartnerCenterHub() {
 
       {activeTab === "overview" ? (
         <>
-      <PartnerAdminSection title="مؤشرات الأداء" description="نظرة سريعة على صحة برنامج الشركاء والأرقام الرئيسية."><div className="pa-stat-grid pa-stat-grid--6">
+      <PartnerAdminSection
+        variant="panel"
+        icon="📊"
+        title="مؤشرات الأداء"
+        description="نظرة سريعة على صحة برنامج الشركاء والأرقام الرئيسية."
+        surface={false}
+      >
+        <div className="pa-stat-grid pa-stat-grid--6">
         {topCards.map((card) => (
           <PartnerAdminStatCard key={card.title} title={card.title} value={card.value} icon={card.icon} money={typeof card.value === "string" && card.value.includes("$")} />
         ))}
-      </div></PartnerAdminSection>
+        </div>
+      </PartnerAdminSection>
 
-      <PartnerAdminSection title="تحليلات الشركاء" description="إحصائيات برنامج الشركاء — Aggregation عبر SQL RPC">
+      <PartnerAdminSection
+        variant="panel"
+        icon="📈"
+        title="تحليلات الشركاء"
+        description="إحصائيات برنامج الشركاء وأداء التسجيلات والعمولات والمبيعات."
+        surface={false}
+      >
         <div className="pa-stat-grid pa-stat-grid--5">
           <PartnerAdminStatCard title="عدد الشركاء" value={adminAnalytics?.totalPartners ?? 0} icon="🤝" />
           <PartnerAdminStatCard title="الشركاء النشطين" value={adminAnalytics?.activePartners ?? 0} icon="✅" />
@@ -719,7 +753,7 @@ export default function AdminPartnerCenterHub() {
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="pa-card">
+          <div className="pa-nested-card pa-nested-card--fill">
             <h3 className="pa-card__title">أعلى 10 شركاء</h3>
             <div className="pa-rank-list pa-scroll-list mt-3">
               {topPartners.map((partner) => (
@@ -735,7 +769,7 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-card">
+          <div className="pa-nested-card">
             <h3 className="pa-card__title">أكثر الخدمات مبيعاً</h3>
             <div className="pa-rank-list pa-scroll-list mt-3">
               {(adminAnalytics?.topServices || []).map((item) => (
@@ -747,7 +781,7 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-card">
+          <div className="pa-nested-card">
             <h3 className="pa-card__title">أكثر المستويات انتشاراً</h3>
             <div className="pa-rank-list pa-scroll-list mt-3">
               {(adminAnalytics?.topTiers || []).map((item) => (
@@ -759,7 +793,7 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-card">
+          <div className="pa-nested-card">
             <h3 className="pa-card__title">آخر التسجيلات</h3>
             <div className="pa-rank-list pa-scroll-list mt-3">
               {(adminAnalytics?.latestSignups || []).map((item) => (
@@ -771,26 +805,34 @@ export default function AdminPartnerCenterHub() {
             </div>
           </div>
 
-          <div className="pa-card lg:col-span-2">
+          <div className="pa-nested-card pa-nested-card--fill lg:col-span-2">
             <h3 className="pa-card__title">آخر عمليات السحب</h3>
-            <div className="pa-rank-list pa-scroll-list mt-3">
-              {(adminAnalytics?.latestWithdrawals || []).map((item) => (
-                <div key={item.id} className="pa-rank-item text-sm">
-                  <span>
-                    {formatPartnerMoney(item.amount)} {item.currency} · {item.network}
-                  </span>
-                  <span className="admin-muted">{formatDate(item.createdAt)}</span>
-                  <StatusBadge status={item.status} variant="partner" />
-                </div>
-              ))}
-            </div>
+            {(adminAnalytics?.latestWithdrawals || []).length === 0 ? (
+              <PartnerAdminEmptyState
+                icon="💳"
+                title="لا توجد عمليات سحب حتى الآن"
+                description="ستظهر هنا أحدث طلبات السحب مع اسم صاحب كل طلب."
+              />
+            ) : (
+              <div className="pa-withdrawal-list pa-scroll-list mt-3">
+                {(adminAnalytics?.latestWithdrawals || []).map((item) => (
+                  <OverviewWithdrawalRow key={item.id} item={item} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </PartnerAdminSection>
 
-      <PartnerAdminSection title="أبرز الشركاء" description="ترتيب سريع حسب التسجيلات والأرباح.">
-        <div className="pa-panel-grid pa-panel-grid--2">
-        <div className="pa-card">
+      <PartnerAdminSection
+        variant="panel"
+        icon="🏆"
+        title="أبرز الشركاء"
+        description="ترتيب سريع حسب التسجيلات والأرباح."
+        surface={false}
+      >
+        <div className="pa-panel-grid pa-panel-grid--2 pa-panel-grid--balanced">
+        <div className="pa-nested-card pa-nested-card--fill">
           <h3 className="pa-card__title">أفضل الشركاء — التسجيلات</h3>
           <div className="pa-rank-list pa-scroll-list mt-3">
             {(summary?.topBySignups || []).map((partner) => (
@@ -806,7 +848,7 @@ export default function AdminPartnerCenterHub() {
           </div>
         </div>
 
-        <div className="pa-card">
+        <div className="pa-nested-card pa-nested-card--fill">
           <h3 className="pa-card__title">أفضل الشركاء — الأرباح</h3>
           <div className="pa-rank-list pa-scroll-list mt-3">
             {(summary?.topByEarnings || []).map((partner) => (
