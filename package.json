@@ -11,6 +11,7 @@
     "subscription-worker": "node worker/subscription-maintenance-worker.js",
     "test:subscription-maintenance-worker": "node scripts/test-subscription-maintenance-worker-local.js",
     "test:subscription-maintenance-cron-caller": "node --test scripts/test-subscription-maintenance-cron-caller.js",
+    "test:profiles-last-sign-in-reconcile-cron-caller": "node --test scripts/test-profiles-last-sign-in-reconcile-cron-caller.js",
     "test:subscription-maintenance-env": "node --test scripts/test-subscription-maintenance-env.js",
     "test:subscription-maintenance-railway-config": "node scripts/test-subscription-maintenance-railway-config.js",
     "test:news-worker-env": "node --test scripts/test-news-worker-env.js",

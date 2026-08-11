@@ -7,4 +7,5 @@ builder = "NIXPACKS"
 
 [deploy]
 startCommand = "node profiles-last-sign-in-reconcile-cron-caller.js"
+cronSchedule = "0 3 * * *"
 restartPolicyType = "NEVER"
