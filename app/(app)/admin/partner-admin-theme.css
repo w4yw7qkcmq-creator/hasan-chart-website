@@ -356,9 +356,9 @@ html[data-theme="light"] .pa-section--panel .pa-section__panel {
 
 .pa-withdrawal-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 0.65rem 0.85rem;
-  align-items: center;
+  align-items: start;
   padding: 0.75rem 0.85rem;
   border-radius: 0.875rem;
   border: 1px solid var(--pa-border);
@@ -396,15 +396,29 @@ html[data-theme="light"] .pa-section--panel .pa-section__panel {
   color: var(--pa-text-primary);
 }
 
+.pa-withdrawal-row__email {
+  margin-top: 0.1rem;
+  font-size: 0.8125rem;
+  color: var(--pa-text-muted);
+  word-break: break-all;
+}
+
 .pa-withdrawal-row__amount {
-  margin-top: 0.15rem;
+  margin-top: 0.35rem;
   font-size: 0.875rem;
   font-weight: 800;
   color: var(--pa-text-secondary);
 }
 
+.pa-withdrawal-row__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.35rem;
+}
+
 .pa-withdrawal-row__date {
-  margin-top: 0.2rem;
   font-size: 0.75rem;
   color: var(--pa-text-muted);
 }
@@ -412,11 +426,6 @@ html[data-theme="light"] .pa-section--panel .pa-section__panel {
 @media (max-width: 767px) {
   .pa-withdrawal-row {
     grid-template-columns: auto 1fr;
-  }
-
-  .pa-withdrawal-row > :last-child {
-    grid-column: 1 / -1;
-    justify-self: flex-start;
   }
 }
 

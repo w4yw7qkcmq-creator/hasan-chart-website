@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminFetch } from "../../../lib/admin-fetch";
-import { formatPartnerMoney, partnerDisplayInitial, WITHDRAWAL_NETWORKS } from "../../../lib/partner-shared";
+import { formatPartnerMoney, partnerDisplayInitial, PARTNER_EMAIL_UNAVAILABLE_AR, WITHDRAWAL_NETWORKS } from "../../../lib/partner-shared";
 import StatusBadge from "../../(app)/admin/components/StatusBadge";
 import AdminPartnerMarketingCenter from "./AdminPartnerMarketingCenter";
 import {
@@ -63,6 +63,7 @@ function formatDate(value) {
 
 function OverviewWithdrawalRow({ item }) {
   const ownerName = item.partner?.displayName || "شريك";
+  const ownerEmail = item.partner?.email || PARTNER_EMAIL_UNAVAILABLE_AR;
 
   return (
     <div className="pa-withdrawal-row">
@@ -71,12 +72,17 @@ function OverviewWithdrawalRow({ item }) {
       </span>
       <div className="pa-withdrawal-row__main">
         <p className="pa-withdrawal-row__owner">{ownerName}</p>
+        <p className="pa-withdrawal-row__email pa-ltr" dir="ltr">
+          {ownerEmail}
+        </p>
         <p className="pa-withdrawal-row__amount pa-ltr">
           {formatPartnerMoney(item.amount)} · {item.currency} · {item.network}
         </p>
-        <p className="pa-withdrawal-row__date">{formatDate(item.createdAt)}</p>
+        <div className="pa-withdrawal-row__footer">
+          <p className="pa-withdrawal-row__date">{formatDate(item.createdAt)}</p>
+          <StatusBadge status={item.status} variant="partner" />
+        </div>
       </div>
-      <StatusBadge status={item.status} variant="partner" />
     </div>
   );
 }
