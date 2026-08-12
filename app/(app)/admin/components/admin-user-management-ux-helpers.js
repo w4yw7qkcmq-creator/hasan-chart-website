@@ -328,17 +328,11 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
     return Number(result.pagination?.total || 0);
   }
 
-  const [serviceStats, cohortToday, cohortWeek, cohortMonth, realUsersResult, ...statusResults] = await Promise.all([
+  const [serviceStats, cohortToday, cohortWeek, cohortMonth, ...statusResults] = await Promise.all([
     fetchAdminUserDashboardStats(adminFetch, { signal }),
     countCohort("today"),
     countCohort("week"),
     countCohort("month"),
-    fetchAdminUserList(adminFetch, {
-      page: 1,
-      pageSize: 1,
-      userClassification: "real",
-      signal,
-    }),
     ...statusKeys.map(async ({ key, status }) => {
       const result = await fetchAdminUserList(adminFetch, {
         page: 1,
@@ -355,22 +349,41 @@ export async function fetchDashboardStats(adminFetch, { signal } = {}) {
 
   const classificationKeys = ["test", "e2e", "internal", "suspected", "unknown"];
   const classificationCounts = {};
-  await Promise.all(
-    classificationKeys.map(async (key) => {
-      const result = await fetchAdminUserList(adminFetch, {
-        page: 1,
-        pageSize: 1,
-        userClassification: key,
-        signal,
-      });
-      classificationCounts[key] = Number(result.pagination?.total || 0);
-    })
-  );
+  const effectiveCounts = serviceStats.effectiveClassificationCounts;
+
+  if (effectiveCounts) {
+    for (const key of classificationKeys) {
+      classificationCounts[key] = Number(effectiveCounts[key] || 0);
+    }
+  } else {
+    await Promise.all(
+      classificationKeys.map(async (key) => {
+        const result = await fetchAdminUserList(adminFetch, {
+          page: 1,
+          pageSize: 1,
+          userClassification: key,
+          signal,
+        });
+        classificationCounts[key] = Number(result.pagination?.total || 0);
+      })
+    );
+  }
+
+  let realUsers = Number(effectiveCounts?.real || 0);
+  if (!effectiveCounts) {
+    const realUsersResult = await fetchAdminUserList(adminFetch, {
+      page: 1,
+      pageSize: 1,
+      userClassification: "real",
+      signal,
+    });
+    realUsers = Number(realUsersResult.pagination?.total || 0);
+  }
 
   return {
     ...statusTotals,
     totalUsers: statusTotals.total,
-    realUsers: Number(realUsersResult.pagination?.total || 0),
+    realUsers,
     testUsers: classificationCounts.test || 0,
     e2eUsers: classificationCounts.e2e || 0,
     internalUsers: classificationCounts.internal || 0,

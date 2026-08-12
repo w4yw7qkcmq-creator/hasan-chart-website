@@ -217,6 +217,27 @@ describe("IAM + authority", () => {
     assert.equal(resolved.source, "admin_manual");
   });
 
+  it("stored UNKNOWN falls through to computed REAL", () => {
+    const resolved = resolveStoredOrComputedClassification({
+      email: "trader@gmail.com",
+      username: "ahmad_trader",
+      created_at: "2025-01-01T00:00:00Z",
+      last_sign_in_at: "2026-01-01T00:00:00Z",
+      user_classification: "unknown",
+    });
+    assert.equal(resolved.classification, USER_CLASSIFICATION.REAL);
+    assert.equal(resolved.source, "computed");
+  });
+
+  it("stored TEST blocks computed REAL", () => {
+    const resolved = resolveStoredOrComputedClassification({
+      email: "trader@gmail.com",
+      username: "ahmad_trader",
+      user_classification: "test",
+    });
+    assert.equal(resolved.classification, USER_CLASSIFICATION.TEST);
+  });
+
   it("validates admin classification input", () => {
     assert.equal(normalizeAdminClassificationInput("TEST"), USER_CLASSIFICATION.TEST);
     assert.throws(() => normalizeAdminClassificationInput("bogus"));

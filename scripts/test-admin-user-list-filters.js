@@ -156,6 +156,22 @@ describe("admin user list filter contract", () => {
     assert.equal(base.registeredTo, nextPage.registeredTo);
     assert.notEqual(base.page, nextPage.page);
   });
+
+  it("default page open does not silently apply registration date filtering", () => {
+    const params = buildAdminUserListRequestParams({
+      clientFilters: DEFAULT_ADMIN_USER_CLIENT_FILTERS,
+    });
+    assert.equal(params.registeredFrom, "");
+    assert.equal(params.registeredTo, "");
+  });
+
+  it("default page open does not silently apply last-login date filtering", () => {
+    const params = buildAdminUserListRequestParams({
+      clientFilters: DEFAULT_ADMIN_USER_CLIENT_FILTERS,
+    });
+    assert.equal(params.lastLoginFrom, "");
+    assert.equal(params.lastLoginTo, "");
+  });
 });
 
 console.log("Admin user list filter tests loaded");
