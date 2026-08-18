@@ -113,6 +113,11 @@ export async function POST(request) {
     if (newUserId && isHumanVerificationEnabled()) {
       try {
         await markTurnstileVerified(admin, newUserId);
+      } catch (hvError) {
+        console.error("Signup human verification persistence failed");
+      }
+
+      try {
         await recordSignupRiskSignals(admin, {
           userId: newUserId,
           clientIp,
