@@ -82,12 +82,15 @@ async function testPersistentWorkerConfigDefaults() {
       EMAIL_QUEUE_POLL_INTERVAL_MS: undefined,
       EMAIL_QUEUE_ERROR_DELAY_MS: undefined,
       EMAIL_QUEUE_IDLE_DELAY_MS: undefined,
+      EMAIL_QUEUE_IDLE_MAX_DELAY_MS: undefined,
     },
     () => {
       const config = getPersistentWorkerConfig();
       assert(config.pollIntervalMs === 2000, "Default poll interval should be 2000ms");
       assert(config.errorDelayMs === 5000, "Default error delay should be 5000ms");
-      assert(config.idleDelayMs === 2000, "Default idle delay should be 2000ms");
+      assert(config.idleDelayMinMs === 2000, "Default idle min delay should be 2000ms");
+      assert(config.idleDelayMaxMs === 30000, "Default idle max delay should be 30000ms");
+      assert(config.idleDelayMs === 2000, "Legacy idleDelayMs alias should match min");
     }
   );
 
@@ -232,6 +235,64 @@ async function testContinuesAfterTransientError() {
   console.log("✓ continues after transient error");
 }
 
+async function testAdaptiveIdleBackoffIncreasesOnEmptyQueue() {
+  let cycleCount = 0;
+  const { sleep, sleeps } = createImmediateSleep();
+
+  await runPersistentEmailQueueLoop({
+    sleep,
+    config: {
+      pollIntervalMs: 1000,
+      errorDelayMs: 100,
+      idleDelayMinMs: 2000,
+      idleDelayMaxMs: 8000,
+      idleBackoffMultiplier: 2,
+      idleDelayMs: 2000,
+    },
+    shouldStop: () => cycleCount >= 4,
+    runCycle: async () => {
+      cycleCount += 1;
+      return { summary: { claimed: 0, sent: 0, retried: 0, failed: 0, skipped: 0 } };
+    },
+  });
+
+  assert(
+    sleeps.length === 3 && sleeps[0] === 2000 && sleeps[1] === 4000 && sleeps[2] === 8000,
+    `Idle sleeps should grow until max cap, got ${JSON.stringify(sleeps)}`
+  );
+
+  console.log("✓ adaptive idle backoff increases on empty queue");
+}
+
+async function testAdaptiveIdleBackoffResetsWhenWorkArrives() {
+  let cycleCount = 0;
+  const { sleep, sleeps } = createImmediateSleep();
+
+  await runPersistentEmailQueueLoop({
+    sleep,
+    config: {
+      pollIntervalMs: 1000,
+      errorDelayMs: 100,
+      idleDelayMinMs: 2000,
+      idleDelayMaxMs: 30000,
+      idleBackoffMultiplier: 2,
+      idleDelayMs: 2000,
+    },
+    shouldStop: () => cycleCount >= 4,
+    runCycle: async () => {
+      cycleCount += 1;
+      const claimed = cycleCount <= 2 ? 0 : 1;
+      return { summary: { claimed, sent: claimed, retried: 0, failed: 0, skipped: 0 } };
+    },
+  });
+
+  assert(sleeps[0] === 2000, "First empty cycle sleeps at min");
+  assert(sleeps[1] === 4000, "Second empty cycle backs off");
+  assert(sleeps.length === 2, "Work cycle should not add idle sleep");
+
+  console.log("✓ adaptive idle backoff resets when work arrives");
+}
+
 async function testGracefulShutdown() {
   let cycleCount = 0;
   let stopRequested = false;
@@ -274,6 +335,8 @@ async function main() {
   await testIdleWaitWhenQueueEmpty();
   await testNoOverlappingCycles();
   await testContinuesAfterTransientError();
+  await testAdaptiveIdleBackoffIncreasesOnEmptyQueue();
+  await testAdaptiveIdleBackoffResetsWhenWorkArrives();
   await testGracefulShutdown();
 
   console.log("\nAll persistent email queue worker tests passed.");

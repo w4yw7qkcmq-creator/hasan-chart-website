@@ -1,5 +1,8 @@
 # Profiles last_sign_in_at daily reconciliation — Railway Cron Job
+# Service: profiles-last-sign-in-reconcile
 # Root Directory = worker | Config File = railway.profiles-last-sign-in-cron.toml
+# DO NOT use worker/railway.toml or npm start (price alerts worker) for this service.
+# Required env: PRODUCTION_URL or WEB_APP_URL, IAM_CRON_SERVICE_ACCOUNT_ID, IAM_CRON_SERVICE_SECRET
 # Schedule: 0 3 * * * (once daily, UTC)
 
 [build]

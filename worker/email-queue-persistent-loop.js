@@ -1,14 +1,14 @@
+const {
+  AdaptiveIdleBackoff,
+  parsePositiveInt,
+  parseMultiplier,
+  resolveAdaptiveIdleBounds,
+} = require("./lib/adaptive-idle-backoff.js");
+
 const MIN_POLL_INTERVAL_MS = 1000;
-
-function parsePositiveInt(value, fallback) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-
-  return Math.floor(parsed);
-}
+const DEFAULT_IDLE_MIN_MS = 2000;
+const DEFAULT_IDLE_MAX_MS = 30_000;
+const DEFAULT_IDLE_BACKOFF_MULTIPLIER = 1.5;
 
 function isOneShotMode(env = process.env) {
   const value = String(env.EMAIL_QUEUE_WORKER_ONESHOT || "")
@@ -19,15 +19,30 @@ function isOneShotMode(env = process.env) {
 }
 
 function getPersistentWorkerConfig(env = process.env) {
+  const { minMs, maxMs } = resolveAdaptiveIdleBounds(env, {
+    minKey: "EMAIL_QUEUE_IDLE_MIN_DELAY_MS",
+    maxKey: "EMAIL_QUEUE_IDLE_MAX_DELAY_MS",
+    legacyMinKey: "EMAIL_QUEUE_IDLE_DELAY_MS",
+    defaultMinMs: DEFAULT_IDLE_MIN_MS,
+    defaultMaxMs: DEFAULT_IDLE_MAX_MS,
+  });
+
   const pollIntervalMs = Math.max(
     MIN_POLL_INTERVAL_MS,
-    parsePositiveInt(env.EMAIL_QUEUE_POLL_INTERVAL_MS, 2000)
+    parsePositiveInt(env.EMAIL_QUEUE_POLL_INTERVAL_MS, DEFAULT_IDLE_MIN_MS)
   );
 
   return {
     pollIntervalMs,
     errorDelayMs: parsePositiveInt(env.EMAIL_QUEUE_ERROR_DELAY_MS, 5000),
-    idleDelayMs: parsePositiveInt(env.EMAIL_QUEUE_IDLE_DELAY_MS, 2000),
+    idleDelayMinMs: minMs,
+    idleDelayMaxMs: maxMs,
+    idleBackoffMultiplier: parseMultiplier(
+      env.EMAIL_QUEUE_IDLE_BACKOFF_MULTIPLIER,
+      DEFAULT_IDLE_BACKOFF_MULTIPLIER
+    ),
+    // Legacy field preserved for callers/tests expecting idleDelayMs.
+    idleDelayMs: minMs,
   };
 }
 
@@ -47,6 +62,9 @@ function logPersistentEvent(event, meta = {}) {
     "skipped",
     "durationMs",
     "sleepMs",
+    "consecutiveEmptyCycles",
+    "idleDelayMs",
+    "nextIdleDelayMs",
   ];
 
   for (const field of allowedFields) {
@@ -79,6 +97,11 @@ async function runPersistentEmailQueueLoop({
   config = getPersistentWorkerConfig(),
   shouldStop = () => false,
   onStopping,
+  idleBackoff = new AdaptiveIdleBackoff({
+    minMs: config.idleDelayMinMs ?? config.idleDelayMs ?? DEFAULT_IDLE_MIN_MS,
+    maxMs: config.idleDelayMaxMs ?? DEFAULT_IDLE_MAX_MS,
+    multiplier: config.idleBackoffMultiplier ?? DEFAULT_IDLE_BACKOFF_MULTIPLIER,
+  }),
 } = {}) {
   let cycleNumber = 0;
   let cycleInProgress = false;
@@ -91,7 +114,10 @@ async function runPersistentEmailQueueLoop({
     }
   };
 
-  logPersistentEvent("EMAIL_QUEUE_PERSISTENT_WORKER_STARTED");
+  logPersistentEvent("EMAIL_QUEUE_PERSISTENT_WORKER_STARTED", {
+    idleDelayMs: config.idleDelayMinMs,
+    nextIdleDelayMs: config.idleDelayMaxMs,
+  });
 
   while (!stopping) {
     if (cycleInProgress) {
@@ -134,11 +160,17 @@ async function runPersistentEmailQueueLoop({
       }
 
       if (claimed === 0) {
+        const idle = idleBackoff.recordEmpty();
         logPersistentEvent("EMAIL_QUEUE_PERSISTENT_IDLE", {
           cycleNumber,
-          sleepMs: config.idleDelayMs,
+          sleepMs: idle.sleepMs,
+          consecutiveEmptyCycles: idle.consecutiveEmptyCycles,
+          idleDelayMs: idle.delayMs,
+          nextIdleDelayMs: idle.nextDelayMs,
         });
-        await sleep(config.idleDelayMs);
+        await sleep(idle.sleepMs);
+      } else {
+        idleBackoff.recordWork();
       }
     } catch (error) {
       cycleInProgress = false;
@@ -170,6 +202,9 @@ async function runPersistentEmailQueueLoop({
 
 module.exports = {
   MIN_POLL_INTERVAL_MS,
+  DEFAULT_IDLE_MIN_MS,
+  DEFAULT_IDLE_MAX_MS,
+  DEFAULT_IDLE_BACKOFF_MULTIPLIER,
   isOneShotMode,
   getPersistentWorkerConfig,
   logPersistentEvent,

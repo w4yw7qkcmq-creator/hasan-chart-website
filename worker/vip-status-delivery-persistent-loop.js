@@ -1,14 +1,15 @@
+const {
+  AdaptiveIdleBackoff,
+  parsePositiveInt,
+  parseMultiplier,
+  resolveAdaptiveIdleBounds,
+} = require("./lib/adaptive-idle-backoff.js");
+
 const MIN_POLL_INTERVAL_MS = 1000;
-
-function parsePositiveInt(value, fallback) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-
-  return Math.floor(parsed);
-}
+const DEFAULT_IDLE_MIN_MS = 2000;
+const DEFAULT_EMPTY_MIN_MS = 5000;
+const DEFAULT_IDLE_MAX_MS = 30_000;
+const DEFAULT_IDLE_BACKOFF_MULTIPLIER = 1.5;
 
 function isOneShotMode(env = process.env) {
   const value = String(env.VIP_STATUS_DELIVERY_WORKER_ONESHOT || "")
@@ -19,15 +20,36 @@ function isOneShotMode(env = process.env) {
 }
 
 function getPersistentWorkerConfig(env = process.env) {
+  const emptyBounds = resolveAdaptiveIdleBounds(env, {
+    minKey: "VIP_STATUS_DELIVERY_EMPTY_MIN_DELAY_MS",
+    maxKey: "VIP_STATUS_DELIVERY_EMPTY_MAX_DELAY_MS",
+    legacyMinKey: "VIP_STATUS_DELIVERY_POLL_INTERVAL_MS",
+    defaultMinMs: DEFAULT_EMPTY_MIN_MS,
+    defaultMaxMs: DEFAULT_IDLE_MAX_MS,
+  });
+
+  const activeDelayMs = Math.max(
+    MIN_POLL_INTERVAL_MS,
+    parsePositiveInt(env.VIP_STATUS_DELIVERY_IDLE_DELAY_MS, DEFAULT_IDLE_MIN_MS)
+  );
+
   const pollIntervalMs = Math.max(
     MIN_POLL_INTERVAL_MS,
-    parsePositiveInt(env.VIP_STATUS_DELIVERY_POLL_INTERVAL_MS, 2000)
+    parsePositiveInt(env.VIP_STATUS_DELIVERY_POLL_INTERVAL_MS, DEFAULT_EMPTY_MIN_MS)
   );
 
   return {
     pollIntervalMs,
+    activeDelayMs,
     errorDelayMs: parsePositiveInt(env.VIP_STATUS_DELIVERY_ERROR_DELAY_MS, 5000),
-    idleDelayMs: parsePositiveInt(env.VIP_STATUS_DELIVERY_IDLE_DELAY_MS, 2000),
+    emptyDelayMinMs: emptyBounds.minMs,
+    emptyDelayMaxMs: emptyBounds.maxMs,
+    idleBackoffMultiplier: parseMultiplier(
+      env.VIP_STATUS_DELIVERY_IDLE_BACKOFF_MULTIPLIER,
+      DEFAULT_IDLE_BACKOFF_MULTIPLIER
+    ),
+    // Legacy alias: empty polling minimum when queue is idle.
+    idleDelayMs: activeDelayMs,
   };
 }
 
@@ -47,6 +69,10 @@ function logPersistentEvent(event, meta = {}) {
     "queued",
     "durationMs",
     "sleepMs",
+    "consecutiveEmptyCycles",
+    "idleDelayMs",
+    "nextIdleDelayMs",
+    "pollIntervalMs",
   ];
 
   for (const field of allowedFields) {
@@ -78,11 +104,18 @@ async function runPersistentVipStatusDeliveryLoop({
   sleep = defaultSleep,
   config = getPersistentWorkerConfig(),
   shouldStop = () => false,
+  idleBackoff = new AdaptiveIdleBackoff({
+    minMs: config.emptyDelayMinMs ?? config.pollIntervalMs ?? DEFAULT_EMPTY_MIN_MS,
+    maxMs: config.emptyDelayMaxMs ?? DEFAULT_IDLE_MAX_MS,
+    multiplier: config.idleBackoffMultiplier ?? DEFAULT_IDLE_BACKOFF_MULTIPLIER,
+  }),
 }) {
   let cycleNumber = 0;
 
   logPersistentEvent("VIP_STATUS_DELIVERY_PERSISTENT_LOOP_STARTED", {
-    pollIntervalMs: config.pollIntervalMs,
+    pollIntervalMs: config.emptyDelayMinMs,
+    idleDelayMs: config.activeDelayMs,
+    nextIdleDelayMs: config.emptyDelayMaxMs,
   });
 
   while (!shouldStop()) {
@@ -91,8 +124,17 @@ async function runPersistentVipStatusDeliveryLoop({
 
     try {
       const summary = await runCycle();
-      const sleepMs =
-        summary?.claimed > 0 ? config.idleDelayMs : config.pollIntervalMs;
+      const claimed = Number(summary?.claimed || 0);
+      let sleepMs = 0;
+      let idleMeta = null;
+
+      if (claimed > 0) {
+        idleBackoff.recordWork();
+        sleepMs = config.activeDelayMs;
+      } else {
+        idleMeta = idleBackoff.recordEmpty();
+        sleepMs = idleMeta.sleepMs;
+      }
 
       logPersistentEvent("VIP_STATUS_DELIVERY_PERSISTENT_CYCLE_FINISHED", {
         cycleNumber,
@@ -103,6 +145,9 @@ async function runPersistentVipStatusDeliveryLoop({
         queued: summary?.queued ?? 0,
         durationMs: Date.now() - startedAt,
         sleepMs,
+        consecutiveEmptyCycles: idleMeta?.consecutiveEmptyCycles ?? 0,
+        idleDelayMs: idleMeta?.delayMs ?? config.activeDelayMs,
+        nextIdleDelayMs: idleMeta?.nextDelayMs ?? config.emptyDelayMinMs,
       });
 
       await sleep(sleepMs);
@@ -112,6 +157,7 @@ async function runPersistentVipStatusDeliveryLoop({
         cycleNumber,
         error: error?.message || String(error),
         durationMs: Date.now() - startedAt,
+        sleepMs: config.errorDelayMs,
       });
       await sleep(config.errorDelayMs);
     }
