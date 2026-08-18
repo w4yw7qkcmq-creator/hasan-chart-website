@@ -166,12 +166,80 @@ export async function stopDevServer(dev) {
   }
 }
 
-export async function loginViaSupabase(context, env, base, email, password) {
+export async function loginViaSupabase(context, env, base, email, password, options = {}) {
+  const maxAttempts = options.maxAttempts ?? 3;
+  const backoffMs = options.backoffMs ?? [0, 500, 1500];
+  const attemptTimeoutMs = options.attemptTimeoutMs ?? 15000;
+  const stats = {
+    attempts: 0,
+    retries: 0,
+    lastError: null,
+    finalStatus: "pending",
+  };
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    stats.attempts = attempt + 1;
+    if (attempt > 0) stats.retries += 1;
+    const waitMs = backoffMs[attempt] ?? backoffMs[backoffMs.length - 1] ?? 0;
+    if (waitMs > 0) await sleep(waitMs);
+    try {
+      await loginViaSupabaseOnce(context, env, base, email, password, attemptTimeoutMs);
+      stats.finalStatus = "ok";
+      return stats;
+    } catch (err) {
+      stats.lastError = String(err?.message || err);
+      const retryable = isRetryableStagingLoginError(err);
+      if (!retryable || attempt === maxAttempts - 1) {
+        stats.finalStatus = "fail";
+        const wrapped = new Error(stats.lastError);
+        wrapped.loginStats = stats;
+        throw wrapped;
+      }
+    }
+  }
+
+  stats.finalStatus = "fail";
+  const wrapped = new Error(stats.lastError || "login_failed");
+  wrapped.loginStats = stats;
+  throw wrapped;
+}
+
+function isRetryableStagingLoginError(err) {
+  const status = Number(err?.status || err?.statusCode || 0);
+  if (status === 401 || status === 403) return false;
+  const msg = String(err?.message || err || "").toLowerCase();
+  const code = String(err?.code || err?.cause?.code || "").toUpperCase();
+  if (
+    msg.includes("invalid login credentials") ||
+    msg.includes("invalid credentials") ||
+    msg.includes("permission") ||
+    msg.includes("malformed")
+  ) {
+    return false;
+  }
+  return (
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    msg.includes("und_err_connect_timeout") ||
+    msg.includes("fetch failed") ||
+    msg.includes("econnreset") ||
+    msg.includes("epipe") ||
+    msg.includes("etimedout") ||
+    msg.includes("authretryablefetcherror") ||
+    err?.name === "AuthRetryableFetchError"
+  );
+}
+
+async function loginViaSupabaseOnce(context, env, base, email, password, attemptTimeoutMs = 15000) {
   assertStagingOnly(env);
   const anon = createClient(env.STAGING_SUPABASE_URL, env.STAGING_SUPABASE_ANON_KEY, {
     auth: { persistSession: false },
   });
-  const { data, error } = await anon.auth.signInWithPassword({ email, password });
+  const { data, error } = await Promise.race([
+    anon.auth.signInWithPassword({ email, password }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(Object.assign(new Error("ETIMEDOUT"), { code: "ETIMEDOUT" })), attemptTimeoutMs)
+    ),
+  ]);
   if (error || !data?.session?.access_token) {
     throw new Error(`Supabase login failed for ${email}: ${error?.message || "no session"}`);
   }
@@ -505,6 +573,94 @@ export async function setTheme(page, theme) {
       /* ignore */
     }
   }, theme);
+}
+
+async function capturePartnerCommissionsDiagnostics(page) {
+  return page.evaluate(() => ({
+    finalUrl: location.href,
+    readyState: document.readyState,
+    title: document.title,
+    hasPaShell: Boolean(document.querySelector(".pa-shell")),
+    hasEmbeddedRoot: Boolean(document.querySelector(".pa-embedded-root")),
+    hasSkeleton: Boolean(
+      document.querySelector(".pa-skeleton-grid, .pa-skeleton, .admin-access-loading")
+    ),
+    hasServiceHeading: [...document.querySelectorAll("h3")].some((el) =>
+      /عمولات الخدمات/u.test(el.textContent || "")
+    ),
+    serviceTableRows: document.querySelectorAll(".pa-table tbody tr").length,
+    bodySample: (document.body?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 400),
+  }));
+}
+
+/** Wait for admin partner hub commissions tab with service-commission policy surface. */
+export async function waitForAdminPartnerCommissionsSurface(page, { timeoutMs = 20000 } = {}) {
+  const start = Date.now();
+  const remaining = () => Math.max(1000, timeoutMs - (Date.now() - start));
+
+  await page
+    .waitForResponse(
+      (res) => res.url().includes("/api/auth/session") && res.status() === 200,
+      { timeout: Math.min(6000, remaining()) }
+    )
+    .catch(() => null);
+
+  await waitForSpinnerHidden(page, remaining());
+
+  try {
+    await page.locator(".pa-shell").waitFor({ state: "visible", timeout: remaining() });
+  } catch {
+    return {
+      ok: false,
+      error: "pa_shell_missing",
+      diagnostics: await capturePartnerCommissionsDiagnostics(page),
+      renderWaitMs: Date.now() - start,
+      selector: ".pa-shell",
+    };
+  }
+
+  await page
+    .waitForResponse(
+      (res) =>
+        res.url().includes("/api/admin/partner-marketing/service-commissions") &&
+        res.status() === 200,
+      { timeout: remaining() }
+    )
+    .catch(() => null);
+
+  try {
+    await page.waitForFunction(
+      () => {
+        const root =
+          document.querySelector(".pa-embedded-root") || document.querySelector(".pa-shell");
+        if (!root) return false;
+        if (root.querySelector(".pa-skeleton-grid") || root.querySelector(".pa-skeleton")) {
+          return false;
+        }
+        const heading = [...root.querySelectorAll("h3")].some((el) =>
+          /عمولات الخدمات/u.test(el.textContent || "")
+        );
+        const rows = root.querySelectorAll(".pa-table tbody tr").length;
+        return heading && rows > 0;
+      },
+      { timeout: remaining() }
+    );
+  } catch {
+    return {
+      ok: false,
+      error: "service_commissions_surface_timeout",
+      diagnostics: await capturePartnerCommissionsDiagnostics(page),
+      renderWaitMs: Date.now() - start,
+      selector: ".pa-embedded-root .pa-table tbody tr",
+    };
+  }
+
+  return {
+    ok: true,
+    diagnostics: await capturePartnerCommissionsDiagnostics(page),
+    renderWaitMs: Date.now() - start,
+    selector: ".pa-embedded-root .pa-table tbody tr",
+  };
 }
 
 export function writeReport(path, report) {

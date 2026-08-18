@@ -50,6 +50,31 @@ async function resetLoginLimitersForIp(ip, email) {
   }
 }
 
+const TEST_HMAC_SECRET = "test-only-security-signal-hmac-secret-not-for-production";
+const ENV_KEYS = ["SECURITY_SIGNAL_HMAC_SECRET", "AUTH_RATE_LIMIT_PEPPER"];
+
+function saveEnvSnapshot() {
+  return Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+}
+
+function restoreEnvSnapshot(snapshot) {
+  for (const key of ENV_KEYS) {
+    if (snapshot[key] === undefined) delete process.env[key];
+    else process.env[key] = snapshot[key];
+  }
+}
+
+function withTestHmacSecret(fn) {
+  const snapshot = saveEnvSnapshot();
+  process.env.SECURITY_SIGNAL_HMAC_SECRET = TEST_HMAC_SECRET;
+  delete process.env.AUTH_RATE_LIMIT_PEPPER;
+  try {
+    return fn();
+  } finally {
+    restoreEnvSnapshot(snapshot);
+  }
+}
+
 describe("client IP extraction", () => {
   it("prefers x-real-ip over x-forwarded-for", () => {
     const ip = getClientIp(
@@ -75,9 +100,24 @@ describe("client IP extraction", () => {
   });
 
   it("hashes network key without exposing raw ip in logs helper", () => {
-    const hash = hashNetworkKey("203.0.113.10");
-    assert.match(hash, /^[a-f0-9]{16}$/);
-    assert.doesNotMatch(hash, /203/);
+    withTestHmacSecret(() => {
+      const hash = hashNetworkKey("203.0.113.10");
+      assert.match(hash, /^[a-f0-9]{16}$/);
+      assert.doesNotMatch(hash, /203/);
+      const again = hashNetworkKey("203.0.113.10");
+      assert.equal(hash, again);
+    });
+  });
+
+  it("returns unknown when HMAC secret is missing (fail-closed)", () => {
+    const snapshot = saveEnvSnapshot();
+    delete process.env.SECURITY_SIGNAL_HMAC_SECRET;
+    delete process.env.AUTH_RATE_LIMIT_PEPPER;
+    try {
+      assert.equal(hashNetworkKey("203.0.113.10"), "unknown");
+    } finally {
+      restoreEnvSnapshot(snapshot);
+    }
   });
 });
 

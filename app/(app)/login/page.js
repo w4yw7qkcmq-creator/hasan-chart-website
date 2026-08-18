@@ -61,7 +61,7 @@ function resolvePostLoginDestination({ email, nextPath }) {
   return safeNext || "/my-dashboard";
 }
 
-async function loginWithApi(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
+async function loginWithApi(email, password, { turnstileToken = "", challengeId = "" } = {}, timeoutMs = SIGN_IN_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -70,11 +70,18 @@ async function loginWithApi(email, password, timeoutMs = SIGN_IN_TIMEOUT_MS) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, turnstileToken, challengeId }),
       signal: controller.signal,
     });
 
     const payload = await response.json().catch(() => ({}));
+
+    if (payload?.code === "TURNSTILE_REQUIRED") {
+      const err = new Error(payload.error || "TURNSTILE_REQUIRED");
+      err.code = "TURNSTILE_REQUIRED";
+      err.challengeId = payload.challengeId;
+      throw err;
+    }
 
     if (response.status === 429) {
       const retryAfterHeader = Number(response.headers.get("Retry-After"));
@@ -167,6 +174,8 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReady, setTurnstileReady] = useState(false);
+  const [turnstileRequired, setTurnstileRequired] = useState(false);
+  const [loginChallengeId, setLoginChallengeId] = useState("");
   const turnstileWidgetId = useRef(null);
 
   useEffect(() => {
@@ -176,7 +185,7 @@ export default function LoginPage() {
   }, [authResolved, status, user, router, nextPath]);
 
   useEffect(() => {
-    if (!TURNSTILE_SITE_KEY) return;
+    if (!TURNSTILE_SITE_KEY || !turnstileRequired) return;
 
     const existingScript = document.querySelector("script[data-turnstile]");
 
@@ -217,7 +226,7 @@ export default function LoginPage() {
     script.dataset.turnstile = "true";
     script.onload = renderTurnstile;
     document.body.appendChild(script);
-  }, []);
+  }, [turnstileRequired]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -235,7 +244,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+    if (turnstileRequired && TURNSTILE_SITE_KEY && !turnstileToken) {
       showAppModal({
         type: "warning",
         title: "تحقق أمني مطلوب",
@@ -247,24 +256,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const captchaCheck = await verifyTurnstileToken(turnstileToken);
-
-      if (!captchaCheck.ok) {
-        showAppModal({
-          type: "error",
-          title: "فشل التحقق الأمني",
-          message: captchaCheck.error,
-        });
-        setTurnstileToken("");
-        if (window.turnstile && turnstileWidgetId.current !== null) {
-          window.turnstile.reset(turnstileWidgetId.current);
-        }
-        return;
-      }
-
       devLog("[LOGIN] before login API", { email: "[redacted]" });
 
-      const { data, error } = await loginWithApi(cleanEmail, password);
+      const { data, error } = await loginWithApi(cleanEmail, password, {
+        turnstileToken: turnstileRequired ? turnstileToken : "",
+        challengeId: turnstileRequired ? loginChallengeId : "",
+      });
 
       devLog("[LOGIN] after login API", {
         ok: !error && Boolean(data?.session),
@@ -317,6 +314,20 @@ export default function LoginPage() {
       router.refresh();
       router.replace(destination);
     } catch (err) {
+      if (err?.code === "TURNSTILE_REQUIRED") {
+        setTurnstileRequired(true);
+        setLoginChallengeId(err.challengeId || "");
+        setTurnstileToken("");
+        if (window.turnstile && turnstileWidgetId.current !== null) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+        showAppModal({
+          type: "warning",
+          title: "تحقق أمني مطلوب",
+          message: "لأسباب أمنية، أكمل التحقق ثم حاول تسجيل الدخول مرة أخرى.",
+        });
+        return;
+      }
       devLog("[LOGIN] catch", err?.message || err);
 
       if (err?.message === "SIGN_IN_TIMEOUT") {
@@ -453,7 +464,7 @@ export default function LoginPage() {
                 />
               </div>
 
-              {TURNSTILE_SITE_KEY && (
+              {TURNSTILE_SITE_KEY && turnstileRequired && (
                 <div className="rounded-2xl border border-cyan-300/15 bg-black/25 p-4 shadow-[0_0_25px_rgba(34,211,238,0.08)]">
                   <div className="mb-3 text-center text-sm font-bold text-cyan-200">
                     تحقق أمني لحماية الحساب

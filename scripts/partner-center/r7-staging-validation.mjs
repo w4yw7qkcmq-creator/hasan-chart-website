@@ -7,12 +7,23 @@
 import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import crypto from "node:crypto";
+import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { loadStagingEnvFile } from "../../lib/load-staging-env.js";
 import {
   PRODUCTION_SUPABASE_PROJECT_REF,
   STAGING_SUPABASE_PROJECT_REF,
 } from "../../lib/staging-env-guard.js";
+import { applyStagingPartnerFeatureFlags } from "../hv-abuse-pass2-lib.mjs";
+import {
+  setRealVerifiedProfile,
+  ensureValidationAdminActorFixture,
+  findAuthUserIdByEmailPaginated,
+} from "../hv-pass3-fixture-lib.mjs";
+import {
+  evaluatePartnerRewardEligibility,
+  REWARD_TYPES,
+} from "../../lib/partner-center/partner-reward-eligibility.js";
 import { createPartnerSignupBonusAtomic } from "../../lib/partner-center/financial-gateway.js";
 import { initializeReferralQualification, transitionReferralQualification } from "../../lib/partner-center/qualification-engine.js";
 import {
@@ -61,10 +72,15 @@ function fail(name, detail = "") {
 
 function loadStaging() {
   loadStagingEnvFile();
+  Object.assign(process.env, applyStagingPartnerFeatureFlags(process.env));
   if (process.env.STAGING_SUPABASE_PROJECT_REF === PRODUCTION_SUPABASE_PROJECT_REF) {
     throw new Error("ABORT: staging matches production");
   }
-  if (process.env.STAGING_SUPABASE_PROJECT_REF !== STAGING_SUPABASE_PROJECT_REF) {
+  if (process.env.HV_VALIDATION_TARGET === "isolated") {
+    if (process.env.STAGING_SUPABASE_PROJECT_REF === STAGING_SUPABASE_PROJECT_REF) {
+      throw new Error("ABORT: isolated run mapped to shared staging ref");
+    }
+  } else if (process.env.STAGING_SUPABASE_PROJECT_REF !== STAGING_SUPABASE_PROJECT_REF) {
     throw new Error(`ABORT: unexpected staging ref ${process.env.STAGING_SUPABASE_PROJECT_REF}`);
   }
   return createClient(process.env.STAGING_SUPABASE_URL, process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY, {
@@ -88,6 +104,182 @@ async function countHistoricalCredits(service) {
     .select("id", { count: "exact", head: true });
   if (error) throw error;
   return count || 0;
+}
+
+async function findAuthUserIdByEmail(service, email) {
+  return findAuthUserIdByEmailPaginated(service, email);
+}
+
+async function isolatedEconomicBaseline(service) {
+  const { data: partners } = await service.from("partners").select("balance_bonus_pending, balance_pending, balance_withdrawable, total_earnings");
+  const sums = (partners || []).reduce(
+    (acc, row) => ({
+      balance_pending: acc.balance_pending + Number(row.balance_pending || 0),
+      balance_bonus_pending: acc.balance_bonus_pending + Number(row.balance_bonus_pending || 0),
+      balance_withdrawable: acc.balance_withdrawable + Number(row.balance_withdrawable || 0),
+      total_earnings: acc.total_earnings + Number(row.total_earnings || 0),
+    }),
+    { balance_pending: 0, balance_bonus_pending: 0, balance_withdrawable: 0, total_earnings: 0 }
+  );
+  const counts = await Promise.all([
+    service.from("partners").select("id", { count: "exact", head: true }),
+    service.from("partner_referrals").select("id", { count: "exact", head: true }),
+    service.from("partner_commissions").select("id", { count: "exact", head: true }),
+    service.from("partner_financial_ledger_entries").select("id", { count: "exact", head: true }),
+    service.from("partner_qualified_referral_reward_credits").select("id", { count: "exact", head: true }),
+  ]);
+  const commissionSum = (await service.from("partner_commissions").select("amount")).data?.reduce((s, r) => s + Number(r.amount || 0), 0) || 0;
+  const qrrSum = (await service.from("partner_qualified_referral_reward_credits").select("amount")).data?.reduce((s, r) => s + Number(r.amount || 0), 0) || 0;
+  return {
+    partners: counts[0].count || 0,
+    partner_referrals: counts[1].count || 0,
+    partner_commissions: counts[2].count || 0,
+    partner_financial_ledger_entries: counts[3].count || 0,
+    partner_qualified_referral_reward_credits: counts[4].count || 0,
+    commission_sum: commissionSum,
+    ledger_signed_sum: 0,
+    signup_bonus_sum: commissionSum,
+    qrr_sum: qrrSum,
+    ...sums,
+  };
+}
+
+async function cleanupR7StagingFixtures(service) {
+  const userIds = [];
+  for (let page = 1; page <= 25; page += 1) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw error;
+    for (const u of data?.users || []) {
+      const email = u.email || "";
+      if (
+        (email.startsWith("r7-") && email.endsWith("@staging-hcw.test")) ||
+        (email.startsWith("isolated-r7-admin-") && email.endsWith("@isolated-hcw.test")) ||
+        (email.startsWith("staging-validation-admin-") && email.endsWith("@staging-hcw.test"))
+      ) {
+        userIds.push(u.id);
+      }
+    }
+    if ((data?.users?.length || 0) < 200) break;
+  }
+  if (!userIds.length) return { authUsers: 0, partners: 0, referrals: 0 };
+
+  const { data: partnerRows } = await service.from("partners").select("id").in("user_id", userIds);
+  const partnerIds = (partnerRows || []).map((row) => row.id);
+  let referralIds = [];
+  if (partnerIds.length || userIds.length) {
+    const filters = [];
+    if (userIds.length) filters.push(`referred_user_id.in.(${userIds.join(",")})`);
+    if (partnerIds.length) filters.push(`partner_id.in.(${partnerIds.join(",")})`);
+    const { data: referralRows } = await service.from("partner_referrals").select("id").or(filters.join(","));
+    referralIds = (referralRows || []).map((row) => row.id);
+  }
+
+  const ref = process.env.STAGING_SUPABASE_PROJECT_REF;
+  const password = process.env.ISOLATED_SUPABASE_DB_PASSWORD;
+  if (process.env.HV_VALIDATION_TARGET === "isolated" && ref && password && (partnerIds.length || userIds.length)) {
+    const client = new pg.Client({
+      connectionString: `postgresql://postgres.${ref}:${encodeURIComponent(password)}@aws-0-ap-south-1.pooler.supabase.com:6543/postgres`,
+      ssl: { rejectUnauthorized: false },
+    });
+    await client.connect();
+    await client.query("set session_replication_role = replica");
+    try {
+      if (referralIds.length) {
+        await client.query(`delete from partner_qualified_referral_reward_credits where referral_id = any($1::uuid[])`, [referralIds]);
+        await client.query(`delete from partner_referral_qualifications where referral_id = any($1::uuid[])`, [referralIds]);
+        await client.query(`delete from partner_referral_attributions where referral_id = any($1::uuid[])`, [referralIds]);
+        await client.query(`delete from partner_fraud_assessments where referral_id = any($1::uuid[])`, [referralIds]);
+        await client.query(`delete from partner_referrals where id = any($1::uuid[])`, [referralIds]);
+      }
+      await client.query(`delete from partner_financial_ledger_entries where partner_id = any($1::uuid[])`, [partnerIds]);
+      await client.query(`delete from partner_commissions where partner_id = any($1::uuid[])`, [partnerIds]);
+      await client.query(`delete from partners where id = any($1::uuid[])`, [partnerIds]);
+      if (userIds.length) {
+        await client.query(`delete from profiles where id = any($1::uuid[])`, [userIds]);
+      }
+    } finally {
+      await client.query("set session_replication_role = default");
+      await client.end();
+    }
+  } else {
+    if (referralIds.length) {
+      await service.from("partner_qualified_referral_reward_credits").delete().in("referral_id", referralIds);
+      await service.from("partner_referral_qualifications").delete().in("referral_id", referralIds);
+      await service.from("partner_referral_attributions").delete().in("referral_id", referralIds);
+      await service.from("partner_fraud_assessments").delete().in("referral_id", referralIds);
+      await service.from("partner_referrals").delete().in("id", referralIds);
+    }
+    if (partnerIds.length) {
+      await service.from("partner_qualified_referral_reward_credits").delete().in("partner_id", partnerIds);
+      await service.from("partner_financial_ledger_entries").delete().in("partner_id", partnerIds);
+      await service.from("partner_commissions").delete().in("partner_id", partnerIds);
+      await service.from("partners").delete().in("id", partnerIds);
+    }
+  }
+  for (const uid of userIds) {
+    await service.auth.admin.deleteUser(uid).catch(() => null);
+  }
+  return { authUsers: userIds.length, partners: partnerIds.length, referrals: referralIds.length };
+}
+
+async function assertR7Preflight(service, actor) {
+  if (!actor?.userId) {
+    fail("R7_CREATED_BY_FIXTURE_MISSING", "actorUserId null");
+    throw new Error("R7_CREATED_BY_FIXTURE_MISSING");
+  }
+  const { data: authWrap, error: authErr } = await service.auth.admin.getUserById(actor.userId);
+  if (authErr || !authWrap?.user?.id) {
+    fail("R7_CREATED_BY_FIXTURE_MISSING", authErr?.message || "auth user missing");
+    throw new Error("R7_CREATED_BY_FIXTURE_MISSING");
+  }
+  const { data: profile } = await service.from("profiles").select("id, email").eq("id", actor.userId).maybeSingle();
+  if (!profile?.id) {
+    fail("R7_CREATED_BY_FIXTURE_MISSING", "profile missing for actor");
+    throw new Error("R7_CREATED_BY_FIXTURE_MISSING");
+  }
+  if (process.env.PARTNER_ANTI_ABUSE_GATE_ENABLED !== "true") {
+    fail("R7_feature_flags", "PARTNER_ANTI_ABUSE_GATE_ENABLED not true");
+    throw new Error("R7 feature flags inactive");
+  }
+  pass("R7_preflight_created_by_fixture", `${actor.email} pages=resolved`);
+  pass("R7_preflight_feature_flags", process.env.PARTNER_ANTI_ABUSE_GATE_ENABLED);
+  return true;
+}
+
+async function assertQrrFixturePreconditions(service, { partnerId, referredUserId }, label) {
+  const [{ data: profile }, authUserResult, eligibility] = await Promise.all([
+    service
+      .from("profiles")
+      .select(
+        "human_verification_status, effective_user_classification, user_classification, partner_reward_eligibility_status, partner_reward_risk_level"
+      )
+      .eq("id", referredUserId)
+      .maybeSingle(),
+    service.auth.admin.getUserById(referredUserId).catch(() => ({ data: { user: null } })),
+    evaluatePartnerRewardEligibility(service, {
+      partnerId,
+      referredUserId,
+      rewardType: REWARD_TYPES.QRR,
+    }),
+  ]);
+  const authUser = authUserResult?.data?.user || null;
+  const detail = {
+    human_verification_status: profile?.human_verification_status || null,
+    effective_user_classification: profile?.effective_user_classification || null,
+    email_confirmed: Boolean(authUser?.email_confirmed_at),
+    eligibility,
+  };
+  const ok =
+    profile?.human_verification_status === "verified" &&
+    profile?.effective_user_classification === "real" &&
+    Boolean(authUser?.email_confirmed_at) &&
+    eligibility.eligible === true &&
+    !eligibility.holdRequired &&
+    !["HIGH", "BLOCKED"].includes(String(eligibility.riskLevel || "").toUpperCase());
+  if (!ok) {
+    throw new Error(`R7_FIXTURE_ELIGIBILITY_PRECONDITION_FAILED ${label}: ${JSON.stringify(detail)}`);
+  }
+  return detail;
 }
 
 async function ensureQualified(service, { referralId, partnerId, referredUserId }) {
@@ -126,15 +318,18 @@ async function mkFixture(service, label) {
       email_confirm: confirm,
       user_metadata: { r7: RUN, label },
     });
-    if (error && !String(error.message).includes("already")) throw error;
     if (data?.user?.id) return data.user.id;
-    const { data: list } = await service.auth.admin.listUsers({ perPage: 200 });
-    return list.users.find((u) => u.email === email)?.id;
+    if (error && !String(error.message).includes("already")) throw error;
+    const existingId = await findAuthUserIdByEmail(service, email);
+    if (!existingId) throw new Error(`mkUser could not resolve auth user for ${email}`);
+    return existingId;
   };
 
   const partnerUserId = await mkUser(partnerEmail, true);
-  const referredUserId = await mkUser(referredEmail, false);
-  const referralCode = `R7${suffix.replace(/-/g, "").toUpperCase()}`.slice(0, 12);
+  const referredUserId = await mkUser(referredEmail, true);
+  await setRealVerifiedProfile(service, referredUserId, { email: referredEmail, runTag: RUN });
+  await setRealVerifiedProfile(service, partnerUserId, { email: partnerEmail, runTag: RUN });
+  const referralCode = `R7${suffix.replace(/-/g, "").toUpperCase()}${crypto.randomBytes(2).toString("hex")}`.slice(0, 12);
 
   const { data: partnerRow, error: pErr } = await service
     .from("partners")
@@ -143,7 +338,14 @@ async function mkFixture(service, label) {
     .single();
   let partnerId = partnerRow?.id;
   if (pErr?.code === "23505") {
-    const { data: ex } = await service.from("partners").select("id, balance_bonus_pending, total_earnings").eq("user_id", partnerUserId).single();
+    const { data: ex } = await service
+      .from("partners")
+      .select("id, balance_bonus_pending, total_earnings")
+      .eq("user_id", partnerUserId)
+      .maybeSingle();
+    if (!ex?.id) {
+      throw new Error(`mkFixture partner conflict without row for user=${partnerUserId} label=${label} code=${referralCode}`);
+    }
     partnerId = ex.id;
   } else if (pErr) throw pErr;
 
@@ -243,9 +445,26 @@ async function validationMatrix() {
   }
 }
 
+function writeArtifact() {
+  mkdirSync(join(process.cwd(), "scripts/partner-center/.artifacts"), { recursive: true });
+  writeFileSync(ARTIFACT, JSON.stringify(report, null, 2));
+}
+
 async function main() {
   const service = loadStaging();
-  report.environment = { ref: STAGING_SUPABASE_PROJECT_REF, name: "staging" };
+  report.environment = {
+    ref: process.env.STAGING_SUPABASE_PROJECT_REF,
+    name: process.env.HV_VALIDATION_TARGET === "isolated" ? "isolated" : "staging",
+    featureFlags: {
+      PARTNER_ANTI_ABUSE_GATE_ENABLED: process.env.PARTNER_ANTI_ABUSE_GATE_ENABLED || null,
+      HUMAN_VERIFICATION_ENABLED: process.env.HUMAN_VERIFICATION_ENABLED || null,
+    },
+  };
+  if (process.env.HV_VALIDATION_TARGET === "isolated") {
+    report.baselineBeforeR7 = await isolatedEconomicBaseline(service);
+  }
+
+  report.baseline.cleanupBefore = await cleanupR7StagingFixtures(service);
 
   report.baseline.historicalCreditsBefore = await countHistoricalCredits(service);
   pass("historical_baseline_credits", String(report.baseline.historicalCreditsBefore));
@@ -253,9 +472,11 @@ async function main() {
   await catalogVerification(service);
   await validationMatrix();
 
-  const { data: userList } = await service.auth.admin.listUsers({ perPage: 1 });
-  const actorId = userList?.users?.[0]?.id || null;
-  if (!actorId) throw new Error("no staging auth user for created_by FK");
+  const actor = await ensureValidationAdminActorFixture(service, { runTag: RUN, label: "r7-admin" });
+  report.createdByFixture = { email: actor.email, userId: actor.userId, provenanceOnly: actor.provenanceOnly };
+  await assertR7Preflight(service, actor);
+  const actorId = actor.userId;
+
   const { created: ruleV1 } = await adminUpdateQualifiedReferralRewardPolicy(service, {
     amount: QRR_AMOUNT_V1,
     isEnabled: true,
@@ -269,6 +490,7 @@ async function main() {
 
   const fixtureA = await mkFixture(service, "stackA");
   const beforeA = await partnerBalances(service, fixtureA.partnerId);
+  await assertQrrFixturePreconditions(service, fixtureA, "stackA");
   await ensureQualified(service, fixtureA);
 
   const releaseA = await releaseSignupBonusOnQualification(service, fixtureA);
@@ -362,6 +584,7 @@ async function main() {
   pass("rule_disable", `v${ruleDisabled.rule_version}`);
 
   const fixtureDisabled = await mkFixture(service, "disabled");
+  await assertQrrFixturePreconditions(service, fixtureDisabled, "disabled");
   await ensureQualified(service, fixtureDisabled);
   const creditDisabled = await creditQualifiedReferralRewardOnQualification(service, fixtureDisabled);
   const { data: skippedRow } = await service
@@ -381,6 +604,7 @@ async function main() {
     actorUserId: actorId,
   });
   const fixtureReenable = await mkFixture(service, "reenable");
+  await assertQrrFixturePreconditions(service, fixtureReenable, "reenable");
   await ensureQualified(service, fixtureReenable);
   const creditReenable = await creditQualifiedReferralRewardOnQualification(service, fixtureReenable);
   if (Number(creditReenable.amount) === QRR_AMOUNT_V2) {
@@ -406,6 +630,7 @@ async function main() {
     actorUserId: actorId,
   });
   const fixtureB = await mkFixture(service, "versionB");
+  await assertQrrFixturePreconditions(service, fixtureB, "versionB");
   await ensureQualified(service, fixtureB);
   await creditQualifiedReferralRewardOnQualification(service, fixtureB);
   const { data: creditB } = await service
@@ -463,18 +688,53 @@ async function main() {
     fail("historical_no_auto_backfill", String(historicalDelta));
   }
 
+  report.baseline.cleanupAfter = await cleanupR7StagingFixtures(service);
+
+  if (process.env.HV_VALIDATION_TARGET === "isolated") {
+    const afterCleanup1 = await isolatedEconomicBaseline(service);
+    report.baseline.cleanupAfterPass2 = await cleanupR7StagingFixtures(service);
+    const afterCleanup2 = await isolatedEconomicBaseline(service);
+    const before = report.baselineBeforeR7 || {};
+    report.isolatedBaselineAfterR7 = afterCleanup2;
+    const economicKeys = [
+      "balance_pending",
+      "balance_bonus_pending",
+      "balance_withdrawable",
+      "total_earnings",
+      "commission_sum",
+      "ledger_signed_sum",
+      "signup_bonus_sum",
+      "qrr_sum",
+    ];
+    const economicRestored = economicKeys.every((k) => Number(afterCleanup2[k] || 0) === Number(before[k] || 0));
+    const pass2Delta = JSON.stringify(afterCleanup1) === JSON.stringify(afterCleanup2);
+    if (economicRestored && pass2Delta) {
+      pass("isolated_baseline_after_r7_cleanup", JSON.stringify({ before, after: afterCleanup2 }));
+      pass("r7_cleanup_pass2_idempotent");
+    } else {
+      fail("isolated_baseline_after_r7_cleanup", JSON.stringify({ before, afterCleanup1, afterCleanup2, pass2Delta }));
+    }
+  }
+
   const passed = Object.values(report.tests).filter((t) => t.status === "PASS").length;
   const failed = Object.values(report.tests).filter((t) => t.status === "FAIL").length;
   report.summary = { passed, failed, verdict: failed === 0 ? "PASS" : "FAIL" };
 
-  mkdirSync(join(process.cwd(), "scripts/partner-center/.artifacts"), { recursive: true });
-  writeFileSync(ARTIFACT, JSON.stringify(report, null, 2));
+  writeArtifact();
   console.log(`\nArtifact: ${ARTIFACT}`);
   console.log(`Summary: ${passed} PASS / ${failed} FAIL`);
   process.exit(failed > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
+  report.fatal = String(err?.message || err);
+  report.errors.push({ name: "fatal", detail: report.fatal });
   console.error("R7 staging validation fatal", err);
+  try {
+    writeArtifact();
+    console.error(`Partial artifact: ${ARTIFACT}`);
+  } catch {
+    /* ignore artifact write failure */
+  }
   process.exit(1);
 });

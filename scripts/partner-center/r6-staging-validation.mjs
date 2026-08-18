@@ -6,6 +6,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import crypto from "node:crypto";
+import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { loadStagingEnvFile } from "../../lib/load-staging-env.js";
 import {
@@ -23,6 +24,18 @@ import { evaluateQualificationDecision } from "../../lib/partner-center/qualific
 import { QUALIFICATION_STATES, FRAUD_RISK_LEVELS } from "../../lib/partner-center/constants.js";
 import { releaseSignupBonusOnQualification } from "../../lib/partner-center/qualification-financial-bridge.js";
 import { verifyTurnstileTokenServer } from "../../lib/turnstile-server.js";
+import { setRealVerifiedProfile } from "../hv-pass3-fixture-lib.mjs";
+import { applyStagingPartnerFeatureFlags } from "../hv-abuse-pass2-lib.mjs";
+import {
+  evaluatePartnerRewardEligibility,
+  REWARD_TYPES,
+} from "../../lib/partner-center/partner-reward-eligibility.js";
+import { resolveEffectiveUserClassification, USER_CLASSIFICATION } from "../../lib/user-classification.js";
+import {
+  HUMAN_VERIFICATION_STATUSES,
+  PARTNER_REWARD_ELIGIBILITY_STATUSES,
+  resolveHumanVerificationState,
+} from "../../lib/security/human-verification.js";
 
 const RUN = `r6-staging-${Date.now()}`;
 const ARTIFACT = join(process.cwd(), "scripts/partner-center/.artifacts", `${RUN}.json`);
@@ -45,7 +58,11 @@ function loadStaging() {
   if (process.env.STAGING_SUPABASE_PROJECT_REF === PRODUCTION_SUPABASE_PROJECT_REF) {
     throw new Error("ABORT: staging matches production");
   }
-  if (process.env.STAGING_SUPABASE_PROJECT_REF !== STAGING_SUPABASE_PROJECT_REF) {
+  if (process.env.HV_VALIDATION_TARGET === "isolated") {
+    if (process.env.STAGING_SUPABASE_PROJECT_REF === STAGING_SUPABASE_PROJECT_REF) {
+      throw new Error("ABORT: isolated run mapped to shared staging ref");
+    }
+  } else if (process.env.STAGING_SUPABASE_PROJECT_REF !== STAGING_SUPABASE_PROJECT_REF) {
     throw new Error("ABORT: unexpected staging ref");
   }
   const url = process.env.STAGING_SUPABASE_URL;
@@ -63,9 +80,112 @@ async function partnerBalances(service, partnerId) {
   return data;
 }
 
+async function assertR6FinancialEligibilityPrecondition(service, { partnerId, referredUserId, referralId, referredEmail }) {
+  const [{ data: profile }, authUserResult, eligibility] = await Promise.all([
+    service
+      .from("profiles")
+      .select(
+        "id, email, user_classification, user_classification_source, effective_user_classification, human_verification_status, human_verified_at, partner_reward_eligibility_status, partner_reward_risk_level"
+      )
+      .eq("id", referredUserId)
+      .maybeSingle(),
+    service.auth.admin.getUserById(referredUserId).catch(() => ({ data: { user: null } })),
+    evaluatePartnerRewardEligibility(service, {
+      partnerId,
+      referredUserId,
+      referralId,
+      rewardType: REWARD_TYPES.SIGNUP_BONUS,
+    }),
+  ]);
+  const authUser = authUserResult?.data?.user || null;
+  const effective = resolveEffectiveUserClassification(profile || {}, authUser);
+  const human = resolveHumanVerificationState({
+    humanVerificationStatus: profile?.human_verification_status,
+    emailConfirmedAt: authUser?.email_confirmed_at,
+    turnstileVerified: profile?.human_verification_status === HUMAN_VERIFICATION_STATUSES.VERIFIED,
+  });
+  const ok =
+    human.status === HUMAN_VERIFICATION_STATUSES.VERIFIED &&
+    effective.classification === USER_CLASSIFICATION.REAL &&
+    eligibility.decision !== PARTNER_REWARD_ELIGIBILITY_STATUSES.MANUAL_REVIEW &&
+    eligibility.decision !== PARTNER_REWARD_ELIGIBILITY_STATUSES.BLOCKED;
+  if (!ok) {
+    fail("R6_FIXTURE_ELIGIBILITY_PRECONDITION_FAILED", JSON.stringify({
+      humanVerified: human.status === HUMAN_VERIFICATION_STATUSES.VERIFIED,
+      effectiveClassification: effective.classification,
+      eligibilityDecision: eligibility.decision,
+      eligibilityReasons: eligibility.reasons,
+      profileExists: Boolean(profile?.id),
+      email: referredEmail,
+    }));
+    return false;
+  }
+  pass("R6_fixture_eligibility_precondition");
+  return true;
+}
+
+async function cleanupR6IsolatedFixtures(service, { partnerId, referralId, referredUserId, partnerUserId }) {
+  if (process.env.HV_VALIDATION_TARGET !== "isolated") return { skipped: true };
+  const ref = process.env.STAGING_SUPABASE_PROJECT_REF;
+  const password = process.env.ISOLATED_SUPABASE_DB_PASSWORD;
+  if (ref && password) {
+    const client = new pg.Client({
+      connectionString: `postgresql://postgres.${ref}:${encodeURIComponent(password)}@aws-0-ap-south-1.pooler.supabase.com:6543/postgres`,
+      ssl: { rejectUnauthorized: false },
+    });
+    await client.connect();
+    await client.query("set session_replication_role = replica");
+    try {
+      await client.query(`delete from partner_financial_ledger_entries where partner_id = $1`, [partnerId]);
+      await client.query(`delete from partner_commissions where partner_id = $1`, [partnerId]);
+      await client.query(`delete from partner_referral_qualifications where referral_id = $1`, [referralId]);
+      await client.query(`delete from partner_referral_attributions where referral_id = $1`, [referralId]);
+      await client.query(`delete from partner_referrals where id = $1`, [referralId]);
+      await client.query(`delete from partners where id = $1`, [partnerId]);
+      await client.query(`delete from profiles where id = any($1::uuid[])`, [[referredUserId, partnerUserId]]);
+    } finally {
+      await client.query("set session_replication_role = default");
+      await client.end();
+    }
+  } else {
+    await service.from("partner_commissions").delete().eq("referral_id", referralId);
+    await service.from("partner_referral_qualifications").delete().eq("referral_id", referralId);
+    await service.from("partner_referral_attributions").delete().eq("referral_id", referralId);
+    await service.from("partner_referrals").delete().eq("id", referralId);
+    await service.from("partners").delete().eq("id", partnerId);
+    await service.from("profiles").delete().in("id", [referredUserId, partnerUserId]);
+  }
+  for (const uid of [referredUserId, partnerUserId]) {
+    await service.auth.admin.deleteUser(uid).catch(() => null);
+  }
+  return { cleaned: true };
+}
+
+async function isolatedBusinessBaseline(service) {
+  const counts = await Promise.all([
+    service.from("partners").select("id", { count: "exact", head: true }),
+    service.from("partner_referrals").select("id", { count: "exact", head: true }),
+    service.from("partner_commissions").select("id", { count: "exact", head: true }),
+    service.from("partner_financial_ledger_entries").select("id", { count: "exact", head: true }),
+  ]);
+  return {
+    partners: counts[0].count || 0,
+    partner_referrals: counts[1].count || 0,
+    partner_commissions: counts[2].count || 0,
+    partner_financial_ledger_entries: counts[3].count || 0,
+  };
+}
+
 async function main() {
+  Object.assign(process.env, applyStagingPartnerFeatureFlags(process.env));
   const service = loadStaging();
-  report.environment = { ref: STAGING_SUPABASE_PROJECT_REF, name: "staging" };
+  report.environment = {
+    ref: process.env.STAGING_SUPABASE_PROJECT_REF,
+    name: process.env.HV_VALIDATION_TARGET === "isolated" ? "isolated" : "staging",
+  };
+  if (process.env.HV_VALIDATION_TARGET === "isolated") {
+    report.baselineBeforeR6 = await isolatedBusinessBaseline(service);
+  }
 
   // Schema probes
   const { error: colErr } = await service.from("partner_commissions").select("qualification_credited_at").limit(1);
@@ -263,6 +383,25 @@ async function main() {
     }
   }
 
+  try {
+    await setRealVerifiedProfile(service, referredUserId, { email: referredEmail, runTag: RUN });
+  } catch (err) {
+    fail("qualified_release_once", `profile_fixture:${err?.message || err}`);
+  }
+
+  const preOk = await assertR6FinancialEligibilityPrecondition(service, {
+    partnerId,
+    referredUserId,
+    referralId,
+    referredEmail,
+  });
+  if (!preOk) {
+    report.verdict = "BLOCKED";
+    mkdirSync(join(process.cwd(), "scripts/partner-center/.artifacts"), { recursive: true });
+    writeFileSync(ARTIFACT, JSON.stringify(report, null, 2));
+    process.exit(1);
+  }
+
   const beforeReleasePartner = await partnerBalances(service, partnerId);
   const release1 = await releaseSignupBonusOnQualification(service, { referralId, partnerId });
   const afterRelease1Partner = await partnerBalances(service, partnerId);
@@ -303,6 +442,24 @@ async function main() {
   if (invalid.skipped) pass("turnstile_invalid_denied", "skipped_turnstile_not_configured");
   else if (!invalid.ok) pass("turnstile_invalid_denied");
   else fail("turnstile_invalid_denied");
+
+  report.cleanup = await cleanupR6IsolatedFixtures(service, {
+    partnerId,
+    referralId,
+    referredUserId,
+    partnerUserId,
+  });
+  if (process.env.HV_VALIDATION_TARGET === "isolated") {
+    report.isolatedBaselineAfterCleanup = await isolatedBusinessBaseline(service);
+    const before = report.baselineBeforeR6 || {};
+    const after = report.isolatedBaselineAfterCleanup;
+    const restored = Object.keys(before).every((k) => Number(after[k]) === Number(before[k]));
+    if (!restored) {
+      fail("isolated_baseline_after_r6_cleanup", JSON.stringify({ before, after }));
+    } else {
+      pass("isolated_baseline_after_r6_cleanup", JSON.stringify({ before, after }));
+    }
+  }
 
   report.verdict = report.errors.length ? "BLOCKED" : "PASS";
   mkdirSync(join(process.cwd(), "scripts/partner-center/.artifacts"), { recursive: true });

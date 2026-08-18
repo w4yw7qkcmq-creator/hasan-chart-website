@@ -170,19 +170,6 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const captchaCheck = await verifyTurnstileToken(turnstileToken);
-
-    if (!captchaCheck.ok) {
-      showAppModal({
-        type: "error",
-        title: "فشل التحقق الأمني",
-        message: captchaCheck.error,
-      });
-      setLoading(false);
-      resetTurnstile();
-      return;
-    }
-
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",

@@ -12,10 +12,14 @@ import {
   extractSupabaseProjectRef,
   maskProjectRef,
 } from "../../lib/staging-env-guard.js";
+import { isIsolatedValidationTarget, loadIsolatedHarnessEnv } from "../../lib/isolated-env-guard.js";
 import { parseEnvFile } from "./browser-qa-harness.mjs";
 
 export const FIXTURE_DOMAIN = "staging-hcw.test";
+export const ISOLATED_FIXTURE_DOMAIN = "isolated-hcw.test";
 export const CANONICAL_SUPER_ADMIN_EMAIL = `iam-super-admin@${FIXTURE_DOMAIN}`;
+export const ISOLATED_VALIDATION_ADMIN_EMAIL = `isolated-validation-admin@${ISOLATED_FIXTURE_DOMAIN}`;
+const VALIDATION_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 function maskEmail(email = "") {
   const value = String(email || "").trim();
@@ -56,6 +60,33 @@ export function loadStagingBrowserEnv(root = process.cwd()) {
   }
 
   return env;
+}
+
+function mergeHarnessSecretsOnly(env, root) {
+  const bootstrap = parseEnvFile(`${root}/.env.staging.bootstrap.local`);
+  const stagingSecrets = parseEnvFile(`${root}/.env.staging.local`);
+  const skipKey = (key) =>
+    key.startsWith("STAGING_SUPABASE_") ||
+    key.startsWith("ISOLATED_SUPABASE_") ||
+    key === "NEXT_PUBLIC_SUPABASE_URL" ||
+    key === "NEXT_PUBLIC_SUPABASE_ANON_KEY";
+  for (const [key, value] of Object.entries({ ...stagingSecrets, ...bootstrap })) {
+    if (skipKey(key)) continue;
+    if (env[key] == null || env[key] === "") env[key] = value;
+  }
+  env.NEXT_PUBLIC_SUPABASE_URL = env.STAGING_SUPABASE_URL;
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY = env.STAGING_SUPABASE_ANON_KEY;
+  env.SUPABASE_SERVICE_ROLE_KEY = env.STAGING_SUPABASE_SERVICE_ROLE_KEY;
+  return env;
+}
+
+/** Target-aware browser/dev env — isolated keeps Supabase refs from isolated harness only. */
+export function loadValidationBrowserEnv(root = process.cwd()) {
+  if (isIsolatedValidationTarget()) {
+    loadIsolatedHarnessEnv(root);
+    return mergeHarnessSecretsOnly({ ...process.env }, root);
+  }
+  return loadStagingBrowserEnv(root);
 }
 
 export function createStagingServiceClient(env) {
@@ -355,6 +386,131 @@ export async function resolveStagingAdminCredentials(env, report = {}) {
     throw new Error("staging_admin_auth_resolution_failed");
   }
   return { ...temp, attempts };
+}
+
+/** Isolated/staging canonical validation super-admin — creates real IAM authority, no staging UUID copy. */
+export async function ensureValidationSuperAdminFixture(service, env, report = {}) {
+  const { ensureValidationIamReferenceBaseline } = await import("../partner-center/r8-staging-harness-lib.mjs");
+  await ensureValidationIamReferenceBaseline(service);
+
+  const email = isIsolatedValidationTarget() ? ISOLATED_VALIDATION_ADMIN_EMAIL : CANONICAL_SUPER_ADMIN_EMAIL;
+  const password = resolveTestPassword(env);
+  const meta = {
+    e2e: true,
+    iam_test: true,
+    validation_admin: true,
+    isolated_validation: isIsolatedValidationTarget(),
+    persistent_reference_identity: true,
+  };
+
+  const { data: list } = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  let user = list?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  let created = false;
+
+  if (!user) {
+    const createdResult = await service.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: meta,
+    });
+    if (createdResult.error) throw createdResult.error;
+    user = createdResult.data.user;
+    created = true;
+  } else {
+    await service.auth.admin.updateUserById(user.id, {
+      password,
+      email_confirm: true,
+      user_metadata: meta,
+    });
+  }
+
+  await service.from("profiles").upsert({
+    id: user.id,
+    email,
+    username: email.split("@")[0],
+    role: "user",
+    admin_role: null,
+  });
+
+  const roleId = "admin";
+  const { data: active } = await service
+    .from("iam_user_assignments")
+    .select("id,organization_id,role_id")
+    .eq("user_id", user.id)
+    .eq("role_id", roleId)
+    .is("revoked_at", null)
+    .maybeSingle();
+
+  if (!active) {
+    await service.from("iam_user_assignments").delete().eq("user_id", user.id);
+    await service.from("iam_user_assignments").insert({
+      user_id: user.id,
+      role_id: roleId,
+      organization_id: VALIDATION_ORG_ID,
+      grant_reason: "validation-admin-fixture",
+    });
+  } else if (active.organization_id !== VALIDATION_ORG_ID) {
+    await service
+      .from("iam_user_assignments")
+      .update({ organization_id: VALIDATION_ORG_ID })
+      .eq("id", active.id);
+  }
+
+  report.validationAdminFixture = {
+    method: created ? "created_validation_admin_fixture" : "reused_validation_admin_fixture",
+    maskedEmail: maskEmail(email),
+    userId: user.id,
+    role: roleId,
+    organizationId: VALIDATION_ORG_ID,
+    persistentReferenceIdentity: true,
+    stagingOwnerEmailUsed: false,
+    stagingUuidCopied: false,
+  };
+
+  return {
+    userId: user.id,
+    email,
+    password,
+    role: roleId,
+    organizationId: VALIDATION_ORG_ID,
+    created,
+    preExisting: !created,
+    cleanup: false,
+  };
+}
+
+/** Target-aware admin resolution — isolated uses validation fixture, staging keeps legacy path. */
+export async function resolveValidationAdminCredentials(env, report = {}) {
+  if (isIsolatedValidationTarget()) {
+    const service = createStagingServiceClient(env);
+    const fixture = await ensureValidationSuperAdminFixture(service, env, report);
+    const login = await tryPasswordLogin(env, fixture.email, fixture.password);
+    const attempts = [
+      {
+        kind: "isolated_validation_admin",
+        maskedEmail: maskEmail(fixture.email),
+        ok: login.ok,
+        error: login.error,
+      },
+    ];
+    if (!login.ok) {
+      report.attempts = attempts;
+      throw new Error("validation_admin_auth_resolution_failed");
+    }
+    report.resolution = {
+      method: "isolated_validation_admin_fixture",
+      maskedEmail: maskEmail(fixture.email),
+      userId: fixture.userId,
+      role: fixture.role,
+      organizationId: fixture.organizationId,
+      created: fixture.created,
+      preExisting: fixture.preExisting,
+      stagingOwnerEmailUsed: false,
+    };
+    return { ...fixture, attempts };
+  }
+  return resolveStagingAdminCredentials(env, report);
 }
 
 export async function cleanupTemporaryClosureAdmin(env, session) {

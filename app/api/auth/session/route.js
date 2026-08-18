@@ -189,11 +189,24 @@ export async function GET() {
     }
 
     if (resolved.user.email_confirmed_at) {
+      const admin = getSupabaseAdmin();
       scheduleReferralQualificationReevaluation(
-        getSupabaseAdmin(),
+        admin,
         resolved.user.id,
         "session_email_confirmed"
       );
+      try {
+        const { syncHumanVerificationFromEmail } = await import(
+          "../../../../lib/security/human-verification.js"
+        );
+        await syncHumanVerificationFromEmail(
+          admin,
+          resolved.user.id,
+          resolved.user.email_confirmed_at
+        );
+      } catch {
+        /* non-blocking */
+      }
     }
 
     return buildSessionResponse(resolved);

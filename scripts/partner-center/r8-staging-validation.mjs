@@ -14,7 +14,6 @@ import {
   applyTestHooksMigration,
   runStagingSql,
   partnerBalances,
-  initFixturePool,
   signInJwt,
   restoreIamSnapshot,
   setQualState,
@@ -37,11 +36,30 @@ import {
   assertNoFraudPollution,
   assertCommissionRpc,
   armStagingFailureInjection,
+  resetPartnerCenterStagingTestFlags,
   initFixtureRegistry,
   trackTierPartner,
+  setCommissionRegistry,
+  clearCommissionRegistry,
   snapshotVipSignalRule,
   restoreVipSignalRule,
   clearStagingFailureFlags,
+  ensurePartnerTierBaseline,
+  ensureR8CommissionRuleBaseline,
+  ensureUniqueProfileEmailOwner,
+  purgeActiveR8StagingFixturesScoped,
+  assertScenarioFixtureBaseline,
+  runR8FixturePreflight,
+  getR8FixtureDomain,
+  purgeOrphanAuthIdentitiesForHarnessPatterns,
+  listCurrentRunOrphanCommissions,
+  maskPartnerId,
+  capturePartnerATraceSnapshot,
+  auditCommissionRegistry,
+  traceCommissionLifecycle,
+  analyzePartnerATraceTimeline,
+  registerCommissionCreatedByProductHook,
+  computeCommissionEconomicExposure,
   R8_DEV_PORT,
   FIXTURE_DOMAIN,
 } from "./r8-staging-harness-lib.mjs";
@@ -55,19 +73,48 @@ import {
   attachPageObservers,
   sleep,
   loadEnv,
+  bootstrapSession,
+  verifyIamMe,
+  waitForAdminPartnerCommissionsSurface,
 } from "../iam/browser-qa-harness.mjs";
+import { applyStagingPartnerFeatureFlags } from "../hv-abuse-pass2-lib.mjs";
+import { applyIsolatedDevServerSupabaseEnv, isIsolatedValidationTarget } from "../../lib/isolated-env-guard.js";
 
-const RUN_ID = `r8_${Date.now()}`;
+const RUN_ID = process.env.HV_R8_RUN_ID || `r8_${Date.now()}`;
+const FORENSIC_MODE = process.env.HV_R8_FORENSIC_MODE === "1";
+const FIN_BEFORE_ISO = process.env.HV_R8_FIN_BEFORE_ISO || null;
+const PARTNERA_TRACE = process.env.HV_R8_PARTNERA_TRACE === "1";
+const STOP_AFTER = process.env.HV_R8_STOP_AFTER || null;
+const FOCUS_COMMISSION_IDS = [
+  "907792de-9b6c-4e42-b189-c1265d6231cd",
+  "b121e3df-ce31-4cd4-9c3e-0fb9d876e23a",
+  "6083128d-ee08-4401-b686-45f077e9b57a",
+];
 const ARTIFACT = join(process.cwd(), "scripts/partner-center/.artifacts", `r8-manifest-${RUN_ID}.json`);
 const BASE = `http://127.0.0.1:${R8_DEV_PORT}`;
 
 const results = [];
+const partnerATrace = [];
+let partnerAFinBefore = null;
 let devServer = null;
 let ctx = {};
+
+const BASELINE_CATEGORIES = new Set([
+  "service",
+  "refund",
+  "failure",
+  "idempotency",
+  "concurrency",
+  "tier",
+  "qualification",
+]);
 
 async function scenario(def) {
   const start = Date.now();
   try {
+    if (BASELINE_CATEGORIES.has(def.category) && ctx.service && ctx.fx) {
+      await assertScenarioFixtureBaseline(ctx.service, ctx.fx, def.id);
+    }
     const evidence = await def.run(ctx);
     const row = {
       id: def.id,
@@ -79,6 +126,18 @@ async function scenario(def) {
     };
     results.push(row);
     console.log(`${row.status} ${def.id} ${def.name}${row.status === "N/A" ? "" : ""}`);
+    if (PARTNERA_TRACE && ctx.fx?.partnerAId && ctx.service) {
+      partnerATrace.push({
+        ...(await capturePartnerATraceSnapshot(ctx.service, ctx.fx.partnerAId, def.id, {
+          finBeforeIso: ctx.finBeforeIso,
+          registryCommissionIds: ctx.fixtureRegistry?.commissionIds || [],
+          focusCommissionIds: FOCUS_COMMISSION_IDS,
+        })),
+        scenarioId: def.id,
+        scenarioName: def.name,
+        status: row.status,
+      });
+    }
     return row;
   } catch (err) {
     const row = {
@@ -91,7 +150,20 @@ async function scenario(def) {
     };
     results.push(row);
     console.error(`FAIL ${def.id} ${def.name}: ${row.error}`);
-    throw err;
+    if (PARTNERA_TRACE && ctx.fx?.partnerAId && ctx.service) {
+      partnerATrace.push({
+        ...(await capturePartnerATraceSnapshot(ctx.service, ctx.fx.partnerAId, def.id, {
+          finBeforeIso: ctx.finBeforeIso,
+          registryCommissionIds: ctx.fixtureRegistry?.commissionIds || [],
+          focusCommissionIds: FOCUS_COMMISSION_IDS,
+        })),
+        scenarioId: def.id,
+        scenarioName: def.name,
+        status: row.status,
+        error: row.error,
+      });
+    }
+    return row;
   }
 }
 
@@ -731,7 +803,12 @@ async function registerRemainingScenarios() {
       name: "trusted_db_price_authoritative",
       category: "tamper",
       run: async ({ service, fx }) => {
+        await ensurePartnerTierBaseline(service, fx.partnerAId, "partner");
+        await ensureR8CommissionRuleBaseline(service);
+        await ensureUniqueProfileEmailOwner(service, fx.referredQualifiedId, fx.emails.referredQualified);
         await setQualState(service, fx.refQualifiedId, fx.partnerAId, QUALIFICATION_STATES.QUALIFIED);
+        const registryCountBefore = ctx.fixtureRegistry?.commissionIds?.length || 0;
+        const scenarioStartedAt = new Date().toISOString();
         const { onPartnerGenericServiceActivated } = await import("../../lib/partner-service-hooks.js");
         const sub = await insertSubscription(service, {
           userEmail: fx.emails.referredQualified,
@@ -747,14 +824,44 @@ async function registerRemainingScenarios() {
           reason: "tamper test",
         });
         assert.equal(result.created, true);
+        const hookCommission = await registerCommissionCreatedByProductHook(service, {
+          scenarioId: "R8-042",
+          runId: RUN_ID,
+          partnerId: fx.partnerAId,
+          sourceType: "vip_subscription",
+          sourceId: String(sub.id),
+          serviceType: "vip_signal",
+          createdAfter: scenarioStartedAt,
+          expectedAmount: 10,
+          referredUserId: fx.referredQualifiedId,
+        });
+        assert.equal(ctx.fixtureRegistry.commissionIds.length, registryCountBefore + 1);
+        assert.ok(ctx.fixtureRegistry.commissionIds.includes(hookCommission.id));
+        assert.ok(
+          ctx.fixtureRegistry.hookCommissionRecords.some(
+            (row) => row.commissionId === hookCommission.id && row.scenarioId === "R8-042"
+          )
+        );
+        const exposure = await computeCommissionEconomicExposure(service, hookCommission.id);
+        assert.equal(exposure.ledgerNet, 10);
+        assert.equal(exposure.activeAmount, 10);
+        assert.equal(exposure.economicallyActive, true);
         const { data: comm } = await service
           .from("partner_commissions")
-          .select("amount, base_amount")
-          .eq("source_id", String(sub.id))
-          .maybeSingle();
+          .select("amount, base_amount, id, source_id, idempotency_key")
+          .eq("id", hookCommission.id)
+          .single();
         assert.equal(Number(comm?.base_amount), 100);
         assert.equal(Number(comm?.amount), 10);
-        return { base_amount: comm?.base_amount, amount: comm?.amount };
+        return {
+          base_amount: comm?.base_amount,
+          amount: comm?.amount,
+          hookCommissionId: hookCommission.id,
+          registered: true,
+          registryCount: ctx.fixtureRegistry.commissionIds.length,
+          ledgerNet: exposure.ledgerNet,
+          activeAmount: exposure.activeAmount,
+        };
       },
     },
     {
@@ -764,7 +871,7 @@ async function registerRemainingScenarios() {
       run: async ({ service, fx }) => {
         await setQualState(service, fx.refQualifiedId, fx.partnerAId, QUALIFICATION_STATES.QUALIFIED);
         const sub = await insertSubscription(service, {
-          userEmail: `r8-own-${RUN_ID}@${FIXTURE_DOMAIN}`,
+          userEmail: `r8-own-${RUN_ID}@${getR8FixtureDomain()}`,
           price: "$100",
           runTag: `${RUN_ID}-own`,
         });
@@ -894,13 +1001,14 @@ async function registerRemainingScenarios() {
           referredUserId: fx.referredQualifiedId,
           runId: RUN_ID,
         }, { sourceId: `forex-${RUN_ID}`, serviceType: "vip_forex", baseAmount: 100 });
-        assert.equal(rpc.data?.created, true);
+        const data = assertCommissionRpc(rpc, "vip_forex_e2e");
+        assert.equal(data.created, true);
         const { count: ledgerCount } = await service
           .from("partner_financial_ledger_entries")
           .select("id", { count: "exact", head: true })
-          .eq("legacy_commission_id", rpc.data.commission_id);
+          .eq("legacy_commission_id", data.commission_id);
         assert.equal(ledgerCount, 1);
-        return { commissionId: rpc.data.commission_id, ledgerCount };
+        return { commissionId: data.commission_id, ledgerCount };
       },
     },
     {
@@ -957,6 +1065,7 @@ async function registerRemainingScenarios() {
       name: "full_refund_reversal",
       category: "refund",
       run: async ({ service, fx }) => {
+        await ensurePartnerTierBaseline(service, fx.partnerAId, "partner");
         await setQualState(service, fx.refQualifiedId, fx.partnerAId, QUALIFICATION_STATES.QUALIFIED);
         const rpc = await createCommissionRpc(service, {
           partnerId: fx.partnerAId,
@@ -1143,6 +1252,7 @@ async function registerRemainingScenarios() {
       name: "failure_injection_create_rollback",
       category: "failure",
       run: async ({ service, fx }) => {
+        await resetPartnerCenterStagingTestFlags(service);
         await service.rpc("create_partner_commission_atomic_test_fail", { p_fail_after: "commission" });
         await armStagingFailureInjection(service, "create", "commission");
         const sourceId = `failc-${RUN_ID}`;
@@ -1161,6 +1271,7 @@ async function registerRemainingScenarios() {
         );
         const after = await service.from("partner_commissions").select("id", { count: "exact", head: true }).eq("source_id", canonicalSourceId);
         assert.equal(after.count, before.count);
+        await resetPartnerCenterStagingTestFlags(service);
         return { rolledBack: true };
       },
     },
@@ -1169,6 +1280,7 @@ async function registerRemainingScenarios() {
       name: "failure_injection_create_retry_once",
       category: "failure",
       run: async ({ service, fx }) => {
+        await resetPartnerCenterStagingTestFlags(service);
         const sourceId = `failc2-${RUN_ID}`;
         const canonicalSourceId = toCommissionSourceId(sourceId);
         await service.rpc("create_partner_commission_atomic_test_fail", { p_fail_after: "commission" });
@@ -1188,6 +1300,7 @@ async function registerRemainingScenarios() {
         assert.equal(ok.data?.created, true, ok.error?.message || ok.data?.error || "retry_failed");
         const { count } = await service.from("partner_commissions").select("id", { count: "exact", head: true }).eq("source_id", canonicalSourceId);
         assert.equal(count, 1);
+        await resetPartnerCenterStagingTestFlags(service);
         return { commissionCount: 1 };
       },
     },
@@ -1196,6 +1309,7 @@ async function registerRemainingScenarios() {
       name: "failure_injection_reversal_rollback",
       category: "failure",
       run: async ({ service, fx }) => {
+        await resetPartnerCenterStagingTestFlags(service);
         const rpc = await createCommissionRpc(service, {
           partnerId: fx.partnerAId,
           referralId: fx.refQualifiedId,
@@ -1225,6 +1339,7 @@ async function registerRemainingScenarios() {
           .select("id", { count: "exact", head: true })
           .eq("commission_id", cid);
         assert.equal(afterRev, beforeRev);
+        await resetPartnerCenterStagingTestFlags(service);
         return { reversalRows: afterRev };
       },
     },
@@ -1233,6 +1348,7 @@ async function registerRemainingScenarios() {
       name: "failure_injection_reversal_retry_once",
       category: "failure",
       run: async ({ service, fx }) => {
+        await resetPartnerCenterStagingTestFlags(service);
         const rpc = await createCommissionRpc(service, {
           partnerId: fx.partnerAId,
           referralId: fx.refQualifiedId,
@@ -1262,6 +1378,7 @@ async function registerRemainingScenarios() {
           .select("id", { count: "exact", head: true })
           .eq("commission_id", cid);
         assert.equal(count, 1);
+        await resetPartnerCenterStagingTestFlags(service);
         return { reversalCount: count };
       },
     }
@@ -1374,7 +1491,7 @@ async function registerRemainingScenarios() {
           referralId: fx.refQualifiedId,
           referredUserId: fx.referredQualifiedId,
           runId: RUN_ID,
-        }, { sourceId: `cancel-${RUN_ID}`, serviceType: "vip_signal", baseAmount: 100 });
+        }, { sourceId: `cancel-${RUN_ID}`, serviceType: "vip_signal", baseAmount: 100, scenarioId: "R8-070" });
         const cid = rpc.data.commission_id;
         const { count: before } = await service
           .from("partner_service_commission_reversals")
@@ -1383,6 +1500,17 @@ async function registerRemainingScenarios() {
         assert.equal(before, 0);
         const { data: comm } = await service.from("partner_commissions").select("status, amount_reversed").eq("id", cid).single();
         assert.equal(Number(comm.amount_reversed || 0), 0);
+        if (PARTNERA_TRACE && ctx.fixtureRegistry && ctx.fx?.partnerAId) {
+          const traceSnap = await capturePartnerATraceSnapshot(service, fx.partnerAId, "R8-070-ownership", {
+            finBeforeIso: ctx.finBeforeIso,
+            registryCommissionIds: ctx.fixtureRegistry.commissionIds || [],
+          });
+          assert.equal(
+            traceSnap.metrics.commissionRowCount,
+            traceSnap.metrics.registryRowCount,
+            `row_registry_gap:${traceSnap.metrics.commissionRowCount} vs ${traceSnap.metrics.registryRowCount}`
+          );
+        }
         return { reversals: before, status: comm.status };
       },
     }
@@ -1518,20 +1646,61 @@ async function registerRemainingScenarios() {
       id: "R8-077",
       name: "admin_browser_desktop",
       category: "browser",
-      run: async ({ browser, sessions, fx }) => {
+      run: async ({ browser, fx }) => {
         const pageCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
         const page = await pageCtx.newPage();
-        const obs = attachPageObservers(page, { consoleErrors: [], pageErrors: [] });
-        await loginViaSupabase(pageCtx, ctx.envBundle.env, BASE, fx.emails.superAdmin, fx.password);
-        await page.goto(`${BASE}/admin/partner-marketing`, { waitUntil: "domcontentloaded" });
-        await sleep(2500);
-        await page.click('button:has-text("عمولات الخدمات")').catch(() => null);
-        await sleep(1500);
-        const body = await page.textContent("body");
-        assert.ok(body?.includes("عمولات") || body?.includes("VIP"));
-        assert.equal(obs.pageErrors.length, 0);
+        const obs = attachPageObservers(page, {
+          consoleErrors: [],
+          pageErrors: [],
+          networkFailures: [],
+        });
+        const loginStats = await loginViaSupabase(
+          pageCtx,
+          ctx.envBundle.env,
+          BASE,
+          fx.emails.superAdmin,
+          fx.password
+        );
+        const boot = await bootstrapSession(page, BASE, { expectedIsAdmin: true });
+        assert.ok(boot.ok, boot.error || JSON.stringify(boot.me?.body || boot.me));
+
+        const navStart = Date.now();
+        await page.goto(`${BASE}/admin/partners?tab=commissions`, {
+          waitUntil: "domcontentloaded",
+          timeout: 60000,
+        });
+        assert.ok(page.url().includes("/admin/partners"), `unexpected_url:${page.url()}`);
+        assert.ok(!page.url().includes("/login"), `auth_redirect:${page.url()}`);
+        assert.ok(!page.url().includes("/403"), `forbidden:${page.url()}`);
+
+        const me = await verifyIamMe(page, { expectedIsAdmin: true, timeoutMs: 15000 });
+        assert.ok(me.ok, JSON.stringify(me));
+
+        const surface = await waitForAdminPartnerCommissionsSurface(page, { timeoutMs: 45000 });
+        assert.ok(
+          surface.ok,
+          `${surface.error || "surface_not_ready"}:${JSON.stringify(surface.diagnostics || {})}`
+        );
+
+        const unexpectedNetwork = obs.networkFailures.filter(
+          (f) => f.status === 401 || f.status >= 500
+        );
+        assert.equal(obs.pageErrors.length, 0, obs.pageErrors.join("; "));
+        assert.equal(unexpectedNetwork.length, 0, JSON.stringify(unexpectedNetwork));
+
+        const evidence = {
+          loaded: true,
+          finalUrl: surface.diagnostics.finalUrl,
+          selector: surface.selector,
+          renderWaitMs: surface.renderWaitMs,
+          navWaitMs: Date.now() - navStart,
+          serviceTableRows: surface.diagnostics.serviceTableRows,
+          consoleErrors: obs.consoleErrors.length,
+          networkFailures: obs.networkFailures.length,
+          loginStats,
+        };
         await pageCtx.close();
-        return { loaded: true, consoleErrors: obs.consoleErrors.length };
+        return evidence;
       },
     },
     {
@@ -1539,10 +1708,12 @@ async function registerRemainingScenarios() {
       name: "admin_browser_mobile_themes",
       category: "browser",
       run: async ({ browser, fx }) => {
+        const loginStats = [];
         for (const theme of ["light", "dark"]) {
           const pageCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
           const page = await pageCtx.newPage();
-          await loginViaSupabase(pageCtx, ctx.envBundle.env, BASE, fx.emails.superAdmin, fx.password);
+          const stats = await loginViaSupabase(pageCtx, ctx.envBundle.env, BASE, fx.emails.superAdmin, fx.password);
+          loginStats.push({ theme, ...stats });
           await page.goto(`${BASE}/admin/partner-marketing`, { waitUntil: "domcontentloaded" });
           await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
           await sleep(1500);
@@ -1550,7 +1721,7 @@ async function registerRemainingScenarios() {
           assert.equal(overflow, false);
           await pageCtx.close();
         }
-        return { themes: ["light", "dark"], mobile: true };
+        return { themes: ["light", "dark"], mobile: true, loginStats };
       },
     },
     {
@@ -1561,14 +1732,14 @@ async function registerRemainingScenarios() {
         const pageCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
         const page = await pageCtx.newPage();
         const obs = attachPageObservers(page, { consoleErrors: [], pageErrors: [] });
-        await loginViaSupabase(pageCtx, ctx.envBundle.env, BASE, fx.emails.partnerA, fx.password);
+        const loginStats = await loginViaSupabase(pageCtx, ctx.envBundle.env, BASE, fx.emails.partnerA, fx.password);
         await page.goto(`${BASE}/partner-center`, { waitUntil: "domcontentloaded" });
         await sleep(2500);
         const body = await page.textContent("body");
         assert.ok(body?.includes("مركز") || body?.includes("Partner"));
         assert.ok(!body?.includes("use_partner_tier"));
         await pageCtx.close();
-        return { loaded: true, pageErrors: obs.pageErrors.length };
+        return { loaded: true, pageErrors: obs.pageErrors.length, loginStats };
       },
     },
     {
@@ -1578,12 +1749,12 @@ async function registerRemainingScenarios() {
       run: async ({ browser, fx }) => {
         const pageCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
         const page = await pageCtx.newPage();
-        await loginViaSupabase(pageCtx, ctx.envBundle.env, BASE, fx.emails.partnerA, fx.password);
+        const loginStats = await loginViaSupabase(pageCtx, ctx.envBundle.env, BASE, fx.emails.partnerA, fx.password);
         await page.goto(`${BASE}/partner-center`, { waitUntil: "domcontentloaded" });
         await page.evaluate(() => document.documentElement.setAttribute("dir", "rtl"));
         await sleep(1500);
         await pageCtx.close();
-        return { mobile: true, rtl: true };
+        return { mobile: true, rtl: true, loginStats };
       },
     }
   );
@@ -1627,11 +1798,16 @@ async function registerRemainingScenarios() {
       id: "R8-089",
       name: "staging_reconciliation_match",
       category: "reconciliation",
-      run: async ({ service, baseline }) => {
+      run: async ({ service, baseline, fx }) => {
+        await cleanupRunFixtures(service, RUN_ID, fx, ctx.fixtureRegistry, ctx.runStartedAt, {
+          forensicMode: ctx.forensicMode,
+          finBeforeIso: ctx.finBeforeIso,
+        });
         const after = await snapshotFinancialBaseline(service);
         const deltaComm = after.commissionCount - baseline.commissionCount;
         const deltaLedger = after.ledgerCount - baseline.ledgerCount;
-        assert.ok(deltaComm >= 0 && deltaLedger >= 0);
+        assert.equal(deltaComm, 0, `commission_count_delta=${deltaComm}`);
+        assert.equal(deltaLedger, 0, `ledger_count_delta=${deltaLedger}`);
         ctx.fixtureDelta = { deltaComm, deltaLedger };
         return { baseline, after, fixtureDelta: ctx.fixtureDelta };
       },
@@ -1641,18 +1817,33 @@ async function registerRemainingScenarios() {
       name: "cleanup_zero_orphan_fixtures",
       category: "cleanup",
       run: async ({ service, fx }) => {
-        await cleanupRunFixtures(service, RUN_ID, fx, ctx.fixtureRegistry, ctx.runStartedAt);
+        await cleanupRunFixtures(service, RUN_ID, fx, ctx.fixtureRegistry, ctx.runStartedAt, {
+          forensicMode: ctx.forensicMode,
+          finBeforeIso: ctx.finBeforeIso,
+        });
         const partnerIds = [
           ...(fx.cleanupIds?.partnerIds || []),
           ...(ctx.fixtureRegistry?.tierPartnerIds || []),
         ];
+        const orphanSince = ctx.finBeforeIso || ctx.runStartedAt;
+        const orphans = await listCurrentRunOrphanCommissions(service, {
+          partnerIds,
+          sinceIso: orphanSince,
+          registryCommissionIds: ctx.fixtureRegistry?.commissionIds || [],
+        });
         const { count } = await service
           .from("partner_commissions")
           .select("id", { count: "exact", head: true })
           .in("partner_id", partnerIds)
-          .gte("created_at", ctx.runStartedAt);
+          .gte("created_at", orphanSince);
+        assert.equal(orphans.length, 0, JSON.stringify(orphans.slice(0, 3)));
         assert.equal(count, 0);
-        return { orphanCommissions: count, partnerScope: partnerIds.length };
+        return {
+          orphanCommissions: count,
+          orphanExposureCount: orphans.length,
+          partnerScope: partnerIds.length,
+          orphanSince,
+        };
       },
     }
   );
@@ -1660,16 +1851,61 @@ async function registerRemainingScenarios() {
 
 async function main() {
   assertStagingGuard();
+  Object.assign(process.env, applyStagingPartnerFeatureFlags(process.env));
   await applyTestHooksMigration();
 
   const service = serviceClient();
+  await clearStagingFailureFlags(service);
+  const preCleanupReport = {};
+  if (!FORENSIC_MODE) {
+    if (process.env.HV_VALIDATION_TARGET === "isolated") {
+      preCleanupReport.orphanIdentityPurge = await purgeOrphanAuthIdentitiesForHarnessPatterns().catch((err) => ({
+        deleted: 0,
+        error: String(err?.message || err),
+      }));
+    }
+    await purgeActiveR8StagingFixturesScoped(service, preCleanupReport);
+  } else {
+    preCleanupReport.skipped = true;
+    preCleanupReport.reason = "forensic_mode_historical_precleanup_external";
+  }
+  await ensureR8CommissionRuleBaseline(service);
+
+  if (process.env.R8_PREFLIGHT_ONLY === "1") {
+    const fixturePreflight = await runR8FixturePreflight(service, RUN_ID);
+    console.log(JSON.stringify(fixturePreflight.structured, null, 2));
+    process.exit(fixturePreflight.ok ? 0 : 1);
+  }
+
   const cfg = assertStagingGuard();
   const anon = (await import("@supabase/supabase-js")).createClient(cfg.url, cfg.anonKey, {
     auth: { persistSession: false },
   });
 
   const baseline = await snapshotFinancialBaseline(service);
-  const fx = await initFixturePool(service, RUN_ID);
+  const fixturePreflight = await runR8FixturePreflight(service, RUN_ID);
+  console.log(JSON.stringify(fixturePreflight.structured, null, 2));
+  const fx = fixturePreflight.fx;
+  if (PARTNERA_TRACE) {
+    partnerAFinBefore = await partnerBalances(service, fx.partnerAId);
+    partnerATrace.push({
+      label: "finBefore",
+      capturedAt: new Date().toISOString(),
+      partnerId: fx.partnerAId,
+      partner: partnerAFinBefore,
+      commissions: [],
+      registryCommissionIds: [],
+      metrics: {
+        activeCommissionExposure: 0,
+        ledgerNetSum: 0,
+        commissionRowCount: 0,
+        registryRowCount: 0,
+      },
+      scenarioId: "finBefore",
+      scenarioName: "measurement_window_start",
+      status: "BASELINE",
+    });
+  }
 
   const sessions = {
     superAdmin: await signInJwt(cfg.url, cfg.anonKey, fx.emails.superAdmin, fx.password),
@@ -1680,6 +1916,10 @@ async function main() {
   };
 
   const envBundle = loadEnv(process.cwd());
+  Object.assign(envBundle.env, applyStagingPartnerFeatureFlags(envBundle.env));
+  if (isIsolatedValidationTarget()) {
+    Object.assign(envBundle.env, applyIsolatedDevServerSupabaseEnv(envBundle.env));
+  }
   envBundle.env.PARTNER_ADMIN_MARKETING = "true";
   envBundle.env.NEXT_PUBLIC_PARTNER_ADMIN_MARKETING = "true";
   envBundle.env.IAM_DB = "true";
@@ -1699,6 +1939,8 @@ async function main() {
     fx,
     anon,
     sessions,
+    forensicMode: FORENSIC_MODE,
+    finBeforeIso: FIN_BEFORE_ISO,
     partnerAClient: sessions.partnerA.userClient,
     baseline,
     browser,
@@ -1707,6 +1949,7 @@ async function main() {
     runStartedAt,
     fixtureRegistry: initFixtureRegistry(),
   };
+  setCommissionRegistry(ctx.fixtureRegistry, { trace: Boolean(process.env.R8_COMMISSION_TRACE) });
 
   registerRpcAclScenarios();
   registerJwtScenarios();
@@ -1733,14 +1976,20 @@ async function main() {
     } catch (e) {
       failures.push({ id: entry.id, error: String(e?.message || e) });
     }
+    if (STOP_AFTER && entry.id === STOP_AFTER) break;
   }
   const fatal = failures.length ? failures[0] : null;
 
   try {
     await restoreIamSnapshot(service, fx.iamSnapshot);
-    await cleanupRunFixtures(service, RUN_ID, fx, ctx.fixtureRegistry, ctx.runStartedAt);
+    await cleanupRunFixtures(service, RUN_ID, fx, ctx.fixtureRegistry, ctx.runStartedAt, {
+      forensicMode: ctx.forensicMode,
+      finBeforeIso: ctx.finBeforeIso,
+    });
   } catch (cleanupErr) {
     console.error("cleanup warning", cleanupErr?.message || cleanupErr);
+  } finally {
+    clearCommissionRegistry();
   }
   if (devServer) stopDevServer(devServer);
   await browser.close();
@@ -1753,6 +2002,7 @@ async function main() {
 
   const report = {
     runId: RUN_ID,
+    preCleanup: preCleanupReport,
     manifestLength: MANIFEST.length,
     passed,
     failed,
@@ -1760,6 +2010,12 @@ async function main() {
     executed,
     REAL_EXECUTED_COUNT,
     results,
+    partnerATrace: PARTNERA_TRACE
+      ? analyzePartnerATraceTimeline(partnerATrace, {
+          finBeforePartner: partnerAFinBefore,
+          focusCommissionIds: FOCUS_COMMISSION_IDS,
+        })
+      : null,
     gate: {
       manifest90: MANIFEST.length === 90,
       passPlusNA: passed + validNA === 90,
@@ -1767,6 +2023,22 @@ async function main() {
       noPending: true,
     },
     fatal: fatal ? String(fatal.message || fatal) : null,
+    commissionTrace: ctx.fixtureRegistry?.commissionTrace || [],
+    commissionRegistryIds: ctx.fixtureRegistry?.commissionIds || [],
+    fixtureRegistry: {
+      commissionIds: ctx.fixtureRegistry?.commissionIds || [],
+      tierPartnerIds: ctx.fixtureRegistry?.tierPartnerIds || [],
+      hookCommissionRecords: ctx.fixtureRegistry?.hookCommissionRecords || [],
+    },
+    fixturePreflight: {
+      ok: fixturePreflight.ok,
+      fraudHigh: fixturePreflight.fraudHigh,
+      maxAuthPagesScanned: fixturePreflight.maxAuthPagesScanned,
+    },
+    runStartedAt: ctx.runStartedAt,
+    finBeforeIso: ctx.finBeforeIso,
+    fxPartnerIds: fx.cleanupIds?.partnerIds || [],
+    forensicMode: FORENSIC_MODE,
   };
 
   mkdirSync(join(process.cwd(), "scripts/partner-center/.artifacts"), { recursive: true });

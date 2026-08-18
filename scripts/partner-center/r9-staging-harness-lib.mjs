@@ -24,6 +24,9 @@ import {
   snapshotFinancialBaseline,
   captureRunStartedAt,
   FIXTURE_DOMAIN,
+  getR8FixtureDomain,
+  ensureValidationIamReferenceBaseline,
+  purgeOrphanAuthIdentitiesForHarnessPatterns,
 } from "./r8-staging-harness-lib.mjs";
 import {
   mapWizardPayloadToCampaignInput,
@@ -49,17 +52,71 @@ export function serviceClient() {
   return r8ServiceClient();
 }
 
+export function getR9FixtureDomain() {
+  return getR8FixtureDomain();
+}
+
+export async function runR9FixturePreflight(service, runId) {
+  const iamReference = await ensureValidationIamReferenceBaseline(service);
+  await purgeOrphanAuthIdentitiesForHarnessPatterns().catch(() => null);
+
+  const requiredPermissions = ["partners.campaigns.read", "partners.campaigns.manage", "dashboard.read"];
+  for (const permission_id of requiredPermissions) {
+    const { data, error } = await service.from("iam_permissions").select("id").eq("id", permission_id).maybeSingle();
+    if (error) throw new Error(`R9_IAM_FIXTURE_PREFLIGHT_FAILED:permission_lookup:${permission_id}:${error.message}`);
+    if (!data?.id) {
+      throw new Error(`R9_IAM_FIXTURE_PREFLIGHT_FAILED:missing_permission:${permission_id}`);
+    }
+  }
+
+  await ensureIamRole(service, "r9_campaigns_read_probe", "R9 Campaigns Read Probe", [
+    "dashboard.read",
+    "partners.campaigns.read",
+  ]);
+  await ensureIamRole(service, "r9_campaigns_manage_probe", "R9 Campaigns Manage Probe", [
+    "dashboard.read",
+    "partners.campaigns.read",
+    "partners.campaigns.manage",
+  ]);
+
+  const { count: readBindings } = await service
+    .from("iam_role_permissions")
+    .select("permission_id", { count: "exact", head: true })
+    .eq("role_id", "r9_campaigns_read_probe")
+    .eq("permission_id", "partners.campaigns.read");
+  if (!readBindings) {
+    throw new Error("R9_IAM_FIXTURE_PREFLIGHT_FAILED:role_permission_binding_missing");
+  }
+
+  await service.from("iam_role_permissions").delete().eq("role_id", "r9_campaigns_read_probe");
+  await service.from("iam_role_permissions").delete().eq("role_id", "r9_campaigns_manage_probe");
+  await service.from("iam_roles").delete().eq("id", "r9_campaigns_read_probe");
+  await service.from("iam_roles").delete().eq("id", "r9_campaigns_manage_probe");
+
+  return {
+    ok: true,
+    verdict: "R9_IAM_FIXTURE_PREFLIGHT_PASS",
+    runId,
+    iamReference,
+    requiredPermissions,
+  };
+}
+
 export async function initR9FixturePool(service, runId) {
   const password = process.env.STAGING_IAM_TEST_PASSWORD || "StagingTestPass!2026";
   const tag = `r9_${runId}`;
+  const domain = getR9FixtureDomain();
   const emails = {
-    superAdmin: `r9-super-admin@${FIXTURE_DOMAIN}`,
-    campaignsManage: `r9-campaigns-manage@${FIXTURE_DOMAIN}`,
-    campaignsRead: `r9-campaigns-read@${FIXTURE_DOMAIN}`,
-    partnerA: `r9-partner-a@${FIXTURE_DOMAIN}`,
-    partnerB: `r9-partner-b@${FIXTURE_DOMAIN}`,
-    unauthorized: `r9-unauthorized@${FIXTURE_DOMAIN}`,
+    superAdmin: `r9-super-admin@${domain}`,
+    campaignsManage: `r9-campaigns-manage@${domain}`,
+    campaignsRead: `r9-campaigns-read@${domain}`,
+    partnerA: `r9-partner-a@${domain}`,
+    partnerB: `r9-partner-b@${domain}`,
+    unauthorized: `r9-unauthorized@${domain}`,
   };
+
+  await ensureValidationIamReferenceBaseline(service);
+  await purgeOrphanAuthIdentitiesForHarnessPatterns().catch(() => null);
 
   const meta = { r9_fixture: true, run_id: runId };
   const superAdminId = await ensureUser(service, emails.superAdmin, password, meta);
@@ -174,8 +231,21 @@ export async function createR9Campaign(service, actorUserId, runId, suffix = "1"
 export async function cleanupR9Fixtures(service, fx, runStartedAt = null) {
   const like = `%${fx.runId}%`;
   const ids = fx.cleanupIds?.campaignIds || [];
+  const partnerIds = fx.cleanupIds?.partnerIds || [];
+  const userIds = [
+    fx.superAdminId,
+    fx.campaignsManageId,
+    fx.campaignsReadId,
+    fx.partnerAUserId,
+    fx.partnerBUserId,
+    fx.unauthorizedId,
+  ].filter(Boolean);
+
   if (ids.length) {
     await service.from("partner_mission_definitions").delete().in("campaign_program_id", ids);
+    try {
+      await service.from("partner_campaign_participants").delete().in("campaign_id", ids);
+    } catch { /* optional table/column */ }
     await service.from("partner_campaign_programs").delete().in("id", ids);
   }
   await service.from("partner_campaign_programs").delete().filter("code", "like", `r9%`);
@@ -183,12 +253,34 @@ export async function cleanupR9Fixtures(service, fx, runStartedAt = null) {
   try {
     await service.from("partner_admin_audit_log").delete().filter("reason", "like", like);
   } catch { /* optional */ }
-  if (runStartedAt && fx.cleanupIds?.partnerIds?.length) {
+
+  for (const uid of userIds) {
+    await service.from("iam_user_assignments").delete().eq("user_id", uid);
+  }
+  for (const roleId of ["r9_campaigns_read", "r9_campaigns_manage"]) {
+    await service.from("iam_role_permissions").delete().eq("role_id", roleId);
+    await service.from("iam_roles").delete().eq("id", roleId);
+  }
+
+  if (runStartedAt && partnerIds.length) {
     runStagingSql(
-      `SELECT public.partner_center_staging_purge_run_commissions(ARRAY[${fx.cleanupIds.partnerIds.map((id) => `'${id}'::uuid`).join(",")}]::uuid[], '${runStartedAt}'::timestamptz);`,
+      `SELECT public.partner_center_staging_purge_run_commissions(ARRAY[${partnerIds.map((id) => `'${id}'::uuid`).join(",")}]::uuid[], '${runStartedAt}'::timestamptz);`,
       { optional: true }
     );
   }
+
+  if (process.env.HV_VALIDATION_TARGET === "isolated") {
+    const { purgeIsolatedHarnessBusinessResidue } = await import("../hv-pass3-pregate-cleanup-lib.mjs");
+    await purgeIsolatedHarnessBusinessResidue(service, { userIds, partnerIds });
+  } else if (partnerIds.length) {
+    await service.from("partners").delete().in("id", partnerIds);
+  }
+
+  for (const uid of userIds) {
+    await service.from("profiles").delete().eq("id", uid);
+    await service.auth.admin.deleteUser(uid).catch(() => null);
+  }
+  await purgeOrphanAuthIdentitiesForHarnessPatterns().catch(() => null);
 }
 
 export async function campaignsAdminApi(base, cookie, method, body, query = "") {
@@ -225,6 +317,7 @@ export {
   adminCreateCampaignWithMissions,
   getPartnerCampaignsView,
   FIXTURE_DOMAIN,
+  ensureValidationIamReferenceBaseline,
 };
 
 export function writeManifestArtifact(runId, report) {

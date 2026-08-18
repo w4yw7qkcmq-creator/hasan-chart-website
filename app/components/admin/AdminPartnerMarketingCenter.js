@@ -5,6 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "../../../lib/admin-fetch";
 import { formatPartnerMoney } from "../../../lib/partner-shared";
 import { campaignStatusLabel } from "../../../lib/partner-center/ui-labels";
+import { fraudSignalLabelAr } from "../../../lib/security/fraud-signal-labels.js";
+import {
+  humanVerificationLabelAr,
+  partnerRewardEligibilityLabelAr,
+} from "../../../lib/security/human-verification.js";
+import { getUserClassificationLabel } from "../../../lib/user-classification";
 import AdminCampaignMissionWizard from "./AdminCampaignMissionWizard";
 import {
   PartnerAdminSection,
@@ -1009,10 +1015,13 @@ export default function AdminPartnerMarketingCenter({
             </PartnerAdminField>
             <PartnerAdminToolbar>
               <button type="button" className="pa-btn pa-btn--success" disabled={!selectedEntitlement || !fraudReason.trim()} onClick={() => void fraudAction("release")}>
-                الموافقة
+                اعتماد وإطلاق المكافأة
               </button>
               <button type="button" className="pa-btn pa-btn--secondary" disabled={!selectedEntitlement || !fraudReason.trim()} onClick={() => void fraudAction("keep_hold")}>
                 الإبقاء على التعليق
+              </button>
+              <button type="button" className="pa-btn pa-btn--danger" disabled={!selectedEntitlement || !fraudReason.trim()} onClick={() => void fraudAction("reject")}>
+                رفض المكافأة
               </button>
             </PartnerAdminToolbar>
             {fraudQueue.length === 0 ? (
@@ -1032,11 +1041,16 @@ export default function AdminPartnerMarketingCenter({
                 <thead>
                   <tr>
                     <th></th>
+                    <th>المستخدم</th>
+                    <th>التصنيف</th>
+                    <th>التحقق</th>
                     <th>الشريك</th>
                     <th>المخاطر</th>
                     <th>المبلغ</th>
+                    <th>المصدر</th>
+                    <th>العناقيد</th>
                     <th>التاريخ</th>
-                    <th>إشارات</th>
+                    <th>الإشارات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1051,14 +1065,50 @@ export default function AdminPartnerMarketingCenter({
                         />
                       </td>
                       <td>
+                        <div>{row.userName || "—"}</div>
+                        <div className="text-xs text-[var(--pa-text-muted)]">{row.userEmail || "—"}</div>
+                      </td>
+                      <td>{row.effectiveClassification ? getUserClassificationLabel(row.effectiveClassification) : "—"}</td>
+                      <td>
+                        <div>{humanVerificationLabelAr(row.humanVerificationStatus)}</div>
+                        <div className="text-xs text-[var(--pa-text-muted)]">
+                          {partnerRewardEligibilityLabelAr(row.rewardEligibilityStatus)}
+                        </div>
+                      </td>
+                      <td>
                         <Link href={`/admin/partners/${row.partnerId}`}>{row.partnerLabel}</Link>
                       </td>
                       <td>
                         <PartnerAdminBadge tone="warning">{riskLevelLabel(row.riskLevel)}</PartnerAdminBadge>
                       </td>
                       <td className="pa-ltr">{formatPartnerMoney(row.heldAmount)}</td>
-                      <td>{formatAuditDate(row.holdDate)}</td>
-                      <td>{(row.signals || []).length} إشارة</td>
+                      <td>
+                        <div>{row.rewardType || "—"}</div>
+                        <div className="text-xs text-[var(--pa-text-muted)]">{row.sourceType || "—"}</div>
+                      </td>
+                      <td>
+                        <span title="جهاز">{row.deviceClusterCount ?? 0}</span>
+                        {" / "}
+                        <span title="شبكة">{row.networkClusterCount ?? 0}</span>
+                      </td>
+                      <td>
+                        <div>{formatAuditDate(row.detectedAt || row.holdDate)}</div>
+                        {row.updatedAt ? (
+                          <div className="text-xs text-[var(--pa-text-muted)]">تحديث: {formatAuditDate(row.updatedAt)}</div>
+                        ) : null}
+                      </td>
+                      <td>
+                        {(row.signals || []).length === 0 ? (
+                          "—"
+                        ) : (
+                          <ul className="text-xs space-y-1">
+                            {(row.signals || []).slice(0, 4).map((signal) => {
+                              const type = typeof signal === "string" ? signal : signal?.type || signal?.signal_type;
+                              return <li key={type}>{fraudSignalLabelAr(type)}</li>;
+                            })}
+                          </ul>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

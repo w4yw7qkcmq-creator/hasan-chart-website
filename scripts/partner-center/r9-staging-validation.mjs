@@ -13,6 +13,7 @@ import {
   captureRunStartedAt,
   snapshotFinancialBaseline,
   cleanupR9Fixtures,
+  runR9FixturePreflight,
   createR9Campaign,
   mkCampaignWizardPayload,
   mapWizardPayloadToCampaignInput,
@@ -439,6 +440,13 @@ function scheduleDashboardBucket(row) {
 async function main() {
   assertStagingGuard();
   const service = serviceClient();
+
+  if (process.env.R9_PREFLIGHT_ONLY === "1") {
+    const preflight = await runR9FixturePreflight(service, RUN_ID);
+    console.log(JSON.stringify(preflight, null, 2));
+    process.exit(preflight.ok ? 0 : 1);
+  }
+
   const runStartedAt = await captureRunStartedAt(service);
   const baselineBefore = await snapshotFinancialBaseline(service);
   const fx = await initR9FixturePool(service, RUN_ID);

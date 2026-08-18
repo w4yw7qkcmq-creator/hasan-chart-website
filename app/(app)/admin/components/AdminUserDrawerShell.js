@@ -12,6 +12,7 @@ import { TIMELINE_FILTER_OPTIONS } from "./admin-user-management-ux-helpers";
 import AdminPaymentProofModal from "./AdminPaymentProofModal";
 import { adminFetch } from "../../../../lib/admin-fetch";
 import { fetchPaymentProof } from "../../../../lib/admin-financial-center-client";
+import AdminUserTrustPanel from "./AdminUserTrustPanel";
 
 function formatDateTime(value) {
   if (!value) return "—";
@@ -532,6 +533,12 @@ export default function AdminUserDrawerShell({
               </TabPanel>
             ),
           })}
+
+        {activeTab === "trust" && user?.id ? (
+          <TabPanel isPageLayout={isPageLayout}>
+            <AdminUserTrustPanel userId={user.id} />
+          </TabPanel>
+        ) : null}
 
         {activeTab === "services" &&
           renderSectionFrame("services", {

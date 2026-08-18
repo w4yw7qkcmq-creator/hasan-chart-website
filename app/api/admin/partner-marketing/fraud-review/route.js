@@ -3,6 +3,7 @@ import { IAM_PERMISSIONS } from "../../../../../lib/iam/constants";
 import {
   adminKeepFraudHold,
   adminListFraudReviewQueue,
+  adminRejectFraudReward,
   adminReleaseGrowthRewardHold,
 } from "../../../../../lib/partner-center/admin-marketing-service.js";
 import { isPartnerAdminMarketingEnabled } from "../../../../../lib/partner-center/feature-flags.js";
@@ -42,10 +43,12 @@ export async function POST(request) {
       return Response.json({ success: false, error: "المعرف والسبب مطلوبان" }, { status: 400 });
     }
 
+    const reviewerUserId = adminCheck.user?.id || adminCheck.userId;
+
     if (action === "release") {
       const result = await adminReleaseGrowthRewardHold(adminCheck.supabase, {
         entitlementId,
-        reviewerUserId: adminCheck.userId,
+        reviewerUserId,
         note: reason,
       });
       return Response.json({ success: true, result });
@@ -54,7 +57,16 @@ export async function POST(request) {
     if (action === "keep_hold") {
       const result = await adminKeepFraudHold(adminCheck.supabase, {
         entitlementId,
-        reviewerUserId: adminCheck.userId,
+        reviewerUserId,
+        reason,
+      });
+      return Response.json({ success: true, result });
+    }
+
+    if (action === "reject") {
+      const result = await adminRejectFraudReward(adminCheck.supabase, {
+        entitlementId,
+        reviewerUserId,
         reason,
       });
       return Response.json({ success: true, result });
