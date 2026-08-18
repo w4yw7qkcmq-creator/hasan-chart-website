@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { getMarketDepthHub, startMarketDepth } from "../../../../lib/market-data/market-depth-hub";
+import { getMarketDepthHub } from "../../../../lib/market-data/market-depth-hub";
 import { getDynamicSymbolManager } from "../../../../lib/market-data/dynamic-symbol-manager";
+import {
+  ensureMarketDepthConsumer,
+  releaseMarketDepthConsumer,
+} from "../../../../lib/market-data/market-depth-lifecycle";
 import {
   validateMarketDepthQuery,
   assertNoMockInProduction,
@@ -11,13 +15,16 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request) {
+  const consumerReason = "api-market-depth-stream";
+
   try {
     assertNoMockInProduction();
     await ensureMarketSymbolsRegistry();
-    startMarketDepth("api-market-depth-stream");
+    await ensureMarketDepthConsumer(consumerReason);
 
     const validation = validateMarketDepthQuery(new URL(request.url).searchParams);
     if (!validation.valid) {
+      releaseMarketDepthConsumer(consumerReason);
       return new Response(JSON.stringify({ success: false, error: validation.error }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -31,6 +38,7 @@ export async function GET(request) {
     const acquireResult = dynamicManager.acquire(params.symbol, clientId);
 
     if (!acquireResult.ok) {
+      releaseMarketDepthConsumer(consumerReason);
       return new Response(JSON.stringify({ success: false, error: acquireResult.error }), {
         status: acquireResult.error === "UNSUPPORTED_SYMBOL" || acquireResult.error === "INVALID_SYMBOL" ? 400 : 429,
         headers: { "Content-Type": "application/json" },
@@ -41,6 +49,13 @@ export async function GET(request) {
     let unsubscribe = null;
     let heartbeatTimer = null;
     let abortHandler = null;
+    let consumerReleased = false;
+
+    const releaseConsumerOnce = () => {
+      if (consumerReleased) return;
+      consumerReleased = true;
+      releaseMarketDepthConsumer(consumerReason);
+    };
 
     const cleanup = (controller) => {
       if (heartbeatTimer) {
@@ -56,6 +71,7 @@ export async function GET(request) {
       dynamicManager.release(params.symbol, clientId);
       unsubscribe?.();
       unsubscribe = null;
+      releaseConsumerOnce();
 
       try {
         controller.close();
@@ -98,6 +114,7 @@ export async function GET(request) {
         dynamicManager.release(params.symbol, clientId);
         unsubscribe?.();
         unsubscribe = null;
+        releaseConsumerOnce();
       },
     });
 
@@ -110,6 +127,7 @@ export async function GET(request) {
       },
     });
   } catch (error) {
+    releaseMarketDepthConsumer(consumerReason);
     return new Response(JSON.stringify({ success: false, error: error?.message || "STREAM_FAILED" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

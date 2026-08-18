@@ -1,15 +1,21 @@
 import { CACHE_NO_STORE, jsonResponse } from "../../../../lib/api-response";
-import { getSharedMarketDepthSnapshot, startMarketDepth } from "../../../../lib/market-data/market-depth-hub";
+import { getSharedMarketDepthSnapshot } from "../../../../lib/market-data/market-depth-hub";
+import {
+  ensureMarketDepthConsumer,
+  releaseMarketDepthConsumer,
+} from "../../../../lib/market-data/market-depth-lifecycle";
 import { validateMarketDepthQuery, assertNoMockInProduction, ensureMarketSymbolsRegistry } from "../../../../lib/market-data/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request) {
+  const consumerReason = "api-market-depth-snapshot";
+
   try {
     assertNoMockInProduction();
     await ensureMarketSymbolsRegistry();
-    startMarketDepth("api-market-depth-snapshot");
+    await ensureMarketDepthConsumer(consumerReason);
 
     const validation = validateMarketDepthQuery(new URL(request.url).searchParams);
     if (!validation.valid) {
@@ -33,5 +39,7 @@ export async function GET(request) {
       },
       { status: 500, cacheControl: CACHE_NO_STORE }
     );
+  } finally {
+    releaseMarketDepthConsumer(consumerReason);
   }
 }
