@@ -231,27 +231,24 @@ async function sendViaResend({ to, from, subject, html }) {
     throw new Error("Missing RESEND_API_KEY");
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${resendApiKey}`,
-    },
-    body: JSON.stringify({
+  const { sendWebsiteResendEmail } = await import("../lib/resend-website.js");
+  const outcome = await sendWebsiteResendEmail({
+    path: "scripts/test-all-email-templates.mjs::sendViaResend",
+    resendApiKey,
+    payload: {
       from: from || "HasaN CharT World <support@hasanchartworld.com>",
       to: [to],
       subject,
       html,
-    }),
+    },
+    to: [to],
   });
 
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error(data?.message || response.statusText || "Resend error");
+  if (!outcome.success) {
+    throw new Error(outcome.reason || outcome.error || "Resend error");
   }
 
-  return data;
+  return outcome.result || { id: outcome.id || null };
 }
 
 async function main() {
