@@ -1,0 +1,72 @@
+{
+  "phase": "I",
+  "capturedAt": "2026-08-19T17:33:15.976Z",
+  "production": {
+    "supabaseProjectRef": "lzgsxdsumnteuwtjfqlm",
+    "gitHead": "82d642478b1357ee73b5f3b027daa9130700fab8",
+    "originMain": "82d642478b1357ee73b5f3b027daa9130700fab8",
+    "deployedCommit": "82d642478b1357ee73b5f3b027daa9130700fab8",
+    "health": {
+      "endpoint": "https://www.hasanchartworld.com/api/health",
+      "status": "ok",
+      "readiness": "ready",
+      "databaseLatencyMs": 833,
+      "iamEffective": { "IAM_DB": true, "IAM_API": true, "IAM_UI": true, "IAM_RLS": true }
+    },
+    "securityFlags": {
+      "HUMAN_VERIFICATION_ENABLED": true,
+      "PARTNER_ANTI_ABUSE_GATE_ENABLED": true,
+      "TURNSTILE_LOGIN_ADAPTIVE_ENABLED": true,
+      "source": "operator_confirmed_policy_plus_deployed_defaults_in_lib/security/feature-flags.js"
+    }
+  },
+  "financialBaseline": {
+    "partners": 16,
+    "partner_referrals": 2,
+    "partner_commissions": { "count": 11, "sum_amount": 99.1 },
+    "partner_financial_ledger_entries": { "count": 28, "signed_sum": 163.1 },
+    "partner_financial_risk_holds": 0,
+    "partner_reward_entitlements": 0,
+    "partner_fraud_assessments": 0,
+    "qrr_credits": 0,
+    "milestone_grants": 0,
+    "mission_progress_completed": 0,
+    "campaign_participants": 0,
+    "monthly_bonus_grants": 0,
+    "performance_bonus_grants": 0,
+    "service_commission_entitlements": 0,
+    "wallet_ledger": 39,
+    "balance_pending_sum": 0,
+    "balance_bonus_pending_sum": 1.6,
+    "balance_withdrawable_sum": 161.5,
+    "total_earnings_sum": 99.1,
+    "total_withdrawn_sum": 96,
+    "ledger_by_type": [
+      { "entry_type": "commission", "count": 11, "sum": 99.1 },
+      { "entry_type": "manual_adjustment", "count": 7, "sum": 220 },
+      { "entry_type": "payout", "count": 10, "sum": 156 }
+    ]
+  },
+  "distributions": {
+    "human_verification_status": {
+      "unverified": 31,
+      "turnstile_verified": 2,
+      "verified": 69
+    },
+    "partner_reward_eligibility_status": { "pending": 102 },
+    "partner_reward_risk_level": { "null": 102 },
+    "user_classification": {
+      "unknown": 50,
+      "test": 23,
+      "e2e": 27,
+      "internal": 2
+    },
+    "effective_user_classification": {
+      "real": 47,
+      "test": 23,
+      "e2e": 27,
+      "internal": 2,
+      "suspected": 3
+    }
+  }
+}
