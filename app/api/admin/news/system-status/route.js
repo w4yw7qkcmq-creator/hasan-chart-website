@@ -23,6 +23,15 @@ export async function GET(request) {
       return Response.json({ success: false, error: adminCheck.error }, { status: adminCheck.status });
     }
 
+    const { enforceRateLimit } = await import("../../../../../lib/enforce-rate-limit");
+    const { adminReadLimiter } = await import("../../../../../lib/rate-limit");
+
+    const rateLimited = await enforceRateLimit(
+      adminReadLimiter,
+      String(adminCheck.user?.email || "admin").toLowerCase()
+    );
+    if (rateLimited) return rateLimited;
+
     const supabase = getServiceSupabase();
     if (!supabase) {
       return Response.json(
