@@ -1,0 +1,95 @@
+{
+  "phase": "K.4",
+  "verdict": "PASS",
+  "activationTimestamp": "2026-08-19T19:31:45.296Z",
+  "campaign": {
+    "id": "671b7e56-68bf-4f99-a579-7af72946f0a7",
+    "code": "wave3_qualified_referral_pilot",
+    "status": "active",
+    "globalBudget": 25,
+    "perPartnerCap": 2,
+    "reward": 0.25,
+    "maxParticipants": 50,
+    "startAt": "2026-08-19T19:31:45.296Z",
+    "endAt": "2026-09-02T19:31:45.296Z",
+    "amountSpent": 0,
+    "amountReversed": 0,
+    "adminMetrics": null
+  },
+  "mission": {
+    "id": "5af1a16f-88e2-4f51-a7d3-4f0759372663",
+    "code": "wave3_pilot_qualified_referral_reward",
+    "status": "active",
+    "missionType": "qualified_referrals_in_period",
+    "maxCompletions": 8
+  },
+  "preBaseline": {
+    "capturedAt": "2026-08-19T19:31:47.486Z",
+    "partners": 17,
+    "referrals": 2,
+    "commissions": {
+      "count": 11,
+      "sum": 99.1
+    },
+    "ledger": {
+      "count": 28
+    },
+    "entitlements": 0,
+    "campaignParticipants": 0,
+    "amountSpent": 0,
+    "amountReversed": 0,
+    "missionProgress": 0,
+    "milestoneGrants": 0,
+    "riskHolds": 0,
+    "fraudAssessments": 0,
+    "qrrCredits": 0,
+    "balances": {
+      "pending": 0,
+      "withdrawable": 161.5,
+      "totalEarnings": 99.1
+    }
+  },
+  "postActivation": {
+    "capturedAt": "2026-08-19T19:32:01.071Z",
+    "partners": 17,
+    "referrals": 2,
+    "commissions": {
+      "count": 11,
+      "sum": 99.1
+    },
+    "ledger": {
+      "count": 28
+    },
+    "entitlements": 0,
+    "campaignParticipants": 0,
+    "amountSpent": 0,
+    "amountReversed": 0,
+    "missionProgress": 0,
+    "milestoneGrants": 0,
+    "riskHolds": 0,
+    "fraudAssessments": 0,
+    "qrrCredits": 0,
+    "balances": {
+      "pending": 0,
+      "withdrawable": 161.5,
+      "totalEarnings": 99.1
+    }
+  },
+  "draftDelta": {
+    "entitlements": 0,
+    "ledger": 0,
+    "amountSpent": 0,
+    "missionProgress": 0,
+    "balancesPending": 0,
+    "balancesWithdrawable": 0
+  },
+  "activationDelta": {
+    "entitlements": 0,
+    "ledger": 0,
+    "amountSpent": 0,
+    "missionProgress": 0,
+    "balancesPending": 0,
+    "balancesWithdrawable": 0
+  },
+  "rollback": "PATCH action=pause on wave3_qualified_referral_pilot + pause linked mission"
+}

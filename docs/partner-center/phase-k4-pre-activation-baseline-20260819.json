@@ -1,0 +1,26 @@
+{
+  "capturedAt": "2026-08-19T19:31:47.486Z",
+  "partners": 17,
+  "referrals": 2,
+  "commissions": {
+    "count": 11,
+    "sum": 99.1
+  },
+  "ledger": {
+    "count": 28
+  },
+  "entitlements": 0,
+  "campaignParticipants": 0,
+  "amountSpent": 0,
+  "amountReversed": 0,
+  "missionProgress": 0,
+  "milestoneGrants": 0,
+  "riskHolds": 0,
+  "fraudAssessments": 0,
+  "qrrCredits": 0,
+  "balances": {
+    "pending": 0,
+    "withdrawable": 161.5,
+    "totalEarnings": 99.1
+  }
+}
