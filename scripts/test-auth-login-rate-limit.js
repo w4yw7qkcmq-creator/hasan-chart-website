@@ -189,12 +189,14 @@ describe("layer 2 — failed authentication", () => {
   });
 
   it("blocks after repeated wrong-password attempts", async () => {
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       await recordLoginFailedAuthAttempt({ clientIp: ip, email });
     }
 
     const blocked = await peekLoginFailedAuthLimits({ clientIp: ip, email });
     assert.equal(blocked.limited, true);
+    assert.equal(blocked.count, 5);
+    assert.equal(blocked.remaining, 0);
     assert.equal(blocked.body.code, AUTH_RATE_LIMITED_CODE);
   });
 
@@ -212,7 +214,7 @@ describe("layer 2 — failed authentication", () => {
     const emailB = "user-b@example.com";
     await resetLoginLimitersForIp(ip, emailB);
 
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       await recordLoginFailedAuthAttempt({ clientIp: ip, email });
     }
 
