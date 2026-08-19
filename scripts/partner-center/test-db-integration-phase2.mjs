@@ -23,9 +23,9 @@ async function seed(db) {
   await query(db, `INSERT INTO auth.users (id) VALUES ($1),($2) ON CONFLICT DO NOTHING`, [USER_A, REFERRED]);
   await query(db, `INSERT INTO partners (id, user_id, referral_code, status, tier_key) VALUES ($1,$2,'ALPHA1','active','partner') ON CONFLICT DO NOTHING`, [PARTNER_A, USER_A]);
   await query(db, `INSERT INTO partner_referrals (id, partner_id, referred_user_id, referral_code, referred_username, status) VALUES ($1,$2,$3,'ALPHA1','ref','registered') ON CONFLICT DO NOTHING`, [REFERRAL, PARTNER_A, REFERRED]);
-  await query(db, `INSERT INTO partner_referral_qualifications (referral_id, partner_id, referred_user_id, state) VALUES ($1,$2,$3,'qualified') ON CONFLICT DO NOTHING`, [REFERRAL, PARTNER_A, REFERRED]);
+  await query(db, `INSERT INTO partner_referral_qualifications (referral_id, partner_id, referred_user_id, state, qualified_at) VALUES ($1,$2,$3,'qualified','2020-01-01T00:00:00Z') ON CONFLICT DO NOTHING`, [REFERRAL, PARTNER_A, REFERRED]);
   await query(db, `INSERT INTO partner_mission_definitions (id, code, name, mission_type, status, target_metric, target_value, reward_amount, period_type, rule_version) VALUES ($1,'Q1','One Qualified','qualified_referrals_count','active','qualified_referrals',1,5,'once',1)`, ["22222222-2222-2222-2222-222222222222"]);
-  await query(db, `INSERT INTO partner_milestone_definitions (id, code, name, metric, threshold_value, reward_amount, status, rule_version) VALUES ($1,'FIRST_Q','First Qualified','qualified_referrals',1,2,'active',1)`, ["33333333-3333-3333-3333-333333333333"]);
+  await query(db, `INSERT INTO partner_milestone_definitions (id, code, name, metric, threshold_value, reward_amount, status, rule_version, effective_from, created_at) VALUES ($1,'FIRST_Q','First Qualified','qualified_referrals',1,2,'active',1,'2020-01-01T00:00:00Z','2020-01-01T00:00:00Z')`, ["33333333-3333-3333-3333-333333333333"]);
   await query(db, `INSERT INTO partner_campaign_programs (id, code, name, status, landing_path, rule_version) VALUES ($1,'launch','Launch','active','/register',1)`, ["44444444-4444-4444-4444-444444444444"]);
 }
 

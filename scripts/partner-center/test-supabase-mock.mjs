@@ -17,6 +17,8 @@ export function createServiceSupabaseFromDb(db) {
       const ctx = {
         table,
         filters: [],
+        rangeFilters: [],
+        notNullCol: null,
         cols: "*",
         payload: null,
         op: "select",
@@ -62,10 +64,20 @@ export function createServiceSupabaseFromDb(db) {
           ctx.inVals = vals;
           return builder;
         },
-        not() {
+        gte(col, val) {
+          ctx.rangeFilters.push(["gte", col, val]);
           return builder;
         },
-        neq() {
+        lte(col, val) {
+          ctx.rangeFilters.push(["lte", col, val]);
+          return builder;
+        },
+        neq(col, val) {
+          ctx.rangeFilters.push(["neq", col, val]);
+          return builder;
+        },
+        not(col, op) {
+          if (op === "is") ctx.notNullCol = col;
           return builder;
         },
         order(col, { ascending = true } = {}) {
@@ -91,12 +103,16 @@ export function createServiceSupabaseFromDb(db) {
           if (ctx.op === "insert") {
             const cols = Object.keys(ctx.payload);
             const vals = Object.values(ctx.payload);
-            const res = await query(
-              db,
-              `INSERT INTO public.${ctx.table} (${cols.join(", ")}) VALUES (${vals.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
-              vals
-            );
-            return { data: ctx.single ? res.rows[0] : res.rows, error: null };
+            try {
+              const res = await query(
+                db,
+                `INSERT INTO public.${ctx.table} (${cols.join(", ")}) VALUES (${vals.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+                vals
+              );
+              return { data: ctx.single ? res.rows[0] : res.rows, error: null };
+            } catch (error) {
+              return { data: null, error };
+            }
           }
           if (ctx.op === "upsert") {
             const cols = Object.keys(ctx.payload);
@@ -131,6 +147,13 @@ export function createServiceSupabaseFromDb(db) {
             vals.push(ctx.inVals);
             wh.push(`${ctx.inCol} = ANY($${vals.length})`);
           }
+          ctx.rangeFilters.forEach(([op, c, v]) => {
+            vals.push(v);
+            if (op === "gte") wh.push(`${c} >= $${vals.length}`);
+            if (op === "lte") wh.push(`${c} <= $${vals.length}`);
+            if (op === "neq") wh.push(`${c} <> $${vals.length}`);
+          });
+          if (ctx.notNullCol) wh.push(`${ctx.notNullCol} IS NOT NULL`);
           if (wh.length) sql += ` WHERE ${wh.join(" AND ")}`;
           if (ctx.order) sql += ` ORDER BY ${ctx.order[0]} ${ctx.order[1] ? "ASC" : "DESC"}`;
           if (ctx.limit) sql += ` LIMIT ${ctx.limit}`;
