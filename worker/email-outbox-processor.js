@@ -2,6 +2,7 @@ const EMAIL_OUTBOX_TABLE = "email_outbox";
 const DEFAULT_FROM = "HasaN CharT World <support@hasanchartworld.com>";
 const DEFAULT_REPLY_TO = "support@hasanchartworld.com";
 const VIP_STATUS_EMAIL_MESSAGE_TYPE = "vip_signal_status";
+const { blockProductionTestRecipientSend } = require("../lib/email-recipient-guard.cjs");
 
 function extractVipDeliveryLink(metadata = {}) {
   if (!metadata || typeof metadata !== "object") {
@@ -334,6 +335,15 @@ async function sendOutboxEmailViaResend(row) {
       skipped: true,
       error: "Missing recipient",
     };
+  }
+
+  const recipientBlocked = blockProductionTestRecipientSend({
+    path: "worker/email-outbox-processor.js::sendOutboxEmailViaResend",
+    to: recipientEmail,
+  });
+
+  if (recipientBlocked) {
+    return recipientBlocked;
   }
 
   const response = await fetch("https://api.resend.com/emails", {
