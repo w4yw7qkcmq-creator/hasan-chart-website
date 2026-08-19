@@ -5,6 +5,7 @@ const {
   buildUnifiedEmailLayout,
   DEFAULT_SITE_URL,
 } = require("./email-layout");
+const { blockProductionTestRecipientSend } = require("../lib/email-recipient-guard.cjs");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -78,6 +79,15 @@ async function sendSubscriptionTemplateEmail({
 
   if (!resendApiKey || !normalizedEmail) {
     return { success: false, skipped: true, reason: "missing-resend-or-recipient" };
+  }
+
+  const recipientBlocked = blockProductionTestRecipientSend({
+    path: "worker/subscription-expiry-shared.js::sendSubscriptionTemplateEmail",
+    to: normalizedEmail,
+  });
+
+  if (recipientBlocked) {
+    return recipientBlocked;
   }
 
   const html = buildUnifiedEmailLayout({

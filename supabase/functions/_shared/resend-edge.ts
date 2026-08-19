@@ -1,4 +1,7 @@
 import {
+  blockProductionTestRecipientSend,
+} from "./email-recipient-guard.ts";
+import {
   blockSupabaseResendPayload,
   logSupabasePriceAlertEmailBlocked,
   SUPABASE_PRICE_ALERT_EMAIL_BLOCKED,
@@ -19,6 +22,15 @@ export async function sendSupabaseResendEmail({
 
   if (blocked) {
     return blocked;
+  }
+
+  const recipientBlocked = blockProductionTestRecipientSend({
+    path,
+    to: payload?.to ?? null,
+  });
+
+  if (recipientBlocked) {
+    return recipientBlocked;
   }
 
   const response = await fetch("https://api.resend.com/emails", {
