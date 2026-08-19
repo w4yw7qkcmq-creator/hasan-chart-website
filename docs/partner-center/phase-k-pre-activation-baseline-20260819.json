@@ -1,0 +1,28 @@
+{
+  "phase": "K",
+  "capturedAt": "2026-08-19T17:45:51.162Z",
+  "goLiveAt": "2026-08-19T17:45:51.162Z",
+  "note": "Pre-activation financial baseline immediately before Wave 1 definition writes",
+  "financialBaseline": {
+    "partners": 17,
+    "partner_referrals": 2,
+    "partner_commissions": { "count": 11, "sum_amount": 99.1 },
+    "partner_financial_ledger_entries": { "count": 28, "signed_sum": 163.1 },
+    "partner_financial_risk_holds": 0,
+    "partner_reward_entitlements": 0,
+    "partner_fraud_assessments": 0,
+    "partner_mission_progress": 0,
+    "partner_campaign_participants": 0,
+    "qrr_credits": { "count": 0, "sum": 0 },
+    "mission_definitions": 0,
+    "milestone_definitions": 0,
+    "balances": {
+      "pending": 0,
+      "bonus_pending": 1.6,
+      "withdrawable": 161.5,
+      "total_earnings": 99.1,
+      "total_withdrawn": 96
+    }
+  },
+  "partnerQualificationState": "all 17 partners had 0 qualified/customer qualifications at activation"
+}

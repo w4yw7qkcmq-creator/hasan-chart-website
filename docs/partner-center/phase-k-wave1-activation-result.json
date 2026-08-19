@@ -1,0 +1,183 @@
+{
+  "missions": [
+    {
+      "code": "wave1_k1_first_qualified",
+      "id": "8387723d-524e-4aae-b7fa-aa5983f3ba31",
+      "status": "draft"
+    },
+    {
+      "code": "wave1_k2_three_qualified",
+      "id": "3bafcb37-a624-4ece-a196-48a93dc56b3d",
+      "status": "draft"
+    },
+    {
+      "code": "wave1_k3_five_qualified",
+      "id": "43e34729-68d7-4f4a-b470-e1e132e652d3",
+      "status": "draft"
+    },
+    {
+      "code": "wave1_k4_first_customer",
+      "id": "c9d342c2-3a61-4c37-9be1-fe4be11f4475",
+      "status": "draft"
+    },
+    {
+      "code": "wave1_k5_smart_link_conversion",
+      "id": "50b9da01-1dbd-4d93-b196-e5be4ddf75e4",
+      "status": "draft"
+    }
+  ],
+  "milestones": [
+    {
+      "code": "wave1_ms10_qualified",
+      "id": "eee34c0d-7522-49a7-8557-5f835a4389e5",
+      "status": "draft"
+    },
+    {
+      "code": "wave1_ms25_qualified",
+      "id": "cab445a3-1bc7-4bce-b1d5-cbbf37650d67",
+      "status": "draft"
+    }
+  ],
+  "activations": [
+    {
+      "type": "mission",
+      "code": "wave1_k1_first_qualified",
+      "id": "8387723d-524e-4aae-b7fa-aa5983f3ba31",
+      "at": "2026-08-19T17:46:21.757Z",
+      "baseline": {
+        "partners": 17,
+        "commissions": 11,
+        "commissionSum": 99.10000000000002,
+        "ledger": 28,
+        "entitlements": 0,
+        "missionProgress": 0,
+        "missionDefs": 5,
+        "milestoneDefs": 2
+      }
+    },
+    {
+      "type": "mission",
+      "code": "wave1_k2_three_qualified",
+      "id": "3bafcb37-a624-4ece-a196-48a93dc56b3d",
+      "at": "2026-08-19T17:46:25.883Z",
+      "baseline": {
+        "partners": 17,
+        "commissions": 11,
+        "commissionSum": 99.10000000000002,
+        "ledger": 28,
+        "entitlements": 0,
+        "missionProgress": 0,
+        "missionDefs": 5,
+        "milestoneDefs": 2
+      }
+    },
+    {
+      "type": "mission",
+      "code": "wave1_k3_five_qualified",
+      "id": "43e34729-68d7-4f4a-b470-e1e132e652d3",
+      "at": "2026-08-19T17:46:30.053Z",
+      "baseline": {
+        "partners": 17,
+        "commissions": 11,
+        "commissionSum": 99.10000000000002,
+        "ledger": 28,
+        "entitlements": 0,
+        "missionProgress": 0,
+        "missionDefs": 5,
+        "milestoneDefs": 2
+      }
+    },
+    {
+      "type": "mission",
+      "code": "wave1_k4_first_customer",
+      "id": "c9d342c2-3a61-4c37-9be1-fe4be11f4475",
+      "at": "2026-08-19T17:46:34.551Z",
+      "baseline": {
+        "partners": 17,
+        "commissions": 11,
+        "commissionSum": 99.10000000000002,
+        "ledger": 28,
+        "entitlements": 0,
+        "missionProgress": 0,
+        "missionDefs": 5,
+        "milestoneDefs": 2
+      }
+    },
+    {
+      "type": "mission",
+      "code": "wave1_k5_smart_link_conversion",
+      "id": "50b9da01-1dbd-4d93-b196-e5be4ddf75e4",
+      "at": "2026-08-19T17:46:38.579Z",
+      "baseline": {
+        "partners": 17,
+        "commissions": 11,
+        "commissionSum": 99.10000000000002,
+        "ledger": 28,
+        "entitlements": 0,
+        "missionProgress": 0,
+        "missionDefs": 5,
+        "milestoneDefs": 2
+      }
+    },
+    {
+      "type": "milestone",
+      "code": "wave1_ms10_qualified",
+      "id": "eee34c0d-7522-49a7-8557-5f835a4389e5",
+      "at": "2026-08-19T17:46:42.668Z",
+      "baseline": {
+        "partners": 17,
+        "commissions": 11,
+        "commissionSum": 99.10000000000002,
+        "ledger": 28,
+        "entitlements": 0,
+        "missionProgress": 0,
+        "missionDefs": 5,
+        "milestoneDefs": 2
+      }
+    },
+    {
+      "type": "milestone",
+      "code": "wave1_ms25_qualified",
+      "id": "cab445a3-1bc7-4bce-b1d5-cbbf37650d67",
+      "at": "2026-08-19T17:46:46.672Z",
+      "baseline": {
+        "partners": 17,
+        "commissions": 11,
+        "commissionSum": 99.10000000000002,
+        "ledger": 28,
+        "entitlements": 0,
+        "missionProgress": 0,
+        "missionDefs": 5,
+        "milestoneDefs": 2
+      }
+    }
+  ],
+  "goLive": "2026-08-19T17:45:51.162Z",
+  "pre": {
+    "partners": 17,
+    "commissions": 11,
+    "commissionSum": 99.10000000000002,
+    "ledger": 28,
+    "entitlements": 0,
+    "missionProgress": 0,
+    "missionDefs": 0,
+    "milestoneDefs": 0
+  },
+  "post": {
+    "partners": 17,
+    "commissions": 11,
+    "commissionSum": 99.10000000000002,
+    "ledger": 28,
+    "entitlements": 0,
+    "missionProgress": 0,
+    "missionDefs": 5,
+    "milestoneDefs": 2
+  },
+  "economicDelta": {
+    "commissions": 0,
+    "commissionSum": 0,
+    "ledger": 0,
+    "entitlements": 0,
+    "missionProgress": 0
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "phase": "K",
+  "wave": 1,
+  "goLivePolicy": "start_at/effective_from set at activation; qualified_referrals_in_period bounds retroactivity",
+  "rollback": "PATCH mission/milestone status to paused via admin API; do not disable HV/anti-abuse/adaptive login",
+  "missions": [
+    {
+      "code": "wave1_k1_first_qualified",
+      "name": "أول إحالة مؤهلة",
+      "mission_type": "qualified_referrals_in_period",
+      "target_value": 1,
+      "reward_amount": 0.25,
+      "period_type": "once",
+      "repeatable": false,
+      "trusted_event": "qualified_referral",
+      "idempotency": "mission_reward:{partner}:{mission}:{period}:seq1"
+    },
+    {
+      "code": "wave1_k2_three_qualified",
+      "name": "3 إحالات مؤهلة",
+      "mission_type": "qualified_referrals_in_period",
+      "target_value": 3,
+      "reward_amount": 0.5,
+      "period_type": "once",
+      "repeatable": false,
+      "trusted_event": "qualified_referral"
+    },
+    {
+      "code": "wave1_k3_five_qualified",
+      "name": "5 إحالات مؤهلة",
+      "mission_type": "qualified_referrals_in_period",
+      "target_value": 5,
+      "reward_amount": 1.0,
+      "period_type": "once",
+      "repeatable": false,
+      "trusted_event": "qualified_referral"
+    },
+    {
+      "code": "wave1_k4_first_customer",
+      "name": "أول عميل محوّل",
+      "mission_type": "first_customer",
+      "target_value": 1,
+      "reward_amount": 0.75,
+      "period_type": "once",
+      "repeatable": false,
+      "trusted_event": "customer",
+      "retroactivity_note": "all-time metric; safe at activation because all partners have 0 customers"
+    },
+    {
+      "code": "wave1_k5_smart_link_conversion",
+      "name": "أول تحويل عبر رابط ذكي",
+      "mission_type": "smart_link_conversions",
+      "target_value": 1,
+      "reward_amount": 0.5,
+      "period_type": "once",
+      "repeatable": false,
+      "trusted_event": "signup/verified_signup with smart_link attribution"
+    }
+  ],
+  "milestones": [
+    {
+      "code": "wave1_ms10_qualified",
+      "name": "10 إحالات مؤهلة",
+      "metric": "qualified_referrals",
+      "threshold_value": 10,
+      "reward_amount": 2.0,
+      "stacking_note": "threshold above mission ladder to avoid duplicate 1/3/5 payouts"
+    },
+    {
+      "code": "wave1_ms25_qualified",
+      "name": "25 إحالة مؤهلة",
+      "metric": "qualified_referrals",
+      "threshold_value": 25,
+      "reward_amount": 5.0
+    }
+  ],
+  "campaigns": [],
+  "maxPlatformExposureWorstCase": {
+    "perPartnerMissionsAndMilestonesUsd": 10.0,
+    "partners10": 100,
+    "partners100": 1000,
+    "partners1000": 10000,
+    "partners10000": 100000
+  }
+}
