@@ -5,7 +5,7 @@ const {
   buildUnifiedEmailLayout,
   DEFAULT_SITE_URL,
 } = require("./email-layout");
-const { blockProductionTestRecipientSend } = require("../lib/email-recipient-guard.cjs");
+const { blockProductionTestRecipientSend } = require("./lib/email-recipient-guard.cjs");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

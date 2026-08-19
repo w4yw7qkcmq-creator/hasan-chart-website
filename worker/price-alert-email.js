@@ -3,7 +3,7 @@ const PRICE_ALERT_FROM =
   String(process.env.EMAIL_FROM || "").trim() || PRICE_ALERT_FROM_DEFAULT;
 const PRICE_ALERT_REPLY_TO =
   String(process.env.EMAIL_REPLY_TO || "").trim() || "support@hasanchartworld.com";
-const { blockProductionTestRecipientSend } = require("../lib/email-recipient-guard.cjs");
+const { blockProductionTestRecipientSend } = require("./lib/email-recipient-guard.cjs");
 const PRICE_ALERT_SITE_BASE = String(process.env.NEXT_PUBLIC_SITE_URL || "")
   .trim()
   .replace(/\/+$/, "");

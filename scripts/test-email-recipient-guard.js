@@ -9,6 +9,7 @@ const {
   isBlockedProductionRecipientEmail,
   blockProductionTestRecipientSend,
 } = require("../lib/email-recipient-guard.cjs");
+const workerGuard = require("../worker/lib/email-recipient-guard.cjs");
 
 const productionEnv = {
   NEXT_PUBLIC_SUPABASE_URL: "https://lzgsxdsumnteuwtjfqlm.supabase.co",
@@ -20,6 +21,51 @@ const stagingEnv = {
   NODE_ENV: "development",
   HC_ENVIRONMENT: "staging",
 };
+
+const blockedProductionRecipients = [
+  "probe@staging-hcw.test",
+  "user@test.local",
+  "qa@vip-staging-test.invalid",
+  "someone@example.com",
+];
+
+const allowedProductionRecipients = [
+  "member@gmail.com",
+  "user@outlook.com",
+  "contact@custom-domain.co",
+];
+
+test("web and worker guards export identical production semantics", () => {
+  for (const email of blockedProductionRecipients) {
+    assert.equal(
+      isBlockedProductionRecipientEmail(email, productionEnv),
+      workerGuard.isBlockedProductionRecipientEmail(email, productionEnv),
+      email
+    );
+    assert.equal(isBlockedProductionRecipientEmail(email, productionEnv), true, email);
+  }
+
+  for (const email of allowedProductionRecipients) {
+    assert.equal(
+      isBlockedProductionRecipientEmail(email, productionEnv),
+      workerGuard.isBlockedProductionRecipientEmail(email, productionEnv),
+      email
+    );
+    assert.equal(isBlockedProductionRecipientEmail(email, productionEnv), false, email);
+  }
+});
+
+test("worker guard blocks production test recipients before provider send", () => {
+  const blocked = workerGuard.blockProductionTestRecipientSend({
+    path: "worker/lib/email-recipient-guard.cjs",
+    to: "probe@staging-hcw.test",
+    env: productionEnv,
+  });
+
+  assert.equal(blocked?.skipped, true);
+  assert.equal(blocked?.reason, PRODUCTION_TEST_RECIPIENT_BLOCKED_EVENT);
+  assert.equal(blocked?.sent, false);
+});
 
 test("detects production email environment from Supabase project ref", () => {
   assert.equal(isProductionEmailEnvironment(productionEnv), true);
