@@ -96,6 +96,10 @@ function recordPublicationSuccess() {
   currentFunnel.publicationsSuccess += 1;
 }
 
+function recordRssPublished(count = 1) {
+  currentFunnel.rssPublished += count;
+}
+
 function recordPublicationFailure() {
   currentFunnel.publicationFailures += 1;
 }
@@ -115,6 +119,7 @@ module.exports = {
   recordRssCopyBlocked,
   recordPublicationAttempt,
   recordPublicationSuccess,
+  recordRssPublished,
   recordPublicationFailure,
   resetCycleFunnelForTests,
 };

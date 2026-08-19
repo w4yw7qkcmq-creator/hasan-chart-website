@@ -206,7 +206,7 @@ function observeCycleEnd(durationMs, stats = {}) {
     at: Date.now(),
     eligible: (funnel.rssEligible || 0) + (funnel.telegramCandidates || 0),
     editorialEvaluated: funnel.editorialEvaluated || 0,
-    published: (funnel.publicationsSuccess || 0) + (funnel.rssPublished || 0) + (funnel.telegramPublished || 0),
+    published: funnel.publicationsSuccess || 0,
     newObserved: (funnel.rssNew || 0) + (funnel.telegramNew || 0),
   });
   if (pipelineStallWindow.length > ANOMALY_THRESHOLDS.pipelineStallWindowCycles) {

@@ -21,6 +21,12 @@ const {
   validateGeneralRssEditorialOutput,
   buildRawSourceText,
 } = require("./editorial-safety");
+const {
+  buildRssPublicationPresentation,
+  normalizeHeadlineComparable,
+  bodyStartsWithEquivalentHeadline,
+  removeLeadingHeadlineFromBody,
+} = require("./publication-format");
 
 module.exports = {
   GENERAL_RSS_FEEDS,
@@ -46,4 +52,8 @@ module.exports = {
   RSS_EDITORIAL_BLOCK_REASONS,
   validateGeneralRssEditorialOutput,
   buildRawSourceText,
+  buildRssPublicationPresentation,
+  normalizeHeadlineComparable,
+  bodyStartsWithEquivalentHeadline,
+  removeLeadingHeadlineFromBody,
 };

@@ -69,6 +69,7 @@ const {
   validateGeneralRssEditorialOutput,
   buildRawSourceText,
 } = require("./lib/general-rss");
+const { buildRssPublicationPresentation } = require("./lib/general-rss/publication-format");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
 const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
@@ -107,6 +108,7 @@ const {
   recordRssCopyBlocked,
   recordPublicationAttempt,
   recordPublicationSuccess,
+  recordRssPublished,
 } = require("./lib/news-ingestion/cycle-funnel");
 const { recordDecision } = require("./lib/news-intelligence/autonomy/decision-record");
 const { createCorrelationId } = require("./lib/news-intelligence/autonomy/structured-log");
@@ -4009,7 +4011,17 @@ async function fetchForexNews(options = {}) {
       }
 
       const message = aiResult.message;
-      const combinedNewsIdentity = `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
+      const rssPresentation = latestNews.isTelegramSource
+        ? null
+        : buildRssPublicationPresentation({
+            sourceTitle: latestNews.title,
+            editorialMessage: message,
+            imageTitle: aiResult.imageTitle,
+          });
+      const publicationMessage = rssPresentation?.telegramMessage || message;
+      const combinedNewsIdentity = rssPresentation
+        ? rssPresentation.dedupeIdentity
+        : `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
       const combinedTopicCluster = getNewsTopicCluster(combinedNewsIdentity);
 
       if (!latestNews.isTelegramSource) {
@@ -4085,7 +4097,7 @@ async function fetchForexNews(options = {}) {
         }
       }
 
-      const imageTitle = aiResult.imageTitle || latestNews.title;
+      const imageTitle = rssPresentation?.imageTitle || aiResult.imageTitle || latestNews.title;
 
       const veryImportantNews = [
         "fed",
@@ -4159,25 +4171,25 @@ async function fetchForexNews(options = {}) {
             const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
 
             if (photoPath) {
-              await sendTelegramPhoto(message, photoPath);
+              await sendTelegramPhoto(publicationMessage, photoPath);
               stats.telegramPublished += 1;
             } else {
               console.log("⏭️ Image rejected or unavailable. Sending text only.");
-              await sendTelegramMessage(message);
+              await sendTelegramMessage(publicationMessage);
               stats.telegramPublished += 1;
             }
           } else {
-            await sendTelegramMessage(message);
+            await sendTelegramMessage(publicationMessage);
             stats.telegramPublished += 1;
           }
         } else {
-          await sendTelegramMessage(message);
+          await sendTelegramMessage(publicationMessage);
           stats.telegramPublished += 1;
         }
 
         const saveResult = await saveNewsPostToSupabase({
-          title: latestNews.title || imageTitle,
-          content: message,
+          title: rssPresentation?.siteTitle || latestNews.title || imageTitle,
+          content: rssPresentation?.siteContent || publicationMessage,
           image_url: finalImage || null,
           impact_level: latestNews.impactLevel || "MEDIUM",
           source_link: latestLink,
@@ -4186,25 +4198,29 @@ async function fetchForexNews(options = {}) {
           stats.dbFailed += 1;
         } else {
           stats.dbInserted += 1;
-          if (stats.rss) {
-            stats.rss.published = (stats.rss.published || 0) + 1;
-          }
         }
 
         await dispatchMarketNewsNotifications({
-          title: latestNews.title || imageTitle,
+          title: rssPresentation?.siteTitle || latestNews.title || imageTitle,
           sourceLink: latestLink,
           impactLevel: latestNews.impactLevel || "MEDIUM",
         });
         savePublishedNewsLink(latestLink, combinedNewsIdentity);
         await savePublishedNewsToSupabase({
           link: latestLink,
-          title: combinedNewsIdentity,
-          normalized_title: normalizeNewsTitle(combinedNewsIdentity).slice(0, 500),
+          title: rssPresentation
+            ? `${rssPresentation.siteTitle}\n\n${rssPresentation.siteContent}`.slice(0, 500)
+            : combinedNewsIdentity,
+          normalized_title: normalizeNewsTitle(
+            rssPresentation?.siteTitle || combinedNewsIdentity
+          ).slice(0, 500),
           topic_cluster: combinedTopicCluster,
           published_at: new Date().toISOString(),
         });
         recordPublicationSuccess();
+        if (!latestNews.isTelegramSource) {
+          recordRssPublished();
+        }
         recordRssCandidateDecision(latestNews, "PUBLISHED", { aiUsed: true });
       }
 
