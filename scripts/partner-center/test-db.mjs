@@ -24,6 +24,8 @@ const PARTNER_MIGRATION_PREFIXES = [
   "20260812_partner_center",
   "20260813_partner_center",
   "20260814_partner_center",
+  "20260823_partner",
+  "20260824_partner",
 ];
 
 function listPartnerMigrations() {

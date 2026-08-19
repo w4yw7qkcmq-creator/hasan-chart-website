@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, requireSessionUser } from "../../../../lib/auth-session";
-import { getPartnerLeaderboard } from "../../../../lib/partner-analytics";
+import { getPublicPartnerLeaderboard } from "../../../../lib/partner-center/leaderboard-engine.js";
+import { LEADERBOARD_METRICS } from "../../../../lib/partner-center/phase2-constants.js";
+import { assertPublicLeaderboardPayload } from "../../../../lib/partner-center/leaderboard-dto.js";
 
 export const dynamic = "force-dynamic";
+
+const METRIC_ALIASES = Object.freeze({
+  sales: LEADERBOARD_METRICS.CONFIRMED_REVENUE,
+  referrals: LEADERBOARD_METRICS.QUALIFIED_REFERRALS,
+  commissions: LEADERBOARD_METRICS.CONFIRMED_REVENUE,
+});
 
 export async function GET(request) {
   try {
@@ -16,12 +24,26 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const metric = searchParams.get("metric") || "sales";
+    const rawMetric = searchParams.get("metric") || LEADERBOARD_METRICS.QUALIFIED_REFERRALS;
+    const metric = METRIC_ALIASES[rawMetric] || rawMetric;
+    const periodType = searchParams.get("period") || searchParams.get("periodType") || "monthly";
     const limit = Number(searchParams.get("limit") || 20);
 
-    const leaderboard = await getPartnerLeaderboard(getSupabaseAdmin(), { metric, limit });
+    const result = await getPublicPartnerLeaderboard(getSupabaseAdmin(), {
+      metric,
+      periodType,
+      limit,
+    });
 
-    return NextResponse.json({ success: true, leaderboard, metric });
+    assertPublicLeaderboardPayload(result.entries);
+
+    return NextResponse.json({
+      success: true,
+      leaderboard: result.entries,
+      metric: result.rankingMetric,
+      periodKey: result.periodKey,
+      periodType: result.periodType,
+    });
   } catch (error) {
     console.error("Partner leaderboard API error");
     return NextResponse.json(

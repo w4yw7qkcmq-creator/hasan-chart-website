@@ -1,0 +1,18 @@
+{
+  "capturedAt": "2026-08-19T18:40:00.000Z",
+  "deployedCommitAtStart": "83b706f6",
+  "partners": 17,
+  "referrals": 2,
+  "commissions": { "count": 11, "sumUsd": 99.1 },
+  "ledger": { "count": 28, "signedSumUsd": 163.1 },
+  "entitlements": 0,
+  "missionProgress": 0,
+  "milestoneGrants": 0,
+  "campaignParticipants": 0,
+  "performanceGrants": 0,
+  "activeMissions": 5,
+  "activeMilestones": 2,
+  "activeCampaigns": 1,
+  "activePerformanceRules": 0,
+  "wave2Campaign": "wave2_smart_link_challenge"
+}
