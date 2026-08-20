@@ -9,7 +9,6 @@ const {
 const { maybeEnhanceWithAi } = require("./ai-editor");
 const { validateQualityGateV2, BLOCK_REASONS } = require("./quality-gate-v2");
 const { validateNumericTokenIntegrity } = require("./numeric-integrity");
-const { resolvePublicationImage } = require("./image-resolver");
 const { resolveVisualPriority } = require("./interpretation-registry");
 const { getEventFamily } = require("../event-registry");
 
@@ -86,19 +85,6 @@ async function composeSingleEditorial(structuredEvent, options = {}) {
 
   logPhase2Event(PHASE2_EVENTS.QUALITY_GATE_PASSED, { eventType: structuredEvent.eventType });
 
-  const imageResult = await resolvePublicationImage(
-    {
-      ...structured,
-      eventType: structuredEvent.eventType,
-      eventFamily: structuredEvent.eventFamily,
-      releaseTime: structuredEvent.releaseTime,
-    },
-    options
-  );
-  if (!imageResult.ok) {
-    return { ok: false, blocked: true, reason: imageResult.reason, stage: "image", imageResult };
-  }
-
   const latencyMs = Date.now() - startedAt;
   logPhase2Event(PHASE2_EVENTS.ECONOMIC_EDITOR_COMPLETED, {
     eventType: structuredEvent.eventType,
@@ -113,15 +99,15 @@ async function composeSingleEditorial(structuredEvent, options = {}) {
     body,
     deterministic,
     aiMeta,
-    image: imageResult.image,
-    imageMeta: imageResult.meta,
+    image: null,
+    imageMeta: { source: "deferred_to_gateway", visualPriority: structured.visualPriority || resolveVisualPriority(structuredEvent.eventType) },
     visualPriority: structured.visualPriority || resolveVisualPriority(structuredEvent.eventType),
     editorialVersion: EDITORIAL_VERSION,
     latency: {
       totalMs: latencyMs,
       deterministicMs: aiResult.deterministicMs || latencyMs,
       aiMs: aiResult.aiMs || 0,
-      imageMs: imageResult.meta?.latencyMs || 0,
+      imageMs: 0,
     },
   };
 }
@@ -186,19 +172,6 @@ async function composeFamilyEditorial(family, children, options = {}) {
 
   logPhase2Event(PHASE2_EVENTS.QUALITY_GATE_PASSED, { eventFamily: family });
 
-  const imageResult = await resolvePublicationImage(
-    {
-      ...structured,
-      eventType: family,
-      eventFamily: family,
-      releaseTime: children[0]?.releaseTime,
-    },
-    options
-  );
-  if (!imageResult.ok) {
-    return { ok: false, blocked: true, reason: imageResult.reason, stage: "image", imageResult };
-  }
-
   const latencyMs = Date.now() - startedAt;
   logPhase2Event(PHASE2_EVENTS.ECONOMIC_EDITOR_COMPLETED, {
     eventFamily: family,
@@ -213,8 +186,8 @@ async function composeFamilyEditorial(family, children, options = {}) {
     body,
     deterministic: familyInterpretation,
     aiMeta,
-    image: imageResult.image,
-    imageMeta: imageResult.meta,
+    image: null,
+    imageMeta: { source: "deferred_to_gateway", visualPriority: structured.visualPriority },
     visualPriority: structured.visualPriority,
     editorialVersion: EDITORIAL_VERSION,
     familyPublicationKey: `${children[0]?.country || "US"}:${family}:${children[0]?.releaseTime}`,
@@ -222,7 +195,7 @@ async function composeFamilyEditorial(family, children, options = {}) {
       totalMs: latencyMs,
       deterministicMs: aiResult.deterministicMs || latencyMs,
       aiMs: aiResult.aiMs || 0,
-      imageMs: imageResult.meta?.latencyMs || 0,
+      imageMs: 0,
     },
   };
 }

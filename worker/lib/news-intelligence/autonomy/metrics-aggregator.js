@@ -26,6 +26,20 @@ function createEmptyCounters() {
     ai_calls: 0,
     ai_skipped: 0,
     ai_failures: 0,
+    ai_image_attempts: 0,
+    ai_image_successes: 0,
+    ai_image_failures: 0,
+    ai_image_retries: 0,
+    branded_fallback_attempts: 0,
+    branded_fallback_successes: 0,
+    published_with_ai_image: 0,
+    published_with_fallback_image: 0,
+    published_without_image: 0,
+    image_storage_uploaded: 0,
+    image_storage_failed: 0,
+    rss_source_image_found: 0,
+    rss_source_image_missing: 0,
+    rss_published_without_image: 0,
   };
 }
 
@@ -116,6 +130,23 @@ function createMetricsAggregator() {
     globalCounters.ai_failures += 1;
   }
 
+  function recordImageTelemetry(telemetry = {}) {
+    if (telemetry.aiImageAttempted) globalCounters.ai_image_attempts += 1;
+    if (telemetry.aiImageSucceeded) globalCounters.ai_image_successes += 1;
+    if (telemetry.aiImageFailed) globalCounters.ai_image_failures += 1;
+    if (telemetry.aiImageRetryCount) globalCounters.ai_image_retries += telemetry.aiImageRetryCount;
+    if (telemetry.brandedFallbackAttempted) globalCounters.branded_fallback_attempts += 1;
+    if (telemetry.brandedFallbackSucceeded) globalCounters.branded_fallback_successes += 1;
+    if (telemetry.publishedWithAiImage) globalCounters.published_with_ai_image += 1;
+    if (telemetry.publishedWithFallbackImage) globalCounters.published_with_fallback_image += 1;
+    if (telemetry.publishedWithoutImage) globalCounters.published_without_image += 1;
+    if (telemetry.imageStorageUploaded) globalCounters.image_storage_uploaded += 1;
+    if (telemetry.imageStorageFailed) globalCounters.image_storage_failed += 1;
+    if (telemetry.sourceImageFound) globalCounters.rss_source_image_found += 1;
+    if (telemetry.sourceImageMissing) globalCounters.rss_source_image_missing += 1;
+    if (telemetry.rssPublishedWithoutImage) globalCounters.rss_published_without_image += 1;
+  }
+
   function recordRssFetchFailure() {
     globalCounters.rss_fetch_failures += 1;
   }
@@ -164,6 +195,7 @@ function createMetricsAggregator() {
     recordPublicationAllowed,
     recordAiSkipped,
     recordAiFailure,
+    recordImageTelemetry,
     recordRssFetchFailure,
     recordTelegramParseFailure,
     setIncidentOpenCount,

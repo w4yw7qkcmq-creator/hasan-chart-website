@@ -168,10 +168,19 @@ function observePublicationResult(publication = {}, result = {}, options = {}) {
       siteInserted: result.siteInserted,
       partial: result.partial,
     },
-    imageStatus: publication.imagePolicy || publication.metadata?.imagePolicy,
-    aiUsed: publication.metadata?.aiUsed === true,
+    imageStatus:
+      publication.metadata?.imageStatus ||
+      result.imageStatus ||
+      publication.imagePolicy ||
+      publication.metadata?.imagePolicy ||
+      null,
+    aiUsed: publication.metadata?.aiUsed === true || publication.metadata?.imageTelemetry?.publishedWithAiImage === true,
     latency: options.latency,
-    metadata: { attribution },
+    metadata: {
+      attribution,
+      imageTelemetry: publication.metadata?.imageTelemetry || null,
+      imageResult: publication.imageResult || null,
+    },
   });
 
   observeAnomaly({

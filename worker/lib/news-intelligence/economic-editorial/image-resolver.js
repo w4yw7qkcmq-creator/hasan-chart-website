@@ -14,7 +14,7 @@ async function resolvePublicationImage(editorialContext = {}, options = {}) {
       ok: true,
       required: false,
       image: null,
-      meta: { source: "none", latencyMs: Date.now() - startedAt },
+      meta: { source: "none", latencyMs: Date.now() - startedAt, advisory: true },
     };
   }
 
@@ -32,7 +32,7 @@ async function resolvePublicationImage(editorialContext = {}, options = {}) {
       required: decision.level === VISUAL_PRIORITY.REQUIRED,
       image: options.sourceImageUrl,
       imageUrl: options.sourceImageUrl,
-      meta: { source: "external", latencyMs: Date.now() - startedAt },
+      meta: { source: "external", latencyMs: Date.now() - startedAt, advisory: true },
     };
   }
 
@@ -46,11 +46,11 @@ async function resolvePublicationImage(editorialContext = {}, options = {}) {
           required: decision.level === VISUAL_PRIORITY.REQUIRED,
           image: visual.path || null,
           imageUrl: visual.url || null,
-          meta: { source: "category_template", latencyMs: Date.now() - startedAt },
+          meta: { source: "category_template", latencyMs: Date.now() - startedAt, advisory: true },
         };
       }
     } catch {
-      // fall through to branded fallback
+      // fall through
     }
   }
 
@@ -64,7 +64,7 @@ async function resolvePublicationImage(editorialContext = {}, options = {}) {
           required: decision.level === VISUAL_PRIORITY.REQUIRED,
           image: fallback.path || null,
           imageUrl: fallback.url || null,
-          meta: { source: "branded_fallback", latencyMs: Date.now() - startedAt },
+          meta: { source: "branded_fallback", latencyMs: Date.now() - startedAt, advisory: true },
         };
       }
     } catch {
@@ -79,26 +79,31 @@ async function resolvePublicationImage(editorialContext = {}, options = {}) {
       required: decision.level === VISUAL_PRIORITY.REQUIRED,
       image: null,
       imageUrl: "phase2://placeholder-visual",
-      meta: { source: "test_placeholder", latencyMs: Date.now() - startedAt, placeholder: true },
+      meta: { source: "test_placeholder", latencyMs: Date.now() - startedAt, placeholder: true, advisory: true },
     };
   }
 
   if (decision.level === VISUAL_PRIORITY.REQUIRED) {
     logPhase2Event(PHASE2_EVENTS.IMAGE_REQUIRED_UNAVAILABLE, {
       eventType: editorialContext.eventType,
+      warning: "IMAGE_DEFERRED_TEXT_ONLY",
     });
-    return {
-      ok: false,
-      reason: "IMAGE_REQUIRED_UNAVAILABLE",
-      required: true,
-    };
   }
 
   return {
     ok: true,
-    required: false,
+    required: decision.level === VISUAL_PRIORITY.REQUIRED,
     image: null,
-    meta: { source: "optional_missing", latencyMs: Date.now() - startedAt },
+    imageUrl: null,
+    warning:
+      decision.level === VISUAL_PRIORITY.REQUIRED
+        ? "IMPORTANT_NEWS_PUBLISHED_WITHOUT_IMAGE"
+        : "OPTIONAL_IMAGE_MISSING",
+    meta: {
+      source: decision.level === VISUAL_PRIORITY.REQUIRED ? "required_missing" : "optional_missing",
+      latencyMs: Date.now() - startedAt,
+      advisory: true,
+    },
   };
 }
 

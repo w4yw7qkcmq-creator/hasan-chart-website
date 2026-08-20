@@ -56,6 +56,10 @@ const {
   logEconomicReleaseDroppedIncomplete,
 } = require("./lib/economic-releases");
 const { buildPremiumImageContextFromRelease } = require("./lib/news-images/important-events");
+const {
+  resolveNewsImagePolicy,
+  assertRssNeverUsesAi,
+} = require("./lib/news-images/image-policy");
 const { deliverTelegramNewsWithOptionalPhoto } = require("./lib/news-images/telegram-delivery");
 const { discoverTelegramNews } = require("./lib/telegram-news");
 const {
@@ -219,12 +223,14 @@ async function buildTelegramPublishDedupContext() {
   };
 }
 
-async function deliverTelegramNews({ message, candidate }) {
+async function deliverTelegramNews({ message, candidate, imageResult = null }) {
   return deliverTelegramNewsWithOptionalPhoto({
     message,
     candidate,
+    imageResult,
     sendTelegramPhoto,
     sendTelegramMessage,
+    options: { skipPremiumImage: true },
   });
 }
 
@@ -2222,23 +2228,12 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH", premiumImag
   void title;
   void impactLevel;
 
-  let resolvedImageUrl = imageUrl;
-
-  if (!resolvedImageUrl && premiumImageContext) {
-    try {
-      const {
-        resolvePremiumNewsImagePath,
-        generateDeterministicBrandedFallbackImage,
-      } = require("./lib/news-images");
-      resolvedImageUrl = await resolvePremiumNewsImagePath(premiumImageContext);
-      if (!resolvedImageUrl) {
-        const fallback = await generateDeterministicBrandedFallbackImage(premiumImageContext);
-        resolvedImageUrl = fallback?.filePath || null;
-      }
-    } catch (error) {
-      console.error("⚠️ Premium news image generation failed:", error.message);
-    }
+  if (premiumImageContext) {
+    console.warn("createNewsCard ignored premiumImageContext; image generation is handled by publication gateway");
+    return null;
   }
+
+  let resolvedImageUrl = imageUrl;
 
   if (!resolvedImageUrl) {
     return null;
@@ -3521,7 +3516,6 @@ async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
     dryRun,
     allowPlaceholderImage: dryRun,
     skipFamilyAggregation: false,
-    createNewsCard,
   });
   if (!phase2Result.ok) {
     console.log(
@@ -3537,21 +3531,10 @@ async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
   const enrichedPublication = phase2Result.publication;
 
   const gateway = getNewsPublisherGateway();
-  const photoPath = dryRun
-    ? null
-    : enrichedPublication.image ||
-      (await createNewsCard(
-        enrichedPublication.title || imageTitle,
-        null,
-        "HIGH",
-        premiumImageContext
-      ));
-  if (photoPath && !enrichedPublication.image) {
-    enrichedPublication.image = photoPath;
-  }
-
   const gatewayResult = await gateway.publish(enrichedPublication, {
     dryRun,
+    supabase: getSupabaseClient(),
+    resolvePublicationImageResult: require("./lib/news-images/image-orchestrator").resolvePublicationImageResult,
     sendTelegramPhoto,
     sendTelegramMessage,
     saveNewsPostToSupabase,
@@ -4155,6 +4138,13 @@ async function fetchForexNews(options = {}) {
       ].some((keyword) => latestNews.title.toLowerCase().includes(keyword));
 
       let finalImage = null;
+      const rssImagePolicy = resolveNewsImagePolicy({
+        sourceType: SOURCE_TYPES.RSS_GENERAL,
+        publicationType: PUBLICATION_TYPES.GENERAL_NEWS,
+        importance: latestNews.impactLevel || "HIGH",
+      });
+      assertRssNeverUsesAi(rssImagePolicy, "rss_publish");
+
       if (veryImportantNews || latestNews.impactLevel === "HIGH") {
         const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
         const articleImage =

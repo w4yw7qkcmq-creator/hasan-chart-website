@@ -53,6 +53,33 @@ function buildStoredPublicationMetadata(publication, editorial, canonical) {
     eventKey: canonical.eventKey,
     image: publication.image || null,
     imageUrl: publication.imageUrl || null,
+    imageResult: publication.imageResult || null,
+    imagePolicy: publication.imagePolicy || null,
+    imageStatus: publication.metadata?.imageStatus || null,
+    imageTelemetry: publication.metadata?.imageTelemetry || null,
+  };
+}
+
+async function attachPublicationImageResult(publication, deps = {}) {
+  if (publication.imageResult?.generationAttempted) {
+    return publication;
+  }
+  if (typeof deps.resolvePublicationImageResult !== "function") {
+    return publication;
+  }
+
+  const imageResolution = await deps.resolvePublicationImageResult(publication, deps);
+  return {
+    ...publication,
+    imagePolicy: imageResolution.policy?.mode || publication.imagePolicy || null,
+    imageResult: imageResolution.imageResult || null,
+    imageUrl: imageResolution.imageResult?.imageUrl || publication.imageUrl || null,
+    image: imageResolution.imageResult?.filePath || publication.image || null,
+    metadata: {
+      ...(publication.metadata || {}),
+      imageTelemetry: imageResolution.telemetry || null,
+      imageStatus: imageResolution.imageStatus || null,
+    },
   };
 }
 
@@ -63,19 +90,14 @@ function createNewsPublisherGateway(options = {}) {
     const destination = resolveDestination(publication);
     let telegramSent = publicationRecord.telegramLegStatus === LEG_STATUS.SUCCESS;
     let siteInserted = publicationRecord.siteLegStatus === LEG_STATUS.SUCCESS;
+    const imageResult = publication.imageResult || null;
+    const photoPath = imageResult?.filePath || publication.image || null;
+    const siteImageUrl = imageResult?.imageUrl || publication.imageUrl || null;
 
     if (shouldDeliverTelegram(destination) && publicationRecord.telegramLegStatus !== LEG_STATUS.SUCCESS) {
       try {
-        if (deps.deliverTelegramNews) {
-          const delivery = await deps.deliverTelegramNews({
-            message: editorial.body,
-            candidate: publication.metadata?.candidate,
-            imageTitle: publication.title,
-            premiumImageContext: publication.metadata?.premiumImageContext,
-          });
-          telegramSent = delivery?.ok !== false;
-        } else if (deps.sendTelegramPhoto && publication.image) {
-          await deps.sendTelegramPhoto(editorial.body, publication.image);
+        if (photoPath && deps.sendTelegramPhoto) {
+          await deps.sendTelegramPhoto(editorial.body, photoPath);
           telegramSent = true;
         } else if (deps.sendTelegramMessage) {
           const delivery = await deps.sendTelegramMessage(editorial.body);
@@ -87,8 +109,14 @@ function createNewsPublisherGateway(options = {}) {
           telegramSent ? LEG_STATUS.SUCCESS : LEG_STATUS.FAILED
         );
       } catch (error) {
-        await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.FAILED);
-        throw error;
+        if (deps.sendTelegramMessage) {
+          await deps.sendTelegramMessage(editorial.body);
+          telegramSent = true;
+          await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.SUCCESS);
+        } else {
+          await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.FAILED);
+          throw error;
+        }
       }
     }
 
@@ -97,7 +125,7 @@ function createNewsPublisherGateway(options = {}) {
         const saveResult = await deps.saveNewsPostToSupabase({
           title: publication.title,
           content: editorial.body,
-          image_url: publication.imageUrl || null,
+          image_url: siteImageUrl || null,
           impact_level: publication.importance || "HIGH",
           source_link: publication.sourceLink || canonical.eventKey,
         });
@@ -389,7 +417,24 @@ function createNewsPublisherGateway(options = {}) {
         };
       }
 
-      const delivery = await deliverPublicationLegs(publication, editorial, canonical, publicationRecord, deps);
+      const publicationForDelivery = await attachPublicationImageResult(
+        {
+          ...publicationWithCorrelation,
+          eventKey: canonical.eventKey || publication.eventKey || null,
+          eventType: publication.eventType || canonical.eventType || null,
+          importance: publication.importance || "HIGH",
+        },
+        deps
+      );
+      publicationRecord.metadata = buildStoredPublicationMetadata(publicationForDelivery, editorial, canonical);
+
+      const delivery = await deliverPublicationLegs(
+        publicationForDelivery,
+        editorial,
+        canonical,
+        publicationRecord,
+        deps
+      );
       await store.updateDeliveryLeg(
         publicationRecord,
         "telegram",
@@ -419,7 +464,7 @@ function createNewsPublisherGateway(options = {}) {
         publicationRecord,
         editorial,
       };
-      phase3?.observePublicationResult(publicationWithCorrelation, successResult, {
+      phase3?.observePublicationResult(publicationForDelivery, successResult, {
         ...deps,
         correlationId,
         gateway: { retryDelivery },
@@ -472,6 +517,8 @@ function createNewsPublisherGateway(options = {}) {
       facts: stored.facts || {},
       image: stored.image || null,
       imageUrl: stored.imageUrl || null,
+      imageResult: stored.imageResult || null,
+      imagePolicy: stored.imagePolicy || null,
       metadata: stored,
     };
 

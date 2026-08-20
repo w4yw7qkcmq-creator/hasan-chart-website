@@ -4,17 +4,20 @@ const { logAutonomyEvent } = require("./structured-log");
 
 function auditPublishedRecord(input = {}) {
   const issues = [];
+  const warnings = [];
   const publication = input.publication || {};
   const record = input.publicationRecord || {};
   const canonicalFacts = input.canonicalFacts || publication.facts || {};
   const metadata = record.metadata || publication.metadata || {};
+  const imageUrl = publication.imageUrl || publication.imageResult?.imageUrl || metadata.imageUrl || null;
+  const imageRef = publication.image || publication.imageResult?.filePath || metadata.image || null;
 
   if (!record.eventKey && publication.publicationType === "RELEASE") {
     issues.push("missing_publication_identity");
   }
 
-  if (input.requiredImage && !publication.image && !publication.imageUrl) {
-    issues.push("missing_required_image_reference");
+  if (input.requiredImage && !imageRef && !imageUrl) {
+    warnings.push("IMPORTANT_NEWS_PUBLISHED_WITHOUT_IMAGE");
   }
 
   if (canonicalFacts.actual && metadata.facts?.actual && canonicalFacts.actual !== metadata.facts.actual) {
@@ -34,19 +37,29 @@ function auditPublishedRecord(input = {}) {
       severity: SEVERITY.HIGH,
       affectedSource: publication.sourceId,
       affectedEventType: publication.eventType,
-      evidenceSummary: { issues, eventKey: record.eventKey },
+      evidenceSummary: { issues, warnings, eventKey: record.eventKey },
       autoAction: "audit_only",
     });
     logAutonomyEvent("NEWS_POST_PUBLISH_AUDIT_FAILED", {
       eventKey: record.eventKey,
       issues,
+      warnings,
       reasonCode: REASON_CODES.POST_PUBLISH_AUDIT_FAILED,
     });
   } else {
-    logAutonomyEvent("NEWS_POST_PUBLISH_AUDIT_PASSED", { eventKey: record.eventKey });
+    logAutonomyEvent("NEWS_POST_PUBLISH_AUDIT_PASSED", {
+      eventKey: record.eventKey,
+      warnings,
+      imageStatus: metadata.imageStatus || publication.metadata?.imageStatus || null,
+    });
   }
 
-  return { ok, issues, reasonCode: ok ? null : REASON_CODES.POST_PUBLISH_AUDIT_FAILED };
+  return {
+    ok,
+    issues,
+    warnings,
+    reasonCode: ok ? null : REASON_CODES.POST_PUBLISH_AUDIT_FAILED,
+  };
 }
 
 module.exports = {

@@ -279,7 +279,7 @@ function testPostPublishAudit() {
     requiredImage: true,
   });
   assert.strictEqual(audit.ok, false);
-  assert.ok(audit.issues.includes("missing_required_image_reference"));
+  assert.ok(audit.warnings.includes("IMPORTANT_NEWS_PUBLISHED_WITHOUT_IMAGE"));
 }
 
 async function testDeliveryReconciliation() {

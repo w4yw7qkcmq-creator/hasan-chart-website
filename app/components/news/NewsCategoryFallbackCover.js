@@ -20,7 +20,7 @@ export function NewsCategoryFallbackCover({
       <div className="news-fallback-cover__vignette" aria-hidden="true" />
       <div className="news-fallback-cover__glow" aria-hidden="true" />
       <div className="news-fallback-cover__watermark" aria-hidden="true">
-        HC
+        EN
       </div>
 
       {theme.isUrgent ? (

@@ -133,7 +133,7 @@ async function testJoblessClaimsReplayPublication() {
   assert.doesNotMatch(familyResult.body, /https?:\/\//i);
   assert.strictEqual(familyResult.aiMeta.aiUsed, false);
   assert.strictEqual(decideImageRequirement({ eventFamily: "US_WEEKLY_LABOR_CLAIMS" }).level, VISUAL_PRIORITY.REQUIRED);
-  assert.ok(familyResult.imageUrl || familyResult.imageMeta?.placeholder);
+  assert.strictEqual(familyResult.imageMeta?.source, "deferred_to_gateway");
   assert.match(familyResult.body, /مختلطة/);
 
   console.log("JOBLESS_CLAIMS_REPLAY_OUTPUT_START");

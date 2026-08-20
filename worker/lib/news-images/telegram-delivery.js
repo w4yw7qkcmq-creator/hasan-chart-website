@@ -1,6 +1,5 @@
 const fs = require("fs");
-const { buildPremiumImageContextFromCandidate } = require("./important-events");
-const { generatePremiumNewsImage } = require("./index");
+const { createEmptyImageTelemetry } = require("./image-telemetry");
 
 function cleanupTempImageFile(filePath, options = {}) {
   if (!filePath || options.keepFile) {
@@ -15,60 +14,28 @@ function cleanupTempImageFile(filePath, options = {}) {
   }
 }
 
-async function resolvePremiumImageForCandidate(candidate, options = {}) {
-  const context = buildPremiumImageContextFromCandidate(candidate);
-  if (!context) {
-    return null;
-  }
-
-  const baseOptions = {
-    ...options,
-    forceEnabled: options.forceEnabled || undefined,
-  };
-
-  try {
-    const result = await generatePremiumNewsImage(context, baseOptions);
-    if (result?.filePath) {
-      return { ...result, context };
-    }
-  } catch (primaryError) {
-    if (options.provider === "fallback") {
-      throw primaryError;
-    }
-  }
-
-  const fallbackResult = await generatePremiumNewsImage(context, {
-    ...baseOptions,
-    provider: "fallback",
-    forceEnabled: true,
-  });
-
-  if (!fallbackResult?.filePath) {
-    return null;
-  }
-
-  return { ...fallbackResult, context, fallbackFrom: options.provider || "primary" };
-}
-
-async function deliverTelegramNewsWithOptionalPhoto({ message, candidate, sendTelegramPhoto, sendTelegramMessage, options = {} }) {
+async function deliverTelegramNewsWithOptionalPhoto({
+  message,
+  candidate,
+  sendTelegramPhoto,
+  sendTelegramMessage,
+  imageResult = null,
+  options = {},
+}) {
   if (!message || typeof sendTelegramMessage !== "function") {
     throw new Error("deliverTelegramNewsWithOptionalPhoto requires message and sendTelegramMessage");
   }
 
-  let imageResult = null;
-  let delivery = "text";
-
-  if (candidate && !options.skipPremiumImage) {
-    try {
-      imageResult = await resolvePremiumImageForCandidate(candidate, options);
-    } catch (error) {
-      console.error("⚠️ Premium news image generation failed:", error.message);
-    }
+  if (options.skipPremiumImage !== true && candidate && !imageResult) {
+    throw new Error("deliverTelegramNewsWithOptionalPhoto requires pre-resolved imageResult; inline generation is disabled");
   }
 
+  const resolvedImageResult = imageResult || null;
+  let delivery = "text";
+
   try {
-    if (imageResult?.filePath && typeof sendTelegramPhoto === "function") {
-      await sendTelegramPhoto(message, imageResult.filePath, { skipTextFallback: true });
+    if (resolvedImageResult?.filePath && typeof sendTelegramPhoto === "function") {
+      await sendTelegramPhoto(message, resolvedImageResult.filePath, { skipTextFallback: true });
       delivery = "photo";
     } else {
       await sendTelegramMessage(message);
@@ -79,22 +46,22 @@ async function deliverTelegramNewsWithOptionalPhoto({ message, candidate, sendTe
     await sendTelegramMessage(message);
     delivery = "text_after_photo_error";
   } finally {
-    if (imageResult?.filePath) {
-      cleanupTempImageFile(imageResult.filePath, options);
+    if (resolvedImageResult?.filePath) {
+      cleanupTempImageFile(resolvedImageResult.filePath, options);
     }
   }
 
   return {
     delivery,
-    premiumImage: Boolean(imageResult?.filePath),
-    provider: imageResult?.provider || null,
-    fallbackFrom: imageResult?.fallbackFrom || null,
-    eventName: imageResult?.eventName || imageResult?.context?.eventName || null,
+    premiumImage: Boolean(resolvedImageResult?.filePath),
+    provider: resolvedImageResult?.provider || null,
+    fallbackFrom: resolvedImageResult?.fallbackFrom || null,
+    eventName: candidate?.facts?.title || null,
+    telemetry: options.telemetry || createEmptyImageTelemetry(),
   };
 }
 
 module.exports = {
   cleanupTempImageFile,
-  resolvePremiumImageForCandidate,
   deliverTelegramNewsWithOptionalPhoto,
 };

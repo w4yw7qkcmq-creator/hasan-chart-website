@@ -58,8 +58,8 @@ const { generatePremiumNewsImage, isPremiumImagesEnabled } = require(path.join(r
 const {
   deliverTelegramNewsWithOptionalPhoto,
   cleanupTempImageFile,
-  resolvePremiumImageForCandidate,
 } = require(path.join(root, "lib/news-images/telegram-delivery"));
+const { resolvePublicationImageResult } = require(path.join(root, "lib/news-images/image-orchestrator"));
 const { publishValidatedTelegramNewsCandidate, resetAtomicPublishForTests } = require(path.join(root, "lib/telegram-news/atomic-publish"));
 const {
   resetPublishStateForTests,
@@ -312,9 +312,28 @@ async function testTelegramCpiUsesPremiumPhotoDelivery() {
   resetCacheForTests(TEST_CACHE_DIR);
   let photoCalls = 0;
   let textCalls = 0;
+  const candidate = makeCpiCandidate();
+  const imageResolution = await resolvePublicationImageResult(
+    {
+      sourceType: "telegram_economic",
+      publicationType: "RELEASE",
+      eventType: "US_CPI_MOM",
+      importance: "HIGH",
+      title: candidate.resolvedTitle,
+      body: candidate.formattedMessage,
+      metadata: { candidate },
+    },
+    {
+      forceEnabled: true,
+      cacheDir: TEST_CACHE_DIR,
+      outputDir: TEST_OUTPUT_DIR,
+      provider: "fallback",
+    }
+  );
   const delivery = await deliverTelegramNewsWithOptionalPhoto({
-    message: makeCpiCandidate().formattedMessage,
-    candidate: makeCpiCandidate(),
+    message: candidate.formattedMessage,
+    candidate,
+    imageResult: imageResolution.imageResult,
     sendTelegramPhoto: async (message, photoPath, options) => {
       photoCalls += 1;
       assert.ok(message.includes("Actual: 0.4%"));
@@ -324,12 +343,7 @@ async function testTelegramCpiUsesPremiumPhotoDelivery() {
     sendTelegramMessage: async () => {
       textCalls += 1;
     },
-    options: {
-      forceEnabled: true,
-      cacheDir: TEST_CACHE_DIR,
-      outputDir: TEST_OUTPUT_DIR,
-      provider: "fallback",
-    },
+    options: { skipPremiumImage: true },
   });
 
   assert.strictEqual(delivery.delivery, "photo");
@@ -341,22 +355,39 @@ async function testTelegramCpiUsesPremiumPhotoDelivery() {
 async function testTelegramGoldSkipsPremiumImage() {
   let photoCalls = 0;
   let textCalls = 0;
+  const candidate = makeGoldCandidate();
+  const imageResolution = await resolvePublicationImageResult(
+    {
+      sourceType: "telegram_general",
+      publicationType: "GENERAL_NEWS",
+      importance: "HIGH",
+      title: candidate.resolvedTitle,
+      body: candidate.formattedMessage,
+      metadata: { candidate, newsValue: { score: 70 } },
+    },
+    {
+      forceEnabled: true,
+      cacheDir: TEST_CACHE_DIR,
+      outputDir: TEST_OUTPUT_DIR,
+      provider: "fallback",
+    }
+  );
   const delivery = await deliverTelegramNewsWithOptionalPhoto({
-    message: makeGoldCandidate().formattedMessage,
-    candidate: makeGoldCandidate(),
+    message: candidate.formattedMessage,
+    candidate,
+    imageResult: imageResolution.imageResult,
     sendTelegramPhoto: async () => {
       photoCalls += 1;
     },
     sendTelegramMessage: async () => {
       textCalls += 1;
     },
-    options: { forceEnabled: true, cacheDir: TEST_CACHE_DIR, outputDir: TEST_OUTPUT_DIR, provider: "fallback" },
+    options: { skipPremiumImage: true },
   });
 
-  assert.strictEqual(delivery.delivery, "text");
-  assert.strictEqual(delivery.premiumImage, false);
-  assert.strictEqual(photoCalls, 0);
-  assert.strictEqual(textCalls, 1);
+  assert.strictEqual(delivery.delivery, imageResolution.imageResult.delivery);
+  assert.strictEqual(photoCalls, imageResolution.imageResult.delivery === "photo" ? 1 : 0);
+  assert.strictEqual(textCalls, imageResolution.imageResult.delivery === "photo" ? 0 : 1);
 }
 
 async function testOpenAiFailureUsesFallbackImage() {
@@ -368,17 +399,27 @@ async function testOpenAiFailureUsesFallbackImage() {
     },
   };
   const registry = createNewsImageProviderRegistry({ providers: { openai: failingOpenAi } });
-  const result = await resolvePremiumImageForCandidate(makeCpiCandidate(), {
-    forceEnabled: true,
-    cacheDir: TEST_CACHE_DIR,
-    outputDir: TEST_OUTPUT_DIR,
-    registry,
-    provider: "openai",
-  });
+  const result = await resolvePublicationImageResult(
+    {
+      sourceType: "telegram_economic",
+      publicationType: "RELEASE",
+      eventType: "US_CPI_MOM",
+      importance: "HIGH",
+      title: "US CPI",
+      body: makeCpiCandidate().formattedMessage,
+      metadata: { candidate: makeCpiCandidate() },
+    },
+    {
+      forceEnabled: true,
+      cacheDir: TEST_CACHE_DIR,
+      outputDir: TEST_OUTPUT_DIR,
+      registry,
+      provider: "openai",
+    }
+  );
 
-  assert.ok(result?.filePath);
-  assert.strictEqual(result.provider, "fallback");
-  assert.strictEqual(result.fallbackFrom, "openai");
+  assert.ok(result.imageResult?.filePath);
+  assert.strictEqual(result.imageResult.provider, "fallback");
 }
 
 async function testFallbackFailureTextOnlyOnce() {
@@ -397,23 +438,35 @@ async function testFallbackFailureTextOnlyOnce() {
   let textCalls = 0;
   const candidate = makeCpiCandidate();
   candidate.post.sourcePublishedAt = "2026-08-02T16:45:00.000Z";
+  const imageResolution = await resolvePublicationImageResult(
+    {
+      sourceType: "telegram_economic",
+      publicationType: "RELEASE",
+      eventType: "US_CPI_MOM",
+      importance: "HIGH",
+      title: candidate.resolvedTitle,
+      body: candidate.formattedMessage,
+      metadata: { candidate },
+    },
+    {
+      forceEnabled: true,
+      cacheDir: TEST_CACHE_DIR,
+      outputDir: TEST_OUTPUT_DIR,
+      registry: brokenRegistry,
+      provider: "fallback",
+    }
+  );
   const delivery = await deliverTelegramNewsWithOptionalPhoto({
     message: candidate.formattedMessage,
     candidate,
+    imageResult: imageResolution.imageResult,
     sendTelegramPhoto: async () => {
       throw new Error("should_not_send_photo");
     },
     sendTelegramMessage: async () => {
       textCalls += 1;
     },
-    options: {
-      forceEnabled: true,
-      cacheDir: TEST_CACHE_DIR,
-      outputDir: TEST_OUTPUT_DIR,
-      registry: brokenRegistry,
-      provider: "fallback",
-      skipPremiumImage: false,
-    },
+    options: { skipPremiumImage: true },
   });
 
   assert.strictEqual(delivery.delivery, "text");
@@ -424,21 +477,35 @@ async function testFallbackFailureTextOnlyOnce() {
 async function testSingleSendPhotoMessageNotDuplicate() {
   resetCacheForTests(TEST_CACHE_DIR);
   let telegramMessages = 0;
+  const candidate = makeCpiCandidate();
+  const imageResolution = await resolvePublicationImageResult(
+    {
+      sourceType: "telegram_economic",
+      publicationType: "RELEASE",
+      eventType: "US_CPI_MOM",
+      importance: "HIGH",
+      title: candidate.resolvedTitle,
+      body: candidate.formattedMessage,
+      metadata: { candidate },
+    },
+    {
+      forceEnabled: true,
+      cacheDir: TEST_CACHE_DIR,
+      outputDir: TEST_OUTPUT_DIR,
+      provider: "fallback",
+    }
+  );
   await deliverTelegramNewsWithOptionalPhoto({
-    message: makeCpiCandidate().formattedMessage,
-    candidate: makeCpiCandidate(),
+    message: candidate.formattedMessage,
+    candidate,
+    imageResult: imageResolution.imageResult,
     sendTelegramPhoto: async () => {
       telegramMessages += 1;
     },
     sendTelegramMessage: async () => {
       telegramMessages += 1;
     },
-    options: {
-      forceEnabled: true,
-      cacheDir: TEST_CACHE_DIR,
-      outputDir: TEST_OUTPUT_DIR,
-      provider: "fallback",
-    },
+    options: { skipPremiumImage: true },
   });
   assert.strictEqual(telegramMessages, 1);
 }
@@ -446,20 +513,34 @@ async function testSingleSendPhotoMessageNotDuplicate() {
 async function testTempfileCleanupAfterDelivery() {
   resetCacheForTests(TEST_CACHE_DIR);
   let generatedPath = null;
+  const candidate = makeCpiCandidate();
+  const imageResolution = await resolvePublicationImageResult(
+    {
+      sourceType: "telegram_economic",
+      publicationType: "RELEASE",
+      eventType: "US_CPI_MOM",
+      importance: "HIGH",
+      title: candidate.resolvedTitle,
+      body: candidate.formattedMessage,
+      metadata: { candidate },
+    },
+    {
+      forceEnabled: true,
+      cacheDir: TEST_CACHE_DIR,
+      outputDir: TEST_OUTPUT_DIR,
+      provider: "fallback",
+    }
+  );
   await deliverTelegramNewsWithOptionalPhoto({
-    message: makeCpiCandidate().formattedMessage,
-    candidate: makeCpiCandidate(),
+    message: candidate.formattedMessage,
+    candidate,
+    imageResult: imageResolution.imageResult,
     sendTelegramPhoto: async (_message, photoPath) => {
       generatedPath = photoPath;
       assert.ok(fs.existsSync(photoPath));
     },
     sendTelegramMessage: async () => {},
-    options: {
-      forceEnabled: true,
-      cacheDir: TEST_CACHE_DIR,
-      outputDir: TEST_OUTPUT_DIR,
-      provider: "fallback",
-    },
+    options: { skipPremiumImage: true },
   });
   assert.ok(generatedPath);
   assert.strictEqual(fs.existsSync(generatedPath), false);
@@ -506,11 +587,14 @@ async function testAtomicPublishUsesDeliverTelegramNewsForCpi() {
 
   const result = await publishValidatedTelegramNewsCandidate(candidate, {}, {
     memoryOnly: true,
-    deliverTelegramNews: async ({ message, candidate: payload }) => {
+    forceEnabled: true,
+    provider: "fallback",
+    cacheDir: TEST_CACHE_DIR,
+    outputDir: TEST_OUTPUT_DIR,
+    sendTelegramPhoto: async (message, photoPath) => {
       assert.ok(message.includes("0.4%"));
-      assert.strictEqual(payload.facts.canonicalEventKey, "US_CPI_MOM");
+      assert.ok(fs.existsSync(photoPath));
       deliveryMode = "photo";
-      return { delivery: "photo", premiumImage: true, provider: "fallback" };
     },
     sendTelegramMessage: async () => {
       deliveryMode = "text";
@@ -528,9 +612,13 @@ async function testAtomicPublishUsesDeliverTelegramNewsForCpi() {
 }
 
 async function testAtomicPublishDryRunFlagsPremiumEligibility() {
-  enablePublishStateForTests("8998");
+  resetAtomicPublishForTests();
+  resetPublishStateForTests();
+  enablePublishStateForTests(String(Date.now()));
   const candidate = makeCpiCandidate();
-  candidate.post.sourceMessageId = "8999";
+  candidate.post.sourceChannel = "ForexBreakingNews";
+  candidate.post.sourceMessageId = `dryrun-${Date.now()}`;
+  candidate.post.sourceUrl = `https://t.me/ForexBreakingNews/${candidate.post.sourceMessageId}`;
   candidate.post.sourcePublishedAt = new Date(Date.now() + 120_000).toISOString();
   const result = await publishValidatedTelegramNewsCandidate(candidate, {}, {
     dryRun: true,

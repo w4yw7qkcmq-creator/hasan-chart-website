@@ -23,22 +23,7 @@ async function maybeApplyPhase2Editorial(publication, deps = {}) {
   }
 
   const aiEnabled = isPhase2AiEnabled(deps);
-  const brandedFallback =
-    deps.createBrandedFallback ||
-    (typeof deps.createNewsCard === "function"
-      ? async (ctx) => {
-          const fromCard = await deps.createNewsCard(
-            ctx.headline || ctx.eventType,
-            null,
-            ctx.importance || "HIGH",
-            ctx.premiumImageContext || publication.metadata?.premiumImageContext
-          );
-          if (fromCard) {
-            return { path: fromCard };
-          }
-          return createPhase2BrandedFallback(ctx);
-        }
-      : createPhase2BrandedFallback);
+  const brandedFallback = deps.createBrandedFallback || null;
 
   const phase2 = await buildPhase2PublicationRequest(publication, {
     disableAi: !aiEnabled,

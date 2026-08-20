@@ -28,7 +28,7 @@ async function createPhase2BrandedFallback(ctx = {}) {
     country: ctx.country || "US",
     releaseTime: ctx.releaseTime || new Date().toISOString(),
     importance: ctx.importance || "HIGH",
-    brandName: "HasaN CharT World",
+    brandName: "Economic Newsi",
   });
 
   const filePath = result?.filePath;

@@ -1,9 +1,15 @@
 const { PUBLICATION_TYPES, DESTINATIONS, SOURCE_TYPES } = require("./publication-types");
+const { resolveCandidateImportance } = require("../news-images/image-policy");
 
 function buildTelegramPublicationRequest(candidate, validation, ctx = {}) {
   const message = validation.sanitizedMessage || String(candidate.formattedMessage || "").trim();
   const sourceLink =
     candidate.post?.sourceUrl || `telegram:${candidate.post?.sourceChannel}/${candidate.post?.sourceMessageId}`;
+
+  const importance =
+    candidate.newsType === "economic" || candidate.newsType === "pre_event"
+      ? "HIGH"
+      : resolveCandidateImportance({ importance: "MEDIUM", metadata: { candidate, newsValue: candidate.newsValue } });
 
   return {
     eventType: candidate.facts?.canonical?.eventKey || candidate.facts?.eventType || null,
@@ -20,7 +26,7 @@ function buildTelegramPublicationRequest(candidate, validation, ctx = {}) {
     rawSourceText: candidate.post?.rawText || null,
     destination: DESTINATIONS.BOTH,
     sourceLink,
-    importance: candidate.newsType === "economic" ? "HIGH" : "MEDIUM",
+    importance,
     facts: {
       actual: candidate.facts?.actual || candidate.facts?.numbers?.actual,
       forecast: candidate.facts?.forecast || candidate.facts?.numbers?.forecast,
@@ -32,6 +38,7 @@ function buildTelegramPublicationRequest(candidate, validation, ctx = {}) {
       mergeKey: ctx.mergeKey || null,
       rawMessageId: candidate.post?.sourceMessageId || null,
       premiumImageContext: null,
+      newsValue: candidate.newsValue || null,
     },
   };
 }

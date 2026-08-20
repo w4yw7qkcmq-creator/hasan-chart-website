@@ -228,7 +228,8 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   const gateway = getAtomicPublishGateway(deps);
   const gatewayResult = await gateway.publish(enrichedPublication, {
     dryRun: deps.dryRun,
-    deliverTelegramNews: deps.deliverTelegramNews,
+    supabase: deps.supabase || null,
+    resolvePublicationImageResult: require("../news-images/image-orchestrator").resolvePublicationImageResult,
     sendTelegramMessage: deps.sendTelegramMessage,
     sendTelegramPhoto: deps.sendTelegramPhoto,
     saveNewsPostToSupabase: deps.saveNewsPostToSupabase,
