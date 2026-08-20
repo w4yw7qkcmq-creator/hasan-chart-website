@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
@@ -443,6 +443,10 @@ function LayoutPageSlot({ children }) {
 
 const MemoizedLayoutPageSlot = memo(LayoutPageSlot);
 
+const MOBILE_HEADER_SCROLL_MQ = "(max-width: 1023px)";
+const MOBILE_HEADER_TOP_THRESHOLD_PX = 12;
+const MOBILE_HEADER_DIRECTION_DELTA_PX = 10;
+
 function RootLayoutShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -455,6 +459,16 @@ function RootLayoutShell({ children }) {
   const [pushEnrollment, setPushEnrollment] = useState(null);
   const [pushEnrollmentChecking, setPushEnrollmentChecking] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const siteHeaderRef = useRef(null);
+  const siteHeaderSpacerRef = useRef(null);
+  const mobileHeaderScrollRef = useRef({
+    lastY: 0,
+    ticking: false,
+    away: false,
+    revealed: false,
+  });
+  const mobileMenuOpenRef = useRef(mobileMenuOpen);
+  mobileMenuOpenRef.current = mobileMenuOpen;
   const [collapsedGroups, setCollapsedGroups] = useState({
     markets: true,
     services: true,
@@ -510,6 +524,157 @@ function RootLayoutShell({ children }) {
 
   const { overlay: bootstrapOverlay, stallBanner: bootstrapStallBanner } =
     useBootstrapLoadingOverlay(authResolved, { enabled: !isAuthPage });
+
+  const setMobileHeaderSpacer = useCallback((active) => {
+    const header = siteHeaderRef.current;
+    const spacer = siteHeaderSpacerRef.current;
+    if (!header || !spacer) return;
+
+    spacer.style.height = active ? `${header.getBoundingClientRect().height}px` : "0px";
+  }, []);
+
+  const applyMobileHeaderScrollClasses = useCallback(
+    (away, revealed) => {
+      const header = siteHeaderRef.current;
+      if (!header) return;
+
+      const nextAway = Boolean(away);
+      const nextRevealed = Boolean(revealed);
+      const state = mobileHeaderScrollRef.current;
+
+      if (state.away === nextAway && state.revealed === nextRevealed) {
+        return;
+      }
+
+      if (nextAway && !state.away) {
+        setMobileHeaderSpacer(true);
+      } else if (!nextAway && state.away) {
+        setMobileHeaderSpacer(false);
+      }
+
+      state.away = nextAway;
+      state.revealed = nextRevealed;
+      header.classList.toggle("site-top-header--away", nextAway);
+      header.classList.toggle("site-top-header--revealed", nextAway && nextRevealed);
+    },
+    [setMobileHeaderSpacer]
+  );
+
+  useEffect(() => {
+    const header = siteHeaderRef.current;
+    const spacer = siteHeaderSpacerRef.current;
+    if (!header || !spacer || typeof ResizeObserver === "undefined") return undefined;
+
+    const observer = new ResizeObserver(() => {
+      if (mobileHeaderScrollRef.current.away) {
+        spacer.style.height = `${header.getBoundingClientRect().height}px`;
+      }
+    });
+
+    observer.observe(header);
+
+    return () => {
+      observer.disconnect();
+      spacer.style.height = "0px";
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const mediaQuery = window.matchMedia(MOBILE_HEADER_SCROLL_MQ);
+    const state = mobileHeaderScrollRef.current;
+
+    const syncMobileHeaderScroll = () => {
+      if (!mediaQuery.matches) {
+        applyMobileHeaderScrollClasses(false, false);
+        return;
+      }
+
+      if (mobileMenuOpenRef.current) {
+        applyMobileHeaderScrollClasses(true, true);
+        state.lastY = window.scrollY;
+        return;
+      }
+
+      const y = window.scrollY;
+
+      if (y <= MOBILE_HEADER_TOP_THRESHOLD_PX) {
+        applyMobileHeaderScrollClasses(false, false);
+        state.lastY = y;
+        return;
+      }
+
+      const delta = y - state.lastY;
+
+      if (Math.abs(delta) >= MOBILE_HEADER_DIRECTION_DELTA_PX) {
+        applyMobileHeaderScrollClasses(true, delta < 0);
+      } else if (!state.away) {
+        applyMobileHeaderScrollClasses(true, false);
+      }
+
+      state.lastY = y;
+    };
+
+    const onScroll = () => {
+      if (state.ticking) return;
+
+      state.ticking = true;
+      window.requestAnimationFrame(() => {
+        state.ticking = false;
+        syncMobileHeaderScroll();
+      });
+    };
+
+    const onMediaQueryChange = () => {
+      if (!mediaQuery.matches) {
+        applyMobileHeaderScrollClasses(false, false);
+        return;
+      }
+
+      state.lastY = window.scrollY;
+      syncMobileHeaderScroll();
+    };
+
+    state.lastY = window.scrollY;
+    syncMobileHeaderScroll();
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    mediaQuery.addEventListener("change", onMediaQueryChange);
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      mediaQuery.removeEventListener("change", onMediaQueryChange);
+      applyMobileHeaderScrollClasses(false, false);
+    };
+  }, [applyMobileHeaderScrollClasses]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    if (mobileMenuOpen) {
+      applyMobileHeaderScrollClasses(true, true);
+      return undefined;
+    }
+
+    const y = window.scrollY;
+    mobileHeaderScrollRef.current.lastY = y;
+
+    if (y <= MOBILE_HEADER_TOP_THRESHOLD_PX) {
+      applyMobileHeaderScrollClasses(false, false);
+    } else {
+      applyMobileHeaderScrollClasses(true, false);
+    }
+
+    return undefined;
+  }, [mobileMenuOpen, applyMobileHeaderScrollClasses]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    mobileHeaderScrollRef.current.lastY = window.scrollY;
+    applyMobileHeaderScrollClasses(false, false);
+  }, [pathname, applyMobileHeaderScrollClasses]);
 
   useEffect(() => {
     if (!mobileMenuOpen || typeof document === "undefined") return undefined;
@@ -1317,7 +1482,15 @@ function RootLayoutShell({ children }) {
           </aside>
 
           <div className="min-w-0 flex-1 overflow-x-hidden">
-            <header className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl">
+            <div
+              ref={siteHeaderSpacerRef}
+              className="site-top-header-spacer lg:hidden"
+              aria-hidden="true"
+            />
+            <header
+              ref={siteHeaderRef}
+              className="site-top-header sticky top-0 z-40 overflow-visible px-4 md:px-6 py-4 backdrop-blur-2xl"
+            >
               <div className="site-top-header__gradient pointer-events-none absolute inset-0" />
               <div className="site-top-header__row relative z-10 flex min-w-0 w-full items-center gap-1 sm:gap-2">
                 <button

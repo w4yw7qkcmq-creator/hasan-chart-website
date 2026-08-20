@@ -1266,6 +1266,37 @@ html[data-theme="light"] aside .sidebar-section-toggle > span:first-child {
   color: var(--header-text);
 }
 
+.site-top-header-spacer {
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 1023px) {
+  .site-top-header {
+    transition: transform 0.22s ease-out;
+    will-change: transform;
+  }
+
+  .site-top-header--away {
+    position: fixed;
+    top: 0;
+    inset-inline: 0;
+    width: 100%;
+    z-index: 40;
+  }
+
+  .site-top-header--away:not(.site-top-header--revealed) {
+    transform: translate3d(0, calc(-100% - env(safe-area-inset-top, 0px)), 0);
+    pointer-events: none;
+  }
+
+  .site-top-header--away.site-top-header--revealed {
+    transform: translate3d(0, 0, 0);
+    pointer-events: auto;
+  }
+}
+
 .site-top-header__gradient {
   background:
     radial-gradient(circle at 20% 10%, rgba(11, 99, 255, 0.2), transparent 28%),
