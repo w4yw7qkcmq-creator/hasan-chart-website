@@ -136,7 +136,16 @@ function buildMinimalStructuredFallback(structuredFacts = {}, facts = {}) {
   const primaryFact = extractPrimaryFact(structuredFacts);
   const numbers = (structuredFacts.keyNumbers || []).slice(0, 2);
   const bullets = numbers.length
-    ? numbers.map((num) => `الرقم الرئيسي: ${num}`)
+    ? numbers.map((num, index) => {
+        const label = /%/.test(String(num))
+          ? "القراءة"
+          : /(?:k|m|b)$/i.test(String(num))
+            ? "المستوى"
+            : index === 0
+              ? "السعر"
+              : "المستوى";
+        return `${label}: ${num}`;
+      })
     : extractSupportingFacts(structuredFacts, primaryFact).slice(0, 2);
 
   return {

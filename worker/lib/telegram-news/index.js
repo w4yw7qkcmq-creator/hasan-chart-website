@@ -181,6 +181,7 @@ async function discoverTelegramNews(options = {}) {
     });
   }
 
+  let bufferSubmittedKeys = new Set();
   if (buffer && isBaselineReadyForPublish()) {
     for (const post of posts) {
       const publishable = isSourcePublishable(post);
@@ -198,17 +199,27 @@ async function discoverTelegramNews(options = {}) {
       const result = buffer.submit(post);
       if (!result?.skip) {
         bufferSubmitted += 1;
+        bufferSubmittedKeys.add(`${post.sourceChannel}:${post.sourceMessageId}`);
       }
     }
 
     if (options.dryRun || options.flushImmediately) {
       bufferFlushed = await buffer.flushAllSync(options);
+      for (const item of bufferFlushed) {
+        const post = item?.post;
+        if (post?.sourceChannel && post?.sourceMessageId) {
+          bufferSubmittedKeys.delete(`${post.sourceChannel}:${post.sourceMessageId}`);
+        }
+      }
     }
   }
 
   for (const post of posts) {
     const classified = classifyTelegramMessage(post.sourceChannel, post);
     if (!classified.new) continue;
+    if (bufferSubmittedKeys.has(`${post.sourceChannel}:${post.sourceMessageId}`)) {
+      continue;
+    }
     const matchingProcessed = processed.filter(
       (item) =>
         item.post?.sourceChannel === post.sourceChannel &&

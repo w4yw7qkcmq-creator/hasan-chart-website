@@ -1,5 +1,10 @@
-const { resolveCanonicalEventKey } = require("../economic-releases/canonical-events");
+const {
+  resolveCanonicalEventKey,
+  CANONICAL_EVENT_DEFINITIONS,
+} = require("../economic-releases/canonical-events");
+const { resolveEventTypeFromAliases } = require("../news-intelligence/event-registry");
 const { extractNumbers } = require("./fingerprint");
+const { normalizeTitleText, isGenericTitle } = require("./editorial-title");
 
 const FIELD_PATTERNS = {
   previous: [
@@ -62,6 +67,23 @@ function extractPeriod(text) {
   return match ? match[0] : null;
 }
 
+function stripLeadingDecorations(line) {
+  return String(line || "")
+    .replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+/gu, "")
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+    .replace(/🇺🇸|🇪🇺|🇬🇧/gu, "")
+    .replace(/^(?:أمريكا|امريكا)\s*[-–—]\s*/i, "")
+    .trim();
+}
+
+function isBreakingHeaderOnlyLine(line) {
+  const cleaned = normalizeTitleText(stripLeadingDecorations(line));
+  if (!cleaned) {
+    return true;
+  }
+  return isGenericTitle(cleaned);
+}
+
 function extractEventTitle(text) {
   const lines = String(text || "")
     .split("\n")
@@ -69,7 +91,7 @@ function extractEventTitle(text) {
     .filter(Boolean);
 
   for (const line of lines) {
-    if (/^(?:صدر الآن|صدر الان|🚨|🟥|🔴)/i.test(line)) {
+    if (isBreakingHeaderOnlyLine(line)) {
       continue;
     }
     if (/السابق|المتوقع|التقدير|الحالي|النتيجة|actual|forecast|previous/i.test(line)) {
@@ -78,12 +100,15 @@ function extractEventTitle(text) {
     if (/^[•▪️▫️⬅️👉📊💎🔵]/.test(line)) {
       continue;
     }
-    const cleaned = line
-      .replace(/^[\W_]+/u, "")
-      .replace(/🇺🇸|🇪🇺|🇬🇧/gu, "")
-      .replace(/^(?:أمريكا|امريكا)\s*[-–—]\s*/i, "")
-      .trim();
-    if (cleaned.length >= 4 && cleaned.length <= 120) {
+    const cleaned = stripLeadingDecorations(line);
+    if (cleaned.length >= 4 && cleaned.length <= 120 && !isGenericTitle(cleaned)) {
+      return cleaned;
+    }
+  }
+
+  for (const line of lines) {
+    const cleaned = stripLeadingDecorations(line);
+    if (cleaned.length >= 4 && cleaned.length <= 120 && !isGenericTitle(cleaned)) {
       return cleaned;
     }
   }
@@ -99,6 +124,14 @@ function resolveCanonicalForTelegram(text) {
       arabicName: "مؤشر S&P Global PMI",
       requiresTripleTemplate: true,
       eventType: "structured_release",
+    };
+  }
+
+  const aliasEventKey = resolveEventTypeFromAliases(value);
+  if (aliasEventKey && CANONICAL_EVENT_DEFINITIONS[aliasEventKey]) {
+    return {
+      eventKey: aliasEventKey,
+      ...CANONICAL_EVENT_DEFINITIONS[aliasEventKey],
     };
   }
 
@@ -156,6 +189,7 @@ function extractFactsFromTelegramPost(post) {
   const title = extractEventTitle(text);
   const period = extractPeriod(text);
   const canonical = resolveCanonicalForTelegram(`${title || ""} ${text}`);
+  const resolvedEventKey = canonical.eventKey || resolveEventTypeFromAliases(`${title || ""} ${text}`);
   const isPlainFedNews =
     canonical.eventType === "plain_news" ||
     ["US_POWELL_SPEECH", "US_FED_STATEMENT"].includes(canonical.eventKey);
@@ -184,10 +218,13 @@ function extractFactsFromTelegramPost(post) {
     sourceMessageId: post.sourceMessageId,
     sourceUrl: post.sourceUrl,
     sourcePublishedAt: post.sourcePublishedAt,
-    canonicalEventKey: canonical.eventKey,
+    canonicalEventKey: resolvedEventKey || canonical.eventKey,
     title,
     country,
-    eventType: canonical.eventType || (isStructuredTriple ? "structured_release" : "general"),
+    eventType:
+      resolvedEventKey ||
+      (canonical.eventKey && canonical.eventKey !== "US_CPI_GENERIC" ? canonical.eventKey : null) ||
+      (isStructuredTriple ? "structured_release" : "general"),
     period,
     previous,
     revisedPrevious,

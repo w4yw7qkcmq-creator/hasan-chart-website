@@ -26,6 +26,17 @@ const ARABIC_ALIASES = {
     /طلبات إعانة البطالة المستمرة/i,
     /المطالبات المستمرة/i,
   ],
+  US_PHILADELPHIA_FED_MANUFACTURING: [
+    /philadelphia fed(?:eral)?(?:\s+bank)?(?:\s+manufacturing|\s+business outlook|\s+index)?/i,
+    /philly fed(?:eral)?(?:\s+manufacturing|\s+business outlook|\s+index)?/i,
+    /philadelphia fed manufacturing index/i,
+    /philly fed manufacturing index/i,
+    /philadelphia fed business outlook/i,
+    /philly fed index/i,
+    /مؤشر فيلادلفيا/i,
+    /فيلادلفيا للصناعات/i,
+    /الصناعات التحويلية/i,
+  ],
 };
 
 function normalizeAliasText(value) {

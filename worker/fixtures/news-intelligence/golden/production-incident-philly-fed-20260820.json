@@ -1,0 +1,18 @@
+{
+  "name": "production-incident-philly-fed-20260820",
+  "sourceText": "🚨 صدر الآن\nمؤشر فيلادلفيا للصناعات التحويلية\n🇺🇸 USA\n\n▪️ السابق: 41.4\n▪️ المتوقع: 24.1\n▫️ الحالي: 47.4\n\n➡️ النتيجة إيجابية للدولار",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "incident-philly-20260820",
+    "sourcePublishedAt": "2026-08-20T12:30:00.000Z",
+    "sourceUrl": "https://t.me/s/ForexBreakingNews/incident-philly-20260820"
+  },
+  "expected": {
+    "canonicalEventKey": "US_PHILADELPHIA_FED_MANUFACTURING",
+    "actual": "47.4",
+    "forecast": "24.1",
+    "previous": "41.4",
+    "isStructuredTriple": true,
+    "titleContains": "فيلادelfia"
+  }
+}

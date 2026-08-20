@@ -87,6 +87,13 @@ const INTERPRETATION_METADATA = {
     visualPriority: "REQUIRED",
     pmiThreshold: 50,
   },
+  US_PHILADELPHIA_FED_MANUFACTURING: {
+    betterWhen: "HIGHER",
+    marketSensitivity: ["USD", "EQUITIES"],
+    importance: "HIGH",
+    visualPriority: "REQUIRED",
+    pmiThreshold: 0,
+  },
   US_ISM_SERVICES: {
     betterWhen: "HIGHER",
     marketSensitivity: ["USD", "EQUITIES"],

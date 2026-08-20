@@ -1,0 +1,18 @@
+{
+  "name": "production-incident-jobless-claims-ar-20260820",
+  "sourceText": "🚨 صدر الآن\nمعدلات الشكاوى من البطالة\n🇺🇸 USA\n\n▪️ السابق: 209K\n▪️ المتوقع: 210K\n▫️ الحالي: 206K\n\n➡️ النتيجة إيجابية للدولار",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "incident-jc-20260820",
+    "sourcePublishedAt": "2026-08-20T12:30:00.000Z",
+    "sourceUrl": "https://t.me/s/ForexBreakingNews/incident-jc-20260820"
+  },
+  "expected": {
+    "canonicalEventKey": "US_INITIAL_JOBLESS_CLAIMS",
+    "actual": "206K",
+    "forecast": "210K",
+    "previous": "209K",
+    "eventFamily": "US_WEEKLY_LABOR_CLAIMS",
+    "isStructuredTriple": true
+  }
+}

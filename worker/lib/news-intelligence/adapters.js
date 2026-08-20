@@ -1,5 +1,23 @@
 const { PUBLICATION_TYPES, DESTINATIONS, SOURCE_TYPES } = require("./publication-types");
 const { resolveCandidateImportance } = require("../news-images/image-policy");
+const { resolveEventTypeFromAliases } = require("./event-registry");
+const { CANONICAL_EVENT_DEFINITIONS } = require("../economic-releases/canonical-events");
+
+function resolvePublicationEventType(candidate = {}) {
+  const facts = candidate.facts || {};
+  if (facts.canonicalEventKey && CANONICAL_EVENT_DEFINITIONS[facts.canonicalEventKey]) {
+    return facts.canonicalEventKey;
+  }
+  const combined = `${facts.title || ""}\n${candidate.post?.rawText || ""}`;
+  const aliasEventType = resolveEventTypeFromAliases(combined);
+  if (aliasEventType) {
+    return aliasEventType;
+  }
+  if (facts.canonical?.eventKey && facts.canonical.eventKey !== "US_CPI_GENERIC") {
+    return facts.canonical.eventKey;
+  }
+  return null;
+}
 
 function buildTelegramPublicationRequest(candidate, validation, ctx = {}) {
   const message = validation.sanitizedMessage || String(candidate.formattedMessage || "").trim();
@@ -11,8 +29,10 @@ function buildTelegramPublicationRequest(candidate, validation, ctx = {}) {
       ? "HIGH"
       : resolveCandidateImportance({ importance: "MEDIUM", metadata: { candidate, newsValue: candidate.newsValue } });
 
+  const eventType = resolvePublicationEventType(candidate);
+
   return {
-    eventType: candidate.facts?.canonical?.eventKey || candidate.facts?.eventType || null,
+    eventType,
     eventKey: null,
     country: candidate.facts?.canonical?.country || "US",
     releaseDate: candidate.post?.sourcePublishedAt || candidate.facts?.scheduledAt || null,
@@ -74,4 +94,5 @@ function buildStructuredEconomicPublicationRequest(result, options = {}) {
 module.exports = {
   buildTelegramPublicationRequest,
   buildStructuredEconomicPublicationRequest,
+  resolvePublicationEventType,
 };

@@ -1,0 +1,26 @@
+{
+  "name": "production-incident-gold-malformed-editorial-20260820",
+  "malformedBody": "🚨 الذهب يسجل تحركًا ملحوظًا في الجلسة\nالذهب يتراجع للأسواق... الذهب يقفز فوق 4530\n\nأبرز التفاصيل:\n• الرقم الرئيسي: 4530\n• الرقم الرئيسي: 4532\n\n📊 التأثير المحتمل:\nقد تؤثر هذه التطورات على الدولار والذهب والنفط ومزاج المخاطر في الأسواق.",
+  "publication": {
+    "publicationType": "GENERAL_NEWS",
+    "sourceType": "telegram_general",
+    "sourceId": "ForexBreakingNews",
+    "importance": "HIGH",
+    "title": "الذهب يسجل تحركًا ملحوظًا في الجلسة",
+    "rawSourceText": "Gold jumps above 4530 during the session while markets watch 4532.",
+    "metadata": {
+      "candidate": {
+        "facts": {
+          "title": "Gold price update",
+          "detailLines": ["Gold traded near 4532 after touching 4530 in the session."],
+          "factualSummary": "Gold traded near 4532 after touching 4530 in the session.",
+          "entities": ["gold"]
+        }
+      }
+    }
+  },
+  "expected": {
+    "malformedValidationFails": true,
+    "mustNotReachGatewayAsMalformed": true
+  }
+}

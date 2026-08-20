@@ -11,6 +11,8 @@ const {
 const { allowMemoryIdempotencyFallback, isProductionRuntime } = require("./runtime-mode");
 const { evaluateCopySimilarity } = require("./copy-similarity-guard");
 const { extractFactsFromTelegramPost } = require("../telegram-news/extractor");
+const { validateAndRepairPublicationSemantics } = require("./editorial-repair");
+const { BLOCK_REASONS: SEMANTIC_BLOCK_REASONS } = require("./semantic-publication-validation");
 const phase3 = (() => {
   try {
     return require("./autonomy/integration");
@@ -23,6 +25,7 @@ const BLOCK_REASONS = {
   ...EDITORIAL_BLOCK_REASONS,
   ...SOURCE_BLOCK_REASONS,
   ...STORE_BLOCK_REASONS,
+  ...SEMANTIC_BLOCK_REASONS,
 };
 
 function resolveDestination(publication) {
@@ -302,13 +305,40 @@ function createNewsPublisherGateway(options = {}) {
     const destination = resolveDestination(publication);
     let publicationRecord = null;
 
+    let publicationForSemantics = publicationWithCorrelation;
+    let editorialForDelivery = editorial;
+
+    if (publicationType === PUBLICATION_TYPES.GENERAL_NEWS && !numericEconomic) {
+      const semanticResult = validateAndRepairPublicationSemantics(
+        publicationWithCorrelation,
+        editorial,
+        deps
+      );
+      if (!semanticResult.ok) {
+        const blocked = {
+          blocked: true,
+          reason: semanticResult.reason || BLOCK_REASONS.SEMANTIC_PUBLICATION_INVALID,
+          stage: semanticResult.stage || "semantic_validation",
+          validation: semanticResult.validation || null,
+        };
+        phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+          ...deps,
+          correlationId,
+          latency: { totalMs: Date.now() - ingestStartedAt },
+        });
+        return blocked;
+      }
+      publicationForSemantics = semanticResult.publication;
+      editorialForDelivery = semanticResult.editorial;
+    }
+
     if (numericEconomic && publicationType === PUBLICATION_TYPES.RELEASE && canonical.eventKey) {
       const identity = await store.acquirePublicationIdentity({
         eventKey: canonical.eventKey,
         publicationType,
         sourceType: publication.sourceType,
         sourceId: publication.sourceId,
-        metadata: buildStoredPublicationMetadata(publication, editorial, canonical),
+        metadata: buildStoredPublicationMetadata(publicationForSemantics, editorialForDelivery, canonical),
       });
 
       if (!identity.acquired) {
@@ -384,10 +414,10 @@ function createNewsPublisherGateway(options = {}) {
         published: true,
         eventKey: canonical.eventKey,
         canonical,
-        message: editorial.body,
+        message: editorialForDelivery.body,
         publicationRecord,
       };
-      phase3?.observePublicationResult(publicationWithCorrelation, dryRunResult, {
+      phase3?.observePublicationResult(publicationForSemantics, dryRunResult, {
         ...deps,
         correlationId,
         latency: { totalMs: Date.now() - ingestStartedAt },
@@ -425,18 +455,22 @@ function createNewsPublisherGateway(options = {}) {
 
       const publicationForDelivery = await attachPublicationImageResult(
         {
-          ...publicationWithCorrelation,
+          ...publicationForSemantics,
           eventKey: canonical.eventKey || publication.eventKey || null,
           eventType: publication.eventType || canonical.eventType || null,
           importance: publication.importance || "HIGH",
         },
         deps
       );
-      publicationRecord.metadata = buildStoredPublicationMetadata(publicationForDelivery, editorial, canonical);
+      publicationRecord.metadata = buildStoredPublicationMetadata(
+        publicationForDelivery,
+        editorialForDelivery,
+        canonical
+      );
 
       const delivery = await deliverPublicationLegs(
         publicationForDelivery,
-        editorial,
+        editorialForDelivery,
         canonical,
         publicationRecord,
         deps
@@ -468,7 +502,7 @@ function createNewsPublisherGateway(options = {}) {
         telegramSent: delivery.telegramSent,
         siteInserted: delivery.siteInserted,
         publicationRecord,
-        editorial,
+        editorial: editorialForDelivery,
       };
       phase3?.observePublicationResult(publicationForDelivery, successResult, {
         ...deps,

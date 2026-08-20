@@ -141,6 +141,23 @@ const CANONICAL_EVENT_DEFINITIONS = {
     requiresTripleTemplate: true,
     eventType: "structured_release",
   },
+  US_PHILADELPHIA_FED_MANUFACTURING: {
+    patterns: [
+      /philadelphia fed(?:eral)?(?:\s+bank)?(?:\s+manufacturing|\s+business outlook|\s+index)?/i,
+      /philly fed(?:eral)?(?:\s+manufacturing|\s+business outlook|\s+index)?/i,
+      /philadelphia fed manufacturing index/i,
+      /philly fed manufacturing index/i,
+      /philadelphia fed business outlook/i,
+    ],
+    calendarPatterns: [
+      /philadelphia fed manufacturing/i,
+      /philly fed manufacturing/i,
+      /philadelphia fed business outlook/i,
+    ],
+    arabicName: "مؤشر فيلادلفيا للصناعات التحويلية",
+    requiresTripleTemplate: true,
+    eventType: "structured_release",
+  },
   US_SP_GLOBAL_PMI: {
     patterns: [/s&p global.*pmi|sp global.*pmi|s&p global manufacturing|sp global manufacturing/i],
     calendarPatterns: [/s&p global.*pmi|sp global.*pmi/i],
@@ -275,7 +292,7 @@ function isStructuredTripleReleaseTitle(title) {
     return false;
   }
 
-  return /jobless claims|initial claims|continuing claims|unemployment claims|unemployment rate|\bcpi\b|core cpi|\bppi\b|\bpce\b|\bnfp\b|nonfarm payrolls|consumer confidence|consumer sentiment|retail sales|\bism\b|\bpmi\b|\bgdp\b|fomc|rate decision|interest rate decision|التضخم|البطالة|الوظائف|طلبات إعانة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|قرار الفائدة/i.test(
+  return /jobless claims|initial claims|continuing claims|unemployment claims|unemployment rate|\bcpi\b|core cpi|\bppi\b|\bpce\b|\bnfp\b|nonfarm payrolls|consumer confidence|consumer sentiment|retail sales|\bism\b|\bpmi\b|philadelphia fed|philly fed|\bgdp\b|fomc|rate decision|interest rate decision|التضخم|البطالة|الوظائف|طلبات إعانة|ثقة المستهلك|مبيعات التجزئة|الناتج المحلي|قرار الفائدة|فيلادلفيا|مؤشر فيلادلفيا/i.test(
     value
   );
 }
