@@ -1,42 +1,38 @@
 import { NextResponse } from "next/server";
+import {
+  applyVerifiedSessionCookies,
+  parseSyncSessionTokens,
+  verifySessionTokensForCookieSync,
+} from "../../../../lib/auth-sync-session-server";
+import {
+  crossOriginRequestResponse,
+  isCrossOriginRequest,
+} from "../../../../lib/security/same-origin-request";
 
 export async function POST(request) {
   try {
-    const body = await request.json().catch(() => null);
-    const accessToken = String(body?.access_token || "").trim();
-    const refreshToken = String(body?.refresh_token || "").trim();
-    const expiresIn = Number(body?.expires_in || 3600);
+    if (isCrossOriginRequest(request)) {
+      return crossOriginRequestResponse();
+    }
 
-    if (!accessToken || !refreshToken) {
+    const body = await request.json().catch(() => null);
+    const { accessToken, refreshToken } = parseSyncSessionTokens(body);
+
+    const verified = await verifySessionTokensForCookieSync(accessToken, refreshToken);
+
+    if (!verified.ok) {
       return NextResponse.json(
-        { success: false, error: "Session tokens are required" },
-        { status: 400 }
+        { success: false, error: verified.error },
+        { status: verified.status }
       );
     }
 
     const response = NextResponse.json({ success: true });
-    const isProduction = process.env.NODE_ENV === "production";
-
-    response.cookies.set("hc_access_token", accessToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax",
-      path: "/",
-      maxAge: expiresIn,
-    });
-
-    response.cookies.set("hc_refresh_token", refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
+    applyVerifiedSessionCookies(response, verified.session);
     return response;
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: error?.message || "Failed to sync session cookies" },
+      { success: false, error: "Failed to sync session cookies" },
       { status: 500 }
     );
   }

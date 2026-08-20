@@ -1,6 +1,7 @@
-import { getSupabaseAdmin } from "../../../../lib/auth-session";
+import { requireSessionUser } from "../../../../lib/auth-session";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
-import { getClientIp, pushUnsubscribeIpLimiter } from "../../../../lib/rate-limit";
+import { deleteOwnedPushSubscription } from "../../../../lib/push-subscriptions-server";
+import { getClientIp, pushSubscribeLimiter, pushUnsubscribeIpLimiter } from "../../../../lib/rate-limit";
 import { logApiError, logApiRequest } from "../../../../lib/structured-logger";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,24 @@ export async function POST(request) {
       return rateLimited;
     }
 
+    const session = await requireSessionUser();
+
+    if (session.error) {
+      return Response.json(
+        {
+          success: false,
+          error: "يجب تسجيل الدخول قبل إلغاء اشتراك الإشعارات",
+        },
+        { status: 401 }
+      );
+    }
+
+    const userRateLimited = await enforceRateLimit(pushSubscribeLimiter, session.id);
+
+    if (userRateLimited) {
+      return userRateLimited;
+    }
+
     const body = await request.json().catch(() => null);
     const endpoint = String(body?.endpoint || "").trim();
 
@@ -30,8 +49,10 @@ export async function POST(request) {
       );
     }
 
-    const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    const { error } = await deleteOwnedPushSubscription({
+      userId: session.id,
+      endpoint,
+    });
 
     if (error) {
       logApiError({
