@@ -11,7 +11,7 @@ import { REVALIDATE_CONTENT_POSTS_PAGE } from "../../../../lib/public-cache-conf
 import { fetchPublishedContentPostBySlug } from "../../../../lib/content-posts";
 import { normalizeContentPostSlugParam } from "../../../../lib/content-post-public.js";
 
-export const revalidate = REVALIDATE_CONTENT_POSTS_PAGE;
+export const revalidate = 300;
 
 export async function generateMetadata({ params }) {
   const resolved = await params;

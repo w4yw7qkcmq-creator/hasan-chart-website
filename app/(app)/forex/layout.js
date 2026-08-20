@@ -1,7 +1,7 @@
 import ForexPageJsonLd from "../../components/forex/ForexPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
-export const revalidate = REVALIDATE_STATIC_MARKETING;
+export const revalidate = 3600;
 
 
 export const metadata = buildPublicPageMetadata({

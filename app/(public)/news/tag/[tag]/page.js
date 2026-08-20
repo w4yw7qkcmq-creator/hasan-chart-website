@@ -10,7 +10,7 @@ import { REVALIDATE_PUBLIC_NEWS } from "../../../../../lib/public-cache-config";
 import { getCachedNewsList } from "../../../../../lib/server-news-cache";
 import { NEWS_TAG_LIST_LIMIT } from "../../../../../lib/public-cache-config";
 
-export const revalidate = REVALIDATE_PUBLIC_NEWS;
+export const revalidate = 120;
 
 const TAG_CONFIG = {
   bitcoin: {

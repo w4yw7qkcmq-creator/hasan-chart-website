@@ -10,7 +10,6 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   experimental: {
-    instrumentationHook: true,
     optimizePackageImports: [
       "@supabase/supabase-js",
       "@tanstack/react-virtual",

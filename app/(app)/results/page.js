@@ -10,7 +10,7 @@ import {
 import { REVALIDATE_CONTENT_POSTS_PAGE } from "../../../lib/public-cache-config";
 import { fetchPublishedContentPosts } from "../../../lib/content-posts";
 
-export const revalidate = REVALIDATE_CONTENT_POSTS_PAGE;
+export const revalidate = 300;
 
 export const metadata = buildPublicMetadata({
   path: "/results",

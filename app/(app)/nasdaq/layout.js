@@ -2,7 +2,7 @@ import AssetPageJsonLd from "../../components/asset-hub/AssetPageJsonLd";
 import { nasdaqAssetConfig } from "../../components/asset-hub/configs/nasdaq";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_ASSET_HUB } from "../../../lib/public-cache-config";
-export const revalidate = REVALIDATE_ASSET_HUB;
+export const revalidate = 300;
 
 
 export const metadata = buildPublicPageMetadata({

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { cache } from "react";
+import CopyArticleButtonClientOnly from "../CopyArticleButtonClientOnly";
 import { NewsArticleCoverImage } from "../../../components/news/NewsCoverImage";
 import NewsServiceLinks from "../../../components/news/NewsServiceLinks";
 import NewsRelatedAssets from "../../../components/news/NewsRelatedAssets";
@@ -38,19 +38,13 @@ import {
   SITE_URL,
 } from "../../../../lib/seo";
 import { getNewsTopicServiceLinks } from "../../../../lib/internal-links";
-import { REVALIDATE_PUBLIC_NEWS } from "../../../../lib/public-cache-config";
 import {
   getCachedAdjacentNews,
   getCachedNewsPost,
   getCachedRelatedNews,
 } from "../../../../lib/server-news-cache";
 
-const CopyArticleButton = dynamic(() => import("../../../components/CopyArticleButton"), {
-  ssr: false,
-  loading: () => null,
-});
-
-export const revalidate = REVALIDATE_PUBLIC_NEWS;
+export const revalidate = 120;
 
 const getNewsArticleForRequest = cache(async (identifier) => {
   return getCachedNewsPost(identifier);
@@ -279,7 +273,7 @@ export default async function NewsDetailsPage({ params }) {
         </Link>
 
         <div className="flex flex-wrap items-center gap-3">
-          <CopyArticleButton url={articleUrl} />
+          <CopyArticleButtonClientOnly url={articleUrl} />
           <a
             href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(title)}`}
             target="_blank"

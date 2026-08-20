@@ -1,7 +1,7 @@
 import AssetsIndexJsonLd from "../../components/asset-hub/AssetsIndexJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { REVALIDATE_STATIC_MARKETING } from "../../../lib/public-cache-config";
-export const revalidate = REVALIDATE_STATIC_MARKETING;
+export const revalidate = 3600;
 
 
 const PAGE_TITLE = "HasaN CharT World | مراكز الأصول — دليل Asset Hub";

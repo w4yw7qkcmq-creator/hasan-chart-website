@@ -4,7 +4,7 @@ import AdminForbiddenPage from "./AdminForbiddenPage";
 import AdminLayoutClient from "./AdminLayoutClient";
 
 export default async function AdminServerGuard({ children }) {
-  const headerStore = headers();
+  const headerStore = await headers();
   const pathname =
     headerStore.get("x-pathname") ||
     headerStore.get("x-admin-pathname") ||
