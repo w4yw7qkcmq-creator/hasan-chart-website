@@ -373,6 +373,12 @@ function createNewsPublisherGateway(options = {}) {
     });
 
     if (deps.dryRun) {
+      if (publicationRecord?.eventKey) {
+        await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.SKIPPED);
+        await store.updateDeliveryLeg(publicationRecord, "site", LEG_STATUS.SKIPPED);
+        publicationRecord.telegramLegStatus = LEG_STATUS.SKIPPED;
+        publicationRecord.siteLegStatus = LEG_STATUS.SKIPPED;
+      }
       const dryRunResult = {
         dryRun: true,
         published: true,

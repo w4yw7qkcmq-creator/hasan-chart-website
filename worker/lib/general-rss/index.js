@@ -26,6 +26,9 @@ const {
   normalizeHeadlineComparable,
   bodyStartsWithEquivalentHeadline,
   removeLeadingHeadlineFromBody,
+  removeAllEquivalentHeadlineLines,
+  collapseRepeatedNormalizedPhrase,
+  resolveCanonicalHeadline,
 } = require("./publication-format");
 
 module.exports = {
@@ -56,4 +59,7 @@ module.exports = {
   normalizeHeadlineComparable,
   bodyStartsWithEquivalentHeadline,
   removeLeadingHeadlineFromBody,
+  removeAllEquivalentHeadlineLines,
+  collapseRepeatedNormalizedPhrase,
+  resolveCanonicalHeadline,
 };

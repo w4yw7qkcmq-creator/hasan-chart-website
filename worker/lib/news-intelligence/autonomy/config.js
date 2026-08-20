@@ -37,6 +37,7 @@ const ANOMALY_THRESHOLDS = Object.freeze({
   pipelineStallEligibleMin: 3,
   pipelineStallWindowCycles: 6,
   pipelineStallPublicationMax: 0,
+  pipelineRecoveryWindowCycles: 3,
   latencyDegradationMs: 500,
   latencyDegradationStreak: 5,
 });

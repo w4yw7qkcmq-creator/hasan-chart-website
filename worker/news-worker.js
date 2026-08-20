@@ -91,6 +91,7 @@ const {
   observeTelegramPoll,
   observeRssPoll,
   flushObservability,
+  reconcileOperationalState,
 } = require("./lib/news-intelligence/autonomy/integration");
 const { getPhase3RuntimeConfig } = require("./lib/news-intelligence/autonomy/feature-flags");
 const { getNewsSystemStatus } = require("./lib/news-intelligence/autonomy/diagnostic-service");
@@ -4198,9 +4199,7 @@ async function fetchForexNews(options = {}) {
         savePublishedNewsLink(latestLink, combinedNewsIdentity);
         await savePublishedNewsToSupabase({
           link: latestLink,
-          title: rssPresentation
-            ? `${rssPresentation.siteTitle}\n\n${rssPresentation.siteContent}`.slice(0, 500)
-            : combinedNewsIdentity,
+          title: (rssPresentation?.siteTitle || combinedNewsIdentity).slice(0, 500),
           normalized_title: normalizeNewsTitle(
             rssPresentation?.siteTitle || combinedNewsIdentity
           ).slice(0, 500),
@@ -4251,6 +4250,7 @@ async function fetchForexNews(options = {}) {
     isFetchingNews = false;
     observeCycleEnd(stats.cycleDurationMs || Date.now() - cycleStartedAt, stats);
     flushObservability(getSupabaseClient()).catch(() => {});
+    reconcileOperationalState(getSupabaseClient(), { staleAgeMs: 30 * 60_000 }).catch(() => {});
     flushIngestionCheckpoints(getSupabaseClient()).catch(() => {});
     flushSourceHealthStates(getSupabaseClient()).catch(() => {});
     const completedAt = new Date().toISOString();

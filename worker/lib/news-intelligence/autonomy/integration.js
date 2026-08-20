@@ -12,6 +12,9 @@ const { reconcileDelivery } = require("./delivery-reconciliation");
 const { updateHeartbeat, getHeartbeat } = require("./heartbeat");
 const { getCircuitBreakerRegistry } = require("./circuit-breaker");
 const { flushObservability } = require("./decision-persistence");
+const { resolvePipelineStallIncidentIfRecovered } = require("./incident-recovery");
+const { reconcileStaleOpenIncidents } = require("./incident-recovery");
+const { reconcileStalePublicationLegs } = require("./publication-leg-reconciliation");
 const {
   isPhase3AutonomyEnabled,
   isPhase3AutoQuarantineEnabled,
@@ -232,7 +235,39 @@ function observeCycleEnd(durationMs, stats = {}) {
         : undefined,
   });
   detectSilentFailures();
+  resolvePipelineStallIncidentIfRecovered(pipelineStallWindow, {
+    lastRssPollAt,
+    lastTelegramPollAt,
+  });
   syncSourceHealthCounts();
+}
+
+async function reconcileOperationalState(supabase, options = {}) {
+  if (!supabase) {
+    return { skipped: true };
+  }
+
+  const incidentRecovery = resolvePipelineStallIncidentIfRecovered(pipelineStallWindow, {
+    lastRssPollAt,
+    lastTelegramPollAt,
+    ...options,
+  });
+
+  const [staleIncidents, stalePublications] = await Promise.all([
+    reconcileStaleOpenIncidents(supabase, {
+      pipelineStallWindow,
+      lastRssPollAt,
+      lastTelegramPollAt,
+      ...options,
+    }),
+    reconcileStalePublicationLegs(supabase, options.publicationReconciliation || {}),
+  ]);
+
+  return {
+    incidentRecovery,
+    staleIncidents,
+    stalePublications,
+  };
 }
 
 function observeTelegramPoll(meta = {}) {
@@ -414,6 +449,7 @@ module.exports = {
   observeAiSkipped,
   observeAiFailure,
   detectSilentFailures,
+  reconcileOperationalState,
   evaluateLatencySlo,
   getBreaker,
   flushObservability: flushObservabilityBatch,

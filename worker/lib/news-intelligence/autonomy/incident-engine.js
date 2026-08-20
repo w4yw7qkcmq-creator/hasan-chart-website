@@ -5,6 +5,7 @@ const { getMetricsAggregator } = require("./metrics-aggregator");
 
 const DEDUPE_WINDOW_MS = 15 * 60_000;
 const incidents = new Map();
+const recentlyChanged = new Map();
 
 function buildSignature(type, context = {}) {
   return crypto
@@ -12,6 +13,23 @@ function buildSignature(type, context = {}) {
     .update([type, context.affectedSource || "", context.affectedEventType || ""].join("|"))
     .digest("hex")
     .slice(0, 24);
+}
+
+function markIncidentChanged(incident) {
+  if (!incident?.incidentId) return;
+  recentlyChanged.set(incident.incidentId, incident);
+}
+
+function drainChangedIncidents(limit = 100) {
+  const batch = [...recentlyChanged.values()].slice(0, limit);
+  for (const incident of batch) {
+    recentlyChanged.delete(incident.incidentId);
+  }
+  return batch;
+}
+
+function resetChangedIncidentsForTests() {
+  recentlyChanged.clear();
 }
 
 function openOrUpdateIncident(input = {}) {
@@ -26,6 +44,7 @@ function openOrUpdateIncident(input = {}) {
     existing.lastSeenAt = now;
     existing.evidenceSummary = { ...(existing.evidenceSummary || {}), ...(input.evidenceSummary || {}) };
     existing.currentState = "open";
+    existing.resolvedAt = null;
     logAutonomyEvent("NEWS_INCIDENT_UPDATED", {
       incidentId: existing.incidentId,
       type: existing.incidentType,
@@ -33,6 +52,7 @@ function openOrUpdateIncident(input = {}) {
       severity: existing.severity,
     });
     syncOpenCount();
+    markIncidentChanged(existing);
     return existing;
   }
 
@@ -60,16 +80,34 @@ function openOrUpdateIncident(input = {}) {
     affectedSource: incident.affectedSource,
   });
   syncOpenCount();
+  markIncidentChanged(incident);
   return incident;
 }
 
-function resolveIncident(signature) {
+function resolveIncident(signature, options = {}) {
   const incident = incidents.get(signature);
-  if (!incident) return null;
+  if (!incident || incident.currentState === "resolved") return null;
   incident.currentState = "resolved";
   incident.resolvedAt = new Date().toISOString();
-  logAutonomyEvent("NEWS_INCIDENT_RESOLVED", { incidentId: incident.incidentId, type: incident.incidentType });
+  if (options.resolutionReason) {
+    incident.evidenceSummary = {
+      ...(incident.evidenceSummary || {}),
+      ...(options.evidenceSummary || {}),
+      resolutionReason: options.resolutionReason,
+    };
+  } else if (options.evidenceSummary) {
+    incident.evidenceSummary = {
+      ...(incident.evidenceSummary || {}),
+      ...(options.evidenceSummary || {}),
+    };
+  }
+  logAutonomyEvent("NEWS_INCIDENT_RESOLVED", {
+    incidentId: incident.incidentId,
+    type: incident.incidentType,
+    resolutionReason: options.resolutionReason || null,
+  });
   syncOpenCount();
+  markIncidentChanged(incident);
   return incident;
 }
 
@@ -87,15 +125,19 @@ function syncOpenCount() {
 
 function resetIncidentsForTests() {
   incidents.clear();
+  recentlyChanged.clear();
   syncOpenCount();
 }
 
 module.exports = {
   INCIDENT_TYPES,
   SEVERITY,
+  buildSignature,
   openOrUpdateIncident,
   resolveIncident,
   getOpenIncidents,
   getAllIncidents,
+  drainChangedIncidents,
+  resetChangedIncidentsForTests,
   resetIncidentsForTests,
 };

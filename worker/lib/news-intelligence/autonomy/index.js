@@ -20,6 +20,8 @@ const integration = require("./integration");
 const failureAttribution = require("./failure-attribution");
 const sourceHealthPersistence = require("./source-health-persistence");
 const incidentPersistence = require("./incident-persistence");
+const incidentRecovery = require("./incident-recovery");
+const publicationLegReconciliation = require("./publication-leg-reconciliation");
 
 module.exports = {
   ...reasonTaxonomy,
@@ -44,4 +46,6 @@ module.exports = {
   ...failureAttribution,
   ...sourceHealthPersistence,
   ...incidentPersistence,
+  ...incidentRecovery,
+  ...publicationLegReconciliation,
 };

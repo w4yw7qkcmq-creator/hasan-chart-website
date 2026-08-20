@@ -1,5 +1,5 @@
 const { logAutonomyEvent } = require("./structured-log");
-const { openOrUpdateIncident, getOpenIncidents } = require("./incident-engine");
+const { openOrUpdateIncident, getOpenIncidents, drainChangedIncidents } = require("./incident-engine");
 
 async function persistIncident(supabase, incident) {
   if (!supabase || !incident) return { skipped: true };
@@ -33,7 +33,17 @@ async function persistIncident(supabase, incident) {
 
 async function flushIncidents(supabase) {
   if (!supabase) return { flushed: 0, skipped: true };
-  const incidents = getOpenIncidents();
+  const incidents = drainChangedIncidents(100);
+  if (!incidents.length) {
+    const openIncidents = getOpenIncidents();
+    let flushed = 0;
+    for (const incident of openIncidents) {
+      const result = await persistIncident(supabase, incident);
+      if (result.ok) flushed += 1;
+    }
+    return { flushed };
+  }
+
   let flushed = 0;
   for (const incident of incidents) {
     const result = await persistIncident(supabase, incident);

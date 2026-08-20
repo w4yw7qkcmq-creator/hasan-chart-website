@@ -166,6 +166,77 @@ function testForexLiveRegressionFixture() {
   assert(presentation.dedupeIdentity.includes(FOREX_LIVE_FIXTURE.sourceTitle), "dedupe identity keeps source title");
 }
 
+const AUG19_EXACT_DUPLICATE_FIXTURE = {
+  sourceTitle: "Trump vows crushing new economic operation against Iran, warns allies",
+  imageTitle: "تحذير شديد من ترامب بشأن حملة اقتصادية جديدة ضد إيران",
+  editorialMessage:
+    "⚠️ تحذير شديد من ترامب بشأن حملة اقتصادية جديدة ضد إيران ⚠️\n\n" +
+    "⚠️ تحذير شديد من ترامب بشأن حملة اقتصادية جديدة ضد إيران ⚠️\n\n" +
+    "تصعيد جديد في الملف الإيراني يثير قلق الأسواق العالمية.\n\n" +
+    "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+};
+
+const AUG19_EMOJI_PUNCTUATION_FIXTURE = {
+  sourceTitle: "Oil prices jump as Middle East tensions rise",
+  imageTitle: "ارتفاع أسعار النفط مع تصاعد التوترات في الشرق الأوسط",
+  editorialMessage:
+    "🚨 ارتفاع أسعار النفط مع تصاعد التوترات في الشرق الأوسط.\n\n" +
+    "ارتفاع أسعار النفط, مع تصاعد التوترات في الشرق الأوسط!\n\n" +
+    "شهدت أسعار الخام تحركات صعودية مع تزايد المخاوف الجيوسياسية.\n\n" +
+    "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+};
+
+const AUG19_SOURCE_TITLE_COMPOSITION_FIXTURE = {
+  sourceTitle: "Fed officials signal patience on rate cuts",
+  imageTitle: "مسؤولو الفيدرالي يشيرون إلى الصبر بشأن خفض الفائدة",
+  editorialMessage:
+    "Fed officials signal patience on rate cuts مسؤولو الفيدرالي يشيرون إلى الصبر بشأن خفض الفائدة\n\n" +
+    "أشار مسؤولو الاحتياطي الفيدرالي إلى ضرورة التريث قبل أي خفض جديد للفائدة.\n\n" +
+    "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi",
+};
+
+function testAug19ExactDuplicateFixture() {
+  const presentation = buildRssPublicationPresentation(AUG19_EXACT_DUPLICATE_FIXTURE);
+  assert(
+    countHeadlineOccurrences(presentation.telegramMessage, presentation.canonicalHeadline) === 1,
+    "Aug19 exact duplicate fixture should render headline once"
+  );
+  assert(
+    !bodyStartsWithEquivalentHeadline(presentation.canonicalHeadline, presentation.siteContent),
+    "Aug19 exact duplicate fixture should not repeat headline in site body"
+  );
+  assert(
+    normalizeHeadlineComparable(presentation.siteTitle) ===
+      normalizeHeadlineComparable(presentation.canonicalHeadline),
+    "Aug19 exact duplicate fixture site title owns canonical headline"
+  );
+}
+
+function testAug19EmojiPunctuationDuplicateFixture() {
+  const presentation = buildRssPublicationPresentation(AUG19_EMOJI_PUNCTUATION_FIXTURE);
+  assert(
+    countHeadlineOccurrences(presentation.telegramMessage, presentation.canonicalHeadline) === 1,
+    "Aug19 emoji/punctuation fixture should render headline once"
+  );
+}
+
+function testAug19SourceTitleNotRepeatedUserFacing() {
+  const presentation = buildRssPublicationPresentation(AUG19_SOURCE_TITLE_COMPOSITION_FIXTURE);
+  assert(
+    !presentation.siteTitle.toLowerCase().includes("fed officials"),
+    "English source title must not appear in user-facing site title"
+  );
+  assert(
+    countHeadlineOccurrences(presentation.telegramMessage, presentation.canonicalHeadline) === 1,
+    "Aug19 source-title composition fixture should render Arabic headline once"
+  );
+  assert(
+    normalizeHeadlineComparable(presentation.siteTitle) ===
+      normalizeHeadlineComparable(AUG19_SOURCE_TITLE_COMPOSITION_FIXTURE.imageTitle),
+    "site title should use Arabic canonical editorial headline"
+  );
+}
+
 function run() {
   testRssPublishedMatchesLogicalSuccess();
   testRssPublishedDoesNotDoubleCountDeliveryLegs();
@@ -179,6 +250,9 @@ function run() {
   testOfficialFooterStillAllowed();
   testWebsiteTitleBodyDoNotDuplicateHeadline();
   testForexLiveRegressionFixture();
+  testAug19ExactDuplicateFixture();
+  testAug19EmojiPunctuationDuplicateFixture();
+  testAug19SourceTitleNotRepeatedUserFacing();
   console.log("rss-publication-cleanup tests passed");
 }
 
