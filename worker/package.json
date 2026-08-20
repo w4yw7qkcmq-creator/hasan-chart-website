@@ -32,14 +32,14 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
-    "axios": "^1.16.1",
+    "axios": "^1.19.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "form-data": "^4.0.5",
+    "form-data": "^4.0.6",
     "rss-parser": "^3.13.0",
     "sharp": "^0.34.5",
     "web-push": "^3.6.7",
-    "ws": "^8.20.1"
+    "ws": "^8.21.3"
   }
 }

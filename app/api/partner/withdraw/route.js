@@ -8,7 +8,7 @@ import {
   handlePartnerApiError,
   PARTNER_API_ERROR_MESSAGES,
 } from "../../../../lib/partner-api-helpers";
-import { checkPartnerRateLimit } from "../../../../lib/partner-security";
+import { enforcePartnerWithdrawRateLimits } from "../../../../lib/partner-security";
 import { capturePartnerAnalyticsEvent } from "../../../../lib/partner-monitoring";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function POST(request) {
       );
     }
 
-    const rate = checkPartnerRateLimit(`withdraw:${session.id}`, { max: 10 });
+    const rate = await enforcePartnerWithdrawRateLimits(request, session.id);
 
     if (!rate.allowed) {
       return NextResponse.json(

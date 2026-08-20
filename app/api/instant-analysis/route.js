@@ -2,6 +2,11 @@ import { getOptionalSessionUser } from "../../../lib/auth-session";
 import { CACHE_NO_STORE } from "../../../lib/api-response";
 import { runApiRoute } from "../../../lib/api-route";
 import {
+  getClientIp,
+  instantAnalysisIpLimiter,
+  instantAnalysisUserLimiter,
+} from "../../../lib/rate-limit";
+import {
   buildAvailabilityResponse,
   normalizeInstantAnalysisSymbol,
 } from "../../../lib/instant-analysis-cooldown";
@@ -39,6 +44,24 @@ export async function POST(request) {
           status: 401,
           code: "AUTH_REQUIRED",
           message: "يجب تسجيل الدخول لاستخدام التحليل اللحظي.",
+        });
+      }
+
+      const ipRate = await instantAnalysisIpLimiter(getClientIp(req));
+      if (!ipRate.success) {
+        return instantAnalysisErrorResponse({
+          status: 429,
+          code: "INSTANT_ANALYSIS_RATE_LIMITED",
+          message: "طلبات كثيرة جداً، يرجى المحاولة لاحقاً.",
+        });
+      }
+
+      const userRate = await instantAnalysisUserLimiter(session.id);
+      if (!userRate.success) {
+        return instantAnalysisErrorResponse({
+          status: 429,
+          code: "INSTANT_ANALYSIS_RATE_LIMITED",
+          message: "طلبات كثيرة جداً، يرجى المحاولة لاحقاً.",
         });
       }
 
