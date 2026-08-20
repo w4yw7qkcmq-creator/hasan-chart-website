@@ -3,6 +3,14 @@ const { createImageProviderResult } = require("./image-provider-interface");
 const { buildOpenAIImagePrompt } = require("./openai-prompt-builder");
 const { resolveOpenAIImageSettings } = require("./openai-image-settings");
 
+function createEmptyProviderTimings() {
+  return {
+    providerRequestMs: 0,
+    providerResponseDecodeMs: 0,
+    providerAssetDownloadMs: 0,
+  };
+}
+
 function createOpenAIImageProvider(options = {}) {
   const apiKey = options.apiKey || process.env.OPENAI_API_KEY;
   const httpClient = options.httpClient || axios;
@@ -19,8 +27,11 @@ function createOpenAIImageProvider(options = {}) {
 
       const promptBundle = buildOpenAIImagePrompt(context);
       const prompt = promptBundle.prompt;
+      const timings = createEmptyProviderTimings();
+      const workflowStartedAt = Date.now();
 
       let response;
+      const requestStartedAt = Date.now();
       try {
         response = await httpClient.post(
           "https://api.openai.com/v1/images/generations",
@@ -35,33 +46,55 @@ function createOpenAIImageProvider(options = {}) {
               Authorization: `Bearer ${apiKey}`,
               "Content-Type": "application/json",
             },
-            timeout: settings.timeoutMs,
+            timeout: settings.providerTimeoutMs,
+            validateStatus: () => true,
           }
         );
       } catch (error) {
+        timings.providerRequestMs = Date.now() - requestStartedAt;
         const apiMessage =
           error.response?.data?.error?.message ||
           error.response?.data?.message ||
           error.message ||
           "OpenAI image generation failed";
-        throw new Error(`OpenAIImageProvider failed: ${apiMessage}`);
+        const wrapped = new Error(`OpenAIImageProvider failed: ${apiMessage}`);
+        wrapped.statusCode = error.response?.status || null;
+        wrapped.timings = timings;
+        throw wrapped;
+      }
+
+      timings.providerRequestMs = Date.now() - requestStartedAt;
+
+      if (response.status >= 400) {
+        const apiMessage =
+          response.data?.error?.message || response.data?.message || `HTTP ${response.status}`;
+        const wrapped = new Error(`OpenAIImageProvider failed: ${apiMessage}`);
+        wrapped.statusCode = response.status;
+        wrapped.timings = timings;
+        throw wrapped;
       }
 
       const item = response.data?.data?.[0];
       let backgroundBuffer = null;
 
       if (item?.b64_json) {
+        const decodeStartedAt = Date.now();
         backgroundBuffer = Buffer.from(item.b64_json, "base64");
+        timings.providerResponseDecodeMs = Date.now() - decodeStartedAt;
       } else if (item?.url) {
+        const downloadStartedAt = Date.now();
         const imageResponse = await httpClient.get(item.url, {
           responseType: "arraybuffer",
-          timeout: Math.min(settings.timeoutMs, 45000),
+          timeout: settings.downloadTimeoutMs,
         });
+        timings.providerAssetDownloadMs = Date.now() - downloadStartedAt;
         backgroundBuffer = Buffer.from(imageResponse.data);
       }
 
       if (!backgroundBuffer || backgroundBuffer.length === 0) {
-        throw new Error("OpenAI image generation returned no image data");
+        const wrapped = new Error("OpenAI image generation returned no image data");
+        wrapped.timings = timings;
+        throw wrapped;
       }
 
       return createImageProviderResult({
@@ -78,6 +111,9 @@ function createOpenAIImageProvider(options = {}) {
         model: settings.model,
         size: settings.size,
         quality: settings.quality,
+        timings,
+        totalProviderMs: Date.now() - workflowStartedAt,
+        httpStatus: response.status,
       });
     },
   };
@@ -85,5 +121,6 @@ function createOpenAIImageProvider(options = {}) {
 
 module.exports = {
   createOpenAIImageProvider,
+  createEmptyProviderTimings,
   resolveOpenAIImageSettings,
 };

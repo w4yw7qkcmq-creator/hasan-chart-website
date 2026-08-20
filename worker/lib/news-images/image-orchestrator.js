@@ -10,9 +10,11 @@ const { buildPremiumImageContextFromRelease, buildPremiumImageContextFromCandida
 const { uploadNewsImageBuffer, buildStablePublicationKey } = require("./image-storage");
 const { createEmptyImageTelemetry, summarizeImageStatus, recordImageTelemetry } = require("./image-telemetry");
 const { resolveOpenAIImageSettings } = require("./openai-image-settings");
+const { classifyImageError, isTransientImageError } = require("./image-error-classifier");
 
-const IMAGE_WORKFLOW_BUDGET_MS = Number(process.env.NEWS_IMAGE_WORKFLOW_BUDGET_MS || 25000);
-const OPENAI_ATTEMPT_TIMEOUT_MS = Number(process.env.NEWS_IMAGE_OPENAI_TIMEOUT_MS || 12000);
+const settings = resolveOpenAIImageSettings();
+const IMAGE_WORKFLOW_BUDGET_MS = settings.workflowBudgetMs;
+const OPENAI_PROVIDER_TIMEOUT_MS = settings.providerTimeoutMs;
 
 let openAiImageCallCount = 0;
 
@@ -24,13 +26,12 @@ function getOpenAiImageCallCountForTests() {
   return openAiImageCallCount;
 }
 
-function isTransientImageError(error) {
-  const message = String(error?.message || error || "").toLowerCase();
-  return (
-    /timeout|timed out|network|econnreset|etimedout|429|rate limit|5\d\d|service unavailable|temporarily unavailable/.test(
-      message
-    )
-  );
+function mergeTimings(telemetry, timings = {}) {
+  telemetry.providerRequestMs = timings.providerRequestMs || telemetry.providerRequestMs || 0;
+  telemetry.providerResponseDecodeMs =
+    timings.providerResponseDecodeMs || telemetry.providerResponseDecodeMs || 0;
+  telemetry.providerAssetDownloadMs = timings.providerAssetDownloadMs || telemetry.providerAssetDownloadMs || 0;
+  telemetry.compositionMs = timings.compositionMs || telemetry.compositionMs || 0;
 }
 
 function buildImageContextFromPublication(publication = {}) {
@@ -45,6 +46,9 @@ function buildImageContextFromPublication(publication = {}) {
       title: premium.title || publication.title,
       brandName: FALLBACK_BRAND,
       importance: publication.importance || premium.importance || "HIGH",
+      actual: undefined,
+      forecast: undefined,
+      previous: undefined,
     };
   }
 
@@ -58,6 +62,9 @@ function buildImageContextFromPublication(publication = {}) {
       ...fromRelease,
       title: publication.title || fromRelease.eventName,
       brandName: FALLBACK_BRAND,
+      actual: undefined,
+      forecast: undefined,
+      previous: undefined,
     };
   }
 
@@ -79,22 +86,41 @@ function buildImageContextFromPublication(publication = {}) {
 }
 
 async function generateAiPrimaryImage(context, options = {}, telemetry = createEmptyImageTelemetry()) {
-  const settings = resolveOpenAIImageSettings(options);
+  const runtimeSettings = resolveOpenAIImageSettings(options);
   telemetry.aiImageProvider = "openai";
-  telemetry.aiImageModel = settings.model;
+  telemetry.aiImageModel = runtimeSettings.model;
   telemetry.aiImageAttempted = true;
+  telemetry.workflowBudgetMs = runtimeSettings.workflowBudgetMs;
 
   const startedAt = Date.now();
-  const deadline = startedAt + IMAGE_WORKFLOW_BUDGET_MS;
+  const deadline = startedAt + runtimeSettings.workflowBudgetMs;
   let lastError = null;
+  let lastClassification = null;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (Date.now() >= deadline) {
+    const remainingBudgetMs = Math.max(0, deadline - Date.now());
+    if (remainingBudgetMs < 3000) {
+      telemetry.aiImageRetrySkippedReason = "WORKFLOW_BUDGET_EXHAUSTED";
       break;
     }
 
+    const attemptProviderTimeoutMs = Math.min(
+      runtimeSettings.providerTimeoutMs,
+      Math.max(5000, remainingBudgetMs - 5000)
+    );
+
     if (attempt > 0) {
+      if (!lastClassification?.retryable) {
+        telemetry.aiImageRetrySkippedReason = "NON_TRANSIENT_ERROR";
+        break;
+      }
+      if (remainingBudgetMs < attemptProviderTimeoutMs + 4000) {
+        telemetry.aiImageRetrySkippedReason = "INSUFFICIENT_BUDGET_FOR_RETRY";
+        break;
+      }
       telemetry.aiImageRetryCount += 1;
+      telemetry.aiImageRetryReason = lastClassification?.reason || "AI_PROVIDER_ERROR";
+      telemetry.remainingBudgetBeforeRetryMs = remainingBudgetMs;
     }
 
     try {
@@ -106,65 +132,101 @@ async function generateAiPrimaryImage(context, options = {}, telemetry = createE
         ...options,
         forceEnabled: true,
         skipEligibilityCheck: true,
-        provider: options.provider || "openai",
-        timeoutMs: Math.min(OPENAI_ATTEMPT_TIMEOUT_MS, Math.max(1000, deadline - Date.now())),
+        disableInternalProviderFallback: true,
+        provider: "openai",
+        providerTimeoutMs: attemptProviderTimeoutMs,
+        timeoutMs: attemptProviderTimeoutMs,
       });
 
+      if (result?.provider !== "openai") {
+        lastError = new Error("OpenAI provider did not produce an OpenAI image");
+        lastClassification = classifyImageError(lastError);
+        continue;
+      }
+
       if (result?.filePath && fs.existsSync(result.filePath)) {
-        telemetry.aiImageLatencyMs = Date.now() - startedAt;
-        telemetry.aiImageSucceeded = result.provider === "openai";
-        telemetry.aiImageFailed = result.provider !== "openai";
-        telemetry.publishedWithAiImage = result.provider === "openai";
-        telemetry.publishedWithFallbackImage = result.provider === "fallback";
+        mergeTimings(telemetry, result.timings);
+        telemetry.totalImageWorkflowMs = Date.now() - startedAt;
+        telemetry.aiImageLatencyMs = telemetry.providerRequestMs || telemetry.totalImageWorkflowMs;
+        telemetry.aiImageSucceeded = true;
+        telemetry.aiImageFailed = false;
+        telemetry.publishedWithAiImage = true;
+        telemetry.openAiImageCalls = openAiImageCallCount;
         return {
           ok: true,
           filePath: result.filePath,
           buffer: fs.readFileSync(result.filePath),
           provider: result.provider,
-          model: settings.model,
-          fallbackFrom: result.fallbackFrom || null,
-          source: result.provider === "openai" ? "ai_image" : "ai_provider_fallback",
+          model: runtimeSettings.model,
+          source: "ai_image",
+          timings: result.timings,
+          assetBytes: result.assetBytes || null,
+          httpStatus: result.httpStatus || null,
         };
       }
 
       lastError = new Error("AI image generation returned no file");
+      lastClassification = classifyImageError(lastError);
     } catch (error) {
       lastError = error;
+      lastClassification = classifyImageError(error);
+      mergeTimings(telemetry, error.timings || {});
       telemetry.aiImageFailed = true;
-      if (!isTransientImageError(error) || attempt >= 1 || Date.now() >= deadline) {
+      telemetry.fallbackReason = lastClassification.reason;
+
+      if (!isTransientImageError(error) || attempt >= 1) {
         break;
       }
     }
   }
 
-  telemetry.aiImageLatencyMs = Date.now() - startedAt;
+  telemetry.totalImageWorkflowMs = Date.now() - startedAt;
+  telemetry.aiImageLatencyMs = telemetry.providerRequestMs || telemetry.totalImageWorkflowMs;
+  telemetry.aiImageFailed = true;
+  telemetry.aiImageSucceeded = false;
   telemetry.openAiImageCalls = openAiImageCallCount;
-  return { ok: false, error: lastError };
+  if (!telemetry.fallbackReason) {
+    telemetry.fallbackReason = lastClassification?.reason || "AI_PROVIDER_ERROR";
+  }
+  return { ok: false, error: lastError, classification: lastClassification };
 }
 
 async function generateBrandedFallbackImage(context, options = {}, telemetry = createEmptyImageTelemetry()) {
   telemetry.brandedFallbackAttempted = true;
+  if (!telemetry.fallbackReason) {
+    telemetry.fallbackReason = "AI_PROVIDER_ERROR";
+  }
+
+  const fallbackStartedAt = Date.now();
   try {
     const result = await generateDeterministicBrandedFallbackImage(
       {
         ...context,
         brandName: FALLBACK_BRAND,
       },
-      options
+      {
+        ...options,
+        disableInternalProviderFallback: true,
+        provider: "fallback",
+      }
     );
     if (result?.filePath && fs.existsSync(result.filePath)) {
+      mergeTimings(telemetry, result.timings);
+      telemetry.compositionMs = telemetry.compositionMs || result.timings?.compositionMs || 0;
       telemetry.brandedFallbackSucceeded = true;
       telemetry.publishedWithFallbackImage = true;
+      telemetry.totalImageWorkflowMs = (telemetry.totalImageWorkflowMs || 0) + (Date.now() - fallbackStartedAt);
       return {
         ok: true,
         filePath: result.filePath,
         buffer: fs.readFileSync(result.filePath),
         provider: result.provider || "fallback",
         source: "branded_fallback",
+        timings: result.timings,
       };
     }
   } catch (_error) {
-    // fall through
+    telemetry.fallbackReason = telemetry.fallbackReason || "AI_BUDGET_EXHAUSTED";
   }
   return { ok: false };
 }
@@ -174,12 +236,16 @@ async function persistPublicationImage(publication, imagePayload, deps = {}, tel
     return imagePayload;
   }
 
+  const uploadStartedAt = Date.now();
   const upload = await uploadNewsImageBuffer(deps.supabase, imagePayload.buffer, publication, {
     publicationKey: buildStablePublicationKey(publication),
   });
+  telemetry.imageStorageUploadMs = Date.now() - uploadStartedAt;
 
   if (upload.ok && upload.publicUrl) {
     telemetry.imageStorageUploaded = true;
+    telemetry.totalImageWorkflowMs =
+      (telemetry.totalImageWorkflowMs || 0) + telemetry.imageStorageUploadMs;
     return {
       ...imagePayload,
       imageUrl: upload.publicUrl,
@@ -189,6 +255,7 @@ async function persistPublicationImage(publication, imagePayload, deps = {}, tel
   }
 
   telemetry.imageStorageFailed = true;
+  telemetry.fallbackReason = telemetry.fallbackReason || "STORAGE_UPLOAD_FAILED";
   return imagePayload;
 }
 
@@ -206,7 +273,9 @@ async function resolvePublicationImageResult(publication = {}, deps = {}) {
   const policy = resolveNewsImagePolicy(publication);
   const telemetry = createEmptyImageTelemetry();
   telemetry.imagePolicyMode = policy.mode;
+  telemetry.workflowBudgetMs = IMAGE_WORKFLOW_BUDGET_MS;
   telemetry.openAiImageCalls = openAiImageCallCount;
+  const workflowStartedAt = Date.now();
 
   if (policy.mode === IMAGE_POLICY_MODES.SOURCE_ONLY) {
     assertRssNeverUsesAi(policy, publication.sourceType || "unknown");
@@ -265,6 +334,7 @@ async function resolvePublicationImageResult(publication = {}, deps = {}) {
   if (!imagePayload.ok) {
     telemetry.publishedWithoutImage = true;
     telemetry.warning = "IMPORTANT_NEWS_PUBLISHED_WITHOUT_IMAGE";
+    telemetry.totalImageWorkflowMs = Date.now() - workflowStartedAt;
     const imageResult = {
       generationAttempted: true,
       delivery: "text",
@@ -284,6 +354,7 @@ async function resolvePublicationImageResult(publication = {}, deps = {}) {
   }
 
   const persisted = await persistPublicationImage(publication, imagePayload, deps, telemetry);
+  telemetry.totalImageWorkflowMs = Date.now() - workflowStartedAt;
   const imageResult = {
     generationAttempted: true,
     delivery: "photo",
@@ -309,11 +380,14 @@ async function resolvePublicationImageResult(publication = {}, deps = {}) {
 
 module.exports = {
   IMAGE_WORKFLOW_BUDGET_MS,
-  OPENAI_ATTEMPT_TIMEOUT_MS,
+  OPENAI_PROVIDER_TIMEOUT_MS,
+  OPENAI_ATTEMPT_TIMEOUT_MS: OPENAI_PROVIDER_TIMEOUT_MS,
   resetOpenAiImageCallCountForTests,
   getOpenAiImageCallCountForTests,
   buildImageContextFromPublication,
   resolvePublicationImageResult,
   generateAiPrimaryImage,
   generateBrandedFallbackImage,
+  classifyImageError,
+  isTransientImageError,
 };

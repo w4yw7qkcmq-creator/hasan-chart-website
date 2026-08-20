@@ -145,7 +145,7 @@ async function generatePremiumNewsImage(context = {}, options = {}) {
   try {
     backgroundResult = await provider.generateBackground(normalizedContext);
   } catch (primaryError) {
-    if (providerName === "fallback") {
+    if (options.disableInternalProviderFallback || providerName === "fallback") {
       throw primaryError;
     }
     backgroundResult = await switchToFallbackBackground(
@@ -168,6 +168,11 @@ async function generatePremiumNewsImage(context = {}, options = {}) {
     typographyInspection = typographyDecision.inspection;
     if (typographyDecision.rejected) {
       layoutAction = typographyDecision.layoutAction;
+      if (options.disableInternalProviderFallback) {
+        const rejected = new Error("OPENAI_BACKGROUND_TEXT_UNSAFE");
+        rejected.reasonCode = "AI_OUTPUT_REJECTED";
+        throw rejected;
+      }
       backgroundResult = await switchToFallbackBackground(
         normalizedContext,
         registry,
@@ -188,11 +193,13 @@ async function generatePremiumNewsImage(context = {}, options = {}) {
     }
   }
 
+  const composeStartedAt = Date.now();
   const composeResult = await composePremiumNewsImage(backgroundResult.backgroundBuffer, {
     ...normalizedContext,
     ...editorialOverlay,
     imageMetadata: createRawBackgroundMetadata(),
   });
+  const compositionMs = Date.now() - composeStartedAt;
 
   layoutAction = layoutAction || composeResult.layoutAction || null;
   const composedBuffer = composeResult.buffer;
@@ -234,6 +241,15 @@ async function generatePremiumNewsImage(context = {}, options = {}) {
     titlePlacement: composeResult.titlePlacement,
     headlineTypography: composeResult.headlineTypography,
     imageStage: "composed_final",
+    timings: {
+      providerRequestMs: backgroundResult.timings?.providerRequestMs || 0,
+      providerResponseDecodeMs: backgroundResult.timings?.providerResponseDecodeMs || 0,
+      providerAssetDownloadMs: backgroundResult.timings?.providerAssetDownloadMs || 0,
+      compositionMs,
+      totalProviderMs: backgroundResult.totalProviderMs || backgroundResult.timings?.providerRequestMs || 0,
+    },
+    httpStatus: backgroundResult.httpStatus || null,
+    assetBytes: composedBuffer.length,
   };
 }
 

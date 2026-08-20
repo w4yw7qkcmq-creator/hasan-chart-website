@@ -48,6 +48,8 @@ function createMetricsAggregator() {
   const bySource = new Map();
   const byEventType = new Map();
   const latencySamples = [];
+  const aiProviderLatencySamples = [];
+  const imageWorkflowLatencySamples = [];
 
   function bump(map, key, field, amount = 1) {
     if (!key) return;
@@ -145,6 +147,23 @@ function createMetricsAggregator() {
     if (telemetry.sourceImageFound) globalCounters.rss_source_image_found += 1;
     if (telemetry.sourceImageMissing) globalCounters.rss_source_image_missing += 1;
     if (telemetry.rssPublishedWithoutImage) globalCounters.rss_published_without_image += 1;
+
+    const providerLatency = Number(telemetry.providerRequestMs || telemetry.aiImageLatencyMs || 0);
+    if (telemetry.aiImageAttempted && providerLatency > 0) {
+      aiProviderLatencySamples.push(providerLatency);
+      if (aiProviderLatencySamples.length > 500) aiProviderLatencySamples.shift();
+    }
+
+    const workflowLatency = Number(telemetry.totalImageWorkflowMs || 0);
+    if (workflowLatency > 0) {
+      imageWorkflowLatencySamples.push(workflowLatency);
+      if (imageWorkflowLatencySamples.length > 500) imageWorkflowLatencySamples.shift();
+    }
+  }
+
+  function averageSample(samples = []) {
+    if (!samples.length) return null;
+    return Math.round(samples.reduce((sum, value) => sum + value, 0) / samples.length);
   }
 
   function recordRssFetchFailure() {
@@ -175,7 +194,11 @@ function createMetricsAggregator() {
       : { avgMs: null, p95Ms: null, samples: 0 };
 
     return {
-      global: { ...globalCounters },
+      global: {
+        ...globalCounters,
+        ai_image_latency_avg_ms: averageSample(aiProviderLatencySamples),
+        image_workflow_latency_avg_ms: averageSample(imageWorkflowLatencySamples),
+      },
       bySource: Object.fromEntries(bySource.entries()),
       byEventType: Object.fromEntries(byEventType.entries()),
       latency,
@@ -187,6 +210,8 @@ function createMetricsAggregator() {
     bySource.clear();
     byEventType.clear();
     latencySamples.length = 0;
+    aiProviderLatencySamples.length = 0;
+    imageWorkflowLatencySamples.length = 0;
   }
 
   return {

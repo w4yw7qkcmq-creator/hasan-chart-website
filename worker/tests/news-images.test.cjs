@@ -853,7 +853,9 @@ function testOpenAISettingsDefaults() {
   assert.strictEqual(settings.model, "gpt-image-1");
   assert.strictEqual(settings.size, "1536x1024");
   assert.strictEqual(settings.quality, "low");
-  assert.ok(settings.timeoutMs >= 60000);
+  assert.ok(settings.providerTimeoutMs >= 20000);
+  assert.ok(settings.workflowBudgetMs >= settings.providerTimeoutMs + 10000);
+  assert.strictEqual(settings.timeoutMs, settings.providerTimeoutMs);
   if (previous.model) process.env.NEWS_IMAGE_OPENAI_MODEL = previous.model;
   if (previous.size) process.env.NEWS_IMAGE_OPENAI_SIZE = previous.size;
   if (previous.quality) process.env.NEWS_IMAGE_OPENAI_QUALITY = previous.quality;
