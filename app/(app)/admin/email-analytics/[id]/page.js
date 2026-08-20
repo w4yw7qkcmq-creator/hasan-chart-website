@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { DetailSkeleton } from "../components/Skeleton";
 import { IconRefresh } from "../components/icons";
 import { useAdminFetch } from "../lib/useAdminFetch";
@@ -67,6 +67,7 @@ function EventTimeline({ events = [] }) {
 }
 
 export default function EmailMessageDetailPage({ params }) {
+  const { id: messageId } = use(params);
   const adminFetch = useAdminFetch();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,7 +94,7 @@ export default function EmailMessageDetailPage({ params }) {
       else setRefreshing(true);
 
       try {
-        const response = await adminFetch(`/api/admin/email-analytics/${params.id}`, {
+        const response = await adminFetch(`/api/admin/email-analytics/${messageId}`, {
           method: "GET",
           cache: "no-store",
         });
@@ -128,7 +129,7 @@ export default function EmailMessageDetailPage({ params }) {
         }
       }
     },
-    [adminFetch, params.id]
+    [adminFetch, messageId]
   );
 
   useEffect(() => {

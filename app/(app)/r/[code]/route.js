@@ -60,7 +60,8 @@ function buildAuthoritativeAttribution(resolved) {
 }
 
 export async function GET(request, { params }) {
-  const rawCode = String(params?.code || "").trim();
+  const resolvedParams = await params;
+  const rawCode = String(resolvedParams?.code || "").trim();
   const queryAttribution = readAttributionFromRequest(request);
   let redirectPath = "/";
   let referralCode = null;

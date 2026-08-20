@@ -7,6 +7,7 @@ import { mapSmartLinkErrorToMessage } from "../../../../../../lib/partner-center
 export const dynamic = "force-dynamic";
 
 export async function DELETE(_request, { params }) {
+  const resolvedParams = await params;
   try {
     const session = await requireSessionUser();
     if (session.error) {
@@ -18,7 +19,7 @@ export async function DELETE(_request, { params }) {
       username: session.username,
     });
 
-    const smartLinkId = String(params?.id || "").trim();
+    const smartLinkId = String(resolvedParams?.id || "").trim();
     if (!smartLinkId) {
       return NextResponse.json(
         { success: false, error: "معرّف الرابط غير صالح", errorKey: "invalid_link_id" },

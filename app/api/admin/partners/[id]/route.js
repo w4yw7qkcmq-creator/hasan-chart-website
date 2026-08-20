@@ -24,6 +24,7 @@ function resolveSiteOrigin(request) {
 }
 
 export async function GET(request, { params }) {
+  const resolvedParams = await params;
   try {
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.PARTNERS_READ, { request });
 
@@ -34,7 +35,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const partnerId = requireValidUuid(params?.id, "partner_id");
+    const partnerId = requireValidUuid(resolvedParams?.id, "partner_id");
 
     const data = await getAdminPartnerDetails(adminCheck.supabase, partnerId, {
       siteOrigin: resolveSiteOrigin(request),

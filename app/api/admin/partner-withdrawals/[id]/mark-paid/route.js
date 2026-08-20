@@ -13,6 +13,7 @@ const ERROR_MESSAGES = {
 };
 
 export async function POST(request, { params }) {
+  const resolvedParams = await params;
   try {
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.PARTNERS_WITHDRAWALS_MANAGE, { request });
 
@@ -23,7 +24,7 @@ export async function POST(request, { params }) {
       );
     }
 
-    const withdrawalId = String(params?.id || "").trim();
+    const withdrawalId = String(resolvedParams?.id || "").trim();
     const body = await request.json().catch(() => ({}));
 
     const withdrawal = await markPartnerWithdrawalPaid(adminCheck.supabase, withdrawalId, {

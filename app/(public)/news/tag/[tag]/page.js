@@ -107,11 +107,12 @@ function matchesTag(item, config) {
 }
 
 export async function generateMetadata({ params }) {
-  const config = getTagConfig(params.tag);
-  const isKnownTag = Boolean(TAG_CONFIG[params.tag]);
+  const resolvedParams = await params;
+  const config = getTagConfig(resolvedParams.tag);
+  const isKnownTag = Boolean(TAG_CONFIG[resolvedParams.tag]);
 
   return buildPublicMetadata({
-    path: `/news/tag/${params.tag}`,
+    path: `/news/tag/${resolvedParams.tag}`,
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
     index: isKnownTag,
@@ -120,19 +121,20 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function TagPage({ params }) {
-  const config = getTagConfig(params.tag);
+  const resolvedParams = await params;
+  const config = getTagConfig(resolvedParams.tag);
 
-  if (!TAG_CONFIG[params.tag]) {
+  if (!TAG_CONFIG[resolvedParams.tag]) {
     notFound();
   }
 
   const { items: news } = await getCachedNewsList({
-    tag: params.tag,
+    tag: resolvedParams.tag,
     limit: NEWS_TAG_LIST_LIMIT,
   });
 
   const jsonLd = buildNewsCollectionPageJsonLd({
-    path: `/news/tag/${params.tag}`,
+    path: `/news/tag/${resolvedParams.tag}`,
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
   });
@@ -163,7 +165,7 @@ export default async function TagPage({ params }) {
               key={key}
               href={`/news/tag/${key}`}
               className={`rounded-2xl border px-5 py-3 text-sm font-black no-underline transition-all ${
-                key === params.tag
+                key === resolvedParams.tag
                   ? "border-cyan-300 bg-cyan-500 !text-white shadow-lg shadow-cyan-500/25"
                   : "border-white/50 bg-white/65 text-slate-600 hover:border-cyan-300 hover:bg-cyan-500 hover:!text-white hover:shadow-lg hover:shadow-cyan-500/25"
               }`}

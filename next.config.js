@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
 const { getSecurityHeaders } = require("./lib/security-headers");
 
 const CACHE_PUBLIC_SEO_ARTIFACT =
@@ -9,6 +10,7 @@ const CACHE_PUBLIC_NEWS_PAGE =
 const nextConfig = {
   compress: true,
   poweredByHeader: false,
+  outputFileTracingRoot: path.join(__dirname),
   experimental: {
     optimizePackageImports: [
       "@supabase/supabase-js",

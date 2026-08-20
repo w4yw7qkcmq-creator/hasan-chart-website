@@ -34,6 +34,7 @@ async function getOwnedAlert({ supabase, alertId, userEmail }) {
 }
 
 export async function PATCH(req, { params }) {
+  const resolvedParams = await params;
   try {
     const crossOriginBlocked = rejectCrossOriginBrowserRequest(req);
     if (crossOriginBlocked) return crossOriginBlocked;
@@ -56,7 +57,7 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const alertId = String(params?.id || "").trim();
+    const alertId = String(resolvedParams?.id || "").trim();
 
     if (!alertId) {
       return Response.json(
@@ -167,6 +168,7 @@ export async function PATCH(req, { params }) {
 }
 
 export async function DELETE(req, { params }) {
+  const resolvedParams = await params;
   try {
     const crossOriginBlocked = rejectCrossOriginBrowserRequest(req);
     if (crossOriginBlocked) return crossOriginBlocked;
@@ -189,7 +191,7 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    const alertId = String(params?.id || "").trim();
+    const alertId = String(resolvedParams?.id || "").trim();
 
     if (!alertId) {
       return Response.json(

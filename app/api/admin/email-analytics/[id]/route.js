@@ -7,6 +7,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request, { params }) {
+  const resolvedParams = await params;
   try {
     const adminCheck = await requireAdminPermission(IAM_PERMISSIONS.EMAIL_ANALYTICS_READ, { request });
 
@@ -17,7 +18,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const detail = await fetchEmailMessageDetail(adminCheck.supabase, params.id);
+    const detail = await fetchEmailMessageDetail(adminCheck.supabase, resolvedParams.id);
 
     if (!detail) {
       return Response.json(

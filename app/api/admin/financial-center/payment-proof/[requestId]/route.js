@@ -29,8 +29,8 @@ function trimIdForLog(value) {
 }
 
 export async function GET(request, { params }) {
-  const startedAt = Date.now();
   const resolvedParams = await params;
+  const startedAt = Date.now();
   let requestId = "";
   let stage = "start";
 

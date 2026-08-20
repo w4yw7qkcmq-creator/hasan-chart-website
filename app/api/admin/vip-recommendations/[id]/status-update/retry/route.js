@@ -10,6 +10,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request, { params }) {
+  const resolvedParams = await params;
   try {
     if (!isVipStatusNotificationsEnabled()) {
       const disabled = vipStatusFeatureDisabledResponse();
@@ -34,7 +35,7 @@ export async function POST(request, { params }) {
       );
     }
 
-    const recommendationId = String(params?.id || "").trim();
+    const recommendationId = String(resolvedParams?.id || "").trim();
     if (!recommendationId) {
       return Response.json({ success: false, error: "معرف التوصية مطلوب" }, { status: 400 });
     }

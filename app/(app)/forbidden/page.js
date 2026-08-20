@@ -6,9 +6,10 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function ForbiddenPage({ searchParams }) {
-  const from = String(searchParams?.from || "").trim();
-  const requestId = String(searchParams?.rid || "").trim();
+export default async function ForbiddenPage({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const from = String(resolvedSearchParams?.from || "").trim();
+  const requestId = String(resolvedSearchParams?.rid || "").trim();
   const isAdminContext = from === "admin";
 
   return (

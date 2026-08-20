@@ -154,7 +154,8 @@ function detectTags(news = {}) {
 }
 
 export async function generateMetadata({ params }) {
-  const news = await getNewsArticleForRequest(params.id);
+  const resolvedParams = await params;
+  const news = await getNewsArticleForRequest(resolvedParams.id);
 
   if (!news) {
     return buildPrivateMetadata({ title: "خبر غير موجود - HasaN CharT World" });
@@ -188,7 +189,8 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function NewsDetailsPage({ params }) {
-  const news = await getNewsArticleForRequest(params.id);
+  const resolvedParams = await params;
+  const news = await getNewsArticleForRequest(resolvedParams.id);
 
   if (!news) {
     notFound();

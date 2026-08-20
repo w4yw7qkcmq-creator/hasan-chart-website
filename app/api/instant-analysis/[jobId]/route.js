@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request, { params }) {
+  const resolvedParams = await params;
   return runApiRoute(request, {
     route: "/api/instant-analysis/[jobId]",
     handler: async () => {
@@ -29,7 +30,7 @@ export async function GET(request, { params }) {
         });
       }
 
-      const jobId = String(params?.jobId || "").trim();
+      const jobId = String(resolvedParams?.jobId || "").trim();
 
       if (isInlineInstantAnalysisJobId(jobId)) {
         return instantAnalysisErrorResponse({

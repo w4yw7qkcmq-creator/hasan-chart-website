@@ -142,33 +142,35 @@ function getNewsHref(item) {
 }
 
 export async function generateMetadata({ params }) {
-  const config = CATEGORY_CONFIG[params.category];
+  const resolvedParams = await params;
+  const config = CATEGORY_CONFIG[resolvedParams.category];
 
   if (!config) {
     return buildPrivateMetadata({ title: "التصنيف غير موجود - HasaN CharT World" });
   }
 
   return buildPublicMetadata({
-    path: `/news/category/${params.category}`,
+    path: `/news/category/${resolvedParams.category}`,
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
   });
 }
 
 export default async function CategoryPage({ params }) {
-  const config = CATEGORY_CONFIG[params.category];
+  const resolvedParams = await params;
+  const config = CATEGORY_CONFIG[resolvedParams.category];
 
   if (!config) {
     notFound();
   }
 
   const { items: news } = await getCachedNewsList({
-    category: params.category,
+    category: resolvedParams.category,
     limit: NEWS_CATEGORY_LIST_LIMIT,
   });
 
   const jsonLd = buildNewsCollectionPageJsonLd({
-    path: `/news/category/${params.category}`,
+    path: `/news/category/${resolvedParams.category}`,
     title: `${config.title} | HasaN CharT World`,
     description: config.description,
   });
@@ -194,7 +196,7 @@ export default async function CategoryPage({ params }) {
 
         <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
           {CATEGORIES.map((category) => {
-            const isActive = category.key === params.category;
+            const isActive = category.key === resolvedParams.category;
             const isAll = category.key === "all";
 
             return (
@@ -202,7 +204,7 @@ export default async function CategoryPage({ params }) {
                 key={category.key}
                 href={category.href}
                 className={`rounded-2xl border px-5 py-3 text-sm font-black no-underline transition-all ${
-                  isActive || (isAll && !params.category)
+                  isActive || (isAll && !resolvedParams.category)
                     ? "border-cyan-300 bg-cyan-500 !text-white shadow-lg shadow-cyan-500/25"
                     : "border-white/50 bg-white/65 text-slate-600 hover:border-cyan-300 hover:bg-cyan-500 hover:!text-white hover:shadow-lg hover:shadow-cyan-500/25"
                 }`}
@@ -264,7 +266,7 @@ export default async function CategoryPage({ params }) {
                       src={newsImage}
                       alt={newsTitle || "صورة الخبر"}
                       title={newsTitle}
-                      category={params.category}
+                      category={resolvedParams.category}
                       item={item}
                       priority={index === 0}
                     />
