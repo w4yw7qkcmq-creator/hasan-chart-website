@@ -8,11 +8,15 @@ import {
   assertPaymentProofStorageReady,
   paymentProofStorageUnavailableMessage,
 } from "../../../lib/payment-proof-storage.js";
+import { rejectCrossOriginBrowserRequest } from "../../../lib/security/enforce-browser-same-origin";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(request);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const session = await requireSessionUser();
 
     if (session.error) {

@@ -65,7 +65,12 @@ export async function GET(request) {
           endpoint: "/api/health",
           status: report.status,
           readiness: report.readiness,
-          build: report.build,
+          build: report.build
+            ? {
+                version: report.build.version,
+                environment: report.build.environment,
+              }
+            : report.build,
           database: report.database,
           checks: report.checks?.database
             ? { database: report.checks.database }

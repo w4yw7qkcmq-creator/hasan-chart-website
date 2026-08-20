@@ -15,7 +15,12 @@ function buildCompactRouteBody(report) {
     endpoint: "/api/health",
     status: report.status,
     readiness: report.readiness,
-    build: report.build,
+    build: report.build
+      ? {
+          version: report.build.version,
+          environment: report.build.environment,
+        }
+      : report.build,
     database: report.database,
     checks: report.checks?.database
       ? { database: report.checks.database }
@@ -46,8 +51,8 @@ function testCompactModeBranch() {
 function testDefaultResponseFields() {
   assert.match(routeSource, /readiness/);
   assert.match(routeSource, /database/);
-  assert.match(routeSource, /build/);
-  assert.match(routeSource, /checks:/);
+  assert.match(routeSource, /environment/);
+  assert.doesNotMatch(routeSource, /commit:/);
   assert.match(healthSource, /checks:\s*\{\s*database:/);
   assert.match(healthSource, /iam,/);
 }

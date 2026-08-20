@@ -9,6 +9,7 @@ import {
   paymentProofStorageUnavailableMessage,
 } from "../../../../lib/payment-proof-storage.js";
 import { finalizePaymentProofUpload } from "../../../../lib/payment-proof-subscription-flow.js";
+import { rejectCrossOriginBrowserRequest } from "../../../../lib/security/enforce-browser-same-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,9 @@ async function sendAdminSubscriptionRequestEmail({
 
 export async function POST(request) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(request);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const session = await requireSessionUser();
     if (session.error) {
       return NextResponse.json(

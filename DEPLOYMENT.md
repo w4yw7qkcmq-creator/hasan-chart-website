@@ -232,6 +232,7 @@ These return disabled responses. Worker is the canonical path:
 - `send-price-alert`
 - `send-price-alert-email`
 - `price-alert-email`
+- `send-analysis-email`
 
 ---
 

@@ -2,6 +2,7 @@ import { requireSessionUser } from "../../../../lib/auth-session";
 import { enforceRateLimit } from "../../../../lib/enforce-rate-limit";
 import { deleteOwnedPushSubscription } from "../../../../lib/push-subscriptions-server";
 import { getClientIp, pushSubscribeLimiter, pushUnsubscribeIpLimiter } from "../../../../lib/rate-limit";
+import { rejectCrossOriginBrowserRequest } from "../../../../lib/security/enforce-browser-same-origin";
 import { logApiError, logApiRequest } from "../../../../lib/structured-logger";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,9 @@ export const maxDuration = 10;
 
 export async function POST(request) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(request);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const rateLimited = await enforceRateLimit(
       pushUnsubscribeIpLimiter,
       getClientIp(request)

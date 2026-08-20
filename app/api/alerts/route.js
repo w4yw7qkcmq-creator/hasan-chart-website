@@ -10,6 +10,7 @@ import {
   resolveAlertCondition,
   trimText,
 } from "../../../lib/price-alert-shared";
+import { rejectCrossOriginBrowserRequest } from "../../../lib/security/enforce-browser-same-origin";
 import { logApiError, logApiRequest } from "../../../lib/structured-logger";
 
 export const dynamic = "force-dynamic";
@@ -137,6 +138,9 @@ export async function GET(request) {
 
 export async function POST(req) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(req);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const session = await requireSessionUser();
 
     if (session.error) {

@@ -5,6 +5,7 @@ import {
   savePushSubscriptionRow,
 } from "../../../../lib/push-subscriptions-server";
 import { pushSubscribeLimiter } from "../../../../lib/rate-limit";
+import { rejectCrossOriginBrowserRequest } from "../../../../lib/security/enforce-browser-same-origin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -79,6 +80,9 @@ function normalizeSubscription(body) {
 
 export async function POST(request) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(request);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
 

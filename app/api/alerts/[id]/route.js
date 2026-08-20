@@ -12,6 +12,7 @@ import {
   resolveAlertCondition,
   trimText,
 } from "../../../../lib/price-alert-shared";
+import { rejectCrossOriginBrowserRequest } from "../../../../lib/security/enforce-browser-same-origin";
 import { logApiError, logApiRequest } from "../../../../lib/structured-logger";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,9 @@ async function getOwnedAlert({ supabase, alertId, userEmail }) {
 
 export async function PATCH(req, { params }) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(req);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const session = await requireSessionUser();
 
     if (session.error) {
@@ -162,8 +166,11 @@ export async function PATCH(req, { params }) {
   }
 }
 
-export async function DELETE(_req, { params }) {
+export async function DELETE(req, { params }) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(req);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const session = await requireSessionUser();
 
     if (session.error) {

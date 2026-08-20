@@ -21,6 +21,7 @@ import {
   forwardInstantAnalysisRequest,
   instantAnalysisErrorResponse,
 } from "../../../lib/instant-analysis-worker";
+import { rejectCrossOriginBrowserRequest } from "../../../lib/security/enforce-browser-same-origin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,6 +38,9 @@ export async function POST(request) {
   return runApiRoute(request, {
     route: "/api/instant-analysis",
     handler: async (req) => {
+      const crossOriginBlocked = rejectCrossOriginBrowserRequest(req);
+      if (crossOriginBlocked) return crossOriginBlocked;
+
       const session = await getOptionalSessionUser();
 
       if (!session) {

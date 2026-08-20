@@ -8,6 +8,7 @@ import { dispatchTransactionalEmail } from "../../../lib/email-dispatch.js";
 import { dispatchAdminSiteNotification } from "../../../lib/site-notification-dispatch.js";
 import { getSupabaseAdmin } from "../../../lib/auth-session.js";
 import { sanitizeText } from "../../../lib/partner-security.js";
+import { rejectCrossOriginBrowserRequest } from "../../../lib/security/enforce-browser-same-origin";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.EMAIL_REPLY_TO || "support@hasanchartworld.com";
 const encryptionSecret = process.env.ACCOUNT_DATA_ENCRYPTION_KEY;
@@ -79,6 +80,9 @@ function encryptValue(value) {
 
 export async function POST(request) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(request);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const supabase = getSupabaseAdmin();
     const cookieStore = await cookies();
     const token = cookieStore.get("hc_access_token")?.value;

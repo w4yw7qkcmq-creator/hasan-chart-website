@@ -10,6 +10,7 @@ import {
 } from "../../../../lib/partner-api-helpers";
 import { enforcePartnerWithdrawRateLimits } from "../../../../lib/partner-security";
 import { capturePartnerAnalyticsEvent } from "../../../../lib/partner-monitoring";
+import { rejectCrossOriginBrowserRequest } from "../../../../lib/security/enforce-browser-same-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ const ERROR_MESSAGES = PARTNER_API_ERROR_MESSAGES;
 
 export async function POST(request) {
   try {
+    const crossOriginBlocked = rejectCrossOriginBrowserRequest(request);
+    if (crossOriginBlocked) return crossOriginBlocked;
+
     const session = await requireSessionUser();
 
     if (session.error) {
