@@ -1,0 +1,69 @@
+{
+  "phase": "J",
+  "capturedAt": "2026-08-19T17:40:00.000Z",
+  "note": "Pre-enable audit baseline — not committed per Phase J Step 4",
+  "gitHead": "3502c8338fb89f52a03a5b15289ff6d67884876f",
+  "deployedCommitAtCapture": "82d642478b1357ee73b5f3b027daa9130700fab8",
+  "productionFeatureFlagsFromApi": {
+    "PARTNER_CENTER_V2_UI": true,
+    "PARTNER_GROWTH_ENGINE": true,
+    "PARTNER_ADMIN_MARKETING": true,
+    "flagConsistency": "ok"
+  },
+  "securityFlagsExpected": {
+    "HUMAN_VERIFICATION_ENABLED": true,
+    "PARTNER_ANTI_ABUSE_GATE_ENABLED": true,
+    "TURNSTILE_LOGIN_ADAPTIVE_ENABLED": true
+  },
+  "financialBaseline": {
+    "partners": 16,
+    "partner_referrals": 2,
+    "partner_commissions": {
+      "count": 11,
+      "sum_amount": 99.1,
+      "by_status": [
+        { "status": "pending", "count": 8, "sum": 1.6 },
+        { "status": "withdrawable", "count": 3, "sum": 97.5 }
+      ]
+    },
+    "partner_financial_ledger_entries": {
+      "count": 28,
+      "signed_sum": 163.1,
+      "by_type": [
+        { "entry_type": "commission", "count": 11, "sum": 99.1 },
+        { "entry_type": "manual_adjustment", "count": 7, "sum": 220 },
+        { "entry_type": "payout", "count": 10, "sum": 156 }
+      ]
+    },
+    "partner_withdrawals": {
+      "count": 17,
+      "by_status": [
+        { "status": "paid", "count": 10, "sum": 156 },
+        { "status": "rejected", "count": 7, "sum": 120 }
+      ]
+    },
+    "partner_financial_risk_holds": 0,
+    "partner_reward_entitlements": 0,
+    "partner_fraud_assessments": 0,
+    "partner_mission_progress": 0,
+    "partner_campaign_participants": 0,
+    "qrr_credits": { "count": 0, "sum": 0 },
+    "balances": {
+      "pending": 0,
+      "bonus_pending": 1.6,
+      "withdrawable": 161.5,
+      "total_earnings": 99.1,
+      "total_withdrawn": 96
+    }
+  },
+  "growthConfigCounts": {
+    "partner_mission_definitions": 0,
+    "partner_milestone_definitions": 0,
+    "partner_campaigns": 0,
+    "partner_campaign_programs": 0,
+    "partner_smart_links": 140,
+    "partner_qualified_referral_reward_rules": 1,
+    "partner_user_achievements": 21,
+    "partner_user_milestones": 6
+  }
+}

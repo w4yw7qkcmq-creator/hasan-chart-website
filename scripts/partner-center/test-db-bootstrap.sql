@@ -16,6 +16,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS auth.users (
   id uuid PRIMARY KEY,
   email text,
+  email_confirmed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -28,7 +29,12 @@ AS $$
 $$;
 
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_classification text DEFAULT 'real',
+  effective_user_classification text DEFAULT 'real',
+  human_verification_status text DEFAULT 'verified',
+  partner_reward_eligibility_status text,
+  partner_reward_risk_level text
 );
 
 CREATE TABLE IF NOT EXISTS public.iam_permissions (

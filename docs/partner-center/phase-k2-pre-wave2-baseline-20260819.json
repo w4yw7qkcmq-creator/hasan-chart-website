@@ -1,0 +1,26 @@
+{
+  "capturedAt": "2026-08-19T18:35:00.000Z",
+  "deployedCommit": "83b706f6",
+  "partners": 17,
+  "referrals": 2,
+  "commissions": { "count": 11, "sumUsd": 99.1 },
+  "ledger": { "count": 28, "signedSumUsd": 163.1 },
+  "entitlements": 0,
+  "missionProgress": 0,
+  "milestoneGrants": 0,
+  "campaignParticipants": 0,
+  "openFraudAssessments": 0,
+  "openRiskHolds": 0,
+  "balances": {
+    "withdrawableSumUsd": 161.5,
+    "pendingSumUsd": 0,
+    "bonusPendingSumUsd": 1.6
+  },
+  "withdrawals": 17,
+  "qrr": { "amountUsd": 0.5, "isEnabled": true },
+  "activeMissions": 5,
+  "activeMilestones": 2,
+  "campaignPrograms": 0,
+  "activePerformanceBonusRules": 0,
+  "wave1GoLive": "2026-08-19T17:45:51.162Z"
+}

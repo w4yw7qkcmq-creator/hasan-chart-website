@@ -48,6 +48,32 @@ export async function createPartnerTestDb() {
     }
   }
 
+  await db.exec(`
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS user_classification text DEFAULT 'real';
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS effective_user_classification text DEFAULT 'real';
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS human_verification_status text DEFAULT 'verified';
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS partner_reward_eligibility_status text;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS partner_reward_risk_level text;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email text;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS username text;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role text DEFAULT 'user';
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS user_classification_source text;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS human_verified_at timestamptz;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS partner_reward_eligibility_at timestamptz;
+    ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
+    CREATE TABLE IF NOT EXISTS public.account_risk_signals (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid,
+      signal_type text,
+      signal_hash text,
+      occurrences int NOT NULL DEFAULT 1,
+      last_seen_at timestamptz NOT NULL DEFAULT now(),
+      risk_weight int NOT NULL DEFAULT 0,
+      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+      expires_at timestamptz NOT NULL DEFAULT (now() + interval '365 days')
+    );
+  `);
+
   return db;
 }
 

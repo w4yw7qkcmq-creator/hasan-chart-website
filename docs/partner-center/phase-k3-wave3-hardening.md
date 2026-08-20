@@ -4,6 +4,7 @@
 **Scope:** Performance effective windows, atomic campaign budgets, leaderboard privacy/anti-gaming  
 **Cash campaign activated:** NO  
 **Leaderboard UI enabled:** NO  
+**Commit:** `41cae12f88fcd31e29350412f8e3b036a1c85bf4`
 
 ## Blockers closed
 

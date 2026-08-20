@@ -2,6 +2,8 @@
 
 **Date:** 2026-08-19  
 **Verdict:** WAVE 2 HARDENING PASS — milestone effective windows enforced; production retroactivity audit = 0
+**Commit:** `83b706f`
+**Deployed commit:** `83b706f6` (Railway web, verified `/api/health`)
 
 ## Root cause
 

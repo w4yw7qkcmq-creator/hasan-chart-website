@@ -1,7 +1,30 @@
 import { query } from "./test-db.mjs";
 
 export function createServiceSupabaseFromDb(db) {
-  return {
+  const client = {
+    auth: {
+      admin: {
+        async getUserById(userId) {
+          const res = await query(
+            db,
+            `SELECT id, email, email_confirmed_at FROM auth.users WHERE id = $1`,
+            [userId]
+          );
+          const row = res.rows[0];
+          if (!row) return { data: { user: null }, error: null };
+          return {
+            data: {
+              user: {
+                id: row.id,
+                email: row.email,
+                email_confirmed_at: row.email_confirmed_at,
+              },
+            },
+            error: null,
+          };
+        },
+      },
+    },
     async rpc(fn, params = {}) {
       const entries = Object.entries(params);
       const values = entries.map(([, v]) => v);
@@ -165,4 +188,5 @@ export function createServiceSupabaseFromDb(db) {
       return builder;
     },
   };
+  return client;
 }

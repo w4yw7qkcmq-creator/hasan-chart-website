@@ -1,0 +1,53 @@
+{
+  "campaign": {
+    "code": "wave2_smart_link_challenge",
+    "id": "63f8d898-60fa-484f-a05a-81a2384a8f21",
+    "createdAsDraftAt": "2026-08-19T18:35:00.000Z",
+    "activatedAt": "2026-08-19T18:35:00.000Z",
+    "status": "active",
+    "financial": false
+  },
+  "performanceBonus": {
+    "activated": false,
+    "reason": "deferred_pending_effective_window_engine_fix"
+  },
+  "pre": {
+    "partners": 17,
+    "commissions": 11,
+    "commissionSum": 99.1,
+    "ledger": 28,
+    "ledgerSigned": 163.1,
+    "entitlements": 0,
+    "missionProgress": 0,
+    "milestoneGrants": 0,
+    "campaignPrograms": 0,
+    "campaignParticipants": 0
+  },
+  "post": {
+    "partners": 17,
+    "commissions": 11,
+    "commissionSum": 99.1,
+    "ledger": 28,
+    "ledgerSigned": 163.1,
+    "entitlements": 0,
+    "missionProgress": 0,
+    "milestoneGrants": 0,
+    "campaignPrograms": 1,
+    "activeCampaigns": 1,
+    "campaignParticipants": 0
+  },
+  "economicDelta": {
+    "commissions": 0,
+    "commissionSum": 0,
+    "ledger": 0,
+    "entitlements": 0,
+    "missionProgress": 0,
+    "milestoneGrants": 0,
+    "campaignParticipants": 0,
+    "balances": 0
+  },
+  "retroactivity": {
+    "RETROACTIVE_CAMPAIGN_REWARDS": 0,
+    "RETROACTIVE_PERFORMANCE_REWARDS": 0
+  }
+}

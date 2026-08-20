@@ -1,0 +1,136 @@
+{
+  "phase": "K.2",
+  "wave": 2,
+  "goLive": "2026-08-19T18:35:00.000Z",
+  "deployedCommitAtStart": "83b706f6",
+  "rollback": "PATCH partner_campaign_programs SET status='paused' WHERE code='wave2_smart_link_challenge'; do not disable HV/anti-abuse",
+  "budgetCapAudit": {
+    "atomicGlobalBudgetInRpc": false,
+    "maxParticipantsEnforced": true,
+    "maxExposureMetadataOnly": true,
+    "decision": "NON_FINANCIAL campaign shell only — no Wave 2 cash mission until atomic budget or accepted bounded-cap policy"
+  },
+  "campaign": {
+    "id": "63f8d898-60fa-484f-a05a-81a2384a8f21",
+    "code": "wave2_smart_link_challenge",
+    "name": "Smart Link Growth Challenge",
+    "nameAr": "تحدي النمو عبر الروابط الذكية",
+    "status": "active",
+    "financial": false,
+    "startAt": "2026-08-19T18:35:00.000Z",
+    "endAt": "2026-10-31T23:59:59.000Z",
+    "effectiveFrom": "2026-08-19T18:35:00.000Z",
+    "landingPath": "/register",
+    "maxParticipants": 500,
+    "partnerEligibility": { "mode": "all" },
+    "trustedOutcomes": [
+      "campaign-attributed smart link creation",
+      "server-verified qualified referral with campaign_program_id on attribution"
+    ],
+    "explicitlyExcluded": ["raw clicks", "page opens", "link creation alone"],
+    "linkedMissions": [],
+    "maxExposureUsd": 0
+  },
+  "performanceBonus": {
+    "activated": false,
+    "decision": "DEFERRED",
+    "blocker": "performance-bonus-engine.js uses all-time computePartnerMetrics(); effective_from/effective_to on rules not enforced (same class as pre-K.1 milestone retroactivity)",
+    "proposedFutureRule": {
+      "code": "wave2_monthly_revenue_bonus",
+      "metric": "confirmed_revenue",
+      "periodType": "monthly",
+      "thresholdValue": 50,
+      "rewardAmount": 1.0,
+      "requiresEngineFix": true
+    }
+  },
+  "economics": {
+    "campaignWorstCaseUsd": {
+      "participants10": 0,
+      "participants100": 0,
+      "participants1000": 0,
+      "participants10000": 0
+    },
+    "hypotheticalFinancialMissionIfEnabledLater": {
+      "rewardPerQualifiedOutcomeUsd": 0.35,
+      "maxPerPartnerUsd": 0.35,
+      "maxParticipants": 500,
+      "maxCampaignExposureUsd": 175,
+      "note": "Design-only; NOT activated — no atomic global budget RPC"
+    },
+    "performanceBonusWorstCaseUsd": "N/A — not activated"
+  },
+  "stackingMatrixUsd": {
+    "firstQualifiedReferral": {
+      "signupBonus": 0.2,
+      "qrr": 0.5,
+      "commission": "variable",
+      "wave1MissionK1": 0.25,
+      "wave1Milestone": 0,
+      "wave2Campaign": 0,
+      "wave2PerformanceBonus": 0,
+      "maxGrowthStackExCommission": 0.95
+    },
+    "thirdQualified": {
+      "qrr": 0.5,
+      "wave1MissionK2": 0.5,
+      "wave2Campaign": 0,
+      "maxGrowthStackExCommission": 1.0
+    },
+    "fifthQualified": {
+      "qrr": 0.5,
+      "wave1MissionK3": 1.0,
+      "wave2Campaign": 0,
+      "maxGrowthStackExCommission": 1.5
+    },
+    "tenthQualified": {
+      "qrr": 0.5,
+      "wave1MilestoneMs10": 2.0,
+      "wave2Campaign": 0,
+      "maxGrowthStackExCommission": 2.5
+    },
+    "smartLinkCampaignQualification": {
+      "wave1MissionK5": 0.5,
+      "wave2Campaign": 0,
+      "note": "Wave 2 campaign tracks attribution; no additional cash in Wave 2 shell"
+    },
+    "paidServiceConversion": {
+      "commission": "tier rule",
+      "wave1MissionK4": 0.75,
+      "wave2Campaign": 0,
+      "wave2PerformanceBonus": 0
+    }
+  },
+  "leaderboard": {
+    "uiEnabled": false,
+    "privacyBlocker": "/api/partner/leaderboard returns email, userId, partnerId, totalCommissions, totalEarnings via lib/partner-analytics.js — must mask before enablement",
+    "safeContract": {
+      "allowedPublic": ["displayLabel", "rank", "aggregateMetricValue"],
+      "neverPublic": ["email", "phone", "rawUserId", "exactPrivateEarnings", "fraudStatus", "classification", "riskLevel"]
+    },
+    "antiGaming": "partner-center leaderboard-engine uses computePartnerMetrics (all-time); ranking not gated on HV/classification — fix before enablement"
+  },
+  "retroactivityAudit": {
+    "RETROACTIVE_CAMPAIGN_REWARDS": 0,
+    "RETROACTIVE_PERFORMANCE_REWARDS": 0
+  },
+  "activationEconomicDelta": {
+    "commissions": 0,
+    "ledger": 0,
+    "entitlements": 0,
+    "missionProgress": 0,
+    "milestoneGrants": 0,
+    "campaignParticipants": 0,
+    "balances": 0
+  },
+  "tests": {
+    "pgliteCampaignEligibility": "max_participants + isWithinWindow enforced in campaign-engine.js",
+    "isolatedStagingCampaignFinancial": "NOT RUN — non-financial activation path",
+    "performanceBonusIsolated": "NOT RUN — deferred"
+  },
+  "security": {
+    "humanVerificationEnabled": true,
+    "partnerAntiAbuseGateEnabled": true,
+    "turnstileLoginAdaptiveEnabled": true
+  }
+}
