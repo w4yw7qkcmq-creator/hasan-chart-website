@@ -35,6 +35,7 @@ function buildCompactRouteBody(report) {
 function testRouteSupportsDetailFlag() {
   assert.match(routeSource, /detail/);
   assert.match(routeSource, /collectHealthReport\(\{ detail \}\)/);
+  assert.match(routeSource, /verifyAdminOrCronSecret/);
 }
 
 function testCompactModeBranch() {

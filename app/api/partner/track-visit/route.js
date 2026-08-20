@@ -5,12 +5,25 @@ import {
   capturePartnerReferral,
   readReferralCookies,
 } from "../../../../lib/partner-referral-capture";
+import { enforcePartnerReferralRateLimits } from "../../../../lib/partner-security";
+import { partnerTrackVisitIpLimiter } from "../../../../lib/rate-limit";
 import { sanitizeReferralCode } from "../../../../lib/partner-shared";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   try {
+    const rateCheck = await enforcePartnerReferralRateLimits(
+      request,
+      partnerTrackVisitIpLimiter
+    );
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, tracked: false, error: "RATE_LIMITED" },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const code = sanitizeReferralCode(body?.code);
     const visitorId = String(body?.visitorId || "").trim() || null;

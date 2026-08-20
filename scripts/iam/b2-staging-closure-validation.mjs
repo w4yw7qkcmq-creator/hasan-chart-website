@@ -241,7 +241,9 @@ async function main() {
     matrix.webCronLegacy = await httpJson(`${webBase}/api/check-subscription-expiry`, {
       headers: { Authorization: `Bearer ${staging.STAGING_IAM_CRON_SECRET}` },
     });
-    const health = await httpJson(`${webBase}/api/health?detail=1`);
+    const health = await httpJson(`${webBase}/api/health?detail=1`, {
+      headers: { Authorization: `Bearer ${staging.STAGING_IAM_CRON_SECRET}` },
+    });
     matrix.machineAuthMetrics = health.body?.iam?.machineAuth || null;
   } finally {
     web.kill("SIGTERM");

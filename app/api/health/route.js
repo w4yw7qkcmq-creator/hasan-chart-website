@@ -1,5 +1,6 @@
 import { runWithRedisRoute } from "../../../lib/redis-instrumentation";
 import { startMarketStream } from "../../../lib/okx-market-stream";
+import { verifyAdminOrCronSecret } from "../../../lib/admin-auth";
 import { CACHE_NO_STORE, jsonResponse } from "../../../lib/api-response";
 import { collectHealthReport } from "../../../lib/health-check";
 import {
@@ -18,6 +19,22 @@ export async function GET(request) {
 
   try {
     if (detail) {
+      const auth = await verifyAdminOrCronSecret(request);
+      if (!auth.ok) {
+        return jsonResponse(
+          {
+            success: false,
+            service: "hasan-chart-website",
+            endpoint: "/api/health",
+            error: auth.error || "Unauthorized diagnostic request.",
+          },
+          {
+            status: auth.status || 401,
+            cacheControl: CACHE_NO_STORE,
+          }
+        );
+      }
+
       startMarketStream("api-health");
     }
     const report = await runWithRedisRoute("/api/health", () =>

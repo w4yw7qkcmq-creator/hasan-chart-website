@@ -101,7 +101,9 @@ async function main() {
   const hashMatch = verifyServiceSecret(secret, account?.secret_hash, ACCOUNT_ID);
   const cronSecret = await loadCronSecretForWeb(local);
 
-  const metricsBefore = await httpJson(`${WEB_BASE}/api/health?detail=1`);
+  const metricsBefore = await httpJson(`${WEB_BASE}/api/health?detail=1`, {
+    headers: cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {},
+  });
   const matrix = {};
 
   matrix.apiHealth = await httpJson(`${API_BASE}/health`);
@@ -156,7 +158,9 @@ async function main() {
     headers: cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {},
   });
 
-  const metricsAfter = await httpJson(`${WEB_BASE}/api/health?detail=1`);
+  const metricsAfter = await httpJson(`${WEB_BASE}/api/health?detail=1`, {
+    headers: cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {},
+  });
 
   const legacyOnlyAcceptable =
     matrix.legacyOnly.status === 200 || matrix.legacyOnly.status === 401;

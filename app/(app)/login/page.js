@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { devLog } from "../../../lib/dev-log";
 import { isAdminUser } from "../../../lib/admin-emails";
 import { applyClientSession } from "../../../lib/auth-session-client";
+import { getSafeNextPath } from "../../../lib/safe-next-path";
 import { useAppModal } from "../../components/AppModalProvider";
 import { useAuth } from "../../components/AuthProvider";
 
@@ -36,17 +37,6 @@ function BrandMark({ size = "lg" }) {
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 const SIGN_IN_TIMEOUT_MS = 10000;
 const SIGN_IN_TIMEOUT_MESSAGE = "تعذر الاتصال بخدمة تسجيل الدخول، أعد المحاولة";
-
-function getSafeNextPath(next) {
-  if (typeof next !== "string") return null;
-
-  const trimmed = next.trim();
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return null;
-  }
-
-  return trimmed;
-}
 
 function resolvePostLoginDestination({ email, nextPath }) {
   const safeNext = getSafeNextPath(nextPath);

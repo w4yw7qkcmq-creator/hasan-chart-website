@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { CACHE_PUBLIC_CONTENT, jsonError, jsonOk } from "../../../lib/api-response";
 import { runApiRoute } from "../../../lib/api-route";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import {
   applyCreatedAtIdCursor,
   buildPaginationResult,
@@ -13,6 +14,7 @@ import {
   NEWS_LIST_MAX_PAGE_SIZE,
   NEWS_LIST_PAGE_SIZE,
 } from "../../../lib/public-cache-config";
+import { getClientIp, publicNewsIpLimiter } from "../../../lib/rate-limit";
 import { withReadCache } from "../../../lib/server-read-cache";
 import { NEWS_LIST_COLUMNS } from "../../../lib/supabase-query-columns";
 import { instrumentSupabaseClient } from "../../../lib/supabase-dev-metrics";
@@ -126,6 +128,9 @@ export async function GET(request) {
     route: "/api/news",
     handler: async (req, logContext) => {
       try {
+        const rateLimited = await enforceRateLimit(publicNewsIpLimiter, getClientIp(req));
+        if (rateLimited) return rateLimited;
+
         const params = parseListParams(req.nextUrl.searchParams);
         const cacheKey = `public:news:list:${params.limit}:${params.cursor || `offset:${params.offset}`}:${params.search}:${params.includeTotal}:legacy:${params.legacyPosts}`;
 

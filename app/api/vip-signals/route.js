@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { CACHE_PRIVATE_USER } from "../../../lib/api-response";
+import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
+import { vipSignalsUserLimiter } from "../../../lib/rate-limit";
 import { withInFlightDedup } from "../../../lib/server-read-cache";
 import {
   VIP_SIGNALS_DEFAULT_LIMIT,
@@ -217,6 +219,9 @@ export async function GET(request) {
         { status: 401 }
       );
     }
+
+    const rateLimited = await enforceRateLimit(vipSignalsUserLimiter, authUser.id);
+    if (rateLimited) return rateLimited;
 
     const { guardActiveAccountForApi } = await import("../../../lib/guard-active-account-api.js");
     const blocked = await guardActiveAccountForApi(supabase, authUser.id);
