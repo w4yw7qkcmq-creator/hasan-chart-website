@@ -77,7 +77,9 @@
     "test:financial-center-cursor": "node scripts/test-financial-center-cursor.js",
     "test:subscription-plan-security": "node --test scripts/test-subscription-plan-security.js",
     "test:partner:migration-history": "node --test scripts/test-partner-migration-history-guard.js && node scripts/partner-center/verify-production-migration-history.mjs",
-    "test:partner:r9-staging": "node scripts/partner-center/r9-staging-validation.mjs"
+    "test:partner:r9-staging": "node scripts/partner-center/r9-staging-validation.mjs",
+    "test:telegram-content-phase2a": "node --test scripts/test-telegram-content-phase2a.js && node scripts/test-telegram-content-rls-static.js",
+    "test:telegram-content-phase2a1": "node --test scripts/test-telegram-content-phase2a1.js && node scripts/test-telegram-content-startup-smoke.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

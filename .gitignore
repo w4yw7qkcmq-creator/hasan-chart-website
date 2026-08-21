@@ -8,6 +8,7 @@ worker/news-card.png
 worker/.env
 .env.local
 .env.staging.local
+.env.staging.telegram.local
 .env.staging.bootstrap.local
 .env.production.bootstrap.local
 .env.production.worker-auth.local

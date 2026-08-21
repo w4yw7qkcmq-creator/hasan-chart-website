@@ -8,6 +8,8 @@ import { adminMutationLimiter, getClientIp } from "../../../lib/rate-limit";
 import { getSupabaseAdmin } from "../../../lib/supabase-admin";
 import { invalidateReadCache, withReadCache } from "../../../lib/server-read-cache";
 import { DAILY_ANALYSIS_API_CACHE_MS } from "../../../lib/public-cache-config";
+import { fetchTelegramDailyAnalysisItems } from "../../../lib/public-section-feed/index.js";
+import { mergeFeedItemsByPublishedAt } from "../../../lib/public-section-feed/merge.js";
 import { DAILY_ANALYSIS_COLUMNS } from "../../../lib/supabase-query-columns";
 import { trimText } from "../../../lib/text-sanitize";
 
@@ -68,10 +70,16 @@ export async function GET(request) {
         throw new Error(error.message || "تعذر تحميل التحليلات.");
       }
 
+      const manualAnalyses = (rows || []).map(normalizeItem).filter(Boolean);
+      const telegramAnalyses = await fetchTelegramDailyAnalysisItems();
+      const analyses = mergeFeedItemsByPublishedAt([...manualAnalyses, ...telegramAnalyses], {
+        cap: 100,
+      });
+
       return {
         success: true,
         tableReady: true,
-        analyses: (rows || []).map(normalizeItem).filter(Boolean),
+        analyses,
       };
     });
 

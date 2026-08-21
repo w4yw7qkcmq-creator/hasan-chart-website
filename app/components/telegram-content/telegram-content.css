@@ -1,0 +1,56 @@
+.telegram-safe-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.telegram-image-gallery {
+  margin: 0.75rem 0 1rem;
+}
+
+.telegram-image-gallery--single .telegram-image-gallery__image,
+.telegram-image-gallery__item .telegram-image-gallery__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 1rem;
+  object-fit: cover;
+}
+
+.telegram-image-gallery--multi {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.telegram-image-gallery__item {
+  margin: 0;
+}
+
+.daily-analysis-card--telegram .daily-analysis-card__telegram-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+}
+
+.content-post-card__telegram-badge {
+  position: absolute;
+  top: 0.75rem;
+  inset-inline-start: 0.75rem;
+  z-index: 2;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+}
+
+.content-post-detail__telegram-gallery {
+  margin-top: 0.5rem;
+}

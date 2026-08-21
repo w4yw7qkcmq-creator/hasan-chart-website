@@ -10,6 +10,9 @@ export default function ContentPostCard({ post, variant = "academy" }) {
   return (
     <Link href={href} className="content-post-card">
       <div className={`content-post-card__media content-post-card__media--${variant}`}>
+        {post.source === "telegram" ? (
+          <span className="content-post-card__telegram-badge">Telegram</span>
+        ) : null}
         {post.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={post.image_url} alt={post.title} className="content-post-card__image" loading="lazy" />

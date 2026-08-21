@@ -14,6 +14,7 @@ import {
   matchesDailyAnalysisFilter,
   resolveAnalysisAsset,
 } from "../../components/daily-analysis/dailyAnalysisHelpers";
+import TelegramFeedCard from "../../components/telegram-content/TelegramFeedCard";
 
 const DailyAnalysisAdminForm = dynamic(() => import("./DailyAnalysisAdminForm"), {
   ssr: false,
@@ -377,9 +378,13 @@ export default function DailyAnalysisClient() {
           />
         ) : (
           <section className="daily-analysis-grid" aria-label="قائمة التحليلات">
-            {filteredAnalyses.map((item) => (
-              <AnalysisCard key={item.id} item={item} />
-            ))}
+            {filteredAnalyses.map((item) =>
+              item.source === "telegram" ? (
+                <TelegramFeedCard key={item.id} item={item} />
+              ) : (
+                <AnalysisCard key={item.id} item={item} />
+              )
+            )}
           </section>
         )}
 

@@ -154,6 +154,9 @@ export function getAnalysisAssetName(item = {}) {
  * @param {string} filterKey
  */
 export function matchesDailyAnalysisFilter(item, filterKey) {
+  if (item?.source === "telegram") {
+    return filterKey === "all";
+  }
   if (filterKey === "all") return true;
   return getAnalysisMarketCategory(item) === filterKey;
 }

@@ -6,6 +6,23 @@ export async function register() {
 
     announceWebsitePriceAlertEmailGuard("instrumentation.js::register");
 
+    const { recoverTelegramAlbumTimersOnStartup } = await import(
+      "./lib/telegram-content/album-liveness-scheduler.js"
+    );
+    const { getSupabaseAdmin } = await import("./lib/auth-session.js");
+    const supabaseAdmin = getSupabaseAdmin();
+    if (supabaseAdmin) {
+      recoverTelegramAlbumTimersOnStartup({ supabase: supabaseAdmin }).catch((error) => {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "telegram_content_startup_recovery_failed",
+            message: error?.message || "unknown",
+          })
+        );
+      });
+    }
+
     const { startMarketStream } = await import("./lib/okx-market-stream.js");
     startMarketStream("instrumentation-register");
 

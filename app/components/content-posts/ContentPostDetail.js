@@ -1,5 +1,8 @@
 import Link from "next/link";
 import Breadcrumbs from "../seo/Breadcrumbs";
+import TelegramImageGallery from "../telegram-content/TelegramImageGallery";
+import TelegramSafeBody from "../telegram-content/TelegramSafeBody";
+import "../telegram-content/telegram-content.css";
 import { formatContentPostDate } from "../../../lib/content-post-public";
 
 export default function ContentPostDetail({
@@ -32,14 +35,20 @@ export default function ContentPostDetail({
         {post.summary ? <p className="content-post-detail__summary">{post.summary}</p> : null}
       </div>
 
-      {post.image_url ? (
+      {post.source === "telegram" && post.images?.length ? (
+        <div className="content-post-detail__telegram-gallery">
+          <TelegramImageGallery images={post.images} alt={post.title} />
+        </div>
+      ) : post.image_url ? (
         <div className={`content-post-detail__hero content-post-detail__hero--${variant}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.image_url} alt={post.title} />
+          <img src={post.image_url} alt={post.title} loading="lazy" decoding="async" />
         </div>
       ) : null}
 
-      <div className="content-post-detail__prose">{post.body}</div>
+      <div className="content-post-detail__prose">
+        {post.source === "telegram" ? <TelegramSafeBody text={post.body} /> : post.body}
+      </div>
 
       {backHref ? (
         <Link href={backHref} className="content-post-detail__back">
