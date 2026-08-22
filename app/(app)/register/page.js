@@ -69,6 +69,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReady, setTurnstileReady] = useState(false);
   const turnstileWidgetId = useRef(null);
@@ -180,6 +181,7 @@ export default function RegisterPage() {
           username: cleanUsername,
           telegram: cleanTelegram,
           turnstileToken,
+          marketingOptIn,
         }),
       });
 
@@ -312,6 +314,21 @@ export default function RegisterPage() {
                   required
                   className="w-full rounded-2xl border border-blue-300/15 bg-black/35 px-5 py-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/70 focus:ring-4 focus:ring-cyan-400/10"
                 />
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-blue-300/10 bg-black/20 p-4">
+                <input
+                  type="checkbox"
+                  checked={marketingOptIn}
+                  onChange={(e) => setMarketingOptIn(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-cyan-300/30 bg-black/40 accent-cyan-400"
+                />
+                <span className="text-sm leading-7 text-slate-300">
+                  أرغب في تلقي الأخبار والتحديثات والعروض عبر البريد الإلكتروني.
+                  <span className="mt-1 block text-xs text-slate-500">
+                    اختياري — ليس شرطاً لإنشاء الحساب.
+                  </span>
+                </span>
               </label>
 
               {TURNSTILE_SITE_KEY && (

@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "../../../../lib/auth-session";
 import { verifyEmailUnsubscribeToken } from "../../../../lib/email-campaign/unsubscribe-token.js";
 import { upsertMarketingPreferences } from "../../../../lib/email-marketing-preferences.js";
+import { EMAIL_POLICY_SOURCES } from "../../../../lib/email-policy/constants.js";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,11 @@ export async function POST(request) {
     await upsertMarketingPreferences(supabase, {
       userId: verified.userId,
       marketingOptIn: false,
-      source: verified.campaignId ? `campaign:${verified.campaignId}` : "unsubscribe-link",
+      source: EMAIL_POLICY_SOURCES.EMAIL_UNSUBSCRIBE,
+      campaignId: verified.campaignId || null,
+      metadata: verified.campaignId
+        ? { unsubscribeChannel: "campaign-email", campaignId: verified.campaignId }
+        : { unsubscribeChannel: "email-link" },
     });
 
     return Response.json({ success: true, message: "Unsubscribed successfully" });

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { formatNotificationTime } from "../../../lib/notifications-shared";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 import UserAccountUuidRow from "./UserAccountUuidRow";
+import MarketingOptInCard from "../../components/email/MarketingOptInCard";
+import EmailPreferencesPanel from "../../components/email/EmailPreferencesPanel";
 
 let dashboardBootstrapInflight = null;
 
@@ -258,6 +260,8 @@ export default function MyDashboard() {
       <div className="user-dashboard-page__bg" aria-hidden="true" />
 
       <div className="user-dashboard-page__inner">
+        <MarketingOptInCard />
+
         <header className="user-dashboard-hero">
           <div className="user-dashboard-hero__content">
             <span className="user-dashboard-hero__eyebrow">لوحة المستخدم</span>
@@ -375,6 +379,8 @@ export default function MyDashboard() {
               </div>
             </div>
           </DashboardPanel>
+
+          <EmailPreferencesPanel />
 
           <DashboardPanel
             title="آخر طلبات التحليل"

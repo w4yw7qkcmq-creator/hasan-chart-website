@@ -19,6 +19,7 @@ export default function EmailComposePage() {
     selectedUserIds: [],
   });
   const [stats, setStats] = useState(null);
+  const [audienceCounts, setAudienceCounts] = useState(null);
   const [previewHtml, setPreviewHtml] = useState("");
   const [testEmail, setTestEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -91,6 +92,15 @@ export default function EmailComposePage() {
   }, [step, campaignId, loadPreview]);
 
   useEffect(() => {
+    void adminFetch("/api/admin/email-campaigns/audience-counts")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setAudienceCounts(data.counts);
+      })
+      .catch(() => {});
+  }, [adminFetch]);
+
+  useEffect(() => {
     if (form.audienceType !== "selected_users" || userQuery.length < 2) {
       setUserResults([]);
       return;
@@ -160,6 +170,31 @@ export default function EmailComposePage() {
 
       {step === 0 ? (
         <section className="mt-6 space-y-4">
+          <div className="rounded-2xl border border-cyan-200/30 bg-cyan-50/50 p-4 text-sm dark:bg-cyan-400/5">
+            <p className="font-black text-cyan-800 dark:text-cyan-200">تصنيف الحملة: تسويق (Marketing)</p>
+            <p className="mt-1 text-slate-600 dark:text-slate-300">
+              الإرسال الجماعي يتطلب موافقة تسويقية صريحة — لا يمكن تجاوز consent عبر transactional.
+            </p>
+          </div>
+
+          {audienceCounts ? (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {[
+                ["إجمالي الحسابات", audienceCounts.totalAccounts],
+                ["موافقون على التسويق", audienceCounts.marketingOptedIn],
+                ["لم يوافقوا أبداً", audienceCounts.neverOptedIn],
+                ["ألغوا الاشتراك", audienceCounts.marketingOptedOut],
+                ["Hard suppressed", audienceCounts.hardSuppressed],
+                ["مؤهلون للحملة", audienceCounts.campaignEligible],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border p-3">
+                  <div className="text-xs text-slate-500">{label}</div>
+                  <div className="text-xl font-black">{value ?? 0}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <input className="w-full rounded-2xl border p-3" placeholder="اسم الحملة" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <select className="w-full rounded-2xl border p-3" value={form.audienceType} onChange={(e) => setForm({ ...form, audienceType: e.target.value })}>
             <option value="all_eligible">جميع المستخدمين المؤهلين</option>
@@ -190,7 +225,17 @@ export default function EmailComposePage() {
             تجهيز الجمهور
           </button>
           {stats ? (
-            <pre className="overflow-auto rounded-2xl bg-slate-50 p-4 text-xs dark:bg-black/30">{JSON.stringify(stats, null, 2)}</pre>
+            <div className="space-y-3 rounded-2xl border p-4 text-sm">
+              <p><strong>مؤهلون:</strong> {stats.eligible}</p>
+              <p><strong>مستبعدون:</strong> {stats.excluded}</p>
+              {stats.exclusionReasonLabels ? (
+                <ul className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                  {Object.entries(stats.exclusionReasonLabels).map(([reason, info]) => (
+                    <li key={reason}>{info.label}: {info.count}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
         </section>
       ) : null}

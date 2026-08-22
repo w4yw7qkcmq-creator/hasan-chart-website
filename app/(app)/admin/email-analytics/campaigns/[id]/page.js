@@ -24,13 +24,15 @@ export default function CampaignDetailPage({ params }) {
   if (!detail) return <p className="p-6">جاري التحميل...</p>;
 
   const { campaign, deliveryBreakdown } = detail;
+  const audienceStats = campaign.metadata?.audienceStats || {};
+  const exclusionReasonLabels = audienceStats.exclusionReasonLabels || {};
 
   return (
     <main className="rounded-[34px] border border-slate-200 bg-white p-6 shadow-lg dark:border-cyan-300/15 dark:bg-[#07142f]/80">
       <Link href="/admin/email-analytics/campaigns" className="text-sm text-cyan-600">← الحملات</Link>
       <h1 className="mt-3 text-2xl font-black">{campaign.name}</h1>
       <p className="text-slate-500">
-        {campaign.status} · {campaign.subject}
+        {campaign.status} · {campaign.category || "marketing"} · {campaign.subject}
         {campaign.enqueue_completed_at ? " · enqueue complete" : ""}
       </p>
 
@@ -47,6 +49,20 @@ export default function CampaignDetailPage({ params }) {
           </div>
         ))}
       </div>
+
+      {Object.keys(exclusionReasonLabels).length ? (
+        <section className="mt-8">
+          <h2 className="font-black">أسباب الاستبعاد (Audience Snapshot)</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            {Object.entries(exclusionReasonLabels).map(([reason, info]) => (
+              <li key={reason} className="flex justify-between rounded-xl border px-3 py-2">
+                <span>{info.label || reason}</span>
+                <strong>{info.count}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="mt-8">
         <h2 className="font-black">Delivery breakdown</h2>

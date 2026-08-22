@@ -20,6 +20,8 @@ import {
   recordSignupRiskSignals,
 } from "../../../../lib/security/account-risk-signals.js";
 import { isHumanVerificationEnabled } from "../../../../lib/security/feature-flags.js";
+import { upsertMarketingPreferences } from "../../../../lib/email-marketing-preferences.js";
+import { EMAIL_POLICY_SOURCES } from "../../../../lib/email-policy/constants.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -50,7 +52,7 @@ export async function POST(request) {
     }
 
     const deviceState = readDeviceTokenFromRequest(request);
-    const { email, password, username, telegram, turnstileToken } = await request.json();
+    const { email, password, username, telegram, turnstileToken, marketingOptIn } = await request.json();
 
     const normalizedEmail = String(email || "")
       .trim()
@@ -150,6 +152,20 @@ export async function POST(request) {
         });
       } catch {
         console.error("Partner registration hook failed");
+      }
+    }
+
+    if (newUserId && marketingOptIn === true) {
+      try {
+        await upsertMarketingPreferences(admin, {
+          userId: newUserId,
+          marketingOptIn: true,
+          source: EMAIL_POLICY_SOURCES.SIGNUP_CHECKBOX,
+          normalizedEmail,
+          metadata: { flow: "register" },
+        });
+      } catch (prefError) {
+        console.error("Signup marketing preference persistence failed");
       }
     }
 
