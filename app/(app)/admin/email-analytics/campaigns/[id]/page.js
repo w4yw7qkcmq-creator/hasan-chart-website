@@ -29,7 +29,10 @@ export default function CampaignDetailPage({ params }) {
     <main className="rounded-[34px] border border-slate-200 bg-white p-6 shadow-lg dark:border-cyan-300/15 dark:bg-[#07142f]/80">
       <Link href="/admin/email-analytics/campaigns" className="text-sm text-cyan-600">← الحملات</Link>
       <h1 className="mt-3 text-2xl font-black">{campaign.name}</h1>
-      <p className="text-slate-500">{campaign.status} · {campaign.subject}</p>
+      <p className="text-slate-500">
+        {campaign.status} · {campaign.subject}
+        {campaign.enqueue_completed_at ? " · enqueue complete" : ""}
+      </p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         {[

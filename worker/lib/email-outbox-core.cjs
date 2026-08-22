@@ -3,6 +3,7 @@
  */
 
 const { blockProductionTestRecipientSend } = require("./email-outbox-guard.cjs");
+const { syncCampaignRecipientFromOutbox } = require("./email-campaign-delivery-sync.cjs");
 
 const EMAIL_OUTBOX_TABLE = "email_outbox";
 const EMAIL_MESSAGES_TABLE = "email_messages";
@@ -575,6 +576,12 @@ async function finalizeProviderAccepted(supabase, row, sendResult, deps = {}) {
     providerMessageId: resendId,
   });
 
+  const campaignSyncFn = deps.syncCampaignRecipientFromOutbox || syncCampaignRecipientFromOutbox;
+  await campaignSyncFn(supabase, row, {
+    outcome: "provider_accepted",
+    resendId,
+  });
+
   return resendId;
 }
 
@@ -606,6 +613,11 @@ async function handleProcessingFailure(supabase, row, sendResult, deps = {}) {
     await syncFn(supabase, row, {
       outcome: "failed",
       errorCode: truncateError(failureError),
+    });
+    const campaignSyncFn = deps.syncCampaignRecipientFromOutbox || syncCampaignRecipientFromOutbox;
+    await campaignSyncFn(supabase, row, {
+      outcome: "failed",
+      error: truncateError(failureError),
     });
 
     logEmailQueueEvent("EMAIL_QUEUE_MESSAGE_FAILED", {
@@ -833,6 +845,7 @@ module.exports = {
   markEmailUncertain,
   upsertEmailMessageFromOutbox,
   syncVipStatusDeliveryFromOutbox,
+  syncCampaignRecipientFromOutbox,
   finalizeProviderAccepted,
   processSingleOutboxEmail,
   processEmailOutboxBatch,
