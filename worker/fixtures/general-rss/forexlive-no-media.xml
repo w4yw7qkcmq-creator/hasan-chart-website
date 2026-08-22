@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>ForexLive</title>
+    <item>
+      <title>EURUSD climbs as dollar weakens</title>
+      <link>https://www.forexlive.com/news/eurusd-climbs-123</link>
+      <guid>https://www.forexlive.com/news/eurusd-climbs-123</guid>
+    </item>
+    <item>
+      <title>USDJPY steady ahead of BOJ decision</title>
+      <link>https://www.forexlive.com/news/usdjpy-steady-456</link>
+      <guid>https://www.forexlive.com/news/usdjpy-steady-456</guid>
+    </item>
+  </channel>
+</rss>

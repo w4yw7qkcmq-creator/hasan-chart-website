@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>CNBC Top News</title>
+    <item>
+      <title>Apple shares rise after earnings beat</title>
+      <link>https://www.cnbc.com/2026/08/22/apple-shares-rise-after-earnings-beat.html</link>
+      <guid>https://www.cnbc.com/2026/08/22/apple-shares-rise-after-earnings-beat.html</guid>
+      <description>Apple reported stronger than expected earnings.</description>
+    </item>
+  </channel>
+</rss>

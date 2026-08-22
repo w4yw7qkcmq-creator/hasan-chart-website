@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>MarketWatch Top Stories</title>
+    <item>
+      <title>Stocks edge higher as investors weigh inflation data</title>
+      <link>https://www.marketwatch.com/story/stocks-edge-higher-12345678</link>
+      <guid>https://www.marketwatch.com/story/stocks-edge-higher-12345678</guid>
+      <media:content url="https://images.mktw.net/im-12345678.jpg?width=1280" medium="image" />
+    </item>
+  </channel>
+</rss>

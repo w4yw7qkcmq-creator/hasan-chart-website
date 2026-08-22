@@ -3,7 +3,29 @@ const axios = require("axios");
 const { GENERAL_RSS_FEEDS } = require("./constants");
 const { filterGeneralRssItems, markRssItemsAsGeneralOnly } = require("../telegram-news/rss-filter");
 
-const parser = new Parser();
+function createRssParser() {
+  return new Parser({
+    customFields: {
+      item: [
+        ["media:content", "mediaContent", { keepArray: true }],
+        ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+        ["content:encoded", "contentEncoded"],
+      ],
+    },
+  });
+}
+
+const parser = createRssParser();
+
+function normalizeParsedRssItem(item = {}) {
+  const contentEncoded = item.contentEncoded || item["content:encoded"] || null;
+  return {
+    ...item,
+    contentEncoded,
+    mediaContent: item.mediaContent || item["media:content"] || null,
+    mediaThumbnail: item.mediaThumbnail || item["media:thumbnail"] || null,
+  };
+}
 
 function resolveFeedName(feedUrl = "") {
   const match = GENERAL_RSS_FEEDS.find((feed) => feed.url === feedUrl);
@@ -77,14 +99,17 @@ async function fetchGeneralRssFeeds(options = {}) {
       const parsed = await parser.parseURL(feed.url);
       const generalOnly = filterGeneralRssItems(parsed.items || []);
       const normalized = markRssItemsAsGeneralOnly(
-        generalOnly.map((item) => ({
-          ...item,
-          feedUrl: feed.url,
-          sourceFeed: feed.url,
-          sourceName: feed.name,
-          fetchedAt: Date.now(),
-          articlePublishedAt: item.isoDate || item.pubDate || null,
-        }))
+        generalOnly.map((item) => {
+          const parsedItem = normalizeParsedRssItem(item);
+          return {
+            ...parsedItem,
+            feedUrl: feed.url,
+            sourceFeed: feed.url,
+            sourceName: feed.name,
+            fetchedAt: Date.now(),
+            articlePublishedAt: parsedItem.isoDate || parsedItem.pubDate || null,
+          };
+        })
       );
 
       report.fetched = (parsed.items || []).length;
@@ -123,4 +148,6 @@ module.exports = {
   fetchGeneralRssFeeds,
   probeFeedHttp,
   resolveFeedName,
+  createRssParser,
+  normalizeParsedRssItem,
 };

@@ -10,6 +10,7 @@
     "test:economic-releases": "node tests/economic-releases.test.cjs",
     "test:telegram-news": "node tests/telegram-news.test.cjs",
     "test:general-rss": "node tests/general-rss.test.cjs",
+    "test:rss-source-image": "node tests/rss-source-image-resolver.test.cjs",
     "test:news-images": "node tests/news-images.test.cjs",
     "start:subscription": "node subscription-maintenance-worker.js",
     "start:subscription:server": "node subscription-maintenance-worker.js",

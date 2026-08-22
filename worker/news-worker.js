@@ -74,6 +74,13 @@ const {
   buildRawSourceText,
 } = require("./lib/general-rss");
 const { buildRssPublicationPresentation } = require("./lib/general-rss/publication-format");
+const {
+  resolveRssSourceImage,
+} = require("./lib/general-rss/rss-source-image-resolver");
+const {
+  recordRssImageResolutionOutcome,
+  getRssImageTelemetrySnapshot,
+} = require("./lib/general-rss/rss-image-telemetry");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
 const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
@@ -1513,7 +1520,15 @@ function shouldUseLocalImageForMajorTopic(title) {
 function normalizeExternalImageUrl(value, baseUrl = "https://www.investing.com") {
   if (!value) return null;
 
-  const rawValue = String(value).trim();
+  const rawValue = String(value)
+    .trim()
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(Number(num)));
   if (!rawValue) return null;
 
   const firstSrcsetItem = rawValue
@@ -2475,7 +2490,7 @@ async function saveNewsPostToSupabase(post) {
       return { error: "client_unavailable" };
     }
 
-    if (!post.image_url && post.source_link) {
+    if (!post.image_url && post.source_link && !post.rssImageResolutionAttempted) {
       post.image_url = await getImageFromArticleUrl(post.source_link);
     }
 
@@ -4090,62 +4105,6 @@ async function fetchForexNews(options = {}) {
 
       const imageTitle = rssPresentation?.imageTitle || aiResult.imageTitle || latestNews.title;
 
-      const veryImportantNews = [
-        "fed",
-        "fomc",
-        "powell",
-        "interest rate",
-        "rate decision",
-        "consumer confidence",
-        "consumer sentiment",
-        "ppi",
-        "pce",
-        "retail sales",
-        "jobless claims",
-        "weekly jobless claims",
-        "claims",
-        "labor market",
-        "job market",
-        "employment",
-        "initial claims",
-        "continuing claims",
-        "pmi",
-        "ism",
-        "unemployment",
-        "cpi",
-        "inflation",
-        "nfp",
-        "gdp",
-        "recession",
-        "bank crisis",
-        "forex",
-        "eurusd",
-        "gbpusd",
-        "usdjpy",
-        "audusd",
-        "currency",
-        "dollar",
-        "usd",
-        "bitcoin",
-        "btc",
-        "crypto",
-        "etf",
-        "war",
-        "iran",
-        "israel",
-        "russia",
-        "ukraine",
-        "oil",
-        "gold",
-        "nasdaq",
-        "dow",
-        "s&p",
-        "attack",
-        "missile",
-        "breaking",
-      ].some((keyword) => latestNews.title.toLowerCase().includes(keyword));
-
-      let finalImage = null;
       const rssImagePolicy = resolveNewsImagePolicy({
         sourceType: SOURCE_TYPES.RSS_GENERAL,
         publicationType: PUBLICATION_TYPES.GENERAL_NEWS,
@@ -4153,30 +4112,29 @@ async function fetchForexNews(options = {}) {
       });
       assertRssNeverUsesAi(rssImagePolicy, "rss_publish");
 
-      if (veryImportantNews || latestNews.impactLevel === "HIGH") {
-        const rssImage = latestNews.isTelegramSource ? null : getImageFromNewsItem(latestNews);
-        const articleImage =
-          latestNews.isTelegramSource || rssImage ? null : await getImageFromArticleUrl(latestNews.link);
-        finalImage = rssImage || articleImage || null;
+      let sourceImageResult = null;
+      if (!latestNews.isTelegramSource) {
+        sourceImageResult = await resolveRssSourceImage({
+          source: latestNews.sourceName,
+          item: latestNews,
+          articleUrl: latestNews.link,
+        });
+        recordRssImageResolutionOutcome(latestNews.sourceName, sourceImageResult);
       }
+      const finalImage = sourceImageResult?.url || null;
 
       if (dryRun) {
         console.log("NEWS_DRY_RUN eligible publish-ready item:", latestNews.title);
       } else {
         recordPublicationAttempt();
-        if (veryImportantNews || latestNews.impactLevel === "HIGH") {
-          if (finalImage) {
-            const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
+        if (finalImage) {
+          const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
 
-            if (photoPath) {
-              await sendTelegramPhoto(publicationMessage, photoPath);
-              stats.telegramPublished += 1;
-            } else {
-              console.log("⏭️ Image rejected or unavailable. Sending text only.");
-              await sendTelegramMessage(publicationMessage);
-              stats.telegramPublished += 1;
-            }
+          if (photoPath) {
+            await sendTelegramPhoto(publicationMessage, photoPath);
+            stats.telegramPublished += 1;
           } else {
+            console.log("⏭️ Image rejected or unavailable. Sending text only.");
             await sendTelegramMessage(publicationMessage);
             stats.telegramPublished += 1;
           }
@@ -4191,6 +4149,7 @@ async function fetchForexNews(options = {}) {
           image_url: finalImage || null,
           impact_level: latestNews.impactLevel || "MEDIUM",
           source_link: latestLink,
+          rssImageResolutionAttempted: !latestNews.isTelegramSource,
         });
         if (saveResult?.error) {
           stats.dbFailed += 1;
@@ -4403,6 +4362,7 @@ function getNewsWorkerHealthSnapshot() {
       ...getMetricsSnapshot(),
       distributedLock: getDistributedLockMetrics(),
       telemetry: getTelemetrySnapshot(),
+      rssImage: getRssImageTelemetrySnapshot(),
     },
     running: !isFetchingNews,
     lastCycleCompletedAt,
