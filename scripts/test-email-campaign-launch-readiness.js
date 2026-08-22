@@ -91,8 +91,14 @@ test("missing subject blocks launch with field hint", () => {
 
 test("content patch invalidates snapshot fingerprint", () => {
   const campaign = readyCampaign();
-  const stale = campaignPatchInvalidatesSnapshot(campaign, { subject: "Changed subject" });
+  const stale = campaignPatchInvalidatesSnapshot(campaign, { audienceType: "active_subscribers" });
   assert.equal(stale, true);
+});
+
+test("message-only patch does not invalidate audience snapshot", () => {
+  const campaign = readyCampaign();
+  const stale = campaignPatchInvalidatesSnapshot(campaign, { subject: "Changed subject" });
+  assert.equal(stale, false);
 });
 
 test("confirmation scenario: eligible=1 from metadata when client stats missing", () => {
