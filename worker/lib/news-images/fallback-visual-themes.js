@@ -9,42 +9,7 @@ const CATEGORY_PALETTES = {
   pmi: { hues: [265, 280, 295], accent: "#D2A8FF", motif: "pmi" },
 };
 
-const FED_KEYS = new Set([
-  "US_FED_RATE_DECISION",
-  "US_FED_STATEMENT",
-  "US_POWELL_SPEECH",
-]);
-const INFLATION_KEYS = new Set([
-  "US_CPI_MOM",
-  "US_CPI_YOY",
-  "US_CPI_GENERIC",
-  "US_CORE_CPI_MOM",
-  "US_CORE_CPI_YOY",
-  "US_PPI",
-  "US_PPI_MOM",
-  "US_PPI_YOY",
-]);
-const LABOR_KEYS = new Set([
-  "US_NFP",
-  "US_UNEMPLOYMENT_RATE",
-  "US_INITIAL_JOBLESS_CLAIMS",
-  "US_CONTINUING_JOBLESS_CLAIMS",
-  "US_ADP",
-]);
-const GROWTH_KEYS = new Set([
-  "US_GDP_QOQ",
-  "US_PCE",
-  "US_CORE_PCE_MOM",
-  "US_CORE_PCE_YOY",
-  "US_RETAIL_SALES",
-  "US_CORE_RETAIL_SALES",
-]);
-const PMI_KEYS = new Set([
-  "US_ISM_MANUFACTURING",
-  "US_ISM_SERVICES",
-  "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
-  "US_SP_GLOBAL_FLASH_SERVICES_PMI",
-]);
+const { resolveVisualCategory } = require("./visual-category-resolver");
 
 function hashSeed(value) {
   let hash = 2166136261;
@@ -64,25 +29,6 @@ function createSeededRandom(seed) {
   };
 }
 
-function resolveVisualCategory(eventKey = "") {
-  const key = String(eventKey || "").trim().toUpperCase();
-  if (FED_KEYS.has(key)) {
-    return "fed";
-  }
-  if (INFLATION_KEYS.has(key)) {
-    return "inflation";
-  }
-  if (LABOR_KEYS.has(key)) {
-    return "labor";
-  }
-  if (GROWTH_KEYS.has(key)) {
-    return "growth";
-  }
-  if (PMI_KEYS.has(key)) {
-    return "pmi";
-  }
-  return "growth";
-}
 
 function buildReleaseSeed(context = {}) {
   const eventKey = String(context.eventKey || context.eventName || "EVENT").trim().toUpperCase();

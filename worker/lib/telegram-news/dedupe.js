@@ -6,6 +6,7 @@ const { validateFinalMessageAgainstFacts } = require("./invariants");
 const { getMergeWindowMs } = require("./merge-window");
 const { prepareTelegramPost } = require("./pipeline");
 const { expandPostsWithMultiStory } = require("./multi-story");
+const { recordTelegramEconomicExitIfNeeded } = require("./terminal-economic-decision");
 const { applyFedWatchDedup } = require("./fedwatch-dedup");
 
 function scorePostCompleteness(facts) {
@@ -206,6 +207,12 @@ async function processTelegramPosts(posts, options = {}) {
 
   for (const post of expandedPosts) {
     if (post._multiStoryUnclear) {
+      recordTelegramEconomicExitIfNeeded({
+        post,
+        facts: extractFactsFromTelegramPost(post),
+        reason: "MULTI_STORY_UNCLEAR",
+        stage: "multi_story",
+      });
       skippedEntries.push({
         post,
         prep: {
@@ -233,9 +240,19 @@ async function processTelegramPosts(posts, options = {}) {
   const processed = [];
 
   for (const { post, prep } of skippedEntries) {
+    const facts = prep.classification?.facts || extractFactsFromTelegramPost(post);
+    if (prep.reason !== "TELEGRAM_PROMOTION_SKIPPED") {
+      recordTelegramEconomicExitIfNeeded({
+        post,
+        facts,
+        classification: prep.classification,
+        reason: prep.reason,
+        stage: "dedupe_skipped_entry",
+      });
+    }
     processed.push({
       post: { ...post, promoFooterRemoved: prep.promoFooterRemoved === true },
-      facts: prep.classification?.facts || extractFactsFromTelegramPost(post),
+      facts,
       fingerprints: buildFingerprintBundle(post, prep.classification?.facts || extractFactsFromTelegramPost(post)),
       formattedMessage: null,
       skipPublish: true,
@@ -259,6 +276,12 @@ async function processTelegramPosts(posts, options = {}) {
     const classification = prep?.classification || {};
 
     if (item.conflict?.hasConflict) {
+      recordTelegramEconomicExitIfNeeded({
+        post: item.post,
+        facts: item.facts,
+        reason: "source_conflict",
+        stage: "dedupe_conflict",
+      });
       processed.push({
         ...item,
         formattedMessage: null,
@@ -284,6 +307,12 @@ async function processTelegramPosts(posts, options = {}) {
         : { ok: !formatted.formatted ? true : false, reason: formatted.reason };
 
     if (finalFactCheck.ok === false && formatted.formatted) {
+      recordTelegramEconomicExitIfNeeded({
+        post: item.post,
+        facts: item.facts,
+        reason: finalFactCheck.reason || "FINAL_MESSAGE_FACT_MISMATCH",
+        stage: "final_fact_check",
+      });
       processed.push({
         ...item,
         formattedMessage: formatted.fixedTemplate || null,

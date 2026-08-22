@@ -304,6 +304,11 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   if (gatewayResult.blocked) {
     releaseMemoryReservation(fingerprint);
     publishStates.delete(fingerprint);
+    recordTerminalEconomicDecision(candidate, publication, ctx, {
+      reason: gatewayResult.reason || "GATEWAY_BLOCKED",
+      detail: gatewayResult.stage || "gateway",
+      stage: gatewayResult.stage || "gateway",
+    });
     console.log(
       "FINAL_ATOMIC_PUBLISH_REJECTED",
       JSON.stringify({
@@ -323,6 +328,10 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   }
 
   if (gatewayResult.failed) {
+    recordTerminalEconomicDecision(candidate, publication, ctx, {
+      reason: gatewayResult.reason || "DELIVERY_FAILED",
+      stage: gatewayResult.stage || "gateway_delivery",
+    });
     legState = transitionPublishLegState(legState, {
       state: PUBLISH_STATES.FAILED_RETRYABLE,
       retryable: true,

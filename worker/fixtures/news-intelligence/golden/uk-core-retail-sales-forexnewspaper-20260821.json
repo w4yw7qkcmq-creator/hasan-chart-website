@@ -1,0 +1,19 @@
+{
+  "name": "uk-core-retail-sales-forexnewspaper-20260821",
+  "sourceText": "🟥 صدر الآن :إنكلترا 🇬🇧 🔴مؤشر مبيعات التجزئة الأساسية السنوي 🇬🇧🔴 السابق :5.0%🔴 المتوقع :3.3%🔵 الحالي :2.3%✍️ النتيجة : سلبي للباوند 👇 .. 🇬🇧",
+  "post": {
+    "sourceChannel": "ForexNewspaper",
+    "sourceMessageId": "uk-core-retail-20260821",
+    "sourcePublishedAt": "2026-08-21T07:00:00.000Z",
+    "sourceUrl": "https://t.me/s/ForexNewspaper/uk-core-retail-20260821"
+  },
+  "expected": {
+    "canonicalEventKey": "UK_CORE_RETAIL_SALES",
+    "countryCode": "UK",
+    "actual": "2.3%",
+    "forecast": "3.3%",
+    "previous": "5.0%",
+    "isStructuredTriple": true,
+    "titleContains": "مبيعات التجزئة"
+  }
+}

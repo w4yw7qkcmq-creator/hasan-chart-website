@@ -3,61 +3,89 @@ const {
   CANONICAL_EVENT_DEFINITIONS,
 } = require("../economic-releases/canonical-events");
 const { resolveEventTypeFromAliases } = require("../news-intelligence/event-registry");
+const { resolveCountryCode } = require("../economic-releases/country-resolver");
+const { normalizeTextForMatching, normalizeArabicIndicDigits } = require("../economic-releases/text-normalization");
 const { extractNumbers } = require("./fingerprint");
 const { normalizeTitleText, isGenericTitle } = require("./editorial-title");
 
 const FIELD_PATTERNS = {
   previous: [
-    /(?:السابق|previous)\s*[:：]\s*([^\n]+)/i,
-    /▪️\s*السابق\s*[:：]\s*([^\n]+)/i,
+    /(?:السابق|previous)\s*[:：]?\s*([^\n]+)/i,
+    /▪️\s*السابق\s*[:：]?\s*([^\n]+)/i,
+    /🔴\s*السابق\s*[:：]?\s*([^\n]+)/i,
   ],
   forecast: [
-    /(?:المتوقع|التقدير|forecast|consensus|expected)\s*[:：]\s*([^\n]+)/i,
-    /▪️\s*(?:المتوقع|التقدير)\s*[:：]\s*([^\n]+)/i,
+    /(?:المتوقع|التقدير|forecast|consensus|expected)\s*[:：]?\s*([^\n]+)/i,
+    /▪️\s*(?:المتوقع|التقدير)\s*[:：]?\s*([^\n]+)/i,
+    /🔴\s*(?:المتوقع|التقدير)\s*[:：]?\s*([^\n]+)/i,
   ],
   actual: [
-    /(?:الحالي|actual)\s*[:：]\s*([^\n]+)/i,
-    /▫️\s*الحالي\s*[:：]\s*([^\n]+)/i,
+    /(?:الحالي|actual)\s*[:：]?\s*([^\n]+)/i,
+    /▫️\s*الحالي\s*[:：]?\s*([^\n]+)/i,
+    /🔵\s*الحالي\s*[:：]?\s*([^\n]+)/i,
   ],
   revisedPrevious: [/previous revised from\s+([^\n]+)/i, /تم revising.*?([0-9.%KMB]+)/i],
 };
 
-const HIGH_IMPACT_KEYS = new Set([
-  "US_CPI_MOM",
-  "US_CPI_YOY",
-  "US_CORE_CPI_MOM",
-  "US_CORE_CPI_YOY",
-  "US_NFP",
-  "US_FED_RATE_DECISION",
-  "US_PPI_MOM",
-  "US_PPI_YOY",
-  "US_PCE",
-  "US_CORE_PCE_MOM",
-  "US_GDP_QOQ",
-  "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
-  "US_SP_GLOBAL_FLASH_SERVICES_PMI",
-]);
+const COUNTRY_DISPLAY = {
+  US: "الولايات المتحدة",
+  UK: "المملكة المتحدة",
+  EZ: "منطقة اليورو",
+  CA: "كندا",
+  AU: "أستراليا",
+  JP: "اليابان",
+  CN: "الصين",
+  DE: "ألمانيا",
+  FR: "فرنسا",
+};
+
+const HIGH_IMPACT_KEYS = new Set(
+  Object.keys(CANONICAL_EVENT_DEFINITIONS).filter((key) => {
+    const def = CANONICAL_EVENT_DEFINITIONS[key];
+    return def.requiresTripleTemplate !== false && def.eventType !== "plain_news";
+  })
+);
+
+function sanitizeFieldValue(value) {
+  if (!value) {
+    return null;
+  }
+  let cleaned = String(value).trim();
+  cleaned = cleaned.split(/🔴|🔵|▪️|▫️|✍️|👇|🇬🇧|🇺🇸|🇪🇺|➡️/)[0].trim();
+  cleaned = cleaned.split(/\s+(?:المتوقع|التقدير|الحالي|forecast|actual|previous|السابق)\s*[:：]/i)[0].trim();
+  return cleaned || null;
+}
 
 function extractField(text, fieldName) {
+  const normalizedText = normalizeArabicIndicDigits(text);
   for (const pattern of FIELD_PATTERNS[fieldName] || []) {
-    const match = String(text || "").match(pattern);
+    const match = String(normalizedText || "").match(pattern);
     if (match?.[1]) {
-      return match[1].trim();
+      return sanitizeFieldValue(match[1].trim());
     }
   }
   return null;
 }
 
-function extractCountry(text) {
+function extractInlineEventTitle(text) {
   const value = String(text || "");
-  if (/🇺🇸|أمريكا|امريكا|الولايات المتحدة|united states|\bus\b/i.test(value)) {
-    return "الولايات المتحدة";
+  const inlineMatch = value.match(
+    /(?:🔴|▪️|🟥)?\s*(?:مؤشر|تقرير|بيانات|مبيعات|معدل|الناتج|قرar|محضr|طلبات|فرص|متوسط|بدايات|تراخيص|الميزان|الحساب|الإنتاج|استغlال|طلبيات|مديري)[^\n🔴🔵▪️▫️✍️👇]{4,120}/i
+  );
+  if (inlineMatch?.[0]) {
+    return stripLeadingDecorations(inlineMatch[0]).slice(0, 120);
   }
-  if (/🇪🇺|أوروبا|euro area|ecb/i.test(value)) {
-    return "منطقة اليورو";
-  }
-  if (/🇬🇧|بريطانيا|uk\b|bank of england/i.test(value)) {
-    return "المملكة المتحدة";
+  return null;
+}
+
+function extractCountryCode(text) {
+  return resolveCountryCode(text);
+}
+
+function extractCountry(text) {
+  const code = extractCountryCode(text);
+  if (code && COUNTRY_DISPLAY[code]) {
+    return COUNTRY_DISPLAY[code];
   }
   return null;
 }
@@ -73,8 +101,8 @@ function stripLeadingDecorations(line) {
   return String(line || "")
     .replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+/gu, "")
     .replace(/^[^\p{L}\p{N}]+/u, "")
-    .replace(/🇺🇸|🇪🇺|🇬🇧/gu, "")
-    .replace(/^(?:أمريكا|امريكا)\s*[-–—]\s*/i, "")
+    .replace(/🇺🇸|🇪🇺|🇬🇧|🇨🇦|🇦🇺|🇯🇵|🇨🇳/gu, "")
+    .replace(/^(?:أمريكا|امريكا|إنكلترا|انكلترا|بريطانيا|كندا|أستراليا|استراليا|اليابان|الصين)\s*[-–—]\s*/i, "")
     .trim();
 }
 
@@ -91,13 +119,9 @@ function isCountryOnlyLine(cleaned) {
   if (!value) {
     return true;
   }
-  if (/^(?:أمريكا|امريكا|الولايات المتحدة|united states|usa|us)$/i.test(value)) {
-    return true;
-  }
-  if (/^(?:أمريكا|امريكا)\s*[-–—]\s*$/i.test(value)) {
-    return true;
-  }
-  return /^(?:🇺🇸|✅|🔵|🟥|🔴)?\s*(?:أمريكا|امريكا)\s*[-–—]?\s*(?:🇺🇸)?$/i.test(String(cleaned || "").trim());
+  return /^(?:أمريكا|امريكا|الولايات المتحدة|united states|usa|us|إنكلترا|انكلترا|بريطانيا|uk|كندا|canada|أستراليا|استراليا|australia|اليابان|japan|الصين|china)$/i.test(
+    value
+  );
 }
 
 function isLikelyStructuredReleaseTitle(cleaned, fullText = "") {
@@ -106,17 +130,18 @@ function isLikelyStructuredReleaseTitle(cleaned, fullText = "") {
     return false;
   }
 
+  const countryCode = extractCountryCode(fullText);
   const combined = `${value}\n${fullText}`;
-  if (resolveEventTypeFromAliases(combined)) {
+  if (resolveEventTypeFromAliases(combined, { countryCode })) {
     return true;
   }
 
-  const canonical = resolveCanonicalEventKey(combined);
+  const canonical = resolveCanonicalEventKey(combined, { countryCode });
   if (canonical?.eventKey) {
     return true;
   }
 
-  return /مؤشر|pmi|purchasing managers|مديري المشتريات|jobless|claims|cpi|nfp|gdp|ppi|pce|fed|fomc|ism|retail sales|consumer confidence/i.test(
+  return /مؤشر|pmi|purchasing managers|مديري المشتريات|jobless|claims|cpi|nfp|gdp|ppi|pce|fed|fomc|ism|retail sales|consumer confidence|michigan|industrial production|housing|trade balance|adp|jolts|average hourly|empire state|durable goods|factory orders|capacity utilization|minutes|محضr/i.test(
     value
   );
 }
@@ -148,7 +173,7 @@ function extractEventTitle(text) {
     if (/السابق|المتوقع|التقدير|الحالي|النتيجة|actual|forecast|previous/i.test(line)) {
       continue;
     }
-    if (/^[•▪️▫️⬅️👉📊💎🔵]/.test(line)) {
+    if (/^[•▪️▫️⬅️👉📊💎🔵🔴]/.test(line)) {
       const cleanedDecorated = stripLeadingDecorations(line);
       if (cleanedDecorated.length >= 4 && cleanedDecorated.length <= 120 && !isGenericTitle(cleanedDecorated)) {
         const score = scoreEventTitleCandidate(cleanedDecorated, text);
@@ -173,6 +198,11 @@ function extractEventTitle(text) {
     return bestTitle;
   }
 
+  const inlineTitle = extractInlineEventTitle(text);
+  if (inlineTitle) {
+    return inlineTitle;
+  }
+
   for (const line of lines) {
     const cleaned = stripLeadingDecorations(line);
     if (cleaned.length >= 4 && cleaned.length <= 120 && !isGenericTitle(cleaned)) {
@@ -183,37 +213,69 @@ function extractEventTitle(text) {
   return lines[0]?.slice(0, 120) || null;
 }
 
-function resolveCanonicalForTelegram(text) {
-  const value = String(text || "");
+function resolveCanonicalForTelegram(text, options = {}) {
+  const value = normalizeTextForMatching(text);
+  const countryCode = options.countryCode || extractCountryCode(value);
 
-  const aliasEventKey = resolveEventTypeFromAliases(value);
+  const aliasEventKey = resolveEventTypeFromAliases(value, { countryCode });
   if (aliasEventKey && CANONICAL_EVENT_DEFINITIONS[aliasEventKey]) {
     return {
       eventKey: aliasEventKey,
+      country: countryCode || aliasEventKey.split("_")[0],
       ...CANONICAL_EVENT_DEFINITIONS[aliasEventKey],
     };
   }
 
   if (/s&p global|sp global|ratingdog|hsbc manufacturing|caixin pmi/i.test(value)) {
+    const prefix = countryCode || "US";
     if (/services|الخدم/i.test(value)) {
-      return {
-        eventKey: "US_SP_GLOBAL_FLASH_SERVICES_PMI",
-        ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_FLASH_SERVICES_PMI,
-      };
+      const key = `${prefix}_SP_GLOBAL_FLASH_SERVICES_PMI`;
+      if (CANONICAL_EVENT_DEFINITIONS[key]) {
+        return { eventKey: key, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[key] };
+      }
+      if (prefix === "US") {
+        return {
+          eventKey: "US_SP_GLOBAL_FLASH_SERVICES_PMI",
+          country: "US",
+          ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_FLASH_SERVICES_PMI,
+        };
+      }
+      const generic = `${prefix}_SERVICES_PMI`;
+      if (CANONICAL_EVENT_DEFINITIONS[generic]) {
+        return { eventKey: generic, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[generic] };
+      }
     }
     if (/manufacturing|الصناع|التصنيع/i.test(value)) {
+      const key = `${prefix}_SP_GLOBAL_FLASH_MANUFACTURING_PMI`;
+      if (CANONICAL_EVENT_DEFINITIONS[key]) {
+        return { eventKey: key, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[key] };
+      }
+      if (prefix === "US") {
+        return {
+          eventKey: "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+          country: "US",
+          ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_FLASH_MANUFACTURING_PMI,
+        };
+      }
+      const generic = `${prefix}_MANUFACTURING_PMI`;
+      if (CANONICAL_EVENT_DEFINITIONS[generic]) {
+        return { eventKey: generic, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[generic] };
+      }
+    }
+    const composite = `${prefix}_SP_GLOBAL_PMI`;
+    if (CANONICAL_EVENT_DEFINITIONS[composite]) {
+      return { eventKey: composite, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[composite] };
+    }
+    if (prefix === "US" && CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_PMI) {
       return {
-        eventKey: "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
-        ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_FLASH_MANUFACTURING_PMI,
+        eventKey: "US_SP_GLOBAL_PMI",
+        country: "US",
+        ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_PMI,
       };
     }
-    return {
-      eventKey: "US_SP_GLOBAL_PMI",
-      ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_PMI,
-    };
   }
 
-  return resolveCanonicalEventKey(value);
+  return resolveCanonicalEventKey(value, { countryCode });
 }
 
 function detectExclusiveAnalysis(text) {
@@ -225,7 +287,7 @@ function detectExclusiveAnalysis(text) {
 function extractEntities(text) {
   const entities = new Set();
   const patterns = [
-    /\bfed\b|\bfomc\b|\bpowell\b|\becb\b|\bboe\b/gi,
+    /\bfed\b|\bfomc\b|\bpowell\b|\becb\b|\bboe\b|\bboj\b|\bboc\b|\brba\b/gi,
     /\bgold\b|\bxau\b|الذهب/gi,
     /\bbitcoin\b|\bbtc\b|بيتكوين/gi,
     /\bnfp\b|\bcpi\b|\bppi\b|\bgdp\b/gi,
@@ -258,19 +320,22 @@ function isStructuredEconomicRelease(text, canonical) {
 }
 
 function extractFactsFromTelegramPost(post) {
-  const text = post.rawText || "";
+  const text = normalizeArabicIndicDigits(post.rawText || "");
   const previous = extractField(text, "previous");
   const forecast = extractField(text, "forecast");
   const actual = extractField(text, "actual");
   const revisedPrevious = extractField(text, "revisedPrevious");
-  const country = extractCountry(text);
+  const countryCode = extractCountryCode(text);
+  const country = extractCountry(text) || COUNTRY_DISPLAY[countryCode] || null;
   const title = extractEventTitle(text);
   const period = extractPeriod(text);
-  const canonical = resolveCanonicalForTelegram(`${title || ""} ${text}`);
-  const resolvedEventKey = canonical.eventKey || resolveEventTypeFromAliases(`${title || ""} ${text}`);
+  const combined = `${title || ""} ${text}`;
+  const canonical = resolveCanonicalForTelegram(combined, { countryCode });
+  const resolvedEventKey =
+    canonical.eventKey || resolveEventTypeFromAliases(combined, { countryCode });
   const isPlainFedNews =
     canonical.eventType === "plain_news" ||
-    ["US_POWELL_SPEECH", "US_FED_STATEMENT"].includes(canonical.eventKey);
+    ["US_POWELL_SPEECH", "US_FED_STATEMENT", "US_FOMC_MINUTES"].includes(canonical.eventKey);
   const hasTripleFields = Boolean(previous || forecast || actual);
   const isStructuredTriple =
     !isPlainFedNews &&
@@ -289,19 +354,22 @@ function extractFactsFromTelegramPost(post) {
     );
 
   const numbers = [...new Set([previous, forecast, actual, revisedPrevious, ...extractNumbers(text)].filter(Boolean))];
-  const importance = HIGH_IMPACT_KEYS.has(canonical.eventKey) ? "high" : "normal";
+  const importance = HIGH_IMPACT_KEYS.has(resolvedEventKey || canonical.eventKey) ? "high" : "normal";
 
   return {
     sourceChannel: post.sourceChannel,
     sourceMessageId: post.sourceMessageId,
     sourceUrl: post.sourceUrl,
     sourcePublishedAt: post.sourcePublishedAt,
+    countryCode: countryCode || canonical.country || null,
     canonicalEventKey: resolvedEventKey || canonical.eventKey,
     title,
     country,
     eventType:
       resolvedEventKey ||
-      (canonical.eventKey && canonical.eventKey !== "US_CPI_GENERIC" ? canonical.eventKey : null) ||
+      (canonical.eventKey && !String(canonical.eventKey).endsWith("_CPI_GENERIC")
+        ? canonical.eventKey
+        : null) ||
       (isStructuredTriple ? "structured_release" : "general"),
     period,
     previous,
@@ -327,7 +395,10 @@ function extractFactsFromTelegramPost(post) {
 module.exports = {
   extractFactsFromTelegramPost,
   extractField,
+  extractCountry,
+  extractCountryCode,
   isStructuredEconomicRelease,
   resolveCanonicalForTelegram,
   detectExclusiveAnalysis,
+  COUNTRY_DISPLAY,
 };

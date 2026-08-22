@@ -4,6 +4,7 @@ const {
   CANONICAL_EVENT_DEFINITIONS,
 } = require("../economic-releases/canonical-events");
 const { resolveEventTypeFromAliases, getEventFamily, normalizeAliasText, isFamilyPublicationEventType } = require("./event-registry");
+const { resolveCountryCode } = require("../economic-releases/country-resolver");
 
 function normalizeReleaseInstant(value) {
   if (!value) {
@@ -29,13 +30,15 @@ function buildCanonicalEventFromCandidate(candidate = {}) {
   const title = candidate.title || candidate.eventTitle || "";
   const combined = `${title}\n${rawText}`;
 
-  let eventType = candidate.eventType || resolveEventTypeFromAliases(combined);
+  const country = candidate.country || candidate.countryCode || resolveCountryCode(combined) || "US";
+
+  let eventType =
+    candidate.eventType || resolveEventTypeFromAliases(combined, { countryCode: country });
   if (!eventType) {
-    const resolved = resolveCanonicalEventKey(combined);
+    const resolved = resolveCanonicalEventKey(combined, { countryCode: country });
     eventType = resolved.eventKey || null;
   }
 
-  const country = candidate.country || "US";
   const releaseDate = normalizeReleaseInstant(
     candidate.releaseDate || candidate.scheduledAt || candidate.sourcePublishedAt || candidate.receivedAt
   );

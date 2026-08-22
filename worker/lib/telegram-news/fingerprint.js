@@ -1,20 +1,6 @@
 const crypto = require("crypto");
 
-function normalizeFingerprintText(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}%./+\-]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeEconomicField(value) {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/,/g, ".")
-    .toLowerCase();
-}
+const { normalizeFingerprintText, normalizeEconomicFieldValue } = require("../economic-releases/text-normalization");
 
 function extractNumbers(text) {
   return [...String(text || "").matchAll(/-?\d+(?:[.,]\d+)?%?|\d+(?:\.\d+)?[KMB]/gi)].map((m) => m[0]);
@@ -36,9 +22,9 @@ function buildScheduledBucket(scheduledAt) {
 }
 
 function buildEconomicMergeKey(facts = {}) {
-  const previous = normalizeEconomicField(facts.previous || facts.revisedPrevious);
-  const forecast = normalizeEconomicField(facts.forecast);
-  const actual = normalizeEconomicField(facts.actual);
+  const previous = normalizeEconomicFieldValue(facts.previous || facts.revisedPrevious);
+  const forecast = normalizeEconomicFieldValue(facts.forecast);
+  const actual = normalizeEconomicFieldValue(facts.actual);
 
   if (!previous || !forecast || !actual) {
     return null;
@@ -52,16 +38,20 @@ function buildEconomicMergeKey(facts = {}) {
     previous,
     forecast,
     actual,
-    normalizeEconomicField(facts.unit || ""),
+    normalizeEconomicFieldValue(facts.unit || ""),
   ].join("|");
 
   return payload;
 }
 
+function normalizeEconomicField(value) {
+  return normalizeEconomicFieldValue(value);
+}
+
 function buildEconomicTripleKey(facts = {}) {
-  const previous = normalizeEconomicField(facts.previous || facts.revisedPrevious);
-  const forecast = normalizeEconomicField(facts.forecast);
-  const actual = normalizeEconomicField(facts.actual);
+  const previous = normalizeEconomicFieldValue(facts.previous || facts.revisedPrevious);
+  const forecast = normalizeEconomicFieldValue(facts.forecast);
+  const actual = normalizeEconomicFieldValue(facts.actual);
 
   if (!previous || !forecast || !actual) {
     return null;
@@ -69,12 +59,13 @@ function buildEconomicTripleKey(facts = {}) {
 
   const payload = [
     normalizeFingerprintText(facts.country || "unknown"),
+    facts.canonicalEventKey || facts.eventType || "ECONOMIC_RELEASE",
     normalizeFingerprintText(facts.period || ""),
     buildScheduledBucket(facts.scheduledAt || facts.sourcePublishedAt),
     previous,
     forecast,
     actual,
-    normalizeEconomicField(facts.unit || ""),
+    normalizeEconomicFieldValue(facts.unit || ""),
   ].join("|");
 
   return payload;

@@ -239,6 +239,13 @@ async function publishTelegramMergeBufferItem(item, ctx = {}) {
   syncPublishingTransition();
 
   if (!item || item.skipPublish || !item.formattedMessage) {
+    const { recordTelegramEconomicExitIfNeeded } = require("./lib/telegram-news/terminal-economic-decision");
+    recordTelegramEconomicExitIfNeeded({
+      post: item?.post,
+      facts: item?.facts,
+      reason: item?.reason || "skip_publish",
+      stage: "merge_buffer_publish",
+    });
     return { skipped: true, reason: item?.reason || "skip_publish" };
   }
 

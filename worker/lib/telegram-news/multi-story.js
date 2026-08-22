@@ -68,10 +68,53 @@ function splitMultiStoryPost(post) {
   return { stories, split: true, storyCount: stories.length };
 }
 
+function splitEconomicStructuredSections(post) {
+  const rawText = String(post.rawText || "").trim();
+  const markerPattern = /(?:🟥|🚨)\s*\u0635\u062F\u0631\s*\u0627\u0644\u0622(?:\u0646|\u0627\u0646)/gi;
+  const markers = [...rawText.matchAll(markerPattern)];
+  if (markers.length < 2) {
+    return { stories: [{ ...post, _storyCount: 1, _storyIndex: 0 }], split: false };
+  }
+
+  const sections = [];
+  for (let i = 0; i < markers.length; i += 1) {
+    const start = markers[i].index;
+    const end = i + 1 < markers.length ? markers[i + 1].index : rawText.length;
+    const chunk = rawText.slice(start, end).trim();
+    if (chunk.length >= 40) {
+      sections.push(chunk);
+    }
+  }
+
+  if (sections.length < 2) {
+    return { stories: [{ ...post, _storyCount: 1, _storyIndex: 0 }], split: false };
+  }
+
+  const stories = sections.slice(0, 4).map((chunk, index) => ({
+    ...post,
+    rawText: chunk,
+    sourceMessageId: `${post.sourceMessageId}:e${index + 1}`,
+    sourceUrl: `${post.sourceUrl || ""}#economic-${index + 1}`,
+    _parentMessageId: post.sourceMessageId,
+    _storyIndex: index,
+    _storyCount: sections.length,
+    _economicBundle: true,
+  }));
+
+  return { stories, split: true, storyCount: stories.length };
+}
+
 function expandPostsWithMultiStory(posts, stats = {}) {
   const expanded = [];
 
   for (const post of posts) {
+    const economicBundle = splitEconomicStructuredSections(post);
+    if (economicBundle.split) {
+      stats.economicBundleSplit = (stats.economicBundleSplit || 0) + economicBundle.storyCount;
+      expanded.push(...economicBundle.stories);
+      continue;
+    }
+
     const result = splitMultiStoryPost(post);
     if (result.unclear) {
       stats.multiStoryUnclear = (stats.multiStoryUnclear || 0) + 1;
@@ -95,6 +138,7 @@ function expandPostsWithMultiStory(posts, stats = {}) {
 
 module.exports = {
   splitMultiStoryPost,
+  splitEconomicStructuredSections,
   expandPostsWithMultiStory,
   detectStoryTopic,
 };
