@@ -159,31 +159,21 @@ export default function EmailAnalyticsPage() {
   };
 
   if (loading) {
-    return (
-      <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-lg dark:border-cyan-300/10 dark:bg-[#020617] dark:text-white md:p-6">
-        <DashboardSkeleton />
-      </main>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {
     return (
-      <main className="relative min-h-[calc(100vh-120px)] overflow-hidden rounded-[34px] border border-slate-200 bg-slate-50 p-6 text-slate-900 shadow-lg dark:border-cyan-300/10 dark:bg-[#020617] dark:text-white">
-        <div className="flex min-h-[50vh] items-center justify-center text-center">
-          <div className="max-w-md rounded-[32px] border border-slate-200 bg-white p-8 dark:border-cyan-300/15 dark:bg-white/[0.045]">
-            <p className="text-xl font-black">{error}</p>
-          </div>
+      <div className="flex min-h-[50vh] items-center justify-center text-center">
+        <div className="max-w-md rounded-[32px] border border-slate-200 bg-white p-8 dark:border-cyan-300/15 dark:bg-white/[0.045]">
+          <p className="text-xl font-black">{error}</p>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="relative z-0 overflow-hidden rounded-[34px] border border-slate-200 bg-slate-50 text-slate-900 shadow-lg dark:border-cyan-300/10 dark:bg-[#020617] dark:text-white dark:shadow-[0_25px_90px_rgba(0,102,255,0.16)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.08),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.06),transparent_30%)] dark:bg-[radial-gradient(circle_at_12%_8%,rgba(0,102,255,0.35),transparent_30%),radial-gradient(circle_at_86%_35%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.08] dark:opacity-[0.13] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
-
-      <div className="relative z-10 space-y-8 p-4 md:p-6">
+    <div className="space-y-8">
         <section className="relative overflow-hidden rounded-[34px] border border-slate-200 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:border-cyan-300/15 dark:bg-gradient-to-br dark:from-[#07142f]/85 dark:via-[#040b1c]/90 dark:to-[#020617]/95 md:p-9">
           <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-600/10 blur-3xl dark:bg-blue-600/20" />
           <div className="absolute bottom-0 right-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
@@ -213,7 +203,7 @@ export default function EmailAnalyticsPage() {
                 className="inline-flex items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-3 font-black text-cyan-900 transition duration-200 hover:-translate-y-0.5 hover:bg-cyan-100 disabled:opacity-60 dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-100 dark:hover:bg-cyan-400/20"
               >
                 <IconRefresh className="h-4 w-4" spinning={refreshing} />
-                {refreshing ? "Refreshing..." : "Refresh"}
+                {refreshing ? "جاري التحديث..." : "تحديث"}
               </button>
             </div>
           </div>
@@ -254,7 +244,6 @@ export default function EmailAnalyticsPage() {
             <EmailTable rows={rows} />
           </>
         )}
-      </div>
-    </main>
+    </div>
   );
 }

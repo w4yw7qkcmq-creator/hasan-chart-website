@@ -1,76 +1,141 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdminFetch } from "../lib/useAdminFetch";
 import { useVisibilityRefresh } from "../../../../hooks/useVisibilityRefresh";
+import { EmailEmptyState } from "../components/email-ops/EmailEmptyState";
+import { EmailErrorItem } from "../components/email-ops/EmailErrorItem";
+import { EmailKpiCard } from "../components/email-ops/EmailKpiCard";
+import { EmailOpsKpiSkeleton } from "../components/email-ops/EmailOpsSkeleton";
+import { EmailOpsPageHeader } from "../components/email-ops/EmailOpsPageHeader";
+import { QueueHealthHero } from "../components/email-ops/QueueHealthHero";
+import { deriveQueueHealth, formatRelativeTimeAr } from "../components/email-ops/utils";
+import { getQueueStatusLabel } from "../components/email-ops/labels";
+import { IconAlert, IconInbox } from "../components/icons-ops";
+
+const KPI_CONFIG = [
+  { key: "pending", tone: "amber", hint: "في انتظار المعالجة" },
+  { key: "processing", tone: "blue", hint: "قيد الإرسال الآن" },
+  { key: "accepted", tone: "cyan", hint: "قبلها مزود البريد" },
+  { key: "sent", tone: "green", hint: "تم الإرسال بنجاح" },
+  { key: "failed", tone: "red", hint: "تحتاج مراجعة" },
+  { key: "skipped", tone: "gray", hint: "تم التجاوز" },
+  { key: "uncertain", tone: "orange", hint: "حالة غير مؤكدة" },
+];
 
 export default function EmailMonitoringPage() {
   const adminFetch = useAdminFetch();
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [lastRefresh, setLastRefresh] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      setError("");
-      const res = await adminFetch("/api/admin/email-outbox?limit=5000");
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Failed");
-      setMetrics(data.metrics);
-    } catch (err) {
-      setError(err.message || "تعذر تحميل الطابور");
-    } finally {
-      setLoading(false);
-    }
-  }, [adminFetch]);
+  const load = useCallback(
+    async ({ silent = false } = {}) => {
+      try {
+        if (!silent) setLoading(true);
+        else setRefreshing(true);
+        setError("");
+        const res = await adminFetch("/api/admin/email-outbox?limit=5000");
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "تعذر تحميل الطابور");
+        setMetrics(data.metrics);
+        setLastRefresh(formatRelativeTimeAr(new Date().toISOString()).replace("منذ ", "منذ ") || "الآن");
+      } catch (err) {
+        setError(err.message || "تعذر تحميل الطابور");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [adminFetch]
+  );
 
   useEffect(() => {
     load();
   }, [load]);
 
-  useVisibilityRefresh(load, 20000);
+  useVisibilityRefresh(() => load({ silent: true }), 20000);
 
+  const health = useMemo(() => deriveQueueHealth(metrics), [metrics]);
   const counts = metrics?.counts || {};
 
   return (
-    <main className="rounded-[34px] border border-slate-200 bg-white p-6 shadow-lg dark:border-cyan-300/15 dark:bg-[#07142f]/80">
-      <h1 className="text-2xl font-black">مراقبة الإرسال</h1>
-      <p className="mt-2 text-slate-600 dark:text-slate-300">حالة طابور email_outbox — تحديث كل 20 ثانية.</p>
+    <div className="space-y-6">
+      <EmailOpsPageHeader
+        eyebrow="مركز عمليات البريد"
+        title="مراقبة الإرسال"
+        description="تابع حالة طابور البريد وعمليات التسليم والأخطاء لحظة بلحظة."
+        statusLabel={health.label === "سليم" ? "النظام يعمل بشكل طبيعي" : health.label}
+        statusLevel={health.level}
+        lastRefresh={lastRefresh ? `آخر تحديث ${lastRefresh}` : null}
+        onRefresh={() => load({ silent: true })}
+        refreshing={refreshing}
+      />
 
-      {loading ? <p className="mt-6">جاري التحميل...</p> : null}
-      {error ? <p className="mt-6 text-red-500">{error}</p> : null}
-
-      {metrics ? (
-        <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[
-            ["pending", counts.pending],
-            ["processing", counts.processing],
-            ["accepted", counts.accepted],
-            ["sent", counts.sent],
-            ["failed", counts.failed],
-            ["skipped", counts.skipped],
-            ["uncertain", counts.uncertain],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-2xl border border-slate-200 p-4 dark:border-cyan-300/15">
-              <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-              <div className="mt-2 text-2xl font-black">{value ?? 0}</div>
-            </div>
-          ))}
+      {error ? (
+        <div className="rounded-[24px] border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-200">
+          {error}
         </div>
       ) : null}
 
-      {metrics?.recentFailures?.length ? (
-        <section className="mt-8">
-          <h2 className="text-lg font-black">أحدث الأخطاء</h2>
-          <ul className="mt-3 space-y-2 text-sm">
-            {metrics.recentFailures.slice(0, 10).map((row) => (
-              <li key={row.id} className="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
-                {row.message_type || "general"} · {row.recipient_email} · {row.error || row.status}
-              </li>
+      {loading ? (
+        <EmailOpsKpiSkeleton count={7} />
+      ) : metrics ? (
+        <>
+          <QueueHealthHero metrics={metrics} />
+
+          <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            {KPI_CONFIG.map(({ key, tone, hint }) => (
+              <EmailKpiCard
+                key={key}
+                label={getQueueStatusLabel(key)}
+                value={counts[key] ?? 0}
+                tone={tone}
+                hint={hint}
+              />
             ))}
-          </ul>
-        </section>
+          </section>
+
+          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 dark:border-cyan-300/15 dark:bg-[#07142f]/60 md:p-6">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black">أحدث الأخطاء</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">آخر حالات الفشل في عينة الطابور</p>
+              </div>
+            </div>
+
+            {metrics.recentFailures?.length ? (
+              <div className="space-y-3">
+                {metrics.recentFailures.slice(0, 10).map((row) => (
+                  <EmailErrorItem
+                    key={row.id}
+                    error={row.error}
+                    failedAt={row.failedAt}
+                    outboxId={row.id}
+                    attempts={row.attempts}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmailEmptyState
+                icon={IconInbox}
+                title="لا توجد أخطاء حديثة"
+                description="نظام البريد يعمل دون أخطاء في العينة الحالية."
+              />
+            )}
+          </section>
+
+          {counts.pending === 0 && !metrics.recentFailures?.length ? (
+            <EmailEmptyState
+              icon={IconAlert}
+              title="لا توجد رسائل بانتظار الإرسال"
+              description="كل شيء محدث حاليًا."
+            />
+          ) : null}
+        </>
       ) : null}
-    </main>
+    </div>
   );
 }

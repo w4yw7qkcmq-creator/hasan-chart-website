@@ -1,10 +1,11 @@
-import { OperationsTabs } from "./components/OperationsTabs";
+import { EmailOpsShell } from "./components/email-ops/EmailOpsShell";
+import { EmailOpsTabs } from "./components/email-ops/EmailOpsTabs";
 
 export default function EmailOperationsLayout({ children }) {
   return (
-    <div className="space-y-6">
-      <OperationsTabs />
+    <EmailOpsShell>
+      <EmailOpsTabs />
       {children}
-    </div>
+    </EmailOpsShell>
   );
 }
