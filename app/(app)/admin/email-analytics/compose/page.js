@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdminFetch } from "../lib/useAdminFetch";
 import { AudienceOptionCards } from "../components/email-ops/AudienceOptionCards";
@@ -14,24 +15,46 @@ import {
   EmailTextInput,
 } from "../components/email-ops/EmailFormField";
 import { EmailOpsPageHeader } from "../components/email-ops/EmailOpsPageHeader";
-import { EmailStepper } from "../components/email-ops/EmailStepper";
+import { deriveComposeWizardStepStates, EmailStepper } from "../components/email-ops/EmailStepper";
+import { LaunchReadinessPanel } from "../components/email-ops/LaunchReadinessPanel";
 import { MarketingPolicyCard } from "../components/email-ops/MarketingPolicyCard";
 import { WIZARD_STEPS } from "../components/email-ops/labels";
+import { getAudienceStatsFromCampaign } from "../components/email-ops/campaign-state";
 import { IconCheck, IconSend } from "../components/icons-ops";
+
+function campaignToForm(campaign) {
+  if (!campaign) {
+    return {
+      name: "",
+      subject: "",
+      previewText: "",
+      htmlContent: "<p>مرحبًا،</p><p>نود مشاركتك آخر تحديثات HasaN CharT World.</p>",
+      audienceType: "all_eligible",
+      selectedUserIds: [],
+    };
+  }
+
+  return {
+    name: campaign.name || "",
+    subject: campaign.subject || "",
+    previewText: campaign.preview_text || "",
+    htmlContent: campaign.html_content || "<p>مرحبًا،</p>",
+    audienceType: campaign.audience_type || "all_eligible",
+    selectedUserIds: campaign.audience_filter?.userIds || [],
+  };
+}
 
 export default function EmailComposePage() {
   const adminFetch = useAdminFetch();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
   const [campaignId, setCampaignId] = useState("");
-  const [form, setForm] = useState({
-    name: "",
-    subject: "",
-    previewText: "",
-    htmlContent: "<p>مرحبًا،</p><p>نود مشاركتك آخر تحديثات HasaN CharT World.</p>",
-    audienceType: "all_eligible",
-    selectedUserIds: [],
-  });
-  const [stats, setStats] = useState(null);
+  const [campaign, setCampaign] = useState(null);
+  const [readiness, setReadiness] = useState(null);
+  const [readinessLoading, setReadinessLoading] = useState(false);
+  const [form, setForm] = useState(() => campaignToForm(null));
+  const [prepareResult, setPrepareResult] = useState(null);
   const [audienceCounts, setAudienceCounts] = useState(null);
   const [audienceLoading, setAudienceLoading] = useState(true);
   const [previewHtml, setPreviewHtml] = useState("");
@@ -44,16 +67,97 @@ export default function EmailComposePage() {
   const [userResults, setUserResults] = useState([]);
   const [showLaunchConfirm, setShowLaunchConfirm] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
+  const [campaignLoading, setCampaignLoading] = useState(false);
 
   const audienceFilter = useMemo(
     () => ({ userIds: form.selectedUserIds }),
     [form.selectedUserIds]
   );
 
+  const audienceStats = useMemo(
+    () => getAudienceStatsFromCampaign(campaign, prepareResult?.stats),
+    [campaign, prepareResult?.stats]
+  );
+
+  const stepStates = useMemo(
+    () => deriveComposeWizardStepStates({ step, readiness, form, campaign }),
+    [step, readiness, form, campaign]
+  );
+
+  const syncCampaignInUrl = useCallback(
+    (id) => {
+      if (!id) return;
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("campaign", id);
+      router.replace(`/admin/email-analytics/compose?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
   const notify = (text, tone = "info") => {
     setMessage(text);
     setMessageTone(tone);
   };
+
+  const loadReadiness = useCallback(
+    async (id) => {
+      if (!id) {
+        setReadiness(null);
+        return null;
+      }
+      setReadinessLoading(true);
+      try {
+        const res = await adminFetch(`/api/admin/email-campaigns/${id}/readiness`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "تعذر التحقق من جاهزية الإطلاق");
+        setCampaign((prev) => ({ ...(prev || {}), ...data.campaign }));
+        setReadiness(data.readiness);
+        return data;
+      } catch (err) {
+        notify(err.message, "error");
+        return null;
+      } finally {
+        setReadinessLoading(false);
+      }
+    },
+    [adminFetch]
+  );
+
+  const loadCampaign = useCallback(
+    async (id) => {
+      if (!id) return;
+      setCampaignLoading(true);
+      try {
+        const res = await adminFetch(`/api/admin/email-campaigns/${id}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "تعذر تحميل الحملة");
+        const row = data.campaign || data;
+        setCampaign(row);
+        setForm(campaignToForm(row));
+        setCampaignId(row.id);
+        await loadReadiness(id);
+      } catch (err) {
+        notify(err.message, "error");
+      } finally {
+        setCampaignLoading(false);
+      }
+    },
+    [adminFetch, loadReadiness]
+  );
+
+  useEffect(() => {
+    const fromUrl = String(searchParams?.get("campaign") || "").trim();
+    if (fromUrl && fromUrl !== campaignId) {
+      setCampaignId(fromUrl);
+      void loadCampaign(fromUrl);
+    }
+  }, [searchParams, campaignId, loadCampaign]);
+
+  useEffect(() => {
+    if (step === 3 && campaignId) {
+      void loadReadiness(campaignId);
+    }
+  }, [step, campaignId, loadReadiness]);
 
   const saveDraft = useCallback(async () => {
     setBusy(true);
@@ -79,29 +183,49 @@ export default function EmailComposePage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "تعذر حفظ المسودة");
       setCampaignId(data.campaign.id);
+      setCampaign(data.campaign);
+      syncCampaignInUrl(data.campaign.id);
+      if (data.campaign.metadata?.audienceSnapshotStale) {
+        setPrepareResult(null);
+        await loadReadiness(data.campaign.id);
+      }
       notify("تم حفظ المسودة", "success");
       return data.campaign.id;
     } finally {
       setBusy(false);
     }
-  }, [adminFetch, audienceFilter, campaignId, form]);
+  }, [adminFetch, audienceFilter, campaignId, form, loadReadiness, syncCampaignInUrl]);
 
   const prepareAudience = useCallback(async () => {
     const id = campaignId || (await saveDraft());
     setBusy(true);
+    notify("");
     try {
       const res = await adminFetch(`/api/admin/email-campaigns/${id}/audience`, { method: "POST" });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "تعذر تجهيز الجمهور");
-      setStats(data.stats);
-      notify("تم تجهيز الجمهور بنجاح", "success");
-      setStep(1);
+
+      setCampaignId(id);
+      setCampaign(data.campaign);
+      setPrepareResult({
+        stats: data.stats,
+        preparedAt: data.campaign?.metadata?.snapshotAt || new Date().toISOString(),
+      });
+      syncCampaignInUrl(id);
+      await loadReadiness(id);
+
+      const eligible = Number(data.stats?.eligible ?? data.campaign?.eligible_count ?? 0);
+      if (eligible <= 0) {
+        notify("تم تجهيز الجمهور، لكن لا يوجد مستلمون مؤهلون حاليًا.", "warning");
+      } else {
+        notify(`تم تجهيز الجمهور — ${eligible.toLocaleString("ar")} مستخدم مؤهل`, "success");
+      }
     } catch (err) {
       notify(err.message, "error");
     } finally {
       setBusy(false);
     }
-  }, [adminFetch, campaignId, saveDraft]);
+  }, [adminFetch, campaignId, loadReadiness, saveDraft, syncCampaignInUrl]);
 
   const loadPreview = useCallback(async () => {
     if (!campaignId) return;
@@ -169,12 +293,23 @@ export default function EmailComposePage() {
       if (!data.success) throw new Error(data.error || "تعذر بدء الحملة");
       notify(`تم إطلاق الحملة — ${data.queuedCount} مستلم في الطابور`, "success");
       setShowLaunchConfirm(false);
+      await loadReadiness(campaignId);
     } catch (err) {
       notify(err.message, "error");
     } finally {
       setBusy(false);
     }
   };
+
+  const handleStepClick = (nextStep) => {
+    if (nextStep === 3 && !campaignId) {
+      notify("احفظ الحملة وجهّز الجمهور قبل الانتقال للتأكيد.", "warning");
+      return;
+    }
+    setStep(nextStep);
+  };
+
+  const launchEnabled = Boolean(readiness?.ready && campaignId && !busy && !readinessLoading);
 
   return (
     <div className="space-y-6">
@@ -186,9 +321,12 @@ export default function EmailComposePage() {
         statusLevel="warning"
       />
 
-      <EmailStepper steps={WIZARD_STEPS} currentStep={step} onStepClick={setStep} />
+      <EmailStepper steps={WIZARD_STEPS} currentStep={step} stepStates={stepStates} onStepClick={handleStepClick} />
 
       {message ? <EmailAlertBanner tone={messageTone}>{message}</EmailAlertBanner> : null}
+      {campaignLoading ? (
+        <EmailAlertBanner tone="info">جاري تحميل مسودة الحملة...</EmailAlertBanner>
+      ) : null}
 
       {step === 0 ? (
         <section className="space-y-6 rounded-[28px] border border-slate-200/80 bg-white/95 p-5 dark:border-cyan-300/15 dark:bg-[#07142f]/60 md:p-7">
@@ -245,19 +383,22 @@ export default function EmailComposePage() {
             {busy ? "جاري التجهيز..." : "تجهيز الجمهور"}
           </EmailPrimaryButton>
 
-          {stats ? (
+          {prepareResult?.stats ? (
             <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/70 p-5 dark:border-emerald-400/20 dark:bg-emerald-500/10">
               <div className="flex items-center gap-2">
                 <IconCheck className="h-5 w-5 text-emerald-600" />
-                <h3 className="font-black text-emerald-900 dark:text-emerald-100">الجمهور جاهز</h3>
+                <h3 className="font-black text-emerald-900 dark:text-emerald-100">تم تجهيز الجمهور بنجاح</h3>
               </div>
-              <p className="mt-2 text-sm font-bold text-emerald-800 dark:text-emerald-200">
-                {stats.eligible?.toLocaleString("ar")} مستخدم مؤهل
-              </p>
-              <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
-                مستبعدون: {stats.excluded?.toLocaleString("ar") ?? 0}
-              </p>
-              {stats.exclusionReasonLabels ? (
+              <ul className="mt-3 space-y-1 text-sm font-bold text-emerald-800 dark:text-emerald-200">
+                <li>المؤهلون: {Number(prepareResult.stats.eligible ?? 0).toLocaleString("ar")}</li>
+                <li>المستبعدون: {Number(prepareResult.stats.excluded ?? 0).toLocaleString("ar")}</li>
+                {prepareResult.preparedAt ? (
+                  <li className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                    وقت التجهيز: {new Date(prepareResult.preparedAt).toLocaleString("ar")}
+                  </li>
+                ) : null}
+              </ul>
+              {prepareResult.stats.exclusionReasonLabels ? (
                 <>
                   <button
                     type="button"
@@ -268,7 +409,7 @@ export default function EmailComposePage() {
                   </button>
                   {showExclusions ? (
                     <ul className="mt-2 space-y-1 text-xs text-emerald-800 dark:text-emerald-200">
-                      {Object.entries(stats.exclusionReasonLabels).map(([reason, info]) => (
+                      {Object.entries(prepareResult.stats.exclusionReasonLabels).map(([reason, info]) => (
                         <li key={reason} className="flex justify-between rounded-lg bg-white/60 px-3 py-2 dark:bg-black/20">
                           <span>{info.label}</span>
                           <strong>{info.count}</strong>
@@ -278,6 +419,14 @@ export default function EmailComposePage() {
                   ) : null}
                 </>
               ) : null}
+              <div className="mt-4">
+                <EmailPrimaryButton
+                  disabled={Number(prepareResult.stats.eligible ?? 0) <= 0}
+                  onClick={() => setStep(1)}
+                >
+                  متابعة إلى الرسالة
+                </EmailPrimaryButton>
+              </div>
             </div>
           ) : null}
         </section>
@@ -366,25 +515,39 @@ export default function EmailComposePage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-[24px] border border-slate-200 p-5 dark:border-white/10">
               <h3 className="font-black">الرسالة</h3>
-              <p className="mt-2 text-sm font-bold">{form.subject}</p>
-              <p className="mt-1 text-xs text-slate-500">{form.previewText}</p>
+              <p className="mt-2 text-sm font-bold">{form.subject || "—"}</p>
+              <p className="mt-1 text-xs text-slate-500">{form.previewText || "—"}</p>
             </div>
             <div className="rounded-[24px] border border-slate-200 p-5 dark:border-white/10">
               <h3 className="font-black">الجمهور</h3>
               <p className="mt-2 text-2xl font-black text-cyan-700 dark:text-cyan-300">
-                {stats?.eligible?.toLocaleString("ar") ?? "—"}
+                {Number.isFinite(Number(audienceStats.eligible))
+                  ? Number(audienceStats.eligible).toLocaleString("ar")
+                  : "—"}
               </p>
               <p className="text-xs text-slate-500">مستخدم مؤهل</p>
             </div>
             <div className="rounded-[24px] border border-slate-200 p-5 dark:border-white/10">
               <h3 className="font-black">الاستبعادات</h3>
-              <p className="mt-2 text-2xl font-black">{stats?.excluded?.toLocaleString("ar") ?? 0}</p>
+              <p className="mt-2 text-2xl font-black">
+                {Number(audienceStats.excluded ?? 0).toLocaleString("ar")}
+              </p>
             </div>
             <div className="rounded-[24px] border border-cyan-200 bg-cyan-50/50 p-5 dark:border-cyan-400/20 dark:bg-cyan-500/10">
               <h3 className="font-black">سياسة الإرسال</h3>
               <p className="mt-2 text-sm">موافقة تسويقية مفعّلة — لن يُرسل إلا للمؤهلين.</p>
             </div>
           </div>
+
+          <LaunchReadinessPanel
+            readiness={readiness}
+            loading={readinessLoading}
+            onGoToAudience={() => setStep(0)}
+            onReprepareAudience={() => {
+              setStep(0);
+              void prepareAudience();
+            }}
+          />
 
           <EmailAlertBanner tone="warning">
             بعد بدء الإرسال لن تتمكن من تعديل محتوى هذه الحملة.
@@ -394,7 +557,7 @@ export default function EmailComposePage() {
             <EmailPrimaryButton variant="secondary" onClick={() => setStep(1)}>
               العودة للتعديل
             </EmailPrimaryButton>
-            <EmailPrimaryButton disabled={busy || !campaignId} onClick={() => setShowLaunchConfirm(true)}>
+            <EmailPrimaryButton disabled={!launchEnabled} onClick={() => setShowLaunchConfirm(true)}>
               بدء الحملة
             </EmailPrimaryButton>
             {campaignId ? (
@@ -409,7 +572,7 @@ export default function EmailComposePage() {
       <ConfirmModal
         open={showLaunchConfirm}
         title="هل تريد بدء الحملة؟"
-        description={`ستتم إضافة ${stats?.eligible ?? 0} رسالة إلى نظام الإرسال.`}
+        description={`ستتم إضافة ${readiness?.eligibleCount ?? audienceStats.eligible ?? 0} رسالة إلى نظام الإرسال.`}
         confirmLabel="نعم، ابدأ الحملة"
         cancelLabel="إلغاء"
         danger

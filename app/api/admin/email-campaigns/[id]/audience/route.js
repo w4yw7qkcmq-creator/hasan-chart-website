@@ -4,6 +4,7 @@ import { auditCampaignAction } from "../../../../../../lib/email-campaign/admin-
 import { buildCampaignAudienceSnapshot } from "../../../../../../lib/email-campaign/snapshot.js";
 import { getCampaignById } from "../../../../../../lib/email-campaign/store.js";
 import { CAMPAIGN_STATUS } from "../../../../../../lib/email-campaign/constants.js";
+import { invalidateShortLivedCache } from "../../../../../../lib/short-lived-cache.js";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,20 @@ export async function POST(request, { params }) {
 
     await auditCampaignAction(admin.supabase, admin.user, "email.campaign.audience_generated", campaignId, result.stats);
 
-    return Response.json({ success: true, ...result });
+    invalidateShortLivedCache("email-audience-counts:");
+
+    return Response.json({
+      success: true,
+      campaign: result.campaign,
+      stats: result.stats,
+      recipientCount: result.recipientCount,
+      exclusionReasons: result.exclusionReasons,
+      readiness: {
+        eligibleCount: result.stats?.eligible ?? result.campaign?.eligible_count ?? 0,
+        excludedCount: result.stats?.excluded ?? 0,
+        snapshotAt: result.campaign?.metadata?.snapshotAt ?? null,
+      },
+    });
   } catch (error) {
     return Response.json({ success: false, error: error?.message || "Failed to prepare audience" }, { status: 500 });
   }
