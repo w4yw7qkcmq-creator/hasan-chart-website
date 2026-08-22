@@ -25,6 +25,8 @@ assert.doesNotMatch(emailToml, /index\.js/);
 
 assert.match(vipNixpacks, /npm run vip-status-delivery-worker/);
 assert.match(emailNixpacks, /npm run email-queue-worker/);
+assert.match(emailNixpacks, /email-outbox-core\.cjs/);
+assert.match(emailNixpacks, /email-outbox-processor\.js/);
 
 assert.equal(pkg.scripts["vip-status-delivery-worker"], "VIP_STATUS_DELIVERY_WORKER_ONESHOT=false node vip-status-delivery-worker.js");
 assert.equal(pkg.scripts["email-queue-worker"], "EMAIL_QUEUE_WORKER_ONESHOT=false node email-queue-worker.js");

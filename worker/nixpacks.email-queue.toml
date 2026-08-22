@@ -11,7 +11,11 @@ aptPkgs = []
 cmds = ["npm ci --omit=dev"]
 
 [phases.build]
-cmds = ["node -e \"require('@supabase/supabase-js'); console.log('email queue worker deps ok')\""]
+cmds = [
+  "mkdir -p lib",
+  "cp ../lib/email-outbox-core.cjs lib/email-outbox-core.cjs",
+  "node -e \"require('./email-outbox-processor.js'); console.log('email queue worker deps ok')\"",
+]
 
 [start]
 cmd = "npm run email-queue-worker"
