@@ -82,7 +82,7 @@ Service accounts (DB rows, `enabled=false` by default):
 | `cron` | Scheduled jobs | Before `IAM_API=true` if cron routes used |
 | `news-worker` | News pipeline | Before worker IAM cutover |
 | `price-alert-worker` | Price alerts | Before worker IAM cutover |
-| `instant-analysis-worker` | Instant analysis | Before worker IAM cutover |
+| `instant-analysis-worker` | Instant analysis *(retired Aug 2026)* | Historical IAM record only |
 | `telegram-bot` | Telegram dispatch | Before bot IAM cutover |
 
 Generate secrets offline (32+ bytes, base64url). Store in password manager. Hash inserted via admin tooling or controlled SQL — **not** in repo.

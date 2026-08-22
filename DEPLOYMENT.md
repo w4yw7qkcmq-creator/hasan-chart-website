@@ -95,7 +95,6 @@ Preflight reads `.env.local` / `.env` if present but **never prints secret value
 | `EMAIL_FROM` | ⭐ | Verified sender |
 | `EMAIL_REPLY_TO` | ⭐ | Support reply address |
 | `ADMIN_EMAIL` | ⭐ | Admin notifications |
-| `NEXT_PUBLIC_RAILWAY_AI_WORKER_URL` | ○ | Dashboard AI feature |
 | `WORKER_API_SECRET` | ○ | Worker API auth (falls back to `CRON_SECRET`) |
 
 ✅ = launch blocker · ⭐ = strongly recommended · ○ = feature-specific
@@ -154,7 +153,7 @@ No legacy paths: Supabase Edge Functions and website cron are disabled.
 | `VAPID_SUBJECT` | ✅ | VAPID identity |
 | `NEXT_PUBLIC_SITE_URL` | ✅ | Email CTA links |
 | `PRICE_ALERT_CHECK_INTERVAL_MS` | ○ | Default `30000` |
-| `OPENAI_API_KEY` | ○ | `/api/instant-analysis` |
+| `OPENAI_API_KEY` | ○ | News intelligence pipeline on worker |
 | `WORKER_API_SECRET` | ○ | Falls back to `CRON_SECRET` |
 | `PORT` | auto | Set by Railway |
 
@@ -397,7 +396,6 @@ Authenticated APIs (alerts, my-analysis, partner) require session cookies — te
 | Resend webhooks 503 | `RESEND_WEBHOOK_SECRET` missing |
 | Alert emails not sent | `RESEND_API_KEY` on Worker; Resend domain verified |
 | Site notifications missing | `user_notifications` table; Worker `create-user-notification.js` logs |
-| AI analysis in dashboard fails | `NEXT_PUBLIC_RAILWAY_AI_WORKER_URL` + Worker `OPENAI_API_KEY` |
 
 Logs are JSON-structured with automatic redaction (`lib/log-redaction.js`, `worker/log-redaction.js`).
 

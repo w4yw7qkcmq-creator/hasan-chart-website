@@ -46,22 +46,6 @@ export function evaluateSlo(qa) {
           : "breached",
   });
 
-  const iaStatus = stepStatus(smoke, "instant-analysis");
-  checks.push({
-    id: "slo-ia-success",
-    name: SLO_TARGETS.iaJobSuccess.label,
-    target: `${SLO_TARGETS.iaJobSuccess.targetPercent}%`,
-    actual: iaStatus === "PASS" ? "100%" : iaStatus === "VERIFY_ONLY" ? "partial" : iaStatus,
-    status:
-      iaStatus === "PASS"
-        ? "met"
-        : iaStatus === "VERIFY_ONLY"
-          ? "partial"
-          : iaStatus === "UNKNOWN"
-            ? "awaiting-data"
-            : "breached",
-  });
-
   const obNote = stepNote(smoke, "order-book");
   const obPass = stepStatus(smoke, "order-book") === "PASS";
   checks.push({

@@ -195,7 +195,7 @@ Service account secrets (future worker phase):
 | cron | ☐ |
 | news-worker | ☐ |
 | price-alert-worker | ☐ |
-| instant-analysis-worker | ☐ |
+| instant-analysis-worker *(retired)* | ☐ |
 | telegram-bot | ☐ |
 
 ---

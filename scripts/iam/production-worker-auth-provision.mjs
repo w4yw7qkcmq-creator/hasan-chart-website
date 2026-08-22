@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Production instant-analysis-worker provisioning for B2.3 dual-mode rollout.
+ * Historical: instant-analysis-worker provisioning (retired Aug 2026).
  *
  * Usage:
  *   node scripts/iam/production-worker-auth-provision.mjs           # dry-run

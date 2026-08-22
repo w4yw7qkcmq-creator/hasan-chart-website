@@ -4,7 +4,7 @@ export const OPS_VERSION = "1.0.0";
 
 export const SERVICES = Object.freeze([
   { id: "next-app", name: "Next.js App", tier: "P0", dependsOn: ["supabase", "redis"] },
-  { id: "ia-worker", name: "Instant Analysis Worker", tier: "P0", dependsOn: ["redis", "openai", "supabase"] },
+  { id: "price-alerts-worker", name: "Price Alerts Worker", tier: "P0", dependsOn: ["supabase", "redis"] },
   { id: "news-worker", name: "News Worker", tier: "P1", dependsOn: ["supabase"] },
   { id: "subscription-worker", name: "Subscription Worker", tier: "P1", dependsOn: ["supabase", "storage"] },
   { id: "market-depth", name: "Market Depth Hub", tier: "P1", dependsOn: ["binance", "bybit", "okx"] },
@@ -20,7 +20,6 @@ export const SLO_TARGETS = Object.freeze({
   latencyP95: { targetMs: 2000, label: "API Latency P95" },
   latencyP99: { targetMs: 5000, label: "API Latency P99" },
   errorRate: { targetPercent: 0.1, label: "Error Rate" },
-  iaJobSuccess: { targetPercent: 99, label: "Instant Analysis Success" },
   orderBookWarmup: { targetMs: 20000, label: "Order Book Warmup" },
   sseBootstrap: { targetMs: 15000, label: "SSE Bootstrap" },
 });
@@ -52,10 +51,9 @@ export const ALERT_RULES = Object.freeze([
 ]);
 
 export const SMOKE_STEP_SERVICE_MAP = Object.freeze({
-  health: ["next-app", "railway", "ia-worker"],
+  health: ["next-app", "railway", "price-alerts-worker"],
   "login-user": ["supabase", "next-app"],
   dashboard: ["next-app", "supabase"],
-  "instant-analysis": ["ia-worker", "openai", "redis", "supabase"],
   "subscription-upload": ["storage", "supabase", "next-app"],
   "admin-login": ["supabase", "next-app"],
   news: ["news-worker", "supabase"],
@@ -66,7 +64,6 @@ export const SMOKE_STEP_SERVICE_MAP = Object.freeze({
 });
 
 export const FEATURE_FLAGS = Object.freeze([
-  { id: "instant-analysis-v2", env: "IA_V2_ENABLED", default: "true" },
   { id: "market-depth-stream", env: "MARKET_DEPTH_ENABLED", default: "true" },
   { id: "news-feed", env: "NEWS_ENABLED", default: "true" },
   { id: "subscription-upload", env: "SUBSCRIPTION_UPLOAD_ENABLED", default: "true" },

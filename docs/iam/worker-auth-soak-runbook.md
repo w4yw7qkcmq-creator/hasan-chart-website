@@ -60,9 +60,8 @@ On FAIL: do not change Production automatically. Choose:
 2. Extend soak
 3. Recommend rollback (requires explicit approval)
 
-## Rollback references
+## Rollback references (historical — instant analysis retired Aug 2026)
 
 - Keep `IAM_WORKER_LEGACY_FALLBACK=true`
 - Keep `CRON_SECRET`
-- Remove `IAM_INSTANT_ANALYSIS_WORKER_SECRET` from Web to force legacy path
 - Disable `instant-analysis-worker` account if secret compromise suspected

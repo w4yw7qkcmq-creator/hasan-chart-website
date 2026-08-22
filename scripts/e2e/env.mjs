@@ -78,7 +78,6 @@ export function loadE2eEnv() {
     supabaseUrl: merged.NEXT_PUBLIC_SUPABASE_URL || merged.SUPABASE_URL || "",
     supabaseAnonKey: merged.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
     supabaseServiceKey: merged.SUPABASE_SERVICE_ROLE_KEY || "",
-    instantAnalysisAllowPost: merged.E2E_INSTANT_ANALYSIS_ALLOW_POST === "1",
     hasUserCredentials: Boolean(merged.E2E_USER_EMAIL && merged.E2E_USER_PASS),
     hasAdminCredentials: Boolean(merged.E2E_ADMIN_EMAIL && merged.E2E_ADMIN_PASS),
     hasSupabaseAdmin: Boolean(

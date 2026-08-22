@@ -32,14 +32,14 @@ open scripts/ops/.artifacts/index.html
 | 4 | Error Budget Tracking | `error-budget.json` |
 | 5 | SLO / SLA Verification | `slo-report.json` |
 | 6 | Latency Monitoring | In ops-platform + monitoring dashboard |
-| 7 | Queue Monitoring | IA queue status from smoke |
+| 7 | Queue Monitoring | News pipeline status from smoke |
 | 8 | Worker Monitoring | Health + smoke inference |
 | 9 | Database Health | Supabase/auth smoke steps |
 | 10 | Storage Health | Subscription upload step |
 | 11 | Memory Monitoring | Framework placeholder (Railway integration ready) |
 | 12 | CPU Monitoring | Framework placeholder |
 | 13 | WebSocket/SSE Monitoring | market-stream smoke step |
-| 14 | OpenAI Availability | instant-analysis smoke step |
+| 14 | OpenAI Availability | news smoke step |
 | 15 | Supabase Monitoring | auth + storage + admin steps |
 | 16 | Railway Monitoring | health commit/readiness |
 | 17 | Automatic Incident Reports | `incident-report.json` |

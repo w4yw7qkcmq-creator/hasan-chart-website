@@ -16,7 +16,7 @@ export function evaluateAlertRules(qa, slo, errorBudget, releaseGate) {
     workerUnavailable: stepStatus(smoke, "health") === "FAIL",
     consoleWarnings: smoke?.consoleCapture?.consoleWarnings || 0,
     releaseGateVerdict: releaseGate?.verdict || "UNKNOWN",
-    queueBacklog: smoke?.steps?.find((s) => s.id === "instant-analysis")?.note?.includes("backlog") ? 101 : 0,
+    queueBacklog: 0,
   };
 
   const evaluated = ALERT_RULES.map((rule) => {

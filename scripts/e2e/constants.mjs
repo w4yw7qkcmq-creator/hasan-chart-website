@@ -43,8 +43,6 @@ export const SAFETY_BLOCKED_ACTIONS = Object.freeze([
 
 export const ORDER_BOOK_WARMUP_MS = 20_000;
 export const ORDER_BOOK_POLL_MS = 1_000;
-export const INSTANT_ANALYSIS_POLL_MS = 3_000;
-export const INSTANT_ANALYSIS_TIMEOUT_MS = 120_000;
 
 export const SMOKE_JPEG = Buffer.from([
   0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,

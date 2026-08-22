@@ -9,7 +9,6 @@ Lightweight post-deploy verification — **not full smoke**.
 | When | Pre-deploy | Post-deploy (T+1m … T+24h) |
 | Creates data | Yes (subscription upload) | **No** |
 | Login | Yes | **No** — auth gate only |
-| Instant Analysis POST | Yes | **No** — health GET only |
 | Cooldown impact | Yes | **No** |
 
 ## Checkpoints

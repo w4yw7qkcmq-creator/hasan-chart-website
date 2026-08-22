@@ -20,7 +20,6 @@ const SERVER_PAGE_FILES = [
 const ROUTE_FILES = [
   "app/api/admin/email-analytics/[id]/route.js",
   "app/api/partner/growth/smart-links/[id]/route.js",
-  "app/api/instant-analysis/[jobId]/route.js",
   "app/api/admin/partner-withdrawals/[id]/approve/route.js",
   "app/api/admin/partner-withdrawals/[id]/reject/route.js",
   "app/api/admin/partner-withdrawals/[id]/mark-paid/route.js",

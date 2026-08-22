@@ -792,7 +792,7 @@ async function runMachineTests(base, env, report) {
   }
 
   report.machine.documentation = {
-    "instant-analysis-worker": "No machine-auth web route; worker calls external service directly",
+    "instant-analysis-worker": "Retired Aug 2026 — historical IAM account; no active web route",
     "telegram-bot": "No standalone telegram web route; uses send-news/support integrations",
   };
 }

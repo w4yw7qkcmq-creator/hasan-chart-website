@@ -268,7 +268,7 @@ function detectWorkerIssues(steps) {
   const health = (steps || []).find((s) => s.id === "health");
   if (!health || health.status !== "FAIL") return [];
   const note = health.note || "";
-  if (/worker|instant-analysis\/health|not configured|unavailable/i.test(note)) {
+  if (/worker|price.?alert|not configured|unavailable/i.test(note)) {
     return [
       issue("WRK-HEALTH", "P0", `Worker/readiness issue: ${note}`, FIX_HINTS.worker, "health"),
     ];
@@ -313,7 +313,6 @@ function computeCategoryScores(payload, allIssues) {
   ux = Math.max(0, Math.round(ux));
 
   const featureIds = [
-    "instant-analysis",
     "subscription-upload",
     "order-book",
     "news",

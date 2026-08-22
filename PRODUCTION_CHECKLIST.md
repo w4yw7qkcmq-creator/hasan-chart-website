@@ -54,7 +54,6 @@ Complete pre-launch verification for the **Web** (Next.js), **Worker** (price al
 | `EMAIL_FROM` | Sender address | Recommended |
 | `EMAIL_REPLY_TO` | Reply-to header | Recommended |
 | `ADMIN_EMAIL` | Admin notifications | Recommended |
-| `NEXT_PUBLIC_RAILWAY_AI_WORKER_URL` | Dashboard AI instant analysis | Feature-only |
 | `WORKER_API_SECRET` | Worker API auth (falls back to CRON_SECRET) | Optional |
 
 ### B3. Web health verification
@@ -97,8 +96,8 @@ Price alerts **must** run here. Website route `/api/check-price-alerts` returns 
 | `VAPID_PRIVATE_KEY` | Push signing | Yes |
 | `VAPID_SUBJECT` | Push identity | Yes |
 | `NEXT_PUBLIC_SITE_URL` | Email CTA links | Yes |
-| `OPENAI_API_KEY` | `/api/instant-analysis` on worker | Feature-only |
-| `WORKER_API_SECRET` or `CRON_SECRET` | Instant-analysis API auth | Recommended |
+| `OPENAI_API_KEY` | News intelligence on worker | Feature-only |
+| `WORKER_API_SECRET` or `CRON_SECRET` | Worker HTTP auth | Recommended |
 | `PORT` | Auto-set by Railway | Auto |
 
 ### C3. Worker health verification

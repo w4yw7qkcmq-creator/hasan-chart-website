@@ -31,7 +31,9 @@ const ARTIFACT_DIR = join(ROOT, "scripts/iam/.artifacts");
 const BASELINE_PATH = join(ARTIFACT_DIR, "worker-auth-soak-baseline-latest.json");
 const REGISTRY_PATH = join(ARTIFACT_DIR, "worker-auth-soak-registry.json");
 const WEB_BASE = process.env.PRODUCTION_WEB_URL || "https://www.hasanchartworld.com";
-const WORKER_BASE = process.env.PRODUCTION_AI_WORKER_URL || "https://ai-worker-production-a6ea.up.railway.app";
+const WORKER_BASE =
+  process.env.PRODUCTION_PRICE_ALERTS_WORKER_URL ||
+  "https://hasan-chart-worker-production.up.railway.app";
 
 function loadJson(path) {
   if (!existsSync(path)) return null;

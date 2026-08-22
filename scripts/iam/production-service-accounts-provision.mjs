@@ -90,7 +90,7 @@ const PRODUCTION_SERVICE_PLAN = Object.freeze([
     id: "instant-analysis-worker",
     label: "Instant Analysis Worker",
     provision: false,
-    skipReason: "/api/instant-analysis uses human session auth; worker HTTP server is separate from Next.js machine-auth routes.",
+    skipReason: "Retired Aug 2026 — instant analysis removed from production; IAM account kept for historical audit.",
     routes: [],
     permissions: [],
   },

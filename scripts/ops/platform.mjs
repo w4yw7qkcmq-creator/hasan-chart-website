@@ -55,7 +55,7 @@ export function buildOpsPlatform() {
     memoryMonitoring: buildInfraPlaceholder("memory", "Requires Railway/host metrics integration"),
     cpuMonitoring: buildInfraPlaceholder("cpu", "Requires Railway/host metrics integration"),
     sseMonitoring: buildComponentPanel("websocket-sse", stepStatus(smoke, "market-stream"), stepNote(smoke, "market-stream"), ["market-depth-stream"]),
-    openaiMonitoring: buildComponentPanel("openai", stepStatus(smoke, "instant-analysis"), stepNote(smoke, "instant-analysis"), ["openai-api"]),
+    openaiMonitoring: buildComponentPanel("openai", stepStatus(smoke, "news"), stepNote(smoke, "news"), ["openai-api"]),
     supabaseMonitoring: buildSupabasePanel(smoke),
     railwayMonitoring: buildRailwayPanel(smoke, releaseGate),
 
@@ -131,22 +131,22 @@ function buildLatencyPanel(smoke) {
 }
 
 function buildQueuePanel(smoke) {
-  const ia = smoke?.steps?.find((s) => s.id === "instant-analysis");
+  const news = smoke?.steps?.find((s) => s.id === "news");
   return {
     title: "Queue Monitoring",
-    queue: "instant-analysis",
-    lastJobStatus: ia?.status || "unknown",
-    note: ia?.note || "Run smoke to capture job queue status",
-    backlogEstimate: ia?.note?.includes("job=") ? "normal" : "unknown",
+    queue: "news-intelligence",
+    lastJobStatus: news?.status || "unknown",
+    note: news?.note || "Run smoke to capture news pipeline status",
+    backlogEstimate: "unknown",
   };
 }
 
 function buildWorkerPanel(smoke) {
   const health = smoke?.steps?.find((s) => s.id === "health");
-  const iaHealth = health?.note || "";
+  const healthNote = health?.note || "";
   return {
     title: "Worker Monitoring",
-    instantAnalysisWorker: /configured|ready/i.test(iaHealth) ? "configured" : stepStatus(smoke, "health"),
+    priceAlertsWorker: /alertsWorker|price.?alert/i.test(healthNote) ? "configured" : stepStatus(smoke, "health"),
     newsWorker: stepStatus(smoke, "news") === "PASS" ? "inferred-ok" : "unknown",
     subscriptionWorker: stepStatus(smoke, "subscription-upload") === "PASS" ? "inferred-ok" : "unknown",
     note: health?.note || "Derived from /api/health and smoke steps",

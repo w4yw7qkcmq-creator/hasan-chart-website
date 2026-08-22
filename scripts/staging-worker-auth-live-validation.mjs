@@ -66,16 +66,10 @@ async function probe(path, headers = {}, method = "GET", body = undefined) {
   return { status: res.status, json, text };
 }
 
-function authAllowed(status) {
-  return status !== 401 && status !== 403 && status !== 503;
-}
-
-async function main() {
   const staging = parseEnvFile(STAGING_ENV);
   const required = [
     "STAGING_SUPABASE_URL",
     "STAGING_SUPABASE_SERVICE_ROLE_KEY",
-    "STAGING_IAM_INSTANT_ANALYSIS_WORKER_SECRET",
     "STAGING_IAM_CRON_SECRET",
     "STAGING_IAM_NEWS_WORKER_SECRET",
   ];
@@ -130,104 +124,7 @@ async function main() {
     record("worker_health_ready", true, {
       machineAuthConfigured: health.workerHttpAuth?.machineAuthConfigured,
       legacyFallbackEnabled: health.workerHttpAuth?.legacyFallbackEnabled,
-    });
-
-    const iaSecret = staging.STAGING_IAM_INSTANT_ANALYSIS_WORKER_SECRET;
-    const cronSecret = staging.STAGING_IAM_CRON_SECRET;
-    const newsSecret = staging.STAGING_IAM_NEWS_WORKER_SECRET;
-    const legacySecret = staging.STAGING_IAM_ANALYSIS_WORKER_SECRET || cronSecret;
-
-    const machineOk = await probe(
-      "/api/instant-analysis",
-      {
-        "x-service-account-id": "instant-analysis-worker",
-        "x-service-account-secret": iaSecret,
-      },
-      "POST",
-      {}
-    );
-    record("machine_correct_secret", authAllowed(machineOk.status), { status: machineOk.status });
-
-    const machineWrong = await probe(
-      "/api/instant-analysis",
-      {
-        "x-service-account-id": "instant-analysis-worker",
-        "x-service-account-secret": "wrong-secret-value",
-      },
-      "POST",
-      {}
-    );
-    record("machine_wrong_secret", machineWrong.status === 401, { status: machineWrong.status });
-
-    const cronAsMachine = await probe(
-      "/api/instant-analysis",
-      {
-        "x-service-account-id": "cron",
-        "x-service-account-secret": cronSecret,
-      },
-      "POST",
-      {}
-    );
-    record("cron_account_denied", cronAsMachine.status === 403, { status: cronAsMachine.status });
-
-    const newsAsMachine = await probe(
-      "/api/instant-analysis",
-      {
-        "x-service-account-id": "news-worker",
-        "x-service-account-secret": newsSecret,
-      },
-      "POST",
-      {}
-    );
-    record("news_account_denied", newsAsMachine.status === 403, { status: newsAsMachine.status });
-
-    const legacyOk = await probe(
-      "/api/instant-analysis",
-      { authorization: `Bearer ${legacySecret}` },
-      "POST",
-      {}
-    );
-    record("legacy_valid_no_machine_headers", authAllowed(legacyOk.status), { status: legacyOk.status });
-
-    const legacyBad = await probe(
-      "/api/instant-analysis",
-      { authorization: "Bearer invalid-legacy-secret" },
-      "POST",
-      {}
-    );
-    record("legacy_invalid", legacyBad.status === 401, { status: legacyBad.status });
-
-    const originOnly = await probe("/api/instant-analysis", { origin: "https://www.hasanchartworld.com" }, "POST", {});
-    record("origin_only_denied", originOnly.status === 403, { status: originOnly.status });
-
-    const refererOnly = await probe(
-      "/api/instant-analysis",
-      { referer: "https://www.hasanchartworld.com/admin" },
-      "POST",
-      {}
-    );
-    record("referer_only_denied", refererOnly.status === 403, { status: refererOnly.status });
-
-    const cookieOnly = await probe(
-      "/api/instant-analysis",
-      { cookie: "hc_access_token=fake-session" },
-      "POST",
-      {}
-    );
-    record("cookie_only_denied", cookieOnly.status === 403, { status: cookieOnly.status });
-
-    const machineWrongLegacyOk = await probe(
-      "/api/instant-analysis",
-      {
-        "x-service-account-id": "instant-analysis-worker",
-        "x-service-account-secret": "wrong",
-        authorization: `Bearer ${legacySecret}`,
-      },
-      "POST",
-      {}
-    );
-    record("machine_wrong_no_legacy_fallback", machineWrongLegacyOk.status === 401, {
-      status: machineWrongLegacyOk.status,
+      alertsWorker: health.alertsWorker,
     });
 
     const finalHealth = await probe("/health");
@@ -237,7 +134,7 @@ async function main() {
     record("metrics_originRejected", typeof metrics.originRejected === "number", {
       originRejected: metrics.originRejected,
     });
-    record("metrics_denied_positive", (metrics.denied || 0) > 0, { denied: metrics.denied });
+    record("metrics_denied_counter", typeof metrics.denied === "number", { denied: metrics.denied });
   } finally {
     child.kill("SIGTERM");
     await sleep(500);
