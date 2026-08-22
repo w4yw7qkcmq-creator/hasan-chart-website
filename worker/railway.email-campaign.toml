@@ -1,0 +1,11 @@
+# HasaN CharT World — email campaign processor
+# Railway: Root Directory = worker | Config File = worker/railway.email-campaign.toml
+
+[build]
+builder = "NIXPACKS"
+nixpacksConfigPath = "nixpacks.email-campaign.toml"
+
+[deploy]
+startCommand = "npm run email-campaign-processor"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

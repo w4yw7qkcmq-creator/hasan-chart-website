@@ -46,8 +46,8 @@ export const ADMIN_HUB_QUICK_NAV_ITEMS = [
   {
     id: "email",
     icon: "📧",
-    title: "مراقبة الإيميلات",
-    description: "تتبع التسليم والأخطاء.",
+    title: "Email Operations Center",
+    description: "تحليلات، طابور، وحملات بريدية.",
     href: "/admin/email-analytics",
     statKey: null,
     statLabel: null,

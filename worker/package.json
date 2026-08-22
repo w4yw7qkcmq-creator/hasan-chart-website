@@ -18,6 +18,7 @@
     "subscription-cron": "SUBSCRIPTION_WORKER_ONESHOT=true node subscription-maintenance-worker.js",
     "email-queue-worker": "EMAIL_QUEUE_WORKER_ONESHOT=false node email-queue-worker.js",
     "email-queue-cron": "EMAIL_QUEUE_WORKER_ONESHOT=true node email-queue-worker.js",
+    "email-campaign-processor": "node email-campaign-processor.js",
     "vip-status-delivery-worker": "VIP_STATUS_DELIVERY_WORKER_ONESHOT=false node vip-status-delivery-worker.js",
     "vip-status-delivery-cron": "VIP_STATUS_DELIVERY_WORKER_ONESHOT=true node vip-status-delivery-worker.js",
     "profiles-last-sign-in-reconcile-cron": "node profiles-last-sign-in-reconcile-cron-caller.js",

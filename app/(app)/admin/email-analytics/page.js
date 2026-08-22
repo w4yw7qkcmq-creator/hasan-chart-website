@@ -191,11 +191,11 @@ export default function EmailAnalyticsPage() {
           <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
             <div>
               <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-cyan-800 dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-100">
-                Email Analytics
+                Email Operations Center
               </span>
-              <h1 className="mt-5 text-3xl font-black leading-tight md:text-5xl">لوحة مراقبة الإيميلات</h1>
+              <h1 className="mt-5 text-3xl font-black leading-tight md:text-5xl">مركز عمليات البريد</h1>
               <p className="mt-4 max-w-3xl leading-8 text-slate-600 dark:text-slate-200">
-                لوحة SaaS احترافية لمراقبة التسليم، الفتح، النقر، والأخطاء — بتصميم مطابق لأسلوب Resend وStripe.
+                نظرة عامة على التسليم والتحليلات — استخدم التبويبات للمراقبة، الإرسال الجماعي، والحملات.
               </p>
             </div>
 

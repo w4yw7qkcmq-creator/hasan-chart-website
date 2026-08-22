@@ -1,0 +1,16 @@
+# Email campaign processor — Root Directory MUST be `worker`.
+
+[variables]
+NODE_VERSION = "22"
+
+[phases.setup]
+aptPkgs = []
+
+[phases.install]
+cmds = ["npm ci --omit=dev"]
+
+[phases.build]
+cmds = ["node -e \"console.log('email campaign processor caller ok')\""]
+
+[start]
+cmd = "npm run email-campaign-processor"
