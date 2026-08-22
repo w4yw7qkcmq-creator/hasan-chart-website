@@ -34,6 +34,8 @@ assert.equal(
   workerCore,
   "worker/lib/email-outbox-core.cjs must stay in sync with lib/email-outbox-core.cjs"
 );
+assert.match(read("lib/email-outbox-guard.cjs"), /email-recipient-guard\.cjs/);
+assert.match(read("worker/lib/email-outbox-guard.cjs"), /email-recipient-guard\.cjs/);
 
 assert.equal(pkg.scripts["vip-status-delivery-worker"], "VIP_STATUS_DELIVERY_WORKER_ONESHOT=false node vip-status-delivery-worker.js");
 assert.equal(pkg.scripts["email-queue-worker"], "EMAIL_QUEUE_WORKER_ONESHOT=false node email-queue-worker.js");
