@@ -249,11 +249,11 @@ test("worker sync: outbox sent updates VIP delivery", async () => {
       message_type: VIP_STATUS_EMAIL_MESSAGE_TYPE,
       metadata: { vipDeliveryId: "del-99", signalId: 1, eventType: "target_1_hit" },
     },
-    { outcome: "sent", providerMessageId: "resend-xyz" }
+    { outcome: "provider_accepted", providerMessageId: "resend-xyz" }
   );
 
   assert.equal(sync.synced, true);
-  assert.equal(updated.status, "delivered");
+  assert.equal(updated.status, "provider_accepted");
 });
 
 test("email-queue-worker sync after mock Resend", async () => {
@@ -261,8 +261,24 @@ test("email-queue-worker sync after mock Resend", async () => {
   const supabase = {
     from(table) {
       if (table === "email_outbox") {
+        const api = {
+          eq() {
+            return api;
+          },
+          in() {
+            return api;
+          },
+          then(resolve) {
+            resolve({ error: null });
+          },
+        };
         return {
-          update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
+          update: () => api,
+        };
+      }
+      if (table === "email_messages") {
+        return {
+          upsert: async () => ({ error: null }),
         };
       }
       if (table === "vip_signal_status_deliveries") {

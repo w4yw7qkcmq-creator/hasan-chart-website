@@ -91,10 +91,20 @@ function createMockSupabase(initialRows = []) {
         const cutoff = Date.now() - staleMinutes * 60 * 1000;
         let releasedPending = 0;
         let markedFailed = 0;
+        let finalizedSent = 0;
 
         for (const row of rows.values()) {
-          if (row.status !== "processing" || !row.claimed_at) continue;
+          if (row.status !== "processing" && row.status !== "accepted") continue;
+          if (!row.claimed_at) continue;
           if (new Date(row.claimed_at).getTime() > cutoff) continue;
+
+          if (row.resend_id) {
+            row.status = "sent";
+            row.sent_at = row.sent_at || row.accepted_at || new Date().toISOString();
+            row.claimed_at = null;
+            finalizedSent += 1;
+            continue;
+          }
 
           if (row.attempts >= row.max_attempts) {
             row.status = "failed";
@@ -108,7 +118,7 @@ function createMockSupabase(initialRows = []) {
         }
 
         return Promise.resolve({
-          data: { releasedPending, markedFailed },
+          data: { releasedPending, markedFailed, finalizedSent },
           error: null,
         });
       }
@@ -119,6 +129,17 @@ function createMockSupabase(initialRows = []) {
       });
     },
     from(table) {
+      if (table === "email_messages") {
+        const messageRows = new Map();
+        return {
+          upsert(row) {
+            const key = row.resend_id;
+            messageRows.set(key, { ...row });
+            return Promise.resolve({ error: null });
+          },
+        };
+      }
+
       if (table !== "email_outbox") {
         throw new Error(`Unexpected table ${table}`);
       }
@@ -128,13 +149,27 @@ function createMockSupabase(initialRows = []) {
           const filters = [];
           const api = {
             eq(column, value) {
-              filters.push([column, value]);
+              filters.push(["eq", column, value]);
+              return api;
+            },
+            in(column, values) {
+              filters.push(["in", column, values]);
               return api;
             },
             async then(resolve, reject) {
               try {
                 for (const row of rows.values()) {
-                  const matches = filters.every(([column, value]) => row[column] === value);
+                  const matches = filters.every((filter) => {
+                    if (filter[0] === "eq") {
+                      const [, column, value] = filter;
+                      return row[column] === value;
+                    }
+                    if (filter[0] === "in") {
+                      const [, column, value] = filter;
+                      return Array.isArray(value) && value.includes(row[column]);
+                    }
+                    return true;
+                  });
                   if (matches) {
                     Object.assign(row, values, {
                       updated_at: new Date().toISOString(),
@@ -176,7 +211,10 @@ function buildPendingRow(overrides = {}) {
     status: overrides.status || "pending",
     attempts: overrides.attempts ?? 0,
     max_attempts: overrides.max_attempts ?? 5,
-    resend_id: null,
+    resend_id: overrides.resend_id || null,
+    provider_idempotency_key: overrides.provider_idempotency_key || null,
+    accepted_at: overrides.accepted_at || null,
+    provider_submission_state: overrides.provider_submission_state || "none",
     error: null,
     metadata: overrides.metadata || {},
     scheduled_at: overrides.scheduled_at || new Date().toISOString(),
