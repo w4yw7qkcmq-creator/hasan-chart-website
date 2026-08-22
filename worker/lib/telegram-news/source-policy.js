@@ -3,6 +3,19 @@ const { isStructuredTripleReleaseTitle } = require("../economic-releases/canonic
 
 const PLAIN_FED_EVENT_KEYS = new Set(["US_POWELL_SPEECH", "US_FED_STATEMENT"]);
 
+const RATE_DECISION_EVENT_KEYS = new Set([
+  "US_FED_RATE_DECISION",
+  "UK_BOE_RATE_DECISION",
+  "EZ_ECB_RATE_DECISION",
+  "EZ_ECB_DEPOSIT_RATE",
+  "EZ_ECB_MAIN_REFINANCING_RATE",
+  "CA_BOC_RATE_DECISION",
+  "AU_RBA_RATE_DECISION",
+  "JP_BOJ_RATE_DECISION",
+  "CH_SNB_RATE_DECISION",
+  "RU_CBR_RATE_DECISION",
+]);
+
 const EXTRA_OFFICIAL_PATTERNS = [/beige book/i, /\badp\b(?:\s+nonfarm|\s+employment|\s+payroll)?/i];
 
 function isFedWatchOrProbabilityPricing(text) {
@@ -37,8 +50,8 @@ function isOfficialHighImpactTelegramPost(classification = {}) {
     return true;
   }
 
-  if (facts.canonicalEventKey === "US_FED_RATE_DECISION") {
-    return facts.isStructuredTriple;
+  if (facts.canonicalEventKey && RATE_DECISION_EVENT_KEYS.has(facts.canonicalEventKey)) {
+    return facts.isStructuredTriple || Boolean(facts.actual);
   }
 
   if (facts.isStructuredTriple) {

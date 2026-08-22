@@ -10,17 +10,17 @@ const { normalizeTitleText, isGenericTitle } = require("./editorial-title");
 
 const FIELD_PATTERNS = {
   previous: [
-    /(?:السابق|previous)\s*[:：]?\s*([^\n]+)/i,
+    /(?:السابق|previous|previous rate|الفائدة السابقة|القرار السابق)\s*[:：]?\s*([^\n]+)/i,
     /▪️\s*السابق\s*[:：]?\s*([^\n]+)/i,
     /🔴\s*السابق\s*[:：]?\s*([^\n]+)/i,
   ],
   forecast: [
-    /(?:المتوقع|التقدير|forecast|consensus|expected)\s*[:：]?\s*([^\n]+)/i,
+    /(?:المتوقع|التقدير|forecast|consensus|expected|expected rate|الفائدة المتوقعة|التوقعات)\s*[:：]?\s*([^\n]+)/i,
     /▪️\s*(?:المتوقع|التقدير)\s*[:：]?\s*([^\n]+)/i,
     /🔴\s*(?:المتوقع|التقدير)\s*[:：]?\s*([^\n]+)/i,
   ],
   actual: [
-    /(?:الحالي|actual)\s*[:：]?\s*([^\n]+)/i,
+    /(?:الحالي|actual|current rate|new rate|key rate|rate decision|الفائدة الجديدة|القرار الحالي)\s*[:：]?\s*([^\n]+)/i,
     /▫️\s*الحالي\s*[:：]?\s*([^\n]+)/i,
     /🔵\s*الحالي\s*[:：]?\s*([^\n]+)/i,
   ],
@@ -35,6 +35,8 @@ const COUNTRY_DISPLAY = {
   AU: "أستراليا",
   JP: "اليابان",
   CN: "الصين",
+  CH: "\u0633\u0648\u064a\u0633\u0631\u0627",
+  RU: "روسيا",
   DE: "ألمانيا",
   FR: "فرنسا",
 };
@@ -51,11 +53,34 @@ function sanitizeFieldValue(value) {
     return null;
   }
   let cleaned = String(value).trim();
-  cleaned = cleaned.split(/🔴|🔵|▪️|▫️|✍️|👇|🇬🇧|🇺🇸|🇪🇺|➡️/)[0].trim();
+  cleaned = cleaned.split(/🔴|🔵|▪️|▫️|✍️|👇|🇬🇧|🇺🇸|🇪🇺|🇨🇭|🇷🇺|➡️/)[0].trim();
   cleaned = cleaned.split(/\s+(?:المتوقع|التقدير|الحالي|forecast|actual|previous|السابق)\s*[:：]/i)[0].trim();
   return cleaned || null;
 }
 
+function extractRateDecisionAction(text) {
+  const value = String(text || "");
+  const hikeMatch = value.match(
+    /(?:rate\s+hike|hiked|raised|increase(?:d)?|(?:رفع|رفعت)\s+(?:الفائدة|سعر\s+الفائدة)?|(?:\+|-)?\d+\s*(?:bp|bps|نقطة|نقاط\s+أساس))[^\n]{0,80}/i
+  );
+  const cutMatch = value.match(
+    /(?:rate\s+cut|cut(?:ting)?|lowered|decrease(?:d)?|(?:خفض|خفضت)\s+(?:الفائدة|سعر\s+الفائدة)?)[^\n]{0,80}/i
+  );
+  const holdMatch = value.match(
+    /(?:unchanged|no change|hold(?:ing)?|kept|left\s+unchanged|ثبات|بدون\s+تغيير|ابق(?:اء|ى)?(?:ت)?\s+على)[^\n]{0,80}/i
+  );
+  if (hikeMatch) return sanitizeFieldValue(hikeMatch[0]);
+  if (cutMatch) return sanitizeFieldValue(cutMatch[0]);
+  if (holdMatch) return sanitizeFieldValue(holdMatch[0]);
+  return null;
+}
+
+function isRateDecisionCanonical(canonical, resolvedEventKey) {
+  const key = resolvedEventKey || canonical?.eventKey;
+  if (!key) return false;
+  const def = CANONICAL_EVENT_DEFINITIONS[key];
+  return def?.eventType === "rate_decision" || canonical?.eventType === "rate_decision";
+}
 function extractField(text, fieldName) {
   const normalizedText = normalizeArabicIndicDigits(text);
   for (const pattern of FIELD_PATTERNS[fieldName] || []) {
@@ -101,8 +126,8 @@ function stripLeadingDecorations(line) {
   return String(line || "")
     .replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+/gu, "")
     .replace(/^[^\p{L}\p{N}]+/u, "")
-    .replace(/🇺🇸|🇪🇺|🇬🇧|🇨🇦|🇦🇺|🇯🇵|🇨🇳/gu, "")
-    .replace(/^(?:أمريكا|امريكا|إنكلترا|انكلترا|بريطانيا|كندا|أستراليا|استراليا|اليابان|الصين)\s*[-–—]\s*/i, "")
+    .replace(/🇺🇸|🇪🇺|🇬🇧|🇨🇦|🇦🇺|🇯🇵|🇨🇳|🇨🇭|🇷🇺/gu, "")
+    .replace(/^(?:أمريكا|امريكا|إنكلترا|انكلترا|بريطانيا|كندا|أستراليا|استراليا|اليابان|الصين|سويسرا|روسيا)\s*[-–—]\s*/i, "")
     .trim();
 }
 
@@ -287,7 +312,7 @@ function detectExclusiveAnalysis(text) {
 function extractEntities(text) {
   const entities = new Set();
   const patterns = [
-    /\bfed\b|\bfomc\b|\bpowell\b|\becb\b|\bboe\b|\bboj\b|\bboc\b|\brba\b/gi,
+    /\bfed\b|\bfomc\b|\bpowell\b|\becb\b|\bboe\b|\bboj\b|\bboc\b|\brba\b|\bsnb\b|\bcbr\b/gi,
     /\bgold\b|\bxau\b|الذهب/gi,
     /\bbitcoin\b|\bbtc\b|بيتكوين/gi,
     /\bnfp\b|\bcpi\b|\bppi\b|\bgdp\b/gi,
@@ -321,9 +346,9 @@ function isStructuredEconomicRelease(text, canonical) {
 
 function extractFactsFromTelegramPost(post) {
   const text = normalizeArabicIndicDigits(post.rawText || "");
-  const previous = extractField(text, "previous");
-  const forecast = extractField(text, "forecast");
-  const actual = extractField(text, "actual");
+  let previous = extractField(text, "previous");
+  let forecast = extractField(text, "forecast");
+  let actual = extractField(text, "actual");
   const revisedPrevious = extractField(text, "revisedPrevious");
   const countryCode = extractCountryCode(text);
   const country = extractCountry(text) || COUNTRY_DISPLAY[countryCode] || null;
@@ -333,6 +358,10 @@ function extractFactsFromTelegramPost(post) {
   const canonical = resolveCanonicalForTelegram(combined, { countryCode });
   const resolvedEventKey =
     canonical.eventKey || resolveEventTypeFromAliases(combined, { countryCode });
+  const rateDecision = isRateDecisionCanonical(canonical, resolvedEventKey);
+  if (rateDecision && !actual) {
+    actual = extractRateDecisionAction(text);
+  }
   const isPlainFedNews =
     canonical.eventType === "plain_news" ||
     ["US_POWELL_SPEECH", "US_FED_STATEMENT", "US_FOMC_MINUTES"].includes(canonical.eventKey);

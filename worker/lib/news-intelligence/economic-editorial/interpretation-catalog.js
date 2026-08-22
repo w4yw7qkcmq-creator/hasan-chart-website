@@ -7,7 +7,8 @@ const CURRENCY_MAP = {
   CA: ["CAD", "GOLD", "RATES", "EQUITIES"],
   AU: ["AUD", "GOLD", "RATES", "EQUITIES"],
   JP: ["JPY", "GOLD", "RATES", "EQUITIES"],
-  CN: ["CNY", "GOLD", "RATES", "EQUITIES"],
+  CH: ["CHF", "GOLD", "RATES", "EQUITIES"],
+  RU: ["RUB", "GOLD", "RATES", "EQUITIES"],
 };
 
 const HIGH_IMPORTANCE = new Set([
@@ -32,6 +33,17 @@ const HIGH_IMPORTANCE = new Set([
   "UK_CORE_RETAIL_SALES",
   "EZ_CPI",
   "EZ_ECB_RATE_DECISION",
+  "EZ_ECB_DEPOSIT_RATE",
+  "EZ_ECB_MAIN_REFINANCING_RATE",
+  "EZ_CORE_CPI",
+  "EZ_GDP",
+  "EZ_UNEMPLOYMENT",
+  "CH_CPI",
+  "CH_SNB_RATE_DECISION",
+  "CH_GDP",
+  "RU_CPI",
+  "RU_CBR_RATE_DECISION",
+  "RU_GDP",
   "CA_CPI",
   "CA_BOC_RATE_DECISION",
   "AU_CPI",
@@ -51,7 +63,7 @@ function inferBetterWhen(eventKey) {
     return "HIGHER";
   }
   if (/PMI|ISM|EMPIRE|PHILADELPHIA|CONFIDENCE|SENTIMENT/.test(key)) return "HIGHER";
-  if (/POWELL|SPEECH|STATEMENT|MINUTES/.test(key)) return "CONTEXTUAL";
+  if (/POWELL|SPEECH|STATEMENT|MINUTES|LAGARDE|MONETARY_POLICY|SNB|CBR|ECB/.test(key)) return "CONTEXTUAL";
   return "CONTEXTUAL";
 }
 

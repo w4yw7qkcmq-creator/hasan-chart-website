@@ -22,6 +22,10 @@ const { getRecentDecisions, resetDecisionRecordsForTests } = require(path.join(
 ));
 const { resolveCanonicalEventKey } = require(path.join(root, "lib/economic-releases/canonical-events"));
 const { resolveEventTypeFromAliases } = require(path.join(root, "lib/news-intelligence/event-registry"));
+const { isPremiumImageEvent } = require(path.join(root, "lib/news-images/important-events"));
+const { isOfficialHighImpactTelegramPost } = require(path.join(root, "lib/telegram-news/source-policy"));
+const { resolveNewsImagePolicy, IMAGE_POLICY_MODES } = require(path.join(root, "lib/news-images/image-policy"));
+const { SOURCE_TYPES } = require(path.join(root, "lib/news-intelligence/publication-types"));
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -86,7 +90,10 @@ function runSameTimeCollisionTests() {
 }
 
 function runDisambiguationTests() {
-  assert(resolveEventTypeFromAliases("ISM Manufacturing PMI", { countryCode: "US" }) === "US_ISM_MANUFACTURING", "ISM manufacturing");
+  assert(
+    resolveCanonicalEventKey("ISM Manufacturing PMI", { countryCode: "US" }).eventKey === "US_ISM_MANUFACTURING",
+    "ISM manufacturing"
+  );
   assert(
     resolveEventTypeFromAliases("مؤشر مديري المشتريات الصناعي", { countryCode: "US" }) ===
       "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
@@ -101,6 +108,135 @@ function runDisambiguationTests() {
       "US_CONSUMER_CONFIDENCE",
     "Consumer confidence split"
   );
+}
+
+function runFixture(name, checks = {}) {
+  const fixture = loadFixture(name);
+  const post = { ...fixture.post, rawText: fixture.sourceText };
+  const facts = extractFactsFromTelegramPost(post);
+  if (fixture.expected.canonicalEventKey) {
+    assert(facts.canonicalEventKey === fixture.expected.canonicalEventKey, `${name} canonical`);
+  }
+  if (fixture.expected.countryCode) {
+    assert(facts.countryCode === fixture.expected.countryCode, `${name} country`);
+  }
+  if (fixture.expected.actual) {
+    assert(facts.actual === fixture.expected.actual, `${name} actual`);
+  }
+  if (fixture.expected.previous) {
+    assert(facts.previous === fixture.expected.previous, `${name} previous`);
+  }
+  if (fixture.expected.forecast) {
+    assert(facts.forecast === fixture.expected.forecast, `${name} forecast`);
+  }
+  if (fixture.expected.isStructuredTriple != null) {
+    assert(facts.isStructuredTriple === fixture.expected.isStructuredTriple, `${name} triple`);
+  }
+  if (checks.extra) checks.extra(facts, fixture);
+  return facts;
+}
+
+function runChRuEzFixtureSuite() {
+  runFixture("ch-snb-rate-decision-ar-20260822.json");
+  runFixture("ch-cpi-ar-20260822.json");
+  runFixture("ru-cbr-rate-decision-ar-20260822.json");
+  runFixture("ru-cpi-ar-20260822.json");
+  runFixture("ez-ecb-rate-decision-ar-20260822.json");
+  runFixture("ez-core-cpi-20260822.json");
+}
+
+function runCountryFirstCpiDisambiguation() {
+  const base = `\u0645\u0624\u0634\u0631 \u0627\u0644\u062a\u0636\u062e\u0645`;
+  const ch = resolveCanonicalEventKey(`${base} 🇨🇭`, { countryCode: resolveCountryCode(`${base} 🇨🇭`) }).eventKey;
+  const ru = resolveCanonicalEventKey(`${base} 🇷🇺`, { countryCode: resolveCountryCode(`${base} 🇷🇺`) }).eventKey;
+  const ez = resolveCanonicalEventKey(`${base} 🇪🇺`, { countryCode: resolveCountryCode(`${base} 🇪🇺`) }).eventKey;
+  assert(ch === "CH_CPI" || ch === "CH_CPI_GENERIC", "CH CPI disambiguation");
+  assert(ru === "RU_CPI" || ru === "RU_CPI_GENERIC", "RU CPI disambiguation");
+  assert(ez === "EZ_CPI" || ez === "EZ_CPI_GENERIC", "EZ CPI disambiguation");
+  assert(ch !== "US_CPI" && ru !== "US_CPI" && ez !== "US_CPI", "no US CPI bleed");
+}
+
+function runCrossCountryDedupeProof() {
+  const ts = "2026-08-22T12:00:00.000Z";
+  const ch = extractFactsFromTelegramPost({
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: "ch-dedupe",
+    sourcePublishedAt: ts,
+    rawText: loadFixture("ch-cpi-ar-20260822.json").sourceText,
+  });
+  const ru = extractFactsFromTelegramPost({
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: "ru-dedupe",
+    sourcePublishedAt: ts,
+    rawText: loadFixture("ru-cpi-ar-20260822.json").sourceText,
+  });
+  assert(ch.previous === ru.previous && ch.forecast === ru.forecast && ch.actual === ru.actual, "same triple");
+  assert(buildEconomicTripleKey(ch) !== buildEconomicTripleKey(ru), "CH/RU dedupe distinct");
+}
+
+function runCentralBankSameMinuteCollisions() {
+  const ts = "2026-08-22T12:45:00.000Z";
+  const snb = extractFactsFromTelegramPost({
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: "snb-collision",
+    sourcePublishedAt: ts,
+    rawText: loadFixture("ch-snb-rate-decision-ar-20260822.json").sourceText,
+  });
+  const ecb = extractFactsFromTelegramPost({
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: "ecb-collision",
+    sourcePublishedAt: ts,
+    rawText: loadFixture("ez-ecb-rate-decision-ar-20260822.json").sourceText,
+  });
+  const cbr = extractFactsFromTelegramPost({
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: "cbr-collision",
+    sourcePublishedAt: ts,
+    rawText: loadFixture("ru-cbr-rate-decision-ar-20260822.json").sourceText,
+  });
+  assert(buildEconomicTripleKey(snb) !== buildEconomicTripleKey(ecb), "SNB/ECB distinct");
+  assert(buildEconomicTripleKey(cbr) !== buildEconomicTripleKey(ecb), "CBR/ECB distinct");
+}
+
+function runImagePolicySuite() {
+  for (const key of ["CH_SNB_RATE_DECISION", "RU_CBR_RATE_DECISION", "EZ_ECB_RATE_DECISION", "CH_CPI", "RU_CPI", "EZ_CORE_CPI"]) {
+    assert(isPremiumImageEvent(key), `${key} premium image`);
+  }
+
+  const snbFacts = runFixture("ch-snb-rate-decision-ar-20260822.json");
+  assert(
+    isOfficialHighImpactTelegramPost({ facts: snbFacts, cleanedText: loadFixture("ch-snb-rate-decision-ar-20260822.json").sourceText }),
+    "SNB high impact telegram"
+  );
+
+  const rssPolicy = resolveNewsImagePolicy({
+    sourceType: SOURCE_TYPES.RSS_GENERAL,
+    eventType: "CH_SNB_RATE_DECISION",
+    importance: "HIGH",
+  });
+  assert(rssPolicy.mode === IMAGE_POLICY_MODES.SOURCE_ONLY, "RSS source only");
+  assert(rssPolicy.allowAi === false, "RSS AI zero");
+}
+
+function runUnknownEventTerminalDecision() {
+  resetTelegramTerminalDecisionsForTests();
+  resetDecisionRecordsForTests();
+  const post = {
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: "unknown-economic",
+    sourcePublishedAt: "2026-08-22T13:00:00.000Z",
+    rawText: "🔴 السابق: 1.0%\n🔴 المتوقع: 1.1%\n🔵 الحالي: 1.2%",
+  };
+  const facts = extractFactsFromTelegramPost(post);
+  recordTelegramEconomicExitIfNeeded({
+    post,
+    facts,
+    reason: "CANONICAL_EVENT_UNRESOLVED",
+    stage: "test_unknown",
+  });
+  const decisions = getRecentDecisions();
+  assert(decisions.length === 1, "unknown event terminal decision");
+  assert(decisions[0].reasonCode === "CANONICAL_EVENT_UNRESOLVED", "unknown reason preserved");
 }
 
 function runTerminalDecisionInvariant() {
@@ -135,8 +271,16 @@ function main() {
   runUkRetailFixture();
   runSameTimeCollisionTests();
   runDisambiguationTests();
+  runChRuEzFixtureSuite();
+  runCountryFirstCpiDisambiguation();
+  runCrossCountryDedupeProof();
+  runCentralBankSameMinuteCollisions();
+  runImagePolicySuite();
+  runUnknownEventTerminalDecision();
   runTerminalDecisionInvariant();
   const report = runRegistryCoverageReport();
+  assert(report.countries.length === 9, "countries count");
+  assert(report.interpretationParity, "interpretation parity");
   console.log(JSON.stringify({ ok: true, report }, null, 2));
 }
 

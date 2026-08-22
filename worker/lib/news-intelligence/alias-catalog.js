@@ -99,13 +99,47 @@ const UK_ALIASES = {
 };
 
 const EZ_ALIASES = {
-  EZ_CPI: alias(/\bcpi\b|inflation/i),
-  EZ_CORE_CPI: alias(/core cpi|core inflation/i),
-  EZ_GDP: alias(/\bgdp\b|gross domestic product/i),
-  EZ_ECB_RATE_DECISION: alias(/ecb rate|european central bank rate/i),
-  EZ_MANUFACTURING_PMI: alias(/manufacturing pmi/i),
-  EZ_SERVICES_PMI: alias(/services pmi/i),
+  EZ_CPI: alias(/\bcpi\b|inflation|hicp|التضخم/i),
+  EZ_CORE_CPI: alias(/core cpi|core inflation|hicp ex|underlying inflation/i),
+  EZ_GDP: alias(/\bgdp\b|gross domestic product|الناتج المحلي/i),
+  EZ_UNEMPLOYMENT: alias(/unemployment rate|unemployment change|معدل البطالة/i),
+  EZ_ECB_RATE_DECISION: alias(
+    /ecb rate|european central bank rate|interest rate decision|قرار الفائدة|قرار ecb|البنك المركزي الأوروبي|المركزي الأوروبي/i
+  ),
+  EZ_ECB_DEPOSIT_RATE: alias(/deposit rate|deposit facility|سعر الإيداع/i),
+  EZ_ECB_MAIN_REFINANCING_RATE: alias(/main refinancing rate|refi rate|mro/i),
+  EZ_ECB_MONETARY_POLICY_STATEMENT: alias(/monetary policy statement|ecb statement|بيان السياسة/i),
+  EZ_LAGARDE_SPEECH: alias(/lagarde|لاجارد|ecb press conference|مؤتمر صحفي/i),
+  EZ_MANUFACTURING_PMI: alias(/manufacturing pmi|flash manufacturing/i),
+  EZ_SERVICES_PMI: alias(/services pmi|flash services/i),
   EZ_COMPOSITE_PMI: alias(/composite pmi/i),
+};
+
+const CH_ALIASES = {
+  CH_CPI: alias(/\bcpi\b|inflation|التضخم|أسعار المستهلك/i),
+  CH_CORE_CPI: alias(/core cpi|core inflation|التضخم الأساس/i),
+  CH_GDP: alias(/\bgdp\b|gross domestic product|الناتج المحلي/i),
+  CH_UNEMPLOYMENT: alias(/unemployment rate|unemployment change|معدل البطالة/i),
+  CH_SNB_RATE_DECISION: alias(
+    /snb rate|swiss national bank rate|interest rate decision|قرار الفائدة|البنك الوطني السويسري|المركزي السويسري|swiss national bank/i
+  ),
+  CH_SNB_MONETARY_POLICY_ASSESSMENT: alias(/monetary policy assessment|snb assessment|تقييم السياسة/i),
+  CH_MANUFACTURING_PMI: alias(/manufacturing pmi|flash manufacturing/i),
+  CH_SERVICES_PMI: alias(/services pmi|flash services/i),
+  CH_COMPOSITE_PMI: alias(/composite pmi/i),
+};
+
+const RU_ALIASES = {
+  RU_CPI: alias(/\bcpi\b|inflation|التضخم|أسعار المستهلك/i),
+  RU_GDP: alias(/\bgdp\b|gross domestic product|الناتج المحلي/i),
+  RU_UNEMPLOYMENT: alias(/unemployment rate|unemployment change|معدل البطالة/i),
+  RU_CBR_RATE_DECISION: alias(
+    /cbr rate|bank of russia rate|key rate|interest rate decision|قرار الفائدة|البنك المركزي الروسي|بنك روسيا|bank of russia/i
+  ),
+  RU_CBR_MONETARY_POLICY_STATEMENT: alias(/monetary policy statement|cbr statement|بيان السياسة/i),
+  RU_MANUFACTURING_PMI: alias(/manufacturing pmi|flash manufacturing/i),
+  RU_SERVICES_PMI: alias(/services pmi|flash services/i),
+  RU_COMPOSITE_PMI: alias(/composite pmi/i),
 };
 
 const CA_ALIASES = {
@@ -153,6 +187,8 @@ const ARABIC_ALIASES = {
   ...US_ALIASES,
   ...UK_ALIASES,
   ...EZ_ALIASES,
+  ...CH_ALIASES,
+  ...RU_ALIASES,
   ...CA_ALIASES,
   ...AU_ALIASES,
   ...JP_ALIASES,
@@ -164,6 +200,8 @@ module.exports = {
   US_ALIASES,
   UK_ALIASES,
   EZ_ALIASES,
+  CH_ALIASES,
+  RU_ALIASES,
   CA_ALIASES,
   AU_ALIASES,
   JP_ALIASES,

@@ -19,6 +19,22 @@ function p(...parts) {
   return parts.filter(Boolean);
 }
 
+const CB_RATE_LABELS = {
+  previous: "القرار السابق",
+  forecast: "التوقع",
+  actual: "القرار الحالي",
+};
+
+function centralBankRate(country, keySuffix, options = {}) {
+  return releaseDef(country, keySuffix, {
+    priority: options.priority ?? 1,
+    patterns: options.patterns,
+    eventType: "rate_decision",
+    fieldLabels: CB_RATE_LABELS,
+    arabicName: options.arabicName,
+  });
+}
+
 const US_INFLATION = Object.fromEntries([
   releaseDef("US", "CPI_MOM", {
     priority: 10,
@@ -365,12 +381,99 @@ const UK = Object.fromEntries([
 const EZ = Object.fromEntries([
   ...Object.entries(countryInflation("EZ", "منطقة اليورو")),
   releaseDef("EZ", "GDP", { patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i], arabicName: "الناتج المحلي لمنطقة اليورو" }),
-  releaseDef("EZ", "ECB_RATE_DECISION", {
-    patterns: [/ecb rate|european central bank rate|interest rate decision|قرار الفائدة|قرار ecb/i],
-    eventType: "rate_decision",
+  releaseDef("EZ", "UNEMPLOYMENT", {
+    patterns: [/unemployment rate|unemployment change|معدل البطالة/i],
+    arabicName: "معدل البطالة في منطقة اليورو",
+  }),
+  centralBankRate("EZ", "ECB_RATE_DECISION", {
+    patterns: p(
+      /ecb rate decision|ecb interest rate|european central bank rate|interest rate decision|european central bank|البنك المركزي الأوروبي|المركزي الأوروبي|قرار الفائدة الأوروبي/i,
+      /قرار الفائدة|قرار فائدة|\brate decision\b|\brate cut\b|\brate hike\b/i
+    ),
     arabicName: "قرار فائدة ECB",
   }),
+  centralBankRate("EZ", "ECB_DEPOSIT_RATE", {
+    priority: 2,
+    patterns: [/deposit rate|deposit facility|سعر الإيداع|mfi interest rate.*deposit/i],
+    arabicName: "سعر إيداع ECB",
+  }),
+  centralBankRate("EZ", "ECB_MAIN_REFINANCING_RATE", {
+    priority: 2,
+    patterns: [/main refinancing rate|refi rate|mro rate|سعر إعادة التمويل/i],
+    arabicName: "سعر إعادة التمويل ECB",
+  }),
+  releaseDef("EZ", "ECB_MONETARY_POLICY_STATEMENT", {
+    priority: 5,
+    patterns: [/monetary policy statement|ecb statement|بيان السياسة النقدية|بيان ecb/i],
+    requiresTripleTemplate: false,
+    eventType: "plain_news",
+    arabicName: "بيان السياسة النقدية ECB",
+  }),
+  releaseDef("EZ", "LAGARDE_SPEECH", {
+    priority: 6,
+    patterns: [/lagarde|لاجارد|ecb press conference|مؤتمر صحفي ecb|christine lagarde/i],
+    requiresTripleTemplate: false,
+    eventType: "plain_news",
+    arabicName: "تصريحات لاجارد / مؤتمر ECB",
+  }),
   ...Object.entries(countryPmi("EZ", "منطقة اليورو")),
+]);
+
+const CH = Object.fromEntries([
+  ...Object.entries(countryInflation("CH", "سويسرا")),
+  releaseDef("CH", "GDP", {
+    patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i],
+    arabicName: "الناتج المحلي السويسري",
+  }),
+  releaseDef("CH", "UNEMPLOYMENT", {
+    patterns: [/unemployment rate|unemployment change|معدل البطالة/i],
+    arabicName: "معدل البطالة السويسري",
+  }),
+  centralBankRate("CH", "SNB_RATE_DECISION", {
+    patterns: p(
+      /snb rate|swiss national bank rate|swiss central bank|interest rate decision|key rate decision/i,
+      /قرار الفائدة السويسري|البنك الوطني السويسري|المركزي السويسري|swiss national bank|snb decision/i
+    ),
+    arabicName: "قرار فائدة SNB",
+  }),
+  releaseDef("CH", "SNB_MONETARY_POLICY_ASSESSMENT", {
+    priority: 4,
+    patterns: [/monetary policy assessment|snb assessment|تقييم السياسة النقدية|بيان snb/i],
+    requiresTripleTemplate: false,
+    eventType: "plain_news",
+    arabicName: "تقييم السياسة النقدية SNB",
+  }),
+  ...Object.entries(countryPmi("CH", "سويسرا")),
+]);
+
+const RU = Object.fromEntries([
+  releaseDef("RU", "CPI", {
+    patterns: [/\bcpi\b|consumer price index|inflation|التضخم|أسعار المستهلك|مؤشر أسعار المستهلك/i],
+    arabicName: "مؤشر التضخم الروسي",
+  }),
+  releaseDef("RU", "GDP", {
+    patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i],
+    arabicName: "الناتج المحلي الروسي",
+  }),
+  releaseDef("RU", "UNEMPLOYMENT", {
+    patterns: [/unemployment rate|unemployment change|معدل البطالة/i],
+    arabicName: "معدل البطالة الروسي",
+  }),
+  centralBankRate("RU", "CBR_RATE_DECISION", {
+    patterns: p(
+      /cbr rate|bank of russia rate|key rate decision|interest rate decision|central bank of russia/i,
+      /قرار الفائدة الروسي|البنك المركزي الروسي|بنك روسيا|المركزي الروسي|bank of russia/i
+    ),
+    arabicName: "قرار فائدة CBR",
+  }),
+  releaseDef("RU", "CBR_MONETARY_POLICY_STATEMENT", {
+    priority: 4,
+    patterns: [/monetary policy statement|cbr statement|بيان السياسة النقدية|بيان cbr/i],
+    requiresTripleTemplate: false,
+    eventType: "plain_news",
+    arabicName: "بيان السياسة النقدية CBR",
+  }),
+  ...Object.entries(countryPmi("RU", "روسيا")),
 ]);
 
 const CA = Object.fromEntries([
@@ -436,6 +539,16 @@ const GENERIC_CPI_FALLBACKS = {
     calendarPatterns: [/\bcpi\b|consumer price index/i],
     arabicName: "مؤشر التضخم لمنطقة اليورo",
   },
+  CH: {
+    patterns: [/cpi|consumer price index|مؤشر أسعار المستهلك|التضخم/i],
+    calendarPatterns: [/\bcpi\b|consumer price index/i],
+    arabicName: "مؤشر التضخم السويسري",
+  },
+  RU: {
+    patterns: [/cpi|consumer price index|مؤشر أسعار المستهلك|التضخm/i],
+    calendarPatterns: [/\bcpi\b|consumer price index/i],
+    arabicName: "مؤشر التضخm الروسي",
+  },
 };
 
 const CANONICAL_EVENT_DEFINITIONS = {
@@ -450,6 +563,8 @@ const CANONICAL_EVENT_DEFINITIONS = {
   ...AU,
   ...JP,
   ...CN,
+  ...CH,
+  ...RU,
 };
 
 module.exports = {

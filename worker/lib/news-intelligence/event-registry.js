@@ -35,7 +35,10 @@ function resolveEventTypeFromAliases(text, options = {}) {
     if (countryCode && !eventKeyMatchesCountry(eventType, countryCode)) {
       continue;
     }
-    if (!countryCode && /_(MANUFACTURING_PMI|SERVICES_PMI|COMPOSITE_PMI|PMI)$/.test(eventType)) {
+    if (
+      !countryCode &&
+      /^(?!US_).+_(MANUFACTURING_PMI|SERVICES_PMI|COMPOSITE_PMI|PMI)$/.test(eventType)
+    ) {
       continue;
     }
     if (matchesAlias(normalized, patterns)) {

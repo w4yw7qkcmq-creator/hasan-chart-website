@@ -1,0 +1,17 @@
+{
+  "name": "ru-cbr-rate-decision-ar-20260822",
+  "sourceText": "🟥 روسيا 🇷🇺\n🔴 قرار الفائدة الروسي - CBR\n🔴 السابق: 16.00%\n🔴 المتوقع: 16.00%\n🔵 key rate: 18.00%\n✍️ رفع 200 نقطة أساس",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "ru-cbr-20260822",
+    "sourcePublishedAt": "2026-08-22T11:00:00.000Z"
+  },
+  "expected": {
+    "canonicalEventKey": "RU_CBR_RATE_DECISION",
+    "countryCode": "RU",
+    "previous": "16.00%",
+    "forecast": "16.00%",
+    "actual": "18.00%",
+    "isStructuredTriple": true
+  }
+}

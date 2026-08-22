@@ -1,0 +1,15 @@
+{
+  "name": "ru-cpi-ar-20260822",
+  "sourceText": "🟥 روسيا 🇷🇺\n🔴 مؤشر التضخم\n🔴 السابق: 1.3%\n🔴 المتوقع: 1.4%\n🔵 الحالي: 1.2%",
+  "post": {
+    "sourceChannel": "ForexNewspaper",
+    "sourceMessageId": "ru-cpi-20260822",
+    "sourcePublishedAt": "2026-08-22T06:00:00.000Z"
+  },
+  "expected": {
+    "canonicalEventKey": "RU_CPI",
+    "countryCode": "RU",
+    "actual": "1.2%",
+    "isStructuredTriple": true
+  }
+}

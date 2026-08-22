@@ -1,0 +1,18 @@
+{
+  "name": "ch-snb-rate-decision-ar-20260822",
+  "sourceText": "🟥 صدر الآن: سويسرا 🇨🇭\n🔴 قرار الفائدة السويسري - SNB\n🔴 السابق: 1.50%\n🔴 المتوقع: 1.50%\n🔵 القرار الحالي: 1.25%\n✍️ خفض 25 نقطة أساس",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "ch-snb-20260822",
+    "sourcePublishedAt": "2026-08-22T08:30:00.000Z",
+    "sourceUrl": "https://t.me/s/ForexBreakingNews/ch-snb-20260822"
+  },
+  "expected": {
+    "canonicalEventKey": "CH_SNB_RATE_DECISION",
+    "countryCode": "CH",
+    "previous": "1.50%",
+    "forecast": "1.50%",
+    "actual": "1.25%",
+    "isStructuredTriple": true
+  }
+}

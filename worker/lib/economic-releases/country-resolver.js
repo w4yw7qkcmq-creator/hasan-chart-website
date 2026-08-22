@@ -19,7 +19,17 @@ const COUNTRY_RULES = [
   },
   {
     code: "EZ",
-    patterns: [/🇪🇺|eurozone|euro area|euro-area|ecb|الاتحاد الأوروبي|الاتحاد الاوروبي|منطقة اليورو|اليورو/i],
+    patterns: [
+      /🇪🇺|eurozone|euro area|euro-area|ecb|european central bank|الاتحاد الأوروبي|الاتحاد الاوروبي|منطقة اليورو|البنك المركزي الأوروبي|المركزي الأوروبي|لاجارد|lagarde/i,
+    ],
+  },
+  {
+    code: "CH",
+    patterns: [/🇨🇭|\bch\b|switzerland|swiss|swiss national bank|\bsnb\b|سويسرا|سويسري|السويسري/i],
+  },
+  {
+    code: "RU",
+    patterns: [/🇷🇺|\bru\b|russia|russian|bank of russia|\bcbr\b|روسيا|روسي|الروسي|بنك روسيا|البنك المركزي الروسي|المركزي الروسي/i],
   },
   {
     code: "CA",
@@ -39,9 +49,38 @@ const COUNTRY_RULES = [
   },
 ];
 
+const FLAG_COUNTRY_CODES = [
+  ["🇺🇸", "US"],
+  ["🇬🇧", "UK"],
+  ["🇩🇪", "DE"],
+  ["🇫🇷", "FR"],
+  ["🇪🇺", "EZ"],
+  ["🇨🇭", "CH"],
+  ["🇷🇺", "RU"],
+  ["🇨🇦", "CA"],
+  ["🇦🇺", "AU"],
+  ["🇯🇵", "JP"],
+  ["🇨🇳", "CN"],
+];
+
+function resolveCountryCodeFromFlags(text) {
+  const raw = String(text || "");
+  for (const [flag, code] of FLAG_COUNTRY_CODES) {
+    if (raw.includes(flag)) {
+      return code;
+    }
+  }
+  return null;
+}
+
 function resolveCountryCode(text, options = {}) {
   if (options.countryCode) {
     return String(options.countryCode).trim().toUpperCase();
+  }
+
+  const fromFlag = resolveCountryCodeFromFlags(text);
+  if (fromFlag) {
+    return fromFlag;
   }
 
   const normalized = normalizeTextForMatching(text);
@@ -62,6 +101,14 @@ function resolveCountryCode(text, options = {}) {
 
   if (matches.includes("UK")) {
     return "UK";
+  }
+
+  if (matches.includes("CH")) {
+    return "CH";
+  }
+
+  if (matches.includes("RU")) {
+    return "RU";
   }
 
   if (matches.includes("EZ") && !matches.includes("UK") && !matches.includes("US")) {
@@ -96,6 +143,8 @@ function eventKeyMatchesCountry(eventKey, countryCode) {
 
 module.exports = {
   COUNTRY_RULES,
+  FLAG_COUNTRY_CODES,
+  resolveCountryCodeFromFlags,
   resolveCountryCode,
   countryPrefixForEventKey,
   eventKeyMatchesCountry,

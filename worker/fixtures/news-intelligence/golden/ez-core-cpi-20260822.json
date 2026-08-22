@@ -1,0 +1,15 @@
+{
+  "name": "ez-core-cpi-20260822",
+  "sourceText": "🟥 Eurozone 🇪🇺\n🔴 Core CPI y/y\n🔴 Previous: 2.7%\n🔴 Forecast: 2.6%\n🔵 Actual: 2.5%",
+  "post": {
+    "sourceChannel": "ForexNewspaper",
+    "sourceMessageId": "ez-core-cpi-20260822",
+    "sourcePublishedAt": "2026-08-22T09:00:00.000Z"
+  },
+  "expected": {
+    "canonicalEventKey": "EZ_CORE_CPI",
+    "countryCode": "EZ",
+    "actual": "2.5%",
+    "isStructuredTriple": true
+  }
+}

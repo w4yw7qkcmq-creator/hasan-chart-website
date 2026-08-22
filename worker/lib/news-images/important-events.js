@@ -7,7 +7,7 @@ const PREMIUM_IMAGE_EVENT_KEYS = new Set(
   Object.entries(interpretationRegistry)
     .filter(([, meta]) => meta.importance === "HIGH" || meta.visualPriority === "REQUIRED")
     .map(([key]) => key)
-    .concat(["US_CPI_GENERIC", "UK_CPI_GENERIC", "EZ_CPI_GENERIC"])
+    .concat(["US_CPI_GENERIC", "UK_CPI_GENERIC", "EZ_CPI_GENERIC", "CH_CPI_GENERIC", "RU_CPI_GENERIC"])
 );
 
 const DISPLAY_NAME_OVERRIDES = Object.fromEntries(
@@ -18,6 +18,8 @@ DISPLAY_NAME_OVERRIDES.US_ADP_EMPLOYMENT = "ADP Employment Report";
 DISPLAY_NAME_OVERRIDES.US_CPI_GENERIC = "US CPI";
 DISPLAY_NAME_OVERRIDES.UK_CPI_GENERIC = "UK CPI";
 DISPLAY_NAME_OVERRIDES.EZ_CPI_GENERIC = "Eurozone CPI";
+DISPLAY_NAME_OVERRIDES.CH_CPI_GENERIC = "Swiss CPI";
+DISPLAY_NAME_OVERRIDES.RU_CPI_GENERIC = "Russia CPI";
 
 function normalizeEventKey(value) {
   return String(value || "").trim().toUpperCase();
