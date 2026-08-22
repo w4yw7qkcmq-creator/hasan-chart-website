@@ -1,0 +1,18 @@
+{
+  "name": "production-incident-sp-global-flash-manufacturing-pmi-20260821",
+  "sourceText": "🟥 صدر الآن :\n\n✅ أمريكا - 🇺🇸\n🔵 مؤشر مديري المشتريات الصناعي \n\n▪️ السابق : 53.9\n▪️ التقدير : 54.0\n▫️ الحالي : 53.2\n\n👈 النتيجة : سلبي للدولار الأمريكي",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "41957",
+    "sourcePublishedAt": "2026-08-21T13:40:14.000Z",
+    "sourceUrl": "https://t.me/ForexBreakingNews/41957"
+  },
+  "expected": {
+    "canonicalEventKey": "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+    "actual": "53.2",
+    "forecast": "54.0",
+    "previous": "53.9",
+    "isStructuredTriple": true,
+    "titleContains": "مؤشر مديري المشتريات الصناعي"
+  }
+}

@@ -14,6 +14,10 @@ const {
 const { createNewsPublisherGateway } = require("../news-intelligence/publisher-gateway");
 const { buildTelegramPublicationRequest } = require("../news-intelligence/adapters");
 const { maybeApplyPhase2Editorial } = require("../news-intelligence/economic-editorial/integration");
+const { recordDecision } = require("../news-intelligence/autonomy/decision-record");
+const { createCorrelationId } = require("../news-intelligence/autonomy/structured-log");
+const { getEventFamily } = require("../news-intelligence/event-registry");
+const { DECISION_OUTCOMES } = require("../news-intelligence/autonomy/reason-taxonomy");
 
 let gatewayInstance = null;
 
@@ -150,9 +154,59 @@ async function reserveNewsPublishFingerprint(candidate, options = {}) {
   return { reserved: true, fingerprint, bundle, sourceLink, memoryOnly: true };
 }
 
+function resolveTerminalReasonCode(evaluation = {}) {
+  if (evaluation.detail && evaluation.detail !== evaluation.reason) {
+    const detail = String(evaluation.detail).trim();
+    if (detail === "MISSING_CANONICAL_EVENT") {
+      return "MISSING_CANONICAL_EVENT";
+    }
+  }
+  return evaluation.reason || evaluation.detail || "QUALITY_GATE_BLOCKED";
+}
+
+function recordTerminalEconomicDecision(candidate, publication, ctx = {}, evaluation = {}) {
+  if (candidate?.newsType !== "economic" && publication?.sourceType !== "telegram_economic") {
+    return null;
+  }
+
+  const correlationId = evaluation.correlationId || createCorrelationId("news");
+  const reasonCode = resolveTerminalReasonCode(evaluation);
+
+  return recordDecision({
+    correlationId,
+    eventKey: publication?.eventKey || null,
+    eventType: publication?.eventType || candidate?.facts?.canonicalEventKey || null,
+    eventFamily: getEventFamily(publication?.eventType || candidate?.facts?.canonicalEventKey),
+    sourceType: publication?.sourceType || "telegram_economic",
+    sourceId: publication?.sourceId || candidate?.post?.sourceChannel || null,
+    sourceMessageId: candidate?.post?.sourceMessageId || publication?.metadata?.rawMessageId || null,
+    sourceLink:
+      publication?.sourceLink ||
+      candidate?.post?.sourceUrl ||
+      `telegram:${candidate?.post?.sourceChannel}/${candidate?.post?.sourceMessageId}`,
+    receivedAt: candidate?.post?.sourcePublishedAt || null,
+    reasonCode,
+    decision: DECISION_OUTCOMES.BLOCKED,
+    importance: publication?.importance || "HIGH",
+    qualityStatus: "blocked",
+    metadata: {
+      stage: evaluation.stage || "phase2_editorial",
+      subReason: evaluation.detail || evaluation.reason || null,
+      mergeKey: ctx.mergeKey || null,
+      titlePreview: String(candidate?.facts?.title || publication?.title || "").slice(0, 120),
+    },
+    latency: evaluation.latency || null,
+  });
+}
+
 async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps = {}) {
   const validation = validateCandidateForAtomicPublish(candidate, ctx);
   if (!validation.ok) {
+    const publication = buildTelegramPublicationRequest(candidate, validation, ctx);
+    recordTerminalEconomicDecision(candidate, publication, ctx, {
+      reason: validation.reason || validation.issues?.[0] || "FINAL_ATOMIC_PUBLISH_REJECTED",
+      stage: "atomic_validation",
+    });
     console.log(
       "FINAL_ATOMIC_PUBLISH_REJECTED",
       JSON.stringify({
@@ -167,6 +221,11 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   const message = validation.sanitizedMessage;
   const reserve = await reserveNewsPublishFingerprint(candidate, deps);
   if (!reserve.reserved) {
+    const publication = buildTelegramPublicationRequest(candidate, validation, ctx);
+    recordTerminalEconomicDecision(candidate, publication, ctx, {
+      reason: reserve.reason === "duplicate_skip" ? "DUPLICATE_BLOCKED" : reserve.reason || "DUPLICATE_BLOCKED",
+      stage: "idempotency",
+    });
     console.log(
       "FINAL_ATOMIC_PUBLISH_REJECTED",
       JSON.stringify({
@@ -210,6 +269,11 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   if (!phase2Result.ok) {
     releaseMemoryReservation(fingerprint);
     publishStates.delete(fingerprint);
+    recordTerminalEconomicDecision(candidate, publication, ctx, {
+      reason: phase2Result.reason || "QUALITY_GATE_BLOCKED",
+      detail: phase2Result.detail || phase2Result.quality?.detail || null,
+      stage: phase2Result.stage || "quality_gate",
+    });
     console.log(
       "PHASE2_EDITORIAL_BLOCKED",
       JSON.stringify({

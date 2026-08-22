@@ -34,6 +34,8 @@ const HIGH_IMPACT_KEYS = new Set([
   "US_PCE",
   "US_CORE_PCE_MOM",
   "US_GDP_QOQ",
+  "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+  "US_SP_GLOBAL_FLASH_SERVICES_PMI",
 ]);
 
 function extractField(text, fieldName) {
@@ -84,11 +86,60 @@ function isBreakingHeaderOnlyLine(line) {
   return isGenericTitle(cleaned);
 }
 
+function isCountryOnlyLine(cleaned) {
+  const value = normalizeTitleText(cleaned).toLowerCase();
+  if (!value) {
+    return true;
+  }
+  if (/^(?:أمريكا|امريكا|الولايات المتحدة|united states|usa|us)$/i.test(value)) {
+    return true;
+  }
+  if (/^(?:أمريكا|امريكا)\s*[-–—]\s*$/i.test(value)) {
+    return true;
+  }
+  return /^(?:🇺🇸|✅|🔵|🟥|🔴)?\s*(?:أمريكا|امريكا)\s*[-–—]?\s*(?:🇺🇸)?$/i.test(String(cleaned || "").trim());
+}
+
+function isLikelyStructuredReleaseTitle(cleaned, fullText = "") {
+  const value = normalizeTitleText(cleaned);
+  if (!value || isGenericTitle(value) || isCountryOnlyLine(value)) {
+    return false;
+  }
+
+  const combined = `${value}\n${fullText}`;
+  if (resolveEventTypeFromAliases(combined)) {
+    return true;
+  }
+
+  const canonical = resolveCanonicalEventKey(combined);
+  if (canonical?.eventKey) {
+    return true;
+  }
+
+  return /مؤشر|pmi|purchasing managers|مديري المشتريات|jobless|claims|cpi|nfp|gdp|ppi|pce|fed|fomc|ism|retail sales|consumer confidence/i.test(
+    value
+  );
+}
+
+function scoreEventTitleCandidate(cleaned, fullText) {
+  let score = Math.min(String(cleaned || "").length, 120);
+  if (isCountryOnlyLine(cleaned)) {
+    score -= 200;
+  }
+  if (isLikelyStructuredReleaseTitle(cleaned, fullText)) {
+    score += 250;
+  }
+  return score;
+}
+
 function extractEventTitle(text) {
   const lines = String(text || "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+
+  let bestTitle = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
 
   for (const line of lines) {
     if (isBreakingHeaderOnlyLine(line)) {
@@ -98,12 +149,28 @@ function extractEventTitle(text) {
       continue;
     }
     if (/^[•▪️▫️⬅️👉📊💎🔵]/.test(line)) {
+      const cleanedDecorated = stripLeadingDecorations(line);
+      if (cleanedDecorated.length >= 4 && cleanedDecorated.length <= 120 && !isGenericTitle(cleanedDecorated)) {
+        const score = scoreEventTitleCandidate(cleanedDecorated, text);
+        if (score > bestScore) {
+          bestScore = score;
+          bestTitle = cleanedDecorated;
+        }
+      }
       continue;
     }
     const cleaned = stripLeadingDecorations(line);
     if (cleaned.length >= 4 && cleaned.length <= 120 && !isGenericTitle(cleaned)) {
-      return cleaned;
+      const score = scoreEventTitleCandidate(cleaned, text);
+      if (score > bestScore) {
+        bestScore = score;
+        bestTitle = cleaned;
+      }
     }
+  }
+
+  if (bestTitle) {
+    return bestTitle;
   }
 
   for (const line of lines) {
@@ -118,20 +185,31 @@ function extractEventTitle(text) {
 
 function resolveCanonicalForTelegram(text) {
   const value = String(text || "");
-  if (/s&p global|sp global|ratingdog|hsbc manufacturing|caixin pmi/i.test(value)) {
-    return {
-      eventKey: "US_SP_GLOBAL_PMI",
-      arabicName: "مؤشر S&P Global PMI",
-      requiresTripleTemplate: true,
-      eventType: "structured_release",
-    };
-  }
 
   const aliasEventKey = resolveEventTypeFromAliases(value);
   if (aliasEventKey && CANONICAL_EVENT_DEFINITIONS[aliasEventKey]) {
     return {
       eventKey: aliasEventKey,
       ...CANONICAL_EVENT_DEFINITIONS[aliasEventKey],
+    };
+  }
+
+  if (/s&p global|sp global|ratingdog|hsbc manufacturing|caixin pmi/i.test(value)) {
+    if (/services|الخدم/i.test(value)) {
+      return {
+        eventKey: "US_SP_GLOBAL_FLASH_SERVICES_PMI",
+        ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_FLASH_SERVICES_PMI,
+      };
+    }
+    if (/manufacturing|الصناع|التصنيع/i.test(value)) {
+      return {
+        eventKey: "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+        ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_FLASH_MANUFACTURING_PMI,
+      };
+    }
+    return {
+      eventKey: "US_SP_GLOBAL_PMI",
+      ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_PMI,
     };
   }
 

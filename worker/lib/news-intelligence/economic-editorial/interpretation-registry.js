@@ -87,6 +87,13 @@ const INTERPRETATION_METADATA = {
     visualPriority: "REQUIRED",
     pmiThreshold: 50,
   },
+  US_SP_GLOBAL_FLASH_MANUFACTURING_PMI: {
+    betterWhen: "HIGHER",
+    marketSensitivity: ["USD", "EQUITIES"],
+    importance: "HIGH",
+    visualPriority: "REQUIRED",
+    pmiThreshold: 50,
+  },
   US_PHILADELPHIA_FED_MANUFACTURING: {
     betterWhen: "HIGHER",
     marketSensitivity: ["USD", "EQUITIES"],
@@ -95,6 +102,13 @@ const INTERPRETATION_METADATA = {
     pmiThreshold: 0,
   },
   US_ISM_SERVICES: {
+    betterWhen: "HIGHER",
+    marketSensitivity: ["USD", "EQUITIES"],
+    importance: "HIGH",
+    visualPriority: "REQUIRED",
+    pmiThreshold: 50,
+  },
+  US_SP_GLOBAL_FLASH_SERVICES_PMI: {
     betterWhen: "HIGHER",
     marketSensitivity: ["USD", "EQUITIES"],
     importance: "HIGH",
@@ -140,6 +154,8 @@ const IMAGE_REQUIRED_EVENTS = new Set([
   "US_CONTINUING_JOBLESS_CLAIMS",
   "US_GDP_QOQ",
   "US_WEEKLY_LABOR_CLAIMS",
+  "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+  "US_SP_GLOBAL_FLASH_SERVICES_PMI",
 ]);
 
 function getInterpretationMetadata(eventType) {

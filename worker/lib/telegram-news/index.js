@@ -114,7 +114,7 @@ function summarizeTelegramIngestion(posts = [], processed = []) {
       item.formattedMessage
   ).length;
 
-  const factCheckFailed = processed.filter((item) => item.finalFactCheck && item.finalFactCheck !== "ok").length;
+  const factCheckFailed = processed.filter((item) => item.finalFactCheck?.ok === false).length;
   const economicEligible = processed.filter(
     (item) => item.ingestionClassification === "NEW_MESSAGE" && item.newsType === "economic" && !item.skipPublish
   ).length;
@@ -226,7 +226,11 @@ async function discoverTelegramNews(options = {}) {
         String(item.post?.sourceMessageId) === String(post.sourceMessageId)
     );
     const terminal = matchingProcessed.every(
-      (item) => item.skipPublish || item.observabilityOnly || item.finalFactCheck === "ok" || item.newsType
+      (item) =>
+        item.skipPublish ||
+        item.observabilityOnly ||
+        item.finalFactCheck?.ok !== false ||
+        Boolean(item.newsType)
     );
     if (terminal && matchingProcessed.length > 0) {
       markTelegramMessageSeen(post.sourceChannel, post, { outcome: "processed" });

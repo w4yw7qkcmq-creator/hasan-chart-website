@@ -39,7 +39,12 @@ const GROWTH_KEYS = new Set([
   "US_RETAIL_SALES",
   "US_CORE_RETAIL_SALES",
 ]);
-const PMI_KEYS = new Set(["US_ISM_MANUFACTURING", "US_ISM_SERVICES"]);
+const PMI_KEYS = new Set([
+  "US_ISM_MANUFACTURING",
+  "US_ISM_SERVICES",
+  "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+  "US_SP_GLOBAL_FLASH_SERVICES_PMI",
+]);
 
 function hashSeed(value) {
   let hash = 2166136261;

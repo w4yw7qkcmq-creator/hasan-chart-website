@@ -1,0 +1,18 @@
+{
+  "name": "production-incident-sp-global-flash-services-pmi-20260821",
+  "sourceText": "🟥 صدر الآن :\n\n✅ أمريكا - 🇺🇸\n🔵 مؤشر مديري المشتريات الخدمي \n\n▪️ السابق : 54.6\n▪️ التقدير : 53.9\n▫️ الحالي : 56.8\n\n👈 النتيجة : إيجابي للدولار الأمريكي",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "41958",
+    "sourcePublishedAt": "2026-08-21T13:45:00.000Z",
+    "sourceUrl": "https://t.me/ForexBreakingNews/41958"
+  },
+  "expected": {
+    "canonicalEventKey": "US_SP_GLOBAL_FLASH_SERVICES_PMI",
+    "actual": "56.8",
+    "forecast": "53.9",
+    "previous": "54.6",
+    "isStructuredTriple": true,
+    "titleContains": "مؤشر مديري المشتريات الخدمي"
+  }
+}

@@ -37,6 +37,28 @@ const ARABIC_ALIASES = {
     /فيلادلفيا للصناعات/i,
     /الصناعات التحويلية/i,
   ],
+  US_SP_GLOBAL_FLASH_MANUFACTURING_PMI: [
+    /s&p global.*(?:flash.*)?(?:us )?manufacturing pmi|sp global.*(?:flash.*)?(?:us )?manufacturing pmi/i,
+    /flash manufacturing pmi|s&p global us manufacturing pmi|sp global us manufacturing pmi/i,
+    /(?<!ism )(?<!ism\s)(?<!s&p global )(?<!sp global )manufacturing pmi(?![\s\S]*services)/i,
+    /مؤشر مديري المشتريات الصناعي/i,
+    /مؤشر مديري المشتريات التصنيعي/i,
+    /مديري المشتريات الصناعي/i,
+    /مديري المشتريات التصنيعي/i,
+    /مؤشر مديري المشتريات للقطاع الصناعي/i,
+    /مؤشر مديري المشتريات للقطاع التصنيعي/i,
+  ],
+  US_SP_GLOBAL_FLASH_SERVICES_PMI: [
+    /s&p global.*(?:flash.*)?(?:us )?services pmi|sp global.*(?:flash.*)?(?:us )?services pmi/i,
+    /flash services pmi|s&p global us services pmi|sp global us services pmi/i,
+    /(?<!ism )(?<!ism\s)(?<!s&p global )(?<!sp global )services pmi/i,
+    /مؤشر مديري المشتريات الخدمي/i,
+    /مؤشر مديري المشتريات للخدمات/i,
+    /مديري المشتريات الخدمي/i,
+    /مديري المشتريات الخدماتي/i,
+    /مؤشر مديري المشتريات للقطاع الخدمي/i,
+    /مؤشر مديري المشتريات لقطاع الخدمات/i,
+  ],
 };
 
 function normalizeAliasText(value) {

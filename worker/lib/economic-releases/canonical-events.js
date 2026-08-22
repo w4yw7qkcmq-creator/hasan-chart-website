@@ -159,15 +159,39 @@ const CANONICAL_EVENT_DEFINITIONS = {
     eventType: "structured_release",
   },
   US_SP_GLOBAL_PMI: {
-    patterns: [/s&p global.*pmi|sp global.*pmi|s&p global manufacturing|sp global manufacturing/i],
+    patterns: [/s&p global.*pmi|sp global.*pmi|s&p global composite|sp global composite/i],
     calendarPatterns: [/s&p global.*pmi|sp global.*pmi/i],
-    arabicName: "مؤشر S&P Global PMI",
+    arabicName: "مؤشر S&P Global PMI المركب",
+    requiresTripleTemplate: true,
+    eventType: "structured_release",
+  },
+  US_SP_GLOBAL_FLASH_MANUFACTURING_PMI: {
+    patterns: [
+      /s&p global.*(?:flash.*)?(?:us )?manufacturing|sp global.*(?:flash.*)?(?:us )?manufacturing/i,
+      /flash manufacturing pmi|s&p global us manufacturing pmi|sp global us manufacturing pmi/i,
+      /(?<!ism )(?<!ism\s)(?<!s&p global )(?<!sp global )manufacturing pmi(?![\s\S]*services)/i,
+    ],
+    calendarPatterns: [/s&p global.*manufacturing|flash manufacturing pmi/i],
+    arabicName: "مؤشر S&P Global Flash للتصنيع",
+    requiresTripleTemplate: true,
+    eventType: "structured_release",
+  },
+  US_SP_GLOBAL_FLASH_SERVICES_PMI: {
+    patterns: [
+      /s&p global.*(?:flash.*)?(?:us )?services|sp global.*(?:flash.*)?(?:us )?services/i,
+      /flash services pmi|s&p global us services pmi|sp global us services pmi/i,
+      /(?<!ism )(?<!ism\s)(?<!s&p global )(?<!sp global )services pmi/i,
+    ],
+    calendarPatterns: [/s&p global.*services|flash services pmi/i],
+    arabicName: "مؤشر S&P Global Flash للخدمات",
     requiresTripleTemplate: true,
     eventType: "structured_release",
   },
   US_ISM_SERVICES: {
-    patterns: [/\bism\b.*services|ism services pmi|services pmi/i],
-    calendarPatterns: [/ism services|services pmi/i],
+    patterns: [
+      /\bism\b.*services|ism services pmi|(?<!s&p global )(?<!sp global )(?<!flash )services pmi/i,
+    ],
+    calendarPatterns: [/ism services|(?<!s&p )ism services pmi/i],
     arabicName: "مؤشر ISM للخدمات",
     requiresTripleTemplate: true,
     eventType: "structured_release",
