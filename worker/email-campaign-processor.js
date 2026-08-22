@@ -15,8 +15,15 @@ function loadEnv() {
   } catch (_) {}
 }
 
+function normalizeSiteUrl(raw) {
+  const trimmed = String(raw || "").trim().replace(/\/$/, "");
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 async function runOnce() {
-  const siteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "").replace(/\/$/, "");
+  const siteUrl = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "");
   const secret = process.env.CRON_SECRET?.trim() || process.env.WORKER_API_SECRET?.trim();
 
   if (!siteUrl || !secret) {
