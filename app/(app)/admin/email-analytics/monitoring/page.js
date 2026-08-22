@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAdminFetch } from "../lib/useAdminFetch";
 import { useVisibilityRefresh } from "../../../../hooks/useVisibilityRefresh";
 import { EmailEmptyState } from "../components/email-ops/EmailEmptyState";
@@ -30,14 +30,17 @@ export default function EmailMonitoringPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [lastRefresh, setLastRefresh] = useState("");
+  const inFlightRef = useRef(false);
 
   const load = useCallback(
     async ({ silent = false } = {}) => {
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       try {
         if (!silent) setLoading(true);
         else setRefreshing(true);
         setError("");
-        const res = await adminFetch("/api/admin/email-outbox?limit=5000");
+        const res = await adminFetch("/api/admin/email-outbox");
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "تعذر تحميل الطابور");
         setMetrics(data.metrics);
@@ -47,6 +50,7 @@ export default function EmailMonitoringPage() {
       } finally {
         setLoading(false);
         setRefreshing(false);
+        inFlightRef.current = false;
       }
     },
     [adminFetch]
@@ -56,7 +60,10 @@ export default function EmailMonitoringPage() {
     load();
   }, [load]);
 
-  useVisibilityRefresh(() => load({ silent: true }), 20000);
+  useVisibilityRefresh(() => load({ silent: true }), {
+    intervalMs: 20000,
+    singleFlight: true,
+  });
 
   const health = useMemo(() => deriveQueueHealth(metrics), [metrics]);
   const counts = metrics?.counts || {};

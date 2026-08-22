@@ -132,13 +132,14 @@ export default function EmailAnalyticsPage() {
   );
 
   useEffect(() => {
-    loadAnalytics({ syncResend: true });
+    loadAnalytics({ syncResend: false });
   }, []);
 
   useVisibilityRefresh(() => loadAnalytics({ silent: true }), {
     intervalMs: 30000,
     refreshOnVisible: false,
     refreshOnFocus: false,
+    singleFlight: true,
   });
 
   const statCards = useMemo(() => buildStatCards(summary), [summary]);
@@ -157,10 +158,6 @@ export default function EmailAnalyticsPage() {
     setAppliedFilters(DEFAULT_FILTERS);
     loadAnalytics({ silent: true, nextFilters: DEFAULT_FILTERS });
   };
-
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
 
   if (error) {
     return (
