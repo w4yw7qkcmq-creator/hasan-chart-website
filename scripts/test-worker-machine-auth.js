@@ -14,7 +14,6 @@ const machineAuth = require("../worker/lib/machine-auth.js");
 const workerSecurity = require("../worker/worker-security.js");
 const workerIndexSource = readFileSync("worker/index.js", "utf8");
 const workerSecuritySource = readFileSync("worker/worker-security.js", "utf8");
-const instantAnalysisWorkerSource = readFileSync("lib/instant-analysis-worker.js", "utf8");
 
 const ENV_BACKUP = { ...process.env };
 const TEST_PEPPER = "test-pepper-with-at-least-32-characters-long";
@@ -30,9 +29,9 @@ const PRICE_ALERT_GUARD_FILES = [
 
 const PRICE_ALERT_GUARD_MARKERS = {
   "worker/index.js": [
-    "async function checkPriceAlerts()",
+    "async function checkPriceAlerts(",
     "async function deliverRealPriceAlert(",
-    "setInterval(checkPriceAlerts, CHECK_INTERVAL_MS)",
+    "startPriceAlertScheduler",
   ],
   "worker/price-alert-email.js": ["sendPriceAlertEmail"],
   "worker/push-sender.js": ["sendPriceAlertPushNotifications"],
@@ -460,17 +459,7 @@ describe("verifyWorkerApiAccess dual mode", () => {
   });
 });
 
-describe("Website worker request headers", () => {
-  it("prefers machine identity headers by default in source", () => {
-    assert.match(instantAnalysisWorkerSource, /x-service-account-id/);
-    assert.match(instantAnalysisWorkerSource, /IAM_INSTANT_ANALYSIS_WORKER_SECRET/);
-  });
-
-  it("keeps legacy bearer fallback when machine secret missing", () => {
-    assert.match(instantAnalysisWorkerSource, /IAM_WORKER_LEGACY_FALLBACK/);
-    assert.match(instantAnalysisWorkerSource, /Authorization.*Bearer/);
-  });
-
+describe("Website worker security", () => {
   it("origin auth removed from worker security", () => {
     assert.doesNotMatch(workerSecuritySource, /mode:\s*"origin"/);
     assert.doesNotMatch(workerSecuritySource, /isAllowedBrowserOrigin\(req\)/);

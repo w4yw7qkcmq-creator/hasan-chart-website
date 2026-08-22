@@ -14,7 +14,6 @@ export const CHECKPOINTS = Object.freeze([
 
 export const PROBE_IDS = Object.freeze([
   "web-health",
-  "instant-analysis-health",
   "order-book",
   "news",
   "auth-gate",
@@ -46,7 +45,6 @@ export const FRESHNESS_RULES = Object.freeze({
 
 export const LATENCY_BASELINES = Object.freeze({
   "web-health": { warnMs: 800, criticalMs: 2000 },
-  "instant-analysis-health": { warnMs: 1000, criticalMs: 3000 },
   "order-book": { warnMs: 3000, criticalMs: 8000 },
   news: { warnMs: 1500, criticalMs: 5000 },
   "auth-gate": { warnMs: 1200, criticalMs: 4000 },
@@ -58,7 +56,6 @@ export const ORDER_BOOK_MIN_CONNECTED = 1;
 
 export const RUNBOOK_MAP = Object.freeze({
   "web-health": "continuous-verification.md",
-  "instant-analysis-health": "worker-down.md",
   "order-book": "order-book-degraded.md",
   news: "continuous-verification.md",
   "auth-gate": "auth-failure.md",

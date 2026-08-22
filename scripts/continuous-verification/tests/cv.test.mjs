@@ -28,7 +28,6 @@ describe("Continuous Verification mocks", () => {
   it("all probes pass → HEALTHY", async () => {
     const fetchJson = mockFetch({
       "/api/health": { res: { status: 200 }, data: { status: "ok", readiness: "ready", build: { commit: "abc1234" } } },
-      "/api/instant-analysis/health": { res: { status: 200 }, data: { status: "ok", configured: true } },
       "/api/market-depth/snapshot": {
         res: { status: 200 },
         data: { success: true, lastPrice: 1, bids: [1], asks: [1], connectedExchangeCount: 3 },
@@ -83,10 +82,10 @@ describe("Continuous Verification mocks", () => {
     assert.equal(verdict, "UNHEALTHY");
   });
 
-  it("AI Worker fail → P1", () => {
+  it("workers probe fail → P1", () => {
     const verdict = deriveCheckpointVerdict([
       { probe: "web-health", status: "PASS" },
-      { probe: "instant-analysis-health", status: "FAIL", priority: "P1" },
+      { probe: "workers", status: "FAIL", priority: "P1" },
     ]);
     assert.equal(verdict, "UNHEALTHY");
   });

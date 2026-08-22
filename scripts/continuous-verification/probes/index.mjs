@@ -1,5 +1,4 @@
 import { runWebHealth } from "./web-health.mjs";
-import { runInstantAnalysisHealth } from "./instant-analysis-health.mjs";
 import { runOrderBook } from "./order-book.mjs";
 import { runNews } from "./news.mjs";
 import { runAuthGate } from "./auth-gate.mjs";
@@ -15,7 +14,6 @@ export async function runIamHealth(ctx) {
 
 export const PROBE_REGISTRY = Object.freeze({
   "web-health": { id: "web-health", run: runWebHealth, network: true },
-  "instant-analysis-health": { id: "instant-analysis-health", run: runInstantAnalysisHealth, network: true },
   "order-book": { id: "order-book", run: runOrderBook, network: true },
   news: { id: "news", run: runNews, network: true },
   "auth-gate": { id: "auth-gate", run: runAuthGate, network: true },

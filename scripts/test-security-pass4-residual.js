@@ -18,7 +18,6 @@ assert.match(policy, /tradingview\.com/, "TradingView must remain allowed");
 
 const protectedRoutes = [
   "app/api/partner/withdraw/route.js",
-  "app/api/instant-analysis/route.js",
   "app/api/push/subscribe/route.js",
   "app/api/push/unsubscribe/route.js",
   "app/api/subscription-request/route.js",

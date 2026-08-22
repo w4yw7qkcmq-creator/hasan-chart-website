@@ -14,7 +14,7 @@ const modules = [
   "config.mjs", "env.mjs", "paths.mjs", "retry.mjs", "freshness.mjs",
   "scheduler.mjs", "runner.mjs", "report.mjs", "report-engine.mjs",
   "incidents.mjs", "timeline.mjs", "run.mjs",
-  "probes/index.mjs", "probes/web-health.mjs", "probes/instant-analysis-health.mjs",
+  "probes/index.mjs", "probes/web-health.mjs",
   "probes/order-book.mjs", "probes/news.mjs", "probes/auth-gate.mjs",
   "probes/workers.mjs", "probes/release-gate.mjs", "probes/operational-signals.mjs",
 ];
@@ -33,7 +33,7 @@ for (const s of ["cv:verify", "cv:run", "cv:run:production", "cv:checkpoint", "c
 
 try {
   const { CHECKPOINTS, PROBE_IDS } = await import("./config.mjs");
-  if (CHECKPOINTS.length === 6 && PROBE_IDS.length === 8) ok("checkpoint + probe registry");
+  if (CHECKPOINTS.length === 6 && PROBE_IDS.length === 7) ok("checkpoint + probe registry");
   else fail("checkpoint/probe count");
 } catch (e) { fail(e.message); }
 

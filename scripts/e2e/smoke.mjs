@@ -20,8 +20,6 @@ import { retryOnceOnTimeout } from "./retry.mjs";
 import {
   E2E_MARKERS,
   E2E_USER_USERNAME,
-  INSTANT_ANALYSIS_POLL_MS,
-  INSTANT_ANALYSIS_TIMEOUT_MS,
   ORDER_BOOK_POLL_MS,
   ORDER_BOOK_WARMUP_MS,
   SMOKE_JPEG,
@@ -66,22 +64,6 @@ function buildOrderBookQuery() {
     largeTradeThreshold: "50000",
   });
   return params.toString();
-}
-
-async function pollInstantAnalysisJob(client, jobId) {
-  const deadline = Date.now() + INSTANT_ANALYSIS_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const { res, data } = await client.json(`/api/instant-analysis/${encodeURIComponent(jobId)}`);
-    const status = String(data?.status || "").toLowerCase();
-    if (res.status === 200 && status === "completed" && data?.result) {
-      return data;
-    }
-    if (status === "failed") {
-      throw new Error(`instant analysis job failed: ${data?.error || "unknown"}`);
-    }
-    await sleep(INSTANT_ANALYSIS_POLL_MS);
-  }
-  throw new Error("instant analysis job timeout");
 }
 
 async function runSubscriptionUpload(client) {
@@ -214,10 +196,6 @@ async function checkMarketStream(base) {
     if (res.status !== 200 || data?.status !== "ok") {
       throw new Error(`/api/health ${res.status}`);
     }
-    const ia = await new HttpClient(BASE).json("/api/instant-analysis/health");
-    if (ia.res.status !== 200 || !ia.data?.configured) {
-      throw new Error(`/api/instant-analysis/health not configured`);
-    }
     return pass(`commit=${String(data?.build?.commit || "").slice(0, 7)} readiness=${data?.readiness}`);
   });
 
@@ -243,72 +221,6 @@ async function checkMarketStream(base) {
     const session = await userClient.session();
     if (!session.data?.authenticated) throw new Error("session lost");
     return pass("my-dashboard 200, session ok");
-  });
-
-  await reporter.runStep("instant-analysis", "Instant Analysis (1h BTCUSDT)", async () => {
-    if (!env.hasUserCredentials) return blocked("credentials missing");
-
-    const availability = await userClient.json("/api/instant-analysis/availability");
-    if (availability.res.status !== 200) {
-      throw new Error(`availability ${availability.res.status}`);
-    }
-
-    const allowed = availability.data?.allowed !== false;
-    if (!allowed && !env.instantAnalysisAllowPost) {
-      return verifyOnly(`cooldown active retryAfter=${availability.data?.retryAfterSeconds || "?"}s`);
-    }
-
-    if (!allowed) {
-      return verifyOnly("cooldown active — POST skipped (safety)");
-    }
-
-    const post = await userClient.json("/api/instant-analysis", {
-      method: "POST",
-      body: { symbol: "BTCUSDT", timeframe: "1h", source: "e2e-smoke" },
-    });
-
-    if (post.res.status === 429) {
-      return verifyOnly(`cooldown 429 retryAfter=${post.data?.retryAfterSeconds || "?"}`);
-    }
-
-    if (post.res.status !== 200 || !post.data?.success) {
-      throw new Error(`POST failed ${post.res.status} ${post.data?.code || post.data?.error || ""}`);
-    }
-
-    let result = post.data?.result;
-    const jobId = post.data?.jobId;
-
-    if (jobId) {
-      reporter.track("jobId", jobId);
-      const polled = await pollInstantAnalysisJob(userClient, jobId);
-      result = polled.result;
-    }
-
-    const tf =
-      result?.meta?.executionTimeframe ||
-      result?.result?.meta?.executionTimeframe ||
-      result?.executionTimeframe;
-    if (tf && tf !== "1h") {
-      throw new Error(`expected executionTimeframe=1h got ${tf}`);
-    }
-    if (!result) throw new Error("missing analysis result");
-
-    return pass(`job=${jobId || "inline"} tf=${tf || "1h"}`);
-  });
-
-  await reporter.runStep("cooldown", "Instant Analysis cooldown block", async () => {
-    if (!env.hasUserCredentials) return blocked("credentials missing");
-    const second = await userClient.json("/api/instant-analysis", {
-      method: "POST",
-      body: { symbol: "BTCUSDT", timeframe: "1h", source: "e2e-smoke" },
-    });
-    if (second.res.status === 429 || second.data?.code === "INSTANT_ANALYSIS_COOLDOWN") {
-      return pass(`blocked as expected retryAfter=${second.data?.retryAfterSeconds || "?"}`);
-    }
-    if (second.res.status === 200 && second.data?.success) {
-      return verifyOnly("second POST accepted — unexpected, review cooldown policy");
-    }
-    return pass(`status=${second.res.status}`);
   });
 
   await reporter.runStep("subscription-upload", "Subscription proof upload (E2E)", async () => {

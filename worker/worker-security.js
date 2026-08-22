@@ -176,34 +176,6 @@ function createWorkerCorsOptions() {
   };
 }
 
-const analysisRateLimitStore = new Map();
-const ANALYSIS_RATE_WINDOW_MS = 60_000;
-const ANALYSIS_RATE_MAX = 12;
-
-function getRequestIp(req) {
-  const forwarded = String(req.headers["x-forwarded-for"] || "")
-    .split(",")[0]
-    .trim();
-
-  return forwarded || req.socket?.remoteAddress || "unknown";
-}
-
-function checkInstantAnalysisRateLimit(req) {
-  const ip = getRequestIp(req);
-  const now = Date.now();
-  const entry = analysisRateLimitStore.get(ip) || { count: 0, resetAt: now + ANALYSIS_RATE_WINDOW_MS };
-
-  if (now > entry.resetAt) {
-    entry.count = 0;
-    entry.resetAt = now + ANALYSIS_RATE_WINDOW_MS;
-  }
-
-  entry.count += 1;
-  analysisRateLimitStore.set(ip, entry);
-
-  return entry.count <= ANALYSIS_RATE_MAX;
-}
-
 async function workerAccessDeniedMiddleware(req, res, next) {
   try {
     const auth = await verifyWorkerApiAccess(req);
@@ -225,22 +197,10 @@ async function workerAccessDeniedMiddleware(req, res, next) {
   }
 }
 
-function instantAnalysisRateLimitMiddleware(req, res, next) {
-  if (!checkInstantAnalysisRateLimit(req)) {
-    return res.status(429).json({
-      success: false,
-      error: "Too many analysis requests. Try again later.",
-    });
-  }
-
-  return next();
-}
-
 module.exports = {
   createWorkerCorsOptions,
   verifyWorkerApiAccess,
   workerAccessDeniedMiddleware,
-  instantAnalysisRateLimitMiddleware,
   getAllowedOrigins,
   getWorkerAuthMetrics,
   resetWorkerAuthMetrics,

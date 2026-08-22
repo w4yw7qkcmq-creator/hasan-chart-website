@@ -31,7 +31,7 @@ export function deriveCheckpointVerdict(probeResults) {
   const fails = probeResults.filter((r) => r.status === "FAIL");
   const warns = probeResults.filter((r) => r.status === "WARN" || r.latencyPriority === "P2");
   const p0 = fails.some((r) => r.priority === "P0" || r.probe === "web-health" || r.probe === "auth-gate");
-  const p1 = fails.some((r) => r.priority === "P1" || ["order-book", "news", "workers", "instant-analysis-health", "release-gate"].includes(r.probe));
+  const p1 = fails.some((r) => r.priority === "P1" || ["order-book", "news", "workers", "release-gate"].includes(r.probe));
 
   if (p0) return "UNHEALTHY";
   if (p1 || fails.length >= 2) return "UNHEALTHY";

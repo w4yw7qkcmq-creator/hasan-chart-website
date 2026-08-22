@@ -98,7 +98,6 @@ const menuGroups = [
     defaultOpen: true,
     items: [
       { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
-      { href: "/my-dashboard#instant-analysis", icon: "📈", label: "تحليل لحظي", auth: true },
       { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
       { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات", auth: true },
     ],

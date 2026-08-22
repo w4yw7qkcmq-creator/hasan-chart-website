@@ -90,7 +90,6 @@ function probePriority(probeId) {
   const map = {
     "web-health": "P0",
     "auth-gate": "P0",
-    "instant-analysis-health": "P1",
     workers: "P1",
     "order-book": "P1",
     news: "P1",

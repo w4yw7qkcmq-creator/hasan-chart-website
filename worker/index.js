@@ -17,7 +17,6 @@ const cors = require("cors");
 const {
   createWorkerCorsOptions,
   workerAccessDeniedMiddleware,
-  instantAnalysisRateLimitMiddleware,
 } = require("./worker-security");
 const { redactLogMeta } = require("./log-redaction");
 
@@ -32,31 +31,13 @@ const {
   getChannelFeatureFlags,
   DEFAULT_MAX_ALERTS_PER_RUN,
 } = require("./alerts/price-alerts-env");
-const {
-  isAiWorkerPrimaryMode,
-  validateAiWorkerEnvironment,
-} = require("./ai/ai-worker-env");
-const {
-  createJob,
-  getJob,
-  jobRowToStatusPayload,
-  recoverStaleJobs,
-  getRecoveryMetrics,
-} = require("./lib/instant-analysis-job-store");
-const { processInstantAnalysisJob } = require("./lib/instant-analysis-processor");
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
-const openaiApiKey = process.env.OPENAI_API_KEY;
 
-const AI_WORKER_PRIMARY = isAiWorkerPrimaryMode();
-const environmentValidation = AI_WORKER_PRIMARY
-  ? validateAiWorkerEnvironment()
-  : validatePriceAlertsEnvironment();
-const CHECK_INTERVAL_MS = AI_WORKER_PRIMARY
-  ? 0
-  : environmentValidation.checkIntervalMs || resolveCheckIntervalMs();
+const environmentValidation = validatePriceAlertsEnvironment();
+const CHECK_INTERVAL_MS = environmentValidation.checkIntervalMs || resolveCheckIntervalMs();
 const MAX_ALERTS_PER_RUN =
   environmentValidation.maxAlertsPerRun ||
   Number(process.env.PRICE_ALERT_MAX_ALERTS_PER_RUN) ||
@@ -85,20 +66,16 @@ if (!configurationReady) {
     invalidRequiredCount: environmentValidation.invalidRequiredCount,
     missing: environmentValidation.missingRequired,
     invalid: environmentValidation.invalidRequired,
-    workerMode: AI_WORKER_PRIMARY ? "ai" : "price_alerts",
+    workerMode: "price_alerts",
   };
-  if (AI_WORKER_PRIMARY) {
-    console.error("AI_WORKER_MISCONFIGURED", JSON.stringify(misconfiguredPayload));
-  } else {
-    console.error(
-      "PRICE_ALERT_WORKER_MISCONFIGURED",
-      JSON.stringify({
-        ...misconfiguredPayload,
-        channelFlags: environmentValidation.channelFlags,
-        dependencies: environmentValidation.dependencies,
-      })
-    );
-  }
+  console.error(
+    "PRICE_ALERT_WORKER_MISCONFIGURED",
+    JSON.stringify({
+      ...misconfiguredPayload,
+      channelFlags: environmentValidation.channelFlags,
+      dependencies: environmentValidation.dependencies,
+    })
+  );
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -147,9 +124,7 @@ const {
 const { startPriceAlertScheduler, getProcessMetadata } = require("./lib/price-alert-scheduler");
 const { processRetryableDeliveries } = require("./lib/price-alert-retry-processor");
 
-const channelFeatureFlags = AI_WORKER_PRIMARY
-  ? { site: false, push: false, email: false }
-  : environmentValidation.channelFlags || getChannelFeatureFlags();
+const channelFeatureFlags = environmentValidation.channelFlags || getChannelFeatureFlags();
 const processMetadata = getProcessMetadata();
 
 const WORKER_ENTRY = "worker/index.js";
@@ -395,56 +370,6 @@ const formatNumber = (value) => {
 };
 
 
-const getMarketPrice = async (symbol) => {
-  const quote = await fetchOkxTicker(symbol);
-  if (!quote.ok) {
-    throw new Error(quote.reason === "stale_price" ? "STALE_PRICE" : `تعذر جلب سعر ${normalizeSymbol(symbol)} من OKX`);
-  }
-  return quote.price;
-};
-
-const getMarketCandles = async (symbol, bar = "15m", limit = 120) => {
-  const cleanSymbol = normalizeSymbol(symbol);
-
-  if (!cleanSymbol) {
-    throw new Error("EMPTY_SYMBOL");
-  }
-
-  const okxSymbol = normalizeOkxInstrument(symbol);
-  const response = await fetch(
-    `https://www.okx.com/api/v5/market/candles?instId=${encodeURIComponent(okxSymbol)}&bar=${encodeURIComponent(bar)}&limit=${encodeURIComponent(String(limit))}`
-  );
-
-  console.log("OKX_PRICE_FETCH_ATTEMPT", {
-    coin: symbol,
-    okxSymbol,
-    status: response.status,
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok || data?.code !== "0" || !Array.isArray(data?.data)) {
-    throw new Error(`تعذر جلب شموع ${cleanSymbol} من OKX`);
-  }
-
-  return data.data
-    .map((item) => ({
-      time: Number(item[0]),
-      open: Number(item[1]),
-      high: Number(item[2]),
-      low: Number(item[3]),
-      close: Number(item[4]),
-      volume: Number(item[5]),
-    }))
-    .filter((candle) =>
-      Number.isFinite(candle.time) &&
-      Number.isFinite(candle.open) &&
-      Number.isFinite(candle.high) &&
-      Number.isFinite(candle.low) &&
-      Number.isFinite(candle.close)
-    )
-    .reverse();
-};
 
 async function resolvePriceAlertRecipientEmail({ userEmail, userId }) {
   const fromAlert = String(userEmail || "").trim().toLowerCase();
@@ -1380,43 +1305,6 @@ app.get("/health", async (_req, res) => {
     ? process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7)
     : null;
 
-  if (AI_WORKER_PRIMARY) {
-    const { getAiWorkerMetrics } = require("./lib/ai-worker-metrics");
-    const aiValidation = validateAiWorkerEnvironment();
-    const readiness = aiValidation.ok && startupReady;
-    const workerAuth = getWorkerAuthMetrics();
-
-    const body = {
-      success: readiness,
-      status: readiness ? "online" : "misconfigured",
-      readiness,
-      service: "hasan-chart-ai-worker",
-      runtimeMode: process.env.NODE_ENV || "production",
-      environmentValidation: {
-        ok: aiValidation.ok,
-        missingRequiredCount: aiValidation.missingRequiredCount,
-        invalidRequiredCount: aiValidation.invalidRequiredCount,
-      },
-      machineAuth: {
-        configured: workerAuth.machineAuthConfigured,
-        serviceAccountId: aiValidation.machineAuth.serviceAccountId,
-        legacyFallbackEnabled: aiValidation.machineAuth.legacyFallbackEnabled,
-      },
-      dependencies: aiValidation.dependencies,
-      runtime: {
-        ...aiValidation.runtime,
-        activeJobs: getAiWorkerMetrics().activeJobs,
-        queueDepth: getAiWorkerMetrics().activeJobs,
-      },
-      metrics: getAiWorkerMetrics(),
-      build: { commit: buildCommit },
-      workerEntry: WORKER_ENTRY,
-      timestamp: new Date().toISOString(),
-    };
-
-    return res.status(readiness ? 200 : 503).json(body);
-  }
-
   const vapidStatus = getVapidEnvStatus();
   const priceValidation = validatePriceAlertsEnvironment();
   const readiness = priceValidation.ok && isPriceAlertWorkerEnabled();
@@ -1458,266 +1346,85 @@ app.get("/health", async (_req, res) => {
   res.status(readiness ? 200 : 503).json(body);
 });
 
-app.post(
-  "/api/instant-analysis",
-  workerAccessDeniedMiddleware,
-  instantAnalysisRateLimitMiddleware,
-  async (req, res) => {
-  if (!configurationReady) {
-    return res.status(503).json({
-      success: false,
-      code: "WORKER_NOT_READY",
-      error: "Worker is not ready to accept analysis jobs.",
-    });
-  }
-
-  const { markJobQueued, markJobCompleted, markJobFailed } = require("./lib/ai-worker-metrics");
-  const { getInstanceId } = require("./lib/price-alert-distributed-lock");
-
-  try {
-    const symbol = normalizeSymbol(req.body?.symbol);
-
-    if (!symbol) {
-      return res.status(400).json({
-        success: false,
-        error: "رمز العملة مطلوب",
-      });
-    }
-
-    const { resolveExecutionTimeframeInput } = require("./lib/instant-analysis-v2/constants");
-    const timeframeResolution = resolveExecutionTimeframeInput(
-      req.body?.executionTimeframe || req.body?.timeframe
-    );
-
-    if (!timeframeResolution.ok) {
-      return res.status(400).json({
-        success: false,
-        code: timeframeResolution.code,
-        error: timeframeResolution.message,
-      });
-    }
-
-    const resolvedExecutionTimeframe = timeframeResolution.key;
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const requestId = req.body?.requestId || req.body?.request_id || null;
-    const supabase = getSupabaseClient();
-    const created = await createJob(supabase, {
-      jobId,
-      symbol,
-      executionTimeframe: resolvedExecutionTimeframe,
-      requestId,
-    });
-
-    if (!created.ok) {
-      return res.status(500).json({
-        success: false,
-        code: created.code || "JOB_CREATE_FAILED",
-        error: "تعذر إنشاء مهمة التحليل.",
-      });
-    }
-
-    markJobQueued();
-    const ownerId = getInstanceId();
-    const authMode =
-      req.headers["x-service-account-id"] && req.headers["x-service-account-secret"]
-        ? "machine"
-        : req.headers.authorization
-          ? "legacy"
-          : "none";
-
-    process.nextTick(() => {
-      processInstantAnalysisJob({
-        supabase,
-        jobId,
-        symbol,
-        executionTimeframe: resolvedExecutionTimeframe,
-        requestId,
-        ownerId,
-        openaiApiKey,
-        fetchCandles: getMarketCandles,
-        fetchPrice: getMarketPrice,
-        authMode,
-        deploymentId: processMetadata.deploymentId,
-        buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || null,
-        markJobCompleted,
-        markJobFailed,
-      }).catch((error) => {
-        console.error(
-          "INSTANT_ANALYSIS_JOB_UNHANDLED",
-          JSON.stringify({ jobId, reason: String(error?.message || error).slice(0, 120) })
-        );
-      });
-    });
-
-    return res.json({
-      success: true,
-      queued: true,
-      jobId,
-      existing: Boolean(created.existing),
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: error?.message || "SERVER_ERROR",
-    });
-  }
-  }
-);
-
-app.get(
-  "/api/instant-analysis/:jobId",
-  workerAccessDeniedMiddleware,
-  async (req, res) => {
-  try {
-    const jobId = String(req.params?.jobId || "").trim();
-    const supabase = getSupabaseClient();
-    const job = await getJob(supabase, jobId);
-    const payload = jobRowToStatusPayload(job);
-
-    if (!payload) {
-      return res.status(404).json({
-        success: false,
-        error: "JOB_NOT_FOUND",
-      });
-    }
-
-    return res.json({
-      success: true,
-      ...payload,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: error?.message || "SERVER_ERROR",
-    });
-  }
-  }
-);
-
 app.listen(PORT, () => {
-  if (AI_WORKER_PRIMARY) {
-    console.log(
-      "ai_worker_startup_validated",
-      JSON.stringify({
-        workerEnabled: true,
-        maxConcurrency: environmentValidation.runtime?.maxConcurrency,
-        jobTimeoutMs: environmentValidation.runtime?.jobTimeoutMs,
-        machineAuth: environmentValidation.machineAuth,
-        dependencies: environmentValidation.dependencies,
-        instanceId: getInstanceId(),
-      })
-    );
-  } else {
-    const vapidStatus = getVapidEnvStatus();
+  const vapidStatus = getVapidEnvStatus();
 
-    if (!vapidStatus.configured) {
-      console.log("push:vapid:missing", {
-        worker: WORKER_ENTRY,
-        ...vapidStatus,
-        hint: "Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT on Railway worker",
-      });
-    } else {
-      console.log("push:vapid:ready", {
-        worker: WORKER_ENTRY,
-        hasPublicKey: vapidStatus.hasPublicKey,
-        hasPrivateKey: vapidStatus.hasPrivateKey,
-        hasSubject: vapidStatus.hasSubject,
-        subjectPreview: vapidStatus.subjectPreview,
-      });
-    }
+  if (!vapidStatus.configured) {
+    console.log("push:vapid:missing", {
+      worker: WORKER_ENTRY,
+      ...vapidStatus,
+      hint: "Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT on Railway worker",
+    });
+  } else {
+    console.log("push:vapid:ready", {
+      worker: WORKER_ENTRY,
+      hasPublicKey: vapidStatus.hasPublicKey,
+      hasPrivateKey: vapidStatus.hasPrivateKey,
+      hasSubject: vapidStatus.hasSubject,
+      subjectPreview: vapidStatus.subjectPreview,
+    });
   }
 
-  if (!AI_WORKER_PRIMARY) {
-    const vapidStatus = getVapidEnvStatus();
-    logWorkerEvent("PRICE_ALERT_WORKER_STARTED", {
-      worker: WORKER_ENTRY,
-      service: "hasan-chart-price-alerts-worker",
-      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+  logWorkerEvent("PRICE_ALERT_WORKER_STARTED", {
+    worker: WORKER_ENTRY,
+    service: "hasan-chart-price-alerts-worker",
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    port: PORT,
+    checkIntervalMs: CHECK_INTERVAL_MS,
+    priceAlertsEnabled: true,
+    webPushConfigured: vapidStatus.configured,
+    vapidStatus,
+    note: "Price alert delivery: worker/index.js deliverRealPriceAlert (notification + push + email)",
+  });
+
+  logWorkerEvent("WORKER_BOOT", {
+    worker: WORKER_ENTRY,
+    service: "hasan-chart-price-alerts-worker",
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    port: PORT,
+    checkIntervalMs: CHECK_INTERVAL_MS,
+    priceAlertsEnabled: true,
+    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
+    note: "Price alerts: worker/index.js deliverRealPriceAlert only",
+  });
+
+  console.log(
+    "PRICE_ALERT_SINGLE_PATH",
+    JSON.stringify({
+      phase: "worker-listening",
+      path: PRICE_ALERT_SINGLE_PATH,
       port: PORT,
       checkIntervalMs: CHECK_INTERVAL_MS,
-      priceAlertsEnabled: true,
-      webPushConfigured: vapidStatus.configured,
-      vapidStatus,
-      note: "Price alert delivery: worker/index.js deliverRealPriceAlert (notification + push + email)",
-    });
-
-    logWorkerEvent("WORKER_BOOT", {
-      worker: WORKER_ENTRY,
-      service: "hasan-chart-price-alerts-worker",
       moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-      port: PORT,
-      checkIntervalMs: CHECK_INTERVAL_MS,
-      priceAlertsEnabled: true,
-      priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
-      note: "Price alerts: worker/index.js deliverRealPriceAlert only",
-    });
+    })
+  );
 
-    console.log(
-      "PRICE_ALERT_SINGLE_PATH",
-      JSON.stringify({
-        phase: "worker-listening",
-        path: PRICE_ALERT_SINGLE_PATH,
-        port: PORT,
-        checkIntervalMs: CHECK_INTERVAL_MS,
-        moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-      })
-    );
-
-    cleanupOldRuns(getSupabaseClient)
-      .then((result) => {
-        if (result.ok) {
-          console.log(
-            "PRICE_ALERT_TELEMETRY_CLEANUP",
-            JSON.stringify({ deleted: result.deleted, retentionDays: result.retentionDays })
-          );
-        }
-      })
-      .catch(() => {});
-
-    if (isPriceAlertWorkerEnabled() && configurationReady) {
-      startPriceAlertScheduler({
-        intervalMs: CHECK_INTERVAL_MS,
-        enabled: true,
-        runCycle: ({ triggerSource }) => checkPriceAlerts({ triggerSource }),
-      });
-    }
-
-    logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
-      worker: WORKER_ENTRY,
-      moduleVersion: PRICE_ALERTS_MODULE_VERSION,
-      intervalMs: CHECK_INTERVAL_MS,
-      priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
-      enabled: isPriceAlertWorkerEnabled(),
-      processStartedAt: processMetadata.processStartedAt,
-      deploymentId: processMetadata.deploymentId,
-    });
-  } else {
-    recoverStaleJobs(getSupabaseClient())
-      .then((result) => {
+  cleanupOldRuns(getSupabaseClient)
+    .then((result) => {
+      if (result.ok) {
         console.log(
-          "AI_WORKER_STARTUP_RECOVERY",
-          JSON.stringify({
-            ok: result.ok,
-            requeued: result.requeued || 0,
-            timedOut: result.timed_out || 0,
-            metrics: getRecoveryMetrics(),
-          })
+          "PRICE_ALERT_TELEMETRY_CLEANUP",
+          JSON.stringify({ deleted: result.deleted, retentionDays: result.retentionDays })
         );
-      })
-      .catch((error) => {
-        console.warn(
-          "AI_WORKER_STARTUP_RECOVERY_FAILED",
-          JSON.stringify({ reason: String(error?.message || error).slice(0, 120) })
-        );
-      });
+      }
+    })
+    .catch(() => {});
 
-    console.log(
-      "AI_WORKER_LISTENING",
-      JSON.stringify({
-        port: PORT,
-        service: "hasan-chart-ai-worker",
-        deploymentId: processMetadata.deploymentId,
-      })
-    );
+  if (isPriceAlertWorkerEnabled() && configurationReady) {
+    startPriceAlertScheduler({
+      intervalMs: CHECK_INTERVAL_MS,
+      enabled: true,
+      runCycle: ({ triggerSource }) => checkPriceAlerts({ triggerSource }),
+    });
   }
+
+  logWorkerEvent("PRICE_ALERTS_SCHEDULER_STARTED", {
+    worker: WORKER_ENTRY,
+    moduleVersion: PRICE_ALERTS_MODULE_VERSION,
+    intervalMs: CHECK_INTERVAL_MS,
+    priceAlertSinglePath: PRICE_ALERT_SINGLE_PATH,
+    enabled: isPriceAlertWorkerEnabled(),
+    processStartedAt: processMetadata.processStartedAt,
+    deploymentId: processMetadata.deploymentId,
+  });
 });

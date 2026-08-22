@@ -6,9 +6,7 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const shellPath = join(root, "app/components/RootLayoutShell.js");
-const indexPath = join(root, "worker/index.js");
 const shell = readFileSync(shellPath, "utf8");
-const worker = readFileSync(indexPath, "utf8");
 
 const MAX_LINE_LENGTH = 1000;
 
@@ -39,21 +37,6 @@ test("RootLayoutShell does not comment-swallow function tail", () => {
   assert.doesNotMatch(
     shell,
     /\/\/[^\n]*useEffect\(\(\)\s*=>\s*\{[^\n]*logoutAndRedirect/
-  );
-});
-
-test("AI Worker binds getJob at module scope", () => {
-  assert.match(
-    worker,
-    /const\s*\{[^}]*getJob[^}]*jobRowToStatusPayload[^}]*\}\s*=\s*require\("\.\/lib\/instant-analysis-job-store"\);/
-  );
-  const getBlock = worker.slice(
-    worker.indexOf('app.get(\n  "/api/instant-analysis/:jobId"'),
-    worker.indexOf('app.listen(')
-  );
-  assert.doesNotMatch(
-    getBlock.slice(0, getBlock.indexOf("async (req, res)")),
-    /require\("\.\/lib\/instant-analysis-job-store"\)/
   );
 });
 
