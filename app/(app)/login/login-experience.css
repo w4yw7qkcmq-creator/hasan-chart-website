@@ -1,0 +1,79 @@
+/* Login Experience — Premium Fintech UI (client-only styling) */
+
+.login-input {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus,
+.login-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.97) inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.login-input:-moz-autofill {
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.97) inset !important;
+  -moz-text-fill-color: #0f172a !important;
+}
+
+@keyframes login-chart-draw {
+  from {
+    stroke-dashoffset: 1200;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes login-chart-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.login-market-chart__line {
+  stroke-dasharray: 1200;
+  animation: login-chart-draw 4s ease-out forwards;
+}
+
+.login-market-chart__glow {
+  animation: login-chart-glow 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-market-chart__line,
+  .login-market-chart__glow {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 0.4;
+  }
+
+  .login-card-hover,
+  .login-feature-card {
+    transition: none !important;
+  }
+}
+
+.login-spinner {
+  animation: login-spin 0.75s linear infinite;
+}
+
+@keyframes login-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-spinner {
+    animation: none;
+    opacity: 0.7;
+  }
+}

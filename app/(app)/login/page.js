@@ -1,8 +1,10 @@
 "use client";
 
 import "../../components/admin-access-loading.css";
+import "./login-experience.css";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { devLog } from "../../../lib/dev-log";
 import { isAdminUser } from "../../../lib/admin-emails";
 import { applyClientSession } from "../../../lib/auth-session-client";
@@ -11,26 +13,191 @@ import { useAppModal } from "../../components/AppModalProvider";
 import { useAuth } from "../../components/AuthProvider";
 
 function BrandMark({ size = "lg" }) {
-  const box = size === "sm" ? "h-16 w-16" : "h-24 w-24";
-  const textSize = size === "sm" ? "text-lg" : "text-2xl";
+  const box = size === "sm" ? "h-14 w-14 rounded-[22px]" : "h-20 w-20 rounded-[26px]";
+  const textSize = size === "sm" ? "text-base" : "text-xl";
 
   return (
-    <div className={`${box} relative grid place-items-center overflow-hidden rounded-[28px] border border-cyan-300/30 bg-gradient-to-br from-[#0b63ff]/35 via-[#00a3ff]/15 to-[#020617] shadow-[0_0_50px_rgba(0,163,255,0.35)]`}>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(125,211,252,0.45),transparent_35%)]" />
-      <div className="absolute bottom-0 left-0 h-1/2 w-full bg-gradient-to-t from-cyan-400/15 to-transparent" />
+    <div
+      className={`${box} relative grid place-items-center overflow-hidden border border-cyan-300/25 bg-gradient-to-br from-[#0b63ff]/40 via-[#00a3ff]/20 to-[#020617] shadow-[0_0_40px_rgba(0,163,255,0.28)]`}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(125,211,252,0.4),transparent_38%)]" />
       <div className="relative z-10 flex flex-col items-center leading-none">
-        <div className="relative mb-1 h-8 w-12">
-          <span className="absolute bottom-0 right-0 h-4 w-2 rounded bg-cyan-300" />
-          <span className="absolute bottom-0 right-4 h-6 w-2 rounded bg-blue-400" />
-          <span className="absolute bottom-0 right-8 h-8 w-2 rounded bg-white" />
-          <svg viewBox="0 0 80 50" className="absolute -top-1 right-0 h-10 w-14" fill="none">
+        <div className="relative mb-1 h-7 w-10">
+          <span className="absolute bottom-0 end-0 h-3.5 w-1.5 rounded bg-cyan-300" />
+          <span className="absolute bottom-0 end-3.5 h-5 w-1.5 rounded bg-blue-400" />
+          <span className="absolute bottom-0 end-7 h-7 w-1.5 rounded bg-white" />
+          <svg viewBox="0 0 80 50" className="absolute -top-0.5 end-0 h-8 w-12" fill="none" aria-hidden="true">
             <path d="M6 38 L26 24 L40 31 L68 8" stroke="white" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M55 7 H69 V21" stroke="white" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <span className={`${textSize} font-black tracking-tight text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.45)]`}>HC</span>
+        <span className={`${textSize} font-black tracking-tight text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.4)]`}>HC</span>
       </div>
     </div>
+  );
+}
+
+function IconEye({ className = "h-5 w-5" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function IconEyeOff({ className = "h-5 w-5" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-10-8-10-8a18.45 18.45 0 015.06-5.94" strokeLinecap="round" />
+      <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 10 8 10 8a18.5 18.5 0 01-4.87 5.44" strokeLinecap="round" />
+      <path d="M1 1l22 22" strokeLinecap="round" />
+      <path d="M14.12 14.12a3 3 0 11-4.24-4.24" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconLock({ className = "h-4 w-4" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 118 0v3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconTrending({ className = "h-5 w-5" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M3 17l6-6 4 4 8-10" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 5h7v7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconChart({ className = "h-5 w-5" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M4 19V5M4 19h16" strokeLinecap="round" />
+      <path d="M8 15v-4M12 15V9M16 15v-6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconBell({ className = "h-5 w-5" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13.73 21a2 2 0 01-3.46 0" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function LoginSpinner({ className = "h-5 w-5" }) {
+  return (
+    <svg className={`login-spinner ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+      <path d="M12 3a9 9 0 019 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MarketChartVisual() {
+  return (
+    <div className="pointer-events-none relative mx-auto w-full max-w-lg" aria-hidden="true">
+      <div className="login-market-chart__glow absolute inset-0 rounded-[32px] bg-gradient-to-t from-cyan-400/10 via-blue-500/5 to-transparent blur-2xl" />
+      <svg viewBox="0 0 480 160" className="relative w-full text-cyan-300/70" fill="none">
+        <defs>
+          <linearGradient id="login-chart-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(34,211,238,0.18)" />
+            <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+          </linearGradient>
+        </defs>
+        {[40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440].map((x) => (
+          <line key={x} x1={x} y1="20" x2={x} y2="140" stroke="rgba(148,163,184,0.08)" strokeWidth="1" />
+        ))}
+        {[40, 70, 100, 130].map((y) => (
+          <line key={y} x1="30" y1={y} x2="450" y2={y} stroke="rgba(148,163,184,0.06)" strokeWidth="1" />
+        ))}
+        <path
+          d="M30 120 L70 108 L110 112 L150 88 L190 92 L230 68 L270 72 L310 48 L350 56 L390 36 L430 42 L450 28"
+          fill="url(#login-chart-fill)"
+          stroke="none"
+        />
+        <path
+          className="login-market-chart__line"
+          d="M30 120 L70 108 L110 112 L150 88 L190 92 L230 68 L270 72 L310 48 L350 56 L390 36 L430 42 L450 28"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="450" cy="28" r="4" fill="rgba(34,211,238,0.85)" />
+      </svg>
+    </div>
+  );
+}
+
+function FeatureCard({ icon: Icon, title, description }) {
+  return (
+    <article className="login-feature-card group rounded-[22px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md transition duration-200 hover:border-cyan-300/25 hover:bg-white/[0.07] md:p-5">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200 transition group-hover:border-cyan-300/35 group-hover:text-cyan-100">
+        <Icon className="h-5 w-5" />
+      </div>
+      <h3 className="text-sm font-bold text-white md:text-base">{title}</h3>
+      <p className="mt-1 text-xs leading-relaxed text-slate-400 md:text-sm">{description}</p>
+    </article>
+  );
+}
+
+function MarketingPanel({ compact = false }) {
+  if (compact) {
+    return (
+      <div className="mb-5 rounded-[24px] border border-cyan-300/15 bg-gradient-to-br from-[#0b63ff]/15 via-[#07142f]/80 to-[#020617]/90 px-4 py-4 text-center backdrop-blur-xl md:mb-6 md:px-6">
+        <p className="text-sm font-bold text-white md:text-base">منصة واحدة. رؤية أوضح للسوق.</p>
+        <p className="mt-1 text-xs text-slate-400 md:text-sm">الأسعار المباشرة، التحليلات، التنبيهات والأخبار المالية في تجربة واحدة.</p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="relative flex flex-col overflow-hidden rounded-[32px] border border-cyan-300/15 bg-gradient-to-br from-[#0b63ff]/18 via-[#07142f]/92 to-[#020617]/96 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur-2xl md:p-8 lg:p-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(37,99,235,0.35),transparent_38%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.12),transparent_32%)]" />
+      <div className="pointer-events-none absolute -start-24 top-16 h-64 w-64 rounded-full bg-blue-600/15 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-10 end-10 h-72 w-72 rounded-full bg-cyan-400/8 blur-3xl" />
+
+      <div className="relative z-10 flex flex-1 flex-col">
+        <div className="flex items-center gap-3">
+          <BrandMark size="sm" />
+          <div>
+            <p className="text-lg font-black text-white md:text-xl">HasaN CharT World</p>
+            <p className="text-xs text-slate-400 md:text-sm">Trading Intelligence Platform</p>
+          </div>
+        </div>
+
+        <div className="my-8 lg:my-10">
+          <span className="inline-flex rounded-full border border-blue-300/20 bg-blue-500/12 px-3 py-1.5 text-xs font-bold text-blue-200 md:text-sm">
+            تجربة سوق متكاملة
+          </span>
+          <h1 className="mt-5 max-w-xl text-2xl font-black leading-tight tracking-tight text-white md:text-3xl lg:text-4xl xl:text-[2.6rem] xl:leading-[1.15]">
+            منصة واحدة. رؤية أوضح للسوق.
+          </h1>
+          <p className="mt-4 max-w-lg text-sm leading-7 text-slate-300 md:text-base md:leading-8">
+            الأسعار المباشرة، التحليلات، التنبيهات والأخبار المالية في تجربة واحدة.
+          </p>
+        </div>
+
+        <div className="mb-8 lg:mb-10">
+          <MarketChartVisual />
+        </div>
+
+        <div className="mt-auto grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          <FeatureCard icon={IconTrending} title="Live Markets" description="تحركات السوق لحظيًا" />
+          <FeatureCard icon={IconChart} title="Smart Analysis" description="أدوات تحليل متقدمة" />
+          <FeatureCard icon={IconBell} title="24/7 Alerts" description="تنبيهات لا تتوقف" />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -159,9 +326,11 @@ export default function LoginPage() {
   const { authResolved, user, acknowledgeSignIn, status } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReady, setTurnstileReady] = useState(false);
   const [turnstileRequired, setTurnstileRequired] = useState(false);
@@ -226,23 +395,16 @@ export default function LoginPage() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail || !password) {
-      showAppModal({
-        type: "warning",
-        title: "بيانات ناقصة",
-        message: "اكتب البريد الإلكتروني وكلمة المرور",
-      });
+      setFormError("اكتب البريد الإلكتروني وكلمة المرور");
       return;
     }
 
     if (turnstileRequired && TURNSTILE_SITE_KEY && !turnstileToken) {
-      showAppModal({
-        type: "warning",
-        title: "تحقق أمني مطلوب",
-        message: "يرجى تأكيد أنك لست روبوت قبل تسجيل الدخول",
-      });
+      setFormError("يرجى تأكيد أنك لست روبوت قبل تسجيل الدخول");
       return;
     }
 
+    setFormError("");
     setLoading(true);
 
     try {
@@ -264,14 +426,7 @@ export default function LoginPage() {
             ? `${error.message} يمكنك المحاولة مجددًا بعد ${error.retryAfterSeconds} ثانية.`
             : error?.message || "بيانات الدخول غير صحيحة";
 
-        showAppModal({
-          type: "error",
-          title:
-            error?.code === "AUTH_RATE_LIMITED"
-              ? "محاولات كثيرة"
-              : "فشل تسجيل الدخول",
-          message: rateLimitMessage,
-        });
+        setFormError(rateLimitMessage);
         setTurnstileToken("");
         if (window.turnstile && turnstileWidgetId.current !== null) {
           window.turnstile.reset(turnstileWidgetId.current);
@@ -287,11 +442,7 @@ export default function LoginPage() {
       const applied = await applyClientSession(data.session);
 
       if (!applied.ok || !applied.user) {
-        showAppModal({
-          type: "error",
-          title: "فشل تسجيل الدخول",
-          message: "تعذر تفعيل الجلسة بعد تسجيل الدخول. جرّب مرة ثانية.",
-        });
+        setFormError("تعذر تفعيل الجلسة بعد تسجيل الدخول. جرّب مرة ثانية.");
         setTurnstileToken("");
         if (window.turnstile && turnstileWidgetId.current !== null) {
           window.turnstile.reset(turnstileWidgetId.current);
@@ -311,30 +462,18 @@ export default function LoginPage() {
         if (window.turnstile && turnstileWidgetId.current !== null) {
           window.turnstile.reset(turnstileWidgetId.current);
         }
-        showAppModal({
-          type: "warning",
-          title: "تحقق أمني مطلوب",
-          message: "لأسباب أمنية، أكمل التحقق ثم حاول تسجيل الدخول مرة أخرى.",
-        });
+        setFormError("لأسباب أمنية، أكمل التحقق ثم حاول تسجيل الدخول مرة أخرى.");
         return;
       }
       devLog("[LOGIN] catch", err?.message || err);
 
       if (err?.message === "SIGN_IN_TIMEOUT") {
-        showAppModal({
-          type: "error",
-          title: "تعذر تسجيل الدخول",
-          message: SIGN_IN_TIMEOUT_MESSAGE,
-        });
+        setFormError(SIGN_IN_TIMEOUT_MESSAGE);
         return;
       }
 
       console.error("Login error:", err);
-      showAppModal({
-        type: "error",
-        title: "فشل تسجيل الدخول",
-        message: "حدث خطأ أثناء تسجيل الدخول. جرّب مرة ثانية.",
-      });
+      setFormError("حدث خطأ أثناء تسجيل الدخول. جرّب مرة ثانية.");
       setTurnstileToken("");
       if (window.turnstile && turnstileWidgetId.current !== null) {
         window.turnstile.reset(turnstileWidgetId.current);
@@ -411,131 +550,158 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen w-full overflow-hidden bg-[#020617] text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(0,102,255,0.42),transparent_30%),radial-gradient(circle_at_85%_25%,rgba(34,211,238,0.18),transparent_28%),linear-gradient(135deg,#020617,#07142f_48%,#030712)]" />
-      <div className="pointer-events-none fixed inset-0 opacity-[0.18] bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:76px_76px]" />
+    <main className="min-h-screen w-full overflow-x-hidden bg-[#020617] text-slate-900">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(0,102,255,0.38),transparent_32%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.14),transparent_28%),linear-gradient(145deg,#020617,#07142f_50%,#030712)]" />
+      <div className="pointer-events-none fixed inset-0 opacity-[0.14] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:72px_72px]" />
 
-      <div className="relative z-10 grid min-h-screen grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-5 p-4 md:p-6">
-        <section className="order-2 xl:order-1 flex items-center justify-center rounded-[36px] border border-cyan-300/15 bg-gradient-to-br from-[#07142f]/80 via-[#040b1c]/90 to-[#020617]/95 p-6 md:p-10 shadow-2xl backdrop-blur-2xl">
-          <div className="w-full max-w-md">
-            <div className="mb-8 text-center">
-              <div className="mx-auto mb-5 flex justify-center">
-                <BrandMark />
-              </div>
-              <h1 className="text-4xl font-black tracking-tight">مرحباً بعودتك</h1>
-              <p className="mt-3 text-slate-400">ادخل إلى منصة HasaN CharT World لإدارة تحليلاتك وتنبيهاتك</p>
-            </div>
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1280px] items-center px-4 py-6 md:px-6 md:py-8 lg:px-8">
+        <div className="grid w-full grid-cols-1 gap-5 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)] lg:gap-6 xl:gap-8">
+          {/* Marketing — desktop left, hidden on mobile */}
+          <div className="hidden lg:block">
+            <MarketingPanel />
+          </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div className="space-y-2">
-                <label className="block text-sm font-bold text-slate-300">البريد الإلكتروني</label>
-                <input
-                  type="email"
-                  placeholder="example@email.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setResetEmail(e.target.value);
-                  }}
-                  required
-                  className="w-full rounded-2xl border border-blue-300/15 bg-black/35 px-5 py-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/70 focus:ring-4 focus:ring-cyan-400/10"
-                />
+          {/* Login panel — first on mobile */}
+          <section className="login-card-hover order-first flex items-center justify-center rounded-[32px] border border-white/20 bg-white/[0.97] p-5 shadow-[0_28px_80px_rgba(2,6,23,0.35)] backdrop-blur-xl transition duration-200 md:p-7 lg:p-8">
+            <div className="w-full max-w-md">
+              {/* Mobile compact marketing */}
+              <div className="lg:hidden">
+                <MarketingPanel compact />
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-bold text-slate-300">كلمة المرور</label>
-                <input
-                  type="password"
-                  placeholder="أدخل كلمة المرور"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full rounded-2xl border border-blue-300/15 bg-black/35 px-5 py-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/70 focus:ring-4 focus:ring-cyan-400/10"
-                />
+              <div className="mb-6 text-center lg:mb-8">
+                <div className="mx-auto mb-4 flex justify-center lg:mb-5">
+                  <BrandMark size="sm" />
+                </div>
+                <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-3xl">مرحبًا بعودتك</h1>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500 md:text-base">
+                  سجّل دخولك للوصول إلى حسابك وأدواتك في HasaN CharT World
+                </p>
               </div>
 
-              {TURNSTILE_SITE_KEY && turnstileRequired && (
-                <div className="rounded-2xl border border-cyan-300/15 bg-black/25 p-4 shadow-[0_0_25px_rgba(34,211,238,0.08)]">
-                  <div className="mb-3 text-center text-sm font-bold text-cyan-200">
-                    تحقق أمني لحماية الحساب
+              <form onSubmit={handleLogin} className="space-y-4 md:space-y-5" noValidate>
+                {formError ? (
+                  <div
+                    role="alert"
+                    aria-live="polite"
+                    className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                  >
+                    {formError}
                   </div>
-                  <div id="turnstile-login" className="flex min-h-[70px] justify-center overflow-hidden rounded-xl" />
-                  {!turnstileReady && (
-                    <p className="mt-2 text-center text-xs font-bold text-slate-400">
-                      جاري تحميل حماية تسجيل الدخول...
-                    </p>
+                ) : null}
+
+                <div className="space-y-2">
+                  <label htmlFor="login-email" className="block text-sm font-bold text-slate-700">
+                    البريد الإلكتروني
+                  </label>
+                  <input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    dir="ltr"
+                    placeholder="example@email.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setResetEmail(e.target.value);
+                      if (formError) setFormError("");
+                    }}
+                    required
+                    className="login-input w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-start text-slate-900 outline-none placeholder:text-slate-400 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/15 md:px-5 md:py-4"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="login-password" className="block text-sm font-bold text-slate-700">
+                    كلمة المرور
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="login-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      dir="ltr"
+                      placeholder="أدخل كلمة المرور"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (formError) setFormError("");
+                      }}
+                      required
+                      className="login-input w-full rounded-2xl border border-slate-200 bg-white py-3.5 pe-12 ps-4 text-start text-slate-900 outline-none placeholder:text-slate-400 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/15 md:py-4 md:pe-14 md:ps-5"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                      className="absolute inset-y-0 end-2 flex h-full min-w-[44px] items-center justify-center rounded-xl text-slate-400 transition hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40 md:end-3"
+                    >
+                      {showPassword ? <IconEyeOff className="h-5 w-5" /> : <IconEye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {TURNSTILE_SITE_KEY && turnstileRequired && (
+                  <div className="rounded-2xl border border-cyan-200/60 bg-cyan-50/50 p-4">
+                    <div className="mb-3 text-center text-sm font-bold text-cyan-800">
+                      تحقق أمني لحماية الحساب
+                    </div>
+                    <div id="turnstile-login" className="flex min-h-[70px] justify-center overflow-hidden rounded-xl" />
+                    {!turnstileReady && (
+                      <p className="mt-2 text-center text-xs font-medium text-slate-500">
+                        جاري تحميل حماية تسجيل الدخول...
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={sendResetPassword}
+                    disabled={resetLoading}
+                    className="font-bold text-cyan-700 transition hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40 disabled:opacity-60"
+                  >
+                    {resetLoading ? "جاري إرسال الرابط..." : "نسيت كلمة المرور؟"}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-6 py-3.5 font-black text-white shadow-[0_16px_40px_rgba(37,99,235,0.32)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-65 md:py-4"
+                >
+                  {loading ? (
+                    <>
+                      <LoginSpinner className="h-5 w-5" />
+                      <span>جارٍ تسجيل الدخول…</span>
+                    </>
+                  ) : (
+                    <span>تسجيل الدخول</span>
                   )}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <button type="button" onClick={sendResetPassword} disabled={resetLoading} className="font-bold text-cyan-300 underline disabled:opacity-60">
-                  {resetLoading ? "جاري إرسال الرابط..." : "نسيت كلمة المرور؟"}
                 </button>
-                <a href="/register" className="font-bold text-blue-300 underline">
-                  إنشاء حساب
-                </a>
-              </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-l from-blue-700 via-blue-500 to-cyan-300 px-6 py-4 font-black text-white shadow-[0_18px_50px_rgba(37,99,235,0.38)] transition hover:scale-[1.01] disabled:opacity-60"
-              >
-                <span className="absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition group-hover:translate-x-[-120%]" />
-                <span className="relative">{loading ? "جاري التحقق والدخول..." : "تسجيل الدخول"}</span>
-              </button>
-            </form>
-          </div>
-        </section>
+                <p className="text-center text-sm text-slate-600">
+                  ليس لديك حساب؟{" "}
+                  <Link
+                    href="/register"
+                    className="font-bold text-blue-600 transition hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40"
+                  >
+                    إنشاء حساب
+                  </Link>
+                </p>
 
-        <section className="order-1 xl:order-2 relative hidden xl:flex overflow-hidden rounded-[36px] border border-cyan-300/20 bg-gradient-to-br from-[#0b63ff]/20 via-[#07142f]/95 to-[#020617]/95 p-10 shadow-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(37,99,235,0.42),transparent_34%),radial-gradient(circle_at_78%_70%,rgba(34,211,238,0.16),transparent_30%)]" />
-          <div className="absolute -left-32 top-20 h-72 w-72 rounded-full bg-blue-600/20 blur-3xl" />
-          <div className="absolute bottom-16 right-16 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
-
-          <div className="relative z-10 flex h-full w-full flex-col justify-between">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <BrandMark size="sm" />
-                <div>
-                  <h2 className="text-3xl font-black">HasaN CharT World</h2>
-                  <p className="text-slate-400">Trading Intelligence Platform</p>
-                </div>
-              </div>
-              <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-bold text-cyan-200">
-                Live Market Hub
-              </span>
+                <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                  <IconLock className="h-3.5 w-3.5 shrink-0" />
+                  <span>اتصال آمن</span>
+                </p>
+              </form>
             </div>
-
-            <div className="max-w-3xl py-16">
-              <span className="inline-flex rounded-full border border-blue-300/20 bg-blue-500/15 px-4 py-2 text-sm font-bold text-blue-200">
-                منصة تداول ذكية
-              </span>
-              <h1 className="mt-7 text-6xl 2xl:text-7xl font-black leading-tight tracking-tight">
-                تداول أوضح، بيانات أسرع، وتحليلات أدق.
-              </h1>
-              <p className="mt-7 max-w-2xl text-lg leading-9 text-slate-300">
-                تجربة احترافية تجمع الأسعار المباشرة، الشارت الحي، طلبات التحليل، والتنبيهات السعرية داخل لوحة واحدة متناسقة.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-                <strong className="block text-3xl text-cyan-300">24/7</strong>
-                <span className="text-sm text-slate-400">متابعة الأسواق</span>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-                <strong className="block text-3xl text-cyan-300">Live</strong>
-                <span className="text-sm text-slate-400">أسعار مباشرة</span>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-                <strong className="block text-xl text-cyan-300 leading-7">فريق مكون من 6 محللين محترفين</strong>
-                <span className="text-sm text-slate-400">تحليل منظم</span>
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </main>
   );
