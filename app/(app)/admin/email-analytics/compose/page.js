@@ -21,6 +21,12 @@ import { MarketingPolicyCard } from "../components/email-ops/MarketingPolicyCard
 import { WIZARD_STEPS } from "../components/email-ops/labels";
 import { getAudienceStatsFromCampaign } from "../components/email-ops/campaign-state";
 import { IconCheck, IconSend } from "../components/icons-ops";
+import {
+  buildAudienceDraftPatch,
+  buildMessageDraftPatch,
+  localizeCampaignApiError,
+  resolveEffectiveCampaignName,
+} from "../../../../../lib/email-campaign/draft-payload.js";
 
 function campaignToForm(campaign) {
   if (!campaign) {
@@ -216,23 +222,40 @@ export default function EmailComposePage() {
     if (step === 2 && effectiveCampaignId) loadPreview();
   }, [step, effectiveCampaignId, loadPreview]);
 
+  useEffect(() => {
+    const persistedName = String(campaign?.name || "").trim();
+    if (!persistedName) return;
+    if (!String(form.name || "").trim()) {
+      setForm((prev) => ({ ...prev, name: persistedName }));
+    }
+  }, [campaign?.name, form.name]);
+
   const persistCampaignDraft = useCallback(
-    async ({ includeAudience = true } = {}) => {
+    async ({ patchKind = "full" } = {}) => {
       const existingId = resolveCampaignId();
       const hasPreparedSnapshot = Boolean(
         campaign?.metadata?.snapshotAt && campaign?.metadata?.audienceSnapshotStale !== true
       );
 
-      const payload = {
-        name: form.name,
-        subject: form.subject,
-        previewText: form.previewText,
-        htmlContent: form.htmlContent,
-      };
-
-      if (includeAudience && !hasPreparedSnapshot) {
-        payload.audienceType = form.audienceType;
-        payload.audienceFilter = audienceFilter;
+      let payload;
+      if (patchKind === "message") {
+        payload = buildMessageDraftPatch({
+          subject: form.subject,
+          previewText: form.previewText,
+          htmlContent: form.htmlContent,
+          formName: form.name,
+          campaignName: campaign?.name,
+        });
+      } else {
+        payload = buildAudienceDraftPatch({
+          name: resolveEffectiveCampaignName({ formName: form.name, campaignName: campaign?.name }),
+          subject: form.subject,
+          previewText: form.previewText,
+          htmlContent: form.htmlContent,
+          audienceType: form.audienceType,
+          audienceFilter,
+          includeAudienceFields: !hasPreparedSnapshot,
+        });
       }
 
       const res = await adminFetch(
@@ -244,29 +267,33 @@ export default function EmailComposePage() {
         }
       );
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || "تعذر حفظ المسودة");
+      if (!data.success) throw new Error(localizeCampaignApiError(data.error || "تعذر حفظ المسودة"));
       if (!data.campaign?.id) {
         throw new Error("تعذر حفظ المسودة — لم يُرجَع معرّف الحملة");
       }
 
       commitCampaignIdentity(data.campaign.id, data.campaign);
+      setForm(campaignToForm(data.campaign));
       if (data.campaign.metadata?.audienceSnapshotStale) {
         setPrepareResult(null);
       }
 
       return { id: data.campaign.id, campaign: data.campaign };
     },
-    [adminFetch, audienceFilter, campaign?.metadata, commitCampaignIdentity, form, resolveCampaignId]
+    [adminFetch, audienceFilter, campaign?.metadata, campaign?.name, commitCampaignIdentity, form, resolveCampaignId]
   );
 
   const saveDraft = useCallback(async () => {
     setBusy(true);
     notify("");
     try {
-      const { id } = await persistCampaignDraft({ includeAudience: true });
+      const { id } = await persistCampaignDraft({ patchKind: "full" });
       await loadReadiness(id);
       notify("تم حفظ المسودة", "success");
       return id;
+    } catch (err) {
+      notify(localizeCampaignApiError(err.message), "error");
+      throw err;
     } finally {
       setBusy(false);
     }
@@ -280,11 +307,18 @@ export default function EmailComposePage() {
       return false;
     }
 
+    const existingId = resolveCampaignId();
+    const effectiveName = resolveEffectiveCampaignName({ formName: form.name, campaignName: campaign?.name });
+    if (!existingId && !effectiveName) {
+      notify("اسم الحملة مطلوب — أدخل اسمًا داخليًا للحملة في خطوة الجمهور قبل المتابعة.", "warning");
+      return false;
+    }
+
     saveInFlightRef.current = true;
     setBusy(true);
     notify("");
     try {
-      const { id } = await persistCampaignDraft({ includeAudience: false });
+      const { id } = await persistCampaignDraft({ patchKind: "message" });
       const readinessData = await loadReadiness(id);
       if (!readinessData?.readiness?.campaignExists) {
         throw new Error("تعذر التحقق من حالة الحملة بعد الحفظ");
@@ -294,13 +328,22 @@ export default function EmailComposePage() {
       setStep(2);
       return true;
     } catch (err) {
-      notify(err.message || "تعذر حفظ الحملة", "error");
+      notify(localizeCampaignApiError(err.message), "error");
       return false;
     } finally {
       setBusy(false);
       saveInFlightRef.current = false;
     }
-  }, [form.htmlContent, form.subject, loadPreviewFor, loadReadiness, persistCampaignDraft]);
+  }, [
+    campaign?.name,
+    form.htmlContent,
+    form.name,
+    form.subject,
+    loadPreviewFor,
+    loadReadiness,
+    persistCampaignDraft,
+    resolveCampaignId,
+  ]);
 
   const prepareAudience = useCallback(async () => {
     const id = resolveCampaignId() || (await saveDraft());
