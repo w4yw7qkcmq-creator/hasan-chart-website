@@ -1,15 +1,20 @@
-/* Login Experience Phase 1.1 — Premium Fintech Full-Screen UI */
+/* Login Experience Phase 1.2.1 — Visual polish on full-screen split shell */
 
-/* ── Layer 0–2: Full-viewport ambient background ── */
 .login-page {
   --login-navy: #020617;
   --login-navy-mid: #07142f;
   --login-blue: #0b63ff;
   --login-cyan: #22d3ee;
+  --login-shell-gap: clamp(16px, 3vw, 32px);
+  --login-shell-radius: clamp(28px, 3vw, 36px);
   background: var(--login-navy);
   color: #0f172a;
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
+/* ── Layer 0: Ambient background (secondary) ── */
 .login-ambient {
   pointer-events: none;
   position: fixed;
@@ -24,19 +29,18 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 55% at 12% 8%, rgba(11, 99, 255, 0.42), transparent 52%),
-    radial-gradient(ellipse 70% 50% at 88% 12%, rgba(34, 211, 238, 0.2), transparent 48%),
-    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(67, 56, 202, 0.12), transparent 55%),
+    radial-gradient(ellipse 80% 55% at 12% 8%, rgba(11, 99, 255, 0.28), transparent 52%),
+    radial-gradient(ellipse 70% 50% at 88% 12%, rgba(34, 211, 238, 0.12), transparent 48%),
     linear-gradient(155deg, #020617 0%, #07142f 42%, #030712 100%);
 }
 
 .login-ambient__grid {
   position: absolute;
   inset: 0;
-  opacity: 0.16;
+  opacity: 0.1;
   background-image:
-    linear-gradient(90deg, rgba(148, 163, 184, 0.09) 1px, transparent 1px),
-    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px);
   background-size: 64px 64px;
   mask-image: radial-gradient(ellipse 90% 80% at 50% 45%, black 20%, transparent 78%);
 }
@@ -52,7 +56,7 @@
   height: min(42vw, 520px);
   left: -8%;
   top: 18%;
-  background: rgba(37, 99, 235, 0.22);
+  background: rgba(37, 99, 235, 0.14);
 }
 
 .login-ambient__glow--right {
@@ -60,7 +64,7 @@
   height: min(38vw, 480px);
   right: -6%;
   bottom: 12%;
-  background: rgba(34, 211, 238, 0.14);
+  background: rgba(34, 211, 238, 0.08);
 }
 
 .login-ambient__glow--center {
@@ -69,94 +73,120 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(59, 130, 246, 0.08);
-}
-
-.login-ambient__traces {
-  position: absolute;
-  inset: 0;
-  opacity: 0.35;
-}
-
-.login-ambient__tickers {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-
-.login-ambient__ticker {
-  position: absolute;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: rgba(148, 163, 184, 0.07);
-  white-space: nowrap;
-  user-select: none;
-}
-
-.login-ambient__ticker--1 {
-  font-size: clamp(3rem, 8vw, 7rem);
-  left: 2%;
-  top: 22%;
-  transform: rotate(-12deg);
-}
-
-.login-ambient__ticker--2 {
-  font-size: clamp(2.5rem, 6vw, 5.5rem);
-  right: 4%;
-  top: 38%;
-  transform: rotate(8deg);
-}
-
-.login-ambient__ticker--3 {
-  font-size: clamp(2rem, 5vw, 4.5rem);
-  left: 6%;
-  bottom: 18%;
-  transform: rotate(-6deg);
-}
-
-.login-ambient__ticker--4 {
-  font-size: clamp(2.2rem, 5.5vw, 5rem);
-  right: 8%;
-  bottom: 28%;
-  transform: rotate(10deg);
+  background: rgba(59, 130, 246, 0.05);
 }
 
 @media (max-width: 1023px) {
-  .login-ambient__tickers,
-  .login-ambient__traces {
-    display: none;
-  }
-
   .login-ambient__grid {
-    opacity: 0.08;
+    opacity: 0.06;
   }
 }
 
-@media (max-width: 639px) {
-  .login-ambient__glow--left,
-  .login-ambient__glow--right {
-    opacity: 0.65;
-  }
-}
-
-/* ── Content layer ── */
-.login-page__content {
+/* ── Unified shell wrapper ── */
+.login-shell-wrap {
   position: relative;
   z-index: 10;
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--login-shell-gap);
 }
 
-/* ── Marketing glass panel ── */
-.login-marketing-panel {
-  border: 1px solid rgba(125, 211, 252, 0.22);
-  background: linear-gradient(
-    145deg,
-    rgba(11, 99, 255, 0.22) 0%,
-    rgba(7, 20, 47, 0.82) 45%,
-    rgba(2, 6, 23, 0.88) 100%
-  );
+/* ONE SHELL — TWO REGIONS; explicit LTR so Market=LEFT Login=RIGHT in Arabic UI */
+.login-shell {
+  direction: ltr;
+  display: grid;
+  width: 100%;
+  height: calc(100dvh - (var(--login-shell-gap) * 2));
+  min-height: min(640px, calc(100dvh - (var(--login-shell-gap) * 2)));
+  max-height: calc(100dvh - (var(--login-shell-gap) * 2));
+  border-radius: var(--login-shell-radius);
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, 0.14);
   box-shadow:
-    0 24px 80px rgba(2, 6, 23, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 32px 96px rgba(2, 6, 23, 0.55),
+    0 0 0 1px rgba(59, 130, 246, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  grid-template-columns: minmax(0, 58fr) minmax(0, 42fr);
+}
+
+/* ── Market region (LEFT) ── */
+.login-market-region {
+  direction: rtl;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid rgba(125, 211, 252, 0.12);
+  --market-copy-chart-gap: clamp(0.75rem, 1.6vh, 1.375rem);
+  --market-chart-cards-gap: clamp(1.125rem, 2.5vh, 2.25rem);
+  background: linear-gradient(
+    155deg,
+    rgba(11, 99, 255, 0.2) 0%,
+    rgba(7, 20, 47, 0.94) 38%,
+    rgba(2, 6, 23, 0.98) 100%
+  );
+}
+
+.login-market-region__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: clamp(1.25rem, 2.2vw, 2.25rem);
+}
+
+.login-market-region__inner::before {
+  content: "";
+  flex: 0 0 0;
+  min-height: 0;
+}
+
+.login-market-region__inner::after {
+  content: "";
+  flex: 1 1 auto;
+  min-height: clamp(0.5rem, 2vh, 1.5rem);
+}
+
+.login-market-region__glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(37, 99, 235, 0.32), transparent 42%),
+    radial-gradient(circle at 82% 78%, rgba(34, 211, 238, 0.12), transparent 36%);
+}
+
+.login-market-region__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.login-market-region__copy {
+  padding-top: clamp(0.375rem, 0.8vh, 0.625rem);
+}
+
+.login-market-region__chart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--market-copy-chart-gap);
+  padding: 0;
+}
+
+.login-market-region__features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.5rem, 1vw, 0.875rem);
+  margin-top: var(--market-chart-cards-gap);
+  padding-top: 0;
 }
 
 .login-marketing-badge {
@@ -174,46 +204,65 @@
   color: #cbd5e1;
 }
 
-/* ── Chart ── */
-.login-market-chart__line {
-  stroke: rgba(34, 211, 238, 0.92);
-  stroke-width: 2.75;
-  stroke-dasharray: 1200;
-  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.35));
-  animation: login-chart-draw 4s ease-out forwards;
-}
-
-.login-market-chart__fill {
-  stop-color: rgba(34, 211, 238, 0.28);
+/* ── Chart (larger, tighter rhythm) ── */
+.login-market-chart {
+  position: relative;
+  width: 100%;
+  max-width: min(100%, 820px);
+  height: auto;
+  aspect-ratio: 3 / 1;
+  max-height: clamp(165px, 27vh, 330px);
 }
 
 .login-market-chart__glow {
-  background: radial-gradient(ellipse at 70% 30%, rgba(34, 211, 238, 0.18), transparent 65%);
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: radial-gradient(ellipse at 68% 28%, rgba(34, 211, 238, 0.26), transparent 62%);
   animation: login-chart-glow 8s ease-in-out infinite;
+}
+
+.login-market-chart__svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.login-market-chart__line {
+  stroke: rgba(34, 211, 238, 0.94);
+  stroke-width: 3.25;
+  stroke-dasharray: 1500;
+  filter: drop-shadow(0 0 9px rgba(34, 211, 238, 0.38));
+  animation: login-chart-draw 4s ease-out forwards;
 }
 
 .login-market-chart__dot {
   fill: #22d3ee;
-  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.6));
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.55));
 }
 
-/* ── Feature cards ── */
+.login-market-chart__dot--endpoint {
+  fill: #67e8f9;
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.65));
+}
+
+/* ── Feature cards (bottom strip) ── */
 .login-feature-card {
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
   box-shadow: 0 8px 32px rgba(2, 6, 23, 0.2);
+  border-radius: 18px;
+  padding: clamp(0.65rem, 1.2vw, 1rem);
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background-color 0.2s ease;
+    box-shadow 0.2s ease;
 }
 
 .login-feature-card:hover {
   transform: translateY(-2px);
   border-color: rgba(34, 211, 238, 0.35);
-  box-shadow: 0 12px 40px rgba(2, 6, 23, 0.28), 0 0 20px rgba(34, 211, 238, 0.06);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+  box-shadow: 0 12px 40px rgba(2, 6, 23, 0.28);
 }
 
 .login-feature-card__icon {
@@ -235,24 +284,105 @@
   color: #94a3b8;
 }
 
-/* ── Login card glass ── */
-.login-card {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow:
-    0 28px 80px rgba(2, 6, 23, 0.32),
-    0 0 0 1px rgba(59, 130, 246, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(16px);
+/* ── Auth region (RIGHT) ── */
+.login-auth-region {
+  direction: rtl;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: clamp(1.25rem, 3vh, 2rem) clamp(1rem, 2vw, 1.5rem);
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.98) 0%,
+    rgba(241, 245, 249, 0.96) 48%,
+    rgba(236, 254, 255, 0.94) 100%
+  );
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.65);
 }
 
-.login-card:hover {
-  box-shadow:
-    0 32px 88px rgba(2, 6, 23, 0.36),
-    0 0 0 1px rgba(59, 130, 246, 0.08);
+.login-auth-region__inner {
+  width: 100%;
+  max-width: clamp(440px, 92%, 500px);
+  padding: clamp(0.5rem, 1.5vh, 1rem) clamp(1rem, 2.5vw, 1.75rem);
 }
 
-/* ── Password field — LTR container, fixed eye on physical right ── */
+.login-auth-region__header {
+  margin-bottom: clamp(1rem, 2.2vh, 1.625rem);
+  text-align: center;
+}
+
+.login-auth-brand-wrap {
+  transform: scale(1);
+  transition: transform 0.2s ease;
+}
+
+.login-auth-title {
+  letter-spacing: -0.02em;
+}
+
+.login-auth-desc {
+  max-width: 26rem;
+  margin-inline: auto;
+}
+
+.login-brand-phrase {
+  white-space: nowrap;
+}
+
+/* Mobile integrated hero — not a card */
+.login-mobile-hero {
+  margin-bottom: clamp(0.625rem, 1.5vh, 0.875rem);
+  padding-bottom: 0.625rem;
+  text-align: center;
+  background: transparent;
+}
+
+.login-mobile-hero__accent {
+  display: block;
+  width: 2.5rem;
+  height: 3px;
+  margin: 0 auto 0.5625rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(11, 99, 255, 0.85), rgba(34, 211, 238, 0.9));
+}
+
+.login-mobile-hero__title {
+  font-size: clamp(0.875rem, 3.9vw, 0.9375rem);
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+@media (min-width: 1280px) {
+  .login-auth-region {
+    padding-top: clamp(1rem, 2.5vh, 1.75rem);
+    padding-bottom: clamp(2rem, 5vh, 3rem);
+  }
+
+  .login-auth-region__inner {
+    max-width: clamp(480px, 90%, 520px);
+    transform: translateY(-1.5vh);
+  }
+
+  .login-auth-brand-wrap {
+    transform: scale(1.1);
+  }
+
+  .login-auth-title {
+    font-size: 1.625rem;
+  }
+
+  .login-auth-region__header {
+    margin-bottom: clamp(1.125rem, 2.4vh, 1.75rem);
+  }
+}
+
+/* ── Password field — unchanged behavior ── */
 .login-password-field {
   position: relative;
   direction: ltr;
@@ -299,9 +429,9 @@
 
 /* ── Inputs ── */
 .login-input {
-  border-color: #cbd5e1;
+  border: 1px solid #cbd5e1;
   background: rgba(255, 255, 255, 0.98);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .login-input:focus {
@@ -344,17 +474,178 @@
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.28), 0 16px 40px rgba(37, 99, 235, 0.34);
 }
 
-/* ── Security reassurance ── */
-.login-security-note {
-  margin-top: 0.25rem;
-  padding-top: 0.5rem;
+.login-trust-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+  padding-top: 0.625rem;
+  text-align: center;
+  font-size: 0.6875rem;
+  line-height: 1.55;
   color: #94a3b8;
+}
+
+.login-trust-line__icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-top: 0.125rem;
+  opacity: 0.75;
+}
+
+@media (min-width: 768px) {
+  .login-trust-line {
+    font-size: 0.75rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  .login-market-chart {
+    max-width: min(100%, 880px);
+    max-height: clamp(190px, 32vh, 380px);
+  }
+}
+
+/* Tall desktop — split leftover space above/below the market composition */
+@media (min-height: 821px) and (min-width: 1024px) {
+  .login-market-region__inner::before {
+    flex: 0.85 1 0;
+    min-height: clamp(1.25rem, 4.5vh, 3.5rem);
+  }
+
+  .login-market-region__inner::after {
+    flex: 1 1 0;
+    min-height: clamp(1rem, 3.5vh, 2.5rem);
+  }
+}
+
+/* ── Responsive: short laptop ── */
+@media (max-height: 820px) and (min-width: 1024px) {
+  .login-market-region {
+    --market-copy-chart-gap: clamp(0.5rem, 1vh, 0.875rem);
+    --market-chart-cards-gap: clamp(0.625rem, 1.4vh, 1rem);
+  }
+
+  .login-market-region__inner::before {
+    flex: 0 0 0;
+    min-height: 0;
+  }
+
+  .login-market-region__inner::after {
+    flex: 1 1 auto;
+    min-height: clamp(0.375rem, 1.5vh, 1rem);
+  }
+
+  .login-market-region__copy {
+    padding-top: 0.25rem;
+  }
+
+  .login-market-chart {
+    max-width: min(100%, 720px);
+    max-height: clamp(118px, 20vh, 210px);
+  }
+
+  .login-marketing-title {
+    font-size: clamp(1.35rem, 2.2vw, 1.75rem) !important;
+  }
+
+  .login-auth-region__header {
+    margin-bottom: 0.875rem;
+  }
+
+  .login-auth-region__inner {
+    transform: translateY(-0.75vh);
+  }
+}
+
+/* ── Tablet — 55/45 split ── */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .login-shell {
+    grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+    height: calc(100dvh - (var(--login-shell-gap) * 2));
+  }
+
+  .login-market-region {
+    --market-copy-chart-gap: clamp(0.45rem, 0.9vh, 0.75rem);
+    --market-chart-cards-gap: clamp(0.625rem, 1.2vh, 0.875rem);
+  }
+
+  .login-market-region__inner {
+    padding: clamp(1rem, 2vw, 1.5rem);
+  }
+
+  .login-market-region__inner::before {
+    flex: 0 0 0;
+    min-height: 0;
+  }
+
+  .login-market-region__inner::after {
+    flex: 1 1 auto;
+    min-height: clamp(0.375rem, 1.5vh, 1rem);
+  }
+
+  .login-market-chart {
+    max-width: min(100%, 680px);
+    max-height: clamp(112px, 18vh, 195px);
+  }
+
+  .login-feature-card {
+    padding: 0.55rem;
+  }
+
+  .login-feature-card__desc {
+    display: none;
+  }
+
+  .login-auth-region__inner {
+    max-width: min(460px, 100%);
+    transform: none;
+  }
+}
+
+/* ── Mobile: auth-first full screen ── */
+@media (max-width: 767px) {
+  .login-shell-wrap {
+    padding: 0;
+    min-height: 100dvh;
+  }
+
+  .login-shell {
+    direction: rtl;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    height: 100dvh;
+    max-height: none;
+    min-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  .login-market-region {
+    display: none;
+  }
+
+  .login-auth-region {
+    background: linear-gradient(
+      180deg,
+      rgba(248, 250, 252, 0.99) 0%,
+      rgba(241, 245, 249, 0.98) 55%,
+      rgba(236, 254, 255, 0.96) 100%
+    );
+  }
+
+  .login-auth-region__inner {
+    max-width: 100%;
+    padding: clamp(1rem, 4vw, 1.25rem);
+  }
 }
 
 /* ── Animations ── */
 @keyframes login-chart-draw {
   from {
-    stroke-dashoffset: 1200;
+    stroke-dashoffset: 1500;
   }
   to {
     stroke-dashoffset: 0;
@@ -390,7 +681,7 @@
   }
 
   .login-feature-card,
-  .login-card {
+  .login-submit-btn {
     transition: none !important;
   }
 

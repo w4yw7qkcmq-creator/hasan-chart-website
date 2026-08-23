@@ -110,64 +110,55 @@ function AmbientBackground() {
       <div className="login-ambient__glow login-ambient__glow--left" />
       <div className="login-ambient__glow login-ambient__glow--right" />
       <div className="login-ambient__glow login-ambient__glow--center" />
-      <svg className="login-ambient__traces hidden lg:block" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" fill="none">
-        <path d="M0 680 Q320 620 640 640 T1280 580 T1920 520" stroke="rgba(34,211,238,0.06)" strokeWidth="2" />
-        <path d="M0 820 Q400 760 800 780 T1600 720" stroke="rgba(59,130,246,0.05)" strokeWidth="1.5" />
-        <circle cx="420" cy="640" r="3" fill="rgba(34,211,238,0.12)" />
-        <circle cx="980" cy="580" r="2.5" fill="rgba(34,211,238,0.1)" />
-        <circle cx="1540" cy="520" r="3" fill="rgba(34,211,238,0.12)" />
-      </svg>
-      <div className="login-ambient__tickers hidden lg:block">
-        <span className="login-ambient__ticker login-ambient__ticker--1">BTC</span>
-        <span className="login-ambient__ticker login-ambient__ticker--2">XAU</span>
-        <span className="login-ambient__ticker login-ambient__ticker--3">EUR/USD</span>
-        <span className="login-ambient__ticker login-ambient__ticker--4">NASDAQ</span>
-      </div>
     </div>
   );
 }
 
 function MarketChartVisual() {
   const chartPoints = [
-    [70, 108],
-    [150, 88],
-    [230, 68],
-    [310, 48],
-    [390, 36],
-    [450, 28],
+    [40, 148],
+    [100, 132],
+    [160, 138],
+    [220, 108],
+    [280, 114],
+    [340, 86],
+    [400, 92],
+    [460, 66],
+    [520, 72],
+    [560, 48],
   ];
 
   return (
-    <div className="pointer-events-none relative mx-auto w-full max-w-lg" aria-hidden="true">
-      <div className="login-market-chart__glow absolute inset-0 rounded-[32px] blur-2xl" />
-      <svg viewBox="0 0 480 160" className="relative w-full" fill="none">
+    <div className="login-market-chart" aria-hidden="true">
+      <div className="login-market-chart__glow" />
+      <svg viewBox="0 0 600 200" className="login-market-chart__svg" fill="none" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient id="login-chart-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" className="login-market-chart__fill" stopColor="rgba(34,211,238,0.28)" />
+            <stop offset="0%" stopColor="rgba(34,211,238,0.42)" />
+            <stop offset="55%" stopColor="rgba(34,211,238,0.14)" />
             <stop offset="100%" stopColor="rgba(34,211,238,0)" />
           </linearGradient>
         </defs>
-        {[40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440].map((x) => (
-          <line key={x} x1={x} y1="20" x2={x} y2="140" stroke="rgba(148,163,184,0.14)" strokeWidth="1" />
+        {[40, 100, 160, 220, 280, 340, 400, 460, 520, 560].map((x) => (
+          <line key={`v-${x}`} x1={x} y1="28" x2={x} y2="172" stroke="rgba(148,163,184,0.11)" strokeWidth="1" />
         ))}
-        {[40, 70, 100, 130].map((y) => (
-          <line key={y} x1="30" y1={y} x2="450" y2={y} stroke="rgba(148,163,184,0.1)" strokeWidth="1" />
+        {[52, 82, 112, 142].map((y) => (
+          <line key={`h-${y}`} x1="24" y1={y} x2="576" y2={y} stroke="rgba(148,163,184,0.07)" strokeWidth="1" />
         ))}
         <path
-          d="M30 120 L70 108 L110 112 L150 88 L190 92 L230 68 L270 72 L310 48 L350 56 L390 36 L430 42 L450 28 L450 140 L30 140 Z"
+          d="M24 154 L40 148 L100 132 L160 138 L220 108 L280 114 L340 86 L400 92 L460 66 L520 72 L560 48 L560 172 L24 172 Z"
           fill="url(#login-chart-fill)"
-          stroke="none"
         />
         <path
           className="login-market-chart__line"
-          d="M30 120 L70 108 L110 112 L150 88 L190 92 L230 68 L270 72 L310 48 L350 56 L390 36 L430 42 L450 28"
+          d="M24 154 L40 148 L100 132 L160 138 L220 108 L280 114 L340 86 L400 92 L460 66 L520 72 L560 48"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         {chartPoints.map(([cx, cy]) => (
-          <circle key={`${cx}-${cy}`} className="login-market-chart__dot" cx={cx} cy={cy} r="3.5" />
+          <circle key={`${cx}-${cy}`} className="login-market-chart__dot" cx={cx} cy={cy} r="4" />
         ))}
-        <circle className="login-market-chart__dot" cx="450" cy="28" r="4.5" />
+        <circle className="login-market-chart__dot login-market-chart__dot--endpoint" cx="560" cy="48" r="5.5" />
       </svg>
     </div>
   );
@@ -175,63 +166,62 @@ function MarketChartVisual() {
 
 function FeatureCard({ icon: Icon, titleAr, labelEn, description }) {
   return (
-    <article className="login-feature-card group rounded-[22px] p-4 backdrop-blur-md md:p-5">
-      <div className="login-feature-card__icon mb-3 flex h-10 w-10 items-center justify-center rounded-2xl transition group-hover:border-cyan-300/45">
-        <Icon className="h-5 w-5" />
+    <article className="login-feature-card group">
+      <div className="login-feature-card__icon mb-2 flex h-9 w-9 items-center justify-center rounded-xl transition md:mb-3 md:h-10 md:w-10 md:rounded-2xl">
+        <Icon className="h-4 w-4 md:h-5 md:w-5" />
       </div>
-      <h3 className="login-feature-card__title text-sm font-bold md:text-base">{titleAr}</h3>
-      <p className="login-feature-card__label-en mt-0.5 text-[10px] font-semibold uppercase md:text-[11px]">{labelEn}</p>
-      <p className="login-feature-card__desc mt-1.5 text-xs leading-relaxed md:text-sm">{description}</p>
+      <h3 className="login-feature-card__title text-xs font-bold md:text-sm">{titleAr}</h3>
+      <p className="login-feature-card__label-en mt-0.5 text-[9px] font-semibold uppercase md:text-[10px]">{labelEn}</p>
+      <p className="login-feature-card__desc mt-1 text-[11px] leading-relaxed md:text-xs">{description}</p>
     </article>
   );
 }
 
-function MarketingPanel({ compact = false }) {
-  if (compact) {
-    return (
-      <div className="mb-5 rounded-[24px] border border-cyan-300/15 bg-gradient-to-br from-[#0b63ff]/15 via-[#07142f]/80 to-[#020617]/90 px-4 py-4 text-center backdrop-blur-xl md:mb-6 md:px-6">
-        <p className="text-sm font-bold text-white md:text-base">منصة واحدة. رؤية أوضح للسوق.</p>
-        <p className="mt-1 text-xs text-slate-400 md:text-sm">الأسعار المباشرة، التحليلات، التنبيهات والأخبار المالية في تجربة واحدة.</p>
-      </div>
-    );
-  }
-
+function MarketRegion() {
   return (
-    <section className="login-marketing-panel relative flex flex-col overflow-hidden rounded-[32px] p-6 backdrop-blur-2xl md:p-8 lg:p-10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(37,99,235,0.28),transparent_40%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.14),transparent_34%)]" />
-
-      <div className="relative z-10 flex flex-1 flex-col">
-        <div className="flex items-center gap-3">
+    <section className="login-market-region" aria-label="تجربة السوق">
+      <div className="login-market-region__glow" aria-hidden="true" />
+      <div className="login-market-region__inner">
+        <div className="login-market-region__brand">
           <BrandMark size="sm" />
           <div>
-            <p className="text-lg font-black text-white md:text-xl">HasaN CharT World</p>
-            <p className="text-xs text-slate-300 md:text-sm">Trading Intelligence Platform</p>
+            <p className="text-base font-black text-white md:text-lg">HasaN CharT World</p>
+            <p className="text-[11px] text-slate-300 md:text-xs">Trading Intelligence Platform</p>
           </div>
         </div>
 
-        <div className="my-7 lg:my-9">
-          <span className="login-marketing-badge inline-flex rounded-full px-3.5 py-1.5 text-xs font-bold md:text-sm">
+        <div className="login-market-region__copy">
+          <span className="login-marketing-badge inline-flex rounded-full px-3 py-1 text-[11px] font-bold md:px-3.5 md:py-1.5 md:text-xs">
             تجربة سوق متكاملة
           </span>
-          <h1 className="login-marketing-title mt-5 max-w-xl text-2xl font-black leading-[1.25] tracking-tight md:text-3xl lg:text-[2.35rem] lg:leading-[1.2]">
+          <h1 className="login-marketing-title mt-3 max-w-xl text-xl font-black leading-[1.25] tracking-tight md:text-2xl lg:text-[2rem] lg:leading-[1.2]">
             منصة واحدة. رؤية أوضح للسوق.
           </h1>
-          <p className="login-marketing-desc mt-4 max-w-lg text-sm leading-7 md:text-base md:leading-8">
+          <p className="login-marketing-desc mt-2 max-w-lg text-sm leading-6 md:text-[0.9375rem] md:leading-7">
             الأسعار المباشرة، التحليلات، التنبيهات والأخبار المالية في تجربة واحدة.
           </p>
         </div>
 
-        <div className="mb-7 lg:mb-9">
+        <div className="login-market-region__chart">
           <MarketChartVisual />
         </div>
 
-        <div className="mt-auto grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+        <div className="login-market-region__features">
           <FeatureCard icon={IconTrending} titleAr="الأسواق المباشرة" labelEn="Live Markets" description="تحركات السوق لحظيًا" />
           <FeatureCard icon={IconChart} titleAr="التحليل الذكي" labelEn="Smart Analysis" description="أدوات تحليل متقدمة" />
           <FeatureCard icon={IconBell} titleAr="تنبيهات 24/7" labelEn="Alerts" description="تنبيهات لا تتوقف" />
         </div>
       </div>
     </section>
+  );
+}
+
+function MobileMarketingHero() {
+  return (
+    <div className="login-mobile-hero md:hidden">
+      <span className="login-mobile-hero__accent" aria-hidden="true" />
+      <p className="login-mobile-hero__title">منصة واحدة. رؤية أوضح للسوق.</p>
+    </div>
   );
 }
 
@@ -584,32 +574,29 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="login-page relative min-h-[100dvh] w-full overflow-x-hidden">
+    <main className="login-page">
       <AmbientBackground />
 
-      <div className="login-page__content mx-auto flex min-h-[100dvh] w-full max-w-[min(1360px,100%)] items-center px-4 py-5 sm:px-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
-        <div className="grid w-full grid-cols-1 gap-5 lg:grid-cols-[minmax(0,54fr)_minmax(0,46fr)] lg:gap-7 xl:gap-8">
-          <div className="hidden lg:block lg:order-1">
-            <MarketingPanel />
-          </div>
+      <div className="login-shell-wrap">
+        <div className="login-shell">
+          <MarketRegion />
 
-          <section className="login-card order-first rounded-[32px] p-5 transition duration-200 md:p-6 lg:order-2 lg:self-center lg:p-7">
-            <div className="w-full max-w-md mx-auto">
-              <div className="lg:hidden">
-                <MarketingPanel compact />
-              </div>
+          <section className="login-auth-region" aria-label="تسجيل الدخول">
+            <div className="login-auth-region__inner">
+              <MobileMarketingHero />
 
-              <div className="mb-5 text-center lg:mb-6">
-                <div className="mx-auto mb-3 flex justify-center lg:mb-4">
+              <div className="login-auth-region__header">
+                <div className="login-auth-brand-wrap mx-auto mb-3 flex justify-center md:mb-4">
                   <BrandMark size="sm" />
                 </div>
-                <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-[1.75rem]">مرحبًا بعودتك</h1>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600 md:text-base">
-                  سجّل دخولك للوصول إلى حسابك وأدواتك في HasaN CharT World
+                <h2 className="login-auth-title text-xl font-black tracking-tight text-slate-900 md:text-2xl">مرحبًا بعودتك</h2>
+                <p className="login-auth-desc mt-2 text-sm leading-relaxed text-slate-600 md:text-base">
+                  سجّل دخولك للوصول إلى حسابك وأدواتك في{" "}
+                  <span className="login-brand-phrase">HasaN CharT World</span>
                 </p>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-4" noValidate>
+              <form onSubmit={handleLogin} className="space-y-3.5 md:space-y-4" noValidate>
                 {formError ? (
                   <div
                     role="alert"
@@ -724,9 +711,9 @@ export default function LoginPage() {
                   </Link>
                 </p>
 
-                <p className="login-security-note flex items-center justify-center gap-1.5 text-xs">
-                  <IconLock className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                  <span>اتصال آمن</span>
+                <p className="login-trust-line" role="note">
+                  <IconLock className="login-trust-line__icon shrink-0" aria-hidden="true" />
+                  <span>تسجيل دخول آمن • حماية الجلسة • خصوصية الحساب</span>
                 </p>
               </form>
             </div>
