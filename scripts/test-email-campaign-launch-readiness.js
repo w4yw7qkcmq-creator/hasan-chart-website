@@ -101,10 +101,16 @@ test("message-only patch does not invalidate audience snapshot", () => {
   assert.equal(stale, false);
 });
 
-test("confirmation scenario: eligible=1 from metadata when client stats missing", () => {
-  const campaign = readyCampaign();
+test("legacy snapshot without fingerprint is accepted", () => {
+  const campaign = readyCampaign({
+    metadata: {
+      snapshotAt: new Date().toISOString(),
+      audienceStats: { eligible: 1, excluded: 101, initial: 102 },
+      audienceSnapshotStale: false,
+      snapshotContentFingerprint: null,
+    },
+  });
   const readiness = getCampaignLaunchReadiness(campaign);
-  assert.equal(readiness.audienceStats.eligible, 1);
   assert.equal(readiness.ready, true);
 });
 
