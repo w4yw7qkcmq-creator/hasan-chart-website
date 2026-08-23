@@ -60,24 +60,24 @@ export function EmailStepper({ steps, currentStep, stepStates, onStepClick }) {
   );
 }
 
-export function deriveComposeWizardStepStates({ step, readiness, form, campaign }) {
-  const messageComplete = Boolean(String(form?.subject || "").trim() && String(form?.htmlContent || "").trim());
-  const snapshotStale = campaign?.metadata?.audienceSnapshotStale === true;
-  const audiencePrepared = readiness?.audiencePrepared === true && !snapshotStale;
-  const audienceNeedsReview =
-    snapshotStale || readiness?.blockers?.some((b) => b.code === "snapshot_stale") === true;
-
-  return WIZARD_STEP_INDICES.map((index) => {
+export function deriveComposeWizardStepStates({ step, readiness }) {
+  const serverSteps = readiness?.steps;
+  const mapServerStep = (key, index) => {
+    const value = serverSteps?.[key];
     if (index === step) return "current";
-    if (index === 0) {
-      if (audienceNeedsReview) return "needs_review";
-      if (audiencePrepared) return "complete";
-      return "incomplete";
-    }
-    if (index === 1) return messageComplete ? "complete" : "incomplete";
-    if (index === 2) return step > 2 ? "complete" : "incomplete";
+    if (value === "needs_review") return "needs_review";
+    if (value === "complete" || value === "available") return "complete";
     return "incomplete";
-  });
-}
+  };
 
-const WIZARD_STEP_INDICES = [0, 1, 2, 3];
+  if (serverSteps) {
+    return [
+      mapServerStep("audience", 0),
+      mapServerStep("message", 1),
+      mapServerStep("preview", 2),
+      step === 3 ? "current" : serverSteps.confirmation === "available" ? "complete" : "incomplete",
+    ];
+  }
+
+  return [0, 1, 2, 3].map((index) => (index === step ? "current" : index < step ? "complete" : "incomplete"));
+}

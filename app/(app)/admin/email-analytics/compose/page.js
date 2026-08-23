@@ -79,9 +79,14 @@ export default function EmailComposePage() {
     [campaign, prepareResult?.stats]
   );
 
+  const effectiveCampaignId = useMemo(
+    () => String(campaignId || campaign?.id || searchParams?.get("campaign") || "").trim(),
+    [campaignId, campaign?.id, searchParams]
+  );
+
   const stepStates = useMemo(
-    () => deriveComposeWizardStepStates({ step, readiness, form, campaign }),
-    [step, readiness, form, campaign]
+    () => deriveComposeWizardStepStates({ step, readiness }),
+    [step, readiness]
   );
 
   const syncCampaignInUrl = useCallback(
@@ -135,6 +140,12 @@ export default function EmailComposePage() {
         setCampaign(row);
         setForm(campaignToForm(row));
         setCampaignId(row.id);
+        if (row.metadata?.audienceStats) {
+          setPrepareResult({
+            stats: row.metadata.audienceStats,
+            preparedAt: row.metadata?.snapshotAt || null,
+          });
+        }
         await loadReadiness(id);
       } catch (err) {
         notify(err.message, "error");
@@ -154,10 +165,14 @@ export default function EmailComposePage() {
   }, [searchParams, campaignId, loadCampaign]);
 
   useEffect(() => {
-    if (step === 3 && campaignId) {
-      void loadReadiness(campaignId);
+    if (step >= 1 && effectiveCampaignId) {
+      void loadReadiness(effectiveCampaignId);
     }
-  }, [step, campaignId, loadReadiness]);
+  }, [step, effectiveCampaignId, loadReadiness]);
+
+  useEffect(() => {
+    if (step === 2 && effectiveCampaignId) loadPreview();
+  }, [step, effectiveCampaignId, loadPreview]);
 
   const saveDraft = useCallback(async () => {
     setBusy(true);
@@ -173,9 +188,9 @@ export default function EmailComposePage() {
       };
 
       const res = await adminFetch(
-        campaignId ? `/api/admin/email-campaigns/${campaignId}` : "/api/admin/email-campaigns",
+        effectiveCampaignId ? `/api/admin/email-campaigns/${effectiveCampaignId}` : "/api/admin/email-campaigns",
         {
-          method: campaignId ? "PATCH" : "POST",
+          method: effectiveCampaignId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
@@ -185,16 +200,16 @@ export default function EmailComposePage() {
       setCampaignId(data.campaign.id);
       setCampaign(data.campaign);
       syncCampaignInUrl(data.campaign.id);
+      await loadReadiness(data.campaign.id);
       if (data.campaign.metadata?.audienceSnapshotStale) {
         setPrepareResult(null);
-        await loadReadiness(data.campaign.id);
       }
       notify("تم حفظ المسودة", "success");
       return data.campaign.id;
     } finally {
       setBusy(false);
     }
-  }, [adminFetch, audienceFilter, campaignId, form, loadReadiness, syncCampaignInUrl]);
+  }, [adminFetch, audienceFilter, effectiveCampaignId, form, loadReadiness, syncCampaignInUrl]);
 
   const prepareAudience = useCallback(async () => {
     const id = campaignId || (await saveDraft());
@@ -228,15 +243,11 @@ export default function EmailComposePage() {
   }, [adminFetch, campaignId, loadReadiness, saveDraft, syncCampaignInUrl]);
 
   const loadPreview = useCallback(async () => {
-    if (!campaignId) return;
-    const res = await adminFetch(`/api/admin/email-campaigns/${campaignId}/preview`);
+    if (!effectiveCampaignId) return;
+    const res = await adminFetch(`/api/admin/email-campaigns/${effectiveCampaignId}/preview`);
     const data = await res.json();
     if (data.success) setPreviewHtml(data.preview.html);
-  }, [adminFetch, campaignId]);
-
-  useEffect(() => {
-    if (step === 2 && campaignId) loadPreview();
-  }, [step, campaignId, loadPreview]);
+  }, [adminFetch, effectiveCampaignId]);
 
   useEffect(() => {
     setAudienceLoading(true);
@@ -301,15 +312,38 @@ export default function EmailComposePage() {
     }
   };
 
+  const goToConfirmation = useCallback(async () => {
+    const id = effectiveCampaignId;
+    if (!id) {
+      notify("احفظ مسودة الحملة أولًا.", "warning");
+      return false;
+    }
+
+    const data = await loadReadiness(id);
+    if (!data?.readiness?.confirmationReady) {
+      const blocker = data?.readiness?.confirmationBlockers?.[0];
+      notify(blocker?.message || "أكمل الخطوات السابقة قبل الانتقال للتأكيد.", "warning");
+      return false;
+    }
+
+    setStep(3);
+    return true;
+  }, [effectiveCampaignId, loadReadiness]);
+
   const handleStepClick = (nextStep) => {
-    if (nextStep === 3 && !campaignId) {
-      notify("احفظ الحملة وجهّز الجمهور قبل الانتقال للتأكيد.", "warning");
+    if (nextStep === 3) {
+      void goToConfirmation();
       return;
     }
     setStep(nextStep);
   };
 
-  const launchEnabled = Boolean(readiness?.ready && campaignId && !busy && !readinessLoading);
+  const launchEnabled = Boolean(
+    readiness?.launchReady && effectiveCampaignId && !busy && !readinessLoading
+  );
+
+  const confirmationReady = Boolean(readiness?.confirmationReady && !readinessLoading);
+  const confirmationBlocker = readiness?.confirmationBlockers?.[0];
 
   return (
     <div className="space-y-6">
@@ -503,7 +537,14 @@ export default function EmailComposePage() {
               <IconSend className="h-4 w-4" />
               إرسال نسخة تجريبية
             </EmailPrimaryButton>
-            <EmailPrimaryButton variant="secondary" onClick={() => setStep(3)}>
+            {confirmationBlocker && !confirmationReady ? (
+              <EmailAlertBanner tone="warning">{confirmationBlocker.message}</EmailAlertBanner>
+            ) : null}
+            <EmailPrimaryButton
+              variant="secondary"
+              disabled={!confirmationReady || readinessLoading || busy}
+              onClick={() => void goToConfirmation()}
+            >
               متابعة للتأكيد
             </EmailPrimaryButton>
           </div>
@@ -560,8 +601,8 @@ export default function EmailComposePage() {
             <EmailPrimaryButton disabled={!launchEnabled} onClick={() => setShowLaunchConfirm(true)}>
               بدء الحملة
             </EmailPrimaryButton>
-            {campaignId ? (
-              <Link href={`/admin/email-analytics/campaigns/${campaignId}`} className="inline-flex items-center text-sm font-bold text-cyan-600">
+            {effectiveCampaignId ? (
+              <Link href={`/admin/email-analytics/campaigns/${effectiveCampaignId}`} className="inline-flex items-center text-sm font-bold text-cyan-600">
                 عرض تفاصيل الحملة
               </Link>
             ) : null}

@@ -1,6 +1,6 @@
 import { requireAdminPermission } from "../../../../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../../../../lib/iam/constants";
-import { getCampaignLaunchReadiness } from "../../../../../../lib/email-campaign/launch-readiness.js";
+import { getCampaignWizardReadiness } from "../../../../../../lib/email-campaign/launch-readiness.js";
 import { getCampaignById } from "../../../../../../lib/email-campaign/store.js";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
       return Response.json({ success: false, error: "Campaign not found" }, { status: 404 });
     }
 
-    const readiness = getCampaignLaunchReadiness(campaign);
+    const readiness = getCampaignWizardReadiness(campaign);
 
     return Response.json({
       success: true,
@@ -28,6 +28,8 @@ export async function GET(request, { params }) {
         status: campaign.status,
         subject: campaign.subject,
         preview_text: campaign.preview_text,
+        html_content: campaign.html_content,
+        audience_type: campaign.audience_type,
         eligible_count: campaign.eligible_count,
         audience_snapshot_count: campaign.audience_snapshot_count,
         metadata: {

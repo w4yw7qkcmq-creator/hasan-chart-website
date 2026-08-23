@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression tests — campaign launch readiness after prepare audience.
+ * Regression tests — campaign launch + wizard transition readiness.
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -8,6 +8,7 @@ import {
   buildCampaignSnapshotFingerprint,
   campaignPatchInvalidatesSnapshot,
   getCampaignLaunchReadiness,
+  getCampaignWizardReadiness,
 } from "../lib/email-campaign/launch-readiness.js";
 import { CAMPAIGN_STATUS } from "../lib/email-campaign/constants.js";
 
@@ -89,7 +90,7 @@ test("missing subject blocks launch with field hint", () => {
   assert.equal(blocker.field, "subject");
 });
 
-test("content patch invalidates snapshot fingerprint", () => {
+test("audience type change invalidates snapshot", () => {
   const campaign = readyCampaign();
   const stale = campaignPatchInvalidatesSnapshot(campaign, { audienceType: "active_subscribers" });
   assert.equal(stale, true);
@@ -97,7 +98,15 @@ test("content patch invalidates snapshot fingerprint", () => {
 
 test("message-only patch does not invalidate audience snapshot", () => {
   const campaign = readyCampaign();
-  const stale = campaignPatchInvalidatesSnapshot(campaign, { subject: "Changed subject" });
+  assert.equal(campaignPatchInvalidatesSnapshot(campaign, { subject: "Changed subject" }), false);
+  assert.equal(campaignPatchInvalidatesSnapshot(campaign, { htmlContent: "<p>New</p>" }), false);
+});
+
+test("equivalent audience filter shapes do not invalidate snapshot", () => {
+  const campaign = readyCampaign({ audience_filter: {} });
+  const stale = campaignPatchInvalidatesSnapshot(campaign, {
+    audienceFilter: { userIds: [] },
+  });
   assert.equal(stale, false);
 });
 
@@ -112,6 +121,45 @@ test("legacy snapshot without fingerprint is accepted", () => {
   });
   const readiness = getCampaignLaunchReadiness(campaign);
   assert.equal(readiness.ready, true);
+});
+
+test("prepared audience + complete message => confirmationReady", () => {
+  const campaign = readyCampaign();
+  const wizard = getCampaignWizardReadiness(campaign);
+  assert.equal(wizard.confirmationReady, true);
+  assert.equal(wizard.steps.audience, "complete");
+  assert.equal(wizard.steps.message, "complete");
+  assert.equal(wizard.launchReady, true);
+});
+
+test("prepared audience without message blocks confirmation", () => {
+  const campaign = readyCampaign({ subject: "", html_content: "" });
+  const wizard = getCampaignWizardReadiness(campaign);
+  assert.equal(wizard.confirmationReady, false);
+  assert.ok(wizard.confirmationBlockers.some((b) => b.code === "message_incomplete"));
+  assert.equal(wizard.steps.audience, "complete");
+  assert.equal(wizard.steps.message, "incomplete");
+});
+
+test("no prepared audience blocks confirmation", () => {
+  const campaign = readyCampaign({
+    status: CAMPAIGN_STATUS.DRAFT,
+    metadata: { audienceSnapshotStale: false },
+  });
+  const wizard = getCampaignWizardReadiness(campaign);
+  assert.equal(wizard.confirmationReady, false);
+  assert.ok(wizard.confirmationBlockers.some((b) => b.code === "audience_not_prepared"));
+});
+
+test("wizard step states derived from canonical readiness", () => {
+  const campaign = readyCampaign();
+  const wizard = getCampaignWizardReadiness(campaign);
+  assert.deepEqual(wizard.steps, {
+    audience: "complete",
+    message: "complete",
+    preview: "complete",
+    confirmation: "available",
+  });
 });
 
 if (process.exitCode) {
