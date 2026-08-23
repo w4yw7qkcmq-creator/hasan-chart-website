@@ -252,7 +252,7 @@ describe("login UI hardening signals", () => {
   it("login page disables duplicate submit while loading", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
-    const page = readFileSync(join(process.cwd(), "app/(app)/login/page.js"), "utf8");
+    const page = readFileSync(join(process.cwd(), "app/(app)/login/LoginClient.js"), "utf8");
 
     assert.match(page, /if \(loading\) return/);
     assert.match(page, /AUTH_RATE_LIMITED/);

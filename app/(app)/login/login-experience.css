@@ -130,6 +130,7 @@
     rgba(7, 20, 47, 0.94) 38%,
     rgba(2, 6, 23, 0.98) 100%
   );
+  color: #ffffff;
 }
 
 .login-market-region__inner {
@@ -169,18 +170,15 @@
   direction: ltr;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   gap: clamp(0.35rem, 0.75vh, 0.5rem);
   width: 100%;
   max-width: min(100%, 880px);
   margin-inline: auto;
   margin-bottom: 0;
-  text-align: right;
+  text-align: center;
   flex-shrink: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
 }
 
 .login-market-region__header {
@@ -194,9 +192,6 @@
   padding-inline: clamp(1.25rem, 2.2vw, 2.25rem);
   box-sizing: border-box;
   pointer-events: none;
-  background: transparent;
-  border: none;
-  box-shadow: none;
 }
 
 .login-market-region__header .login-market-region__brand {
@@ -210,38 +205,35 @@
   min-height: 0;
   width: 100%;
   padding-top: clamp(11rem, 16.2vh, 12.5rem);
-  background: transparent;
-  border: none;
-  box-shadow: none;
 }
 
 .login-market-region__brand-row {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 0.75rem;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 
 .login-market-region__brand-tagline {
   margin: 0;
-  text-align: right;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  text-align: center;
 }
 
 .login-market-region__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
   max-width: min(100%, 880px);
   margin-inline: auto;
   padding-top: clamp(0.15rem, 0.35vh, 0.35rem);
-  background: transparent;
   text-align: center;
-  border: none;
-  box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -266,25 +258,6 @@
   margin-inline: auto;
   margin-top: var(--market-chart-cards-gap);
   padding-top: 0;
-}
-
-.login-marketing-badge {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: #e0f2fe;
-  box-shadow: none;
-}
-
-.login-marketing-title {
-  color: #f8fafc;
-  background: transparent;
-  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.32);
-}
-
-.login-marketing-desc {
-  color: #cbd5e1;
-  background: transparent;
-  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.24);
 }
 
 /* ── Chart — subtle glass surface ── */
@@ -368,17 +341,8 @@
   box-shadow: none;
 }
 
-.login-feature-card__title {
-  color: #f1f5f9;
-}
-
 .login-feature-card__label-en {
-  color: rgba(103, 232, 249, 0.75);
   letter-spacing: 0.12em;
-}
-
-.login-feature-card__desc {
-  color: #94a3b8;
 }
 
 /* ── Auth region (RIGHT) ── */
@@ -820,4 +784,116 @@
     animation: none;
     opacity: 0.7;
   }
+}
+
+/* Market panel — pure white typography, boxless text, no-surface */
+.login-market-region .login-market-region__header,
+.login-market-region .login-market-region__brand,
+.login-market-region .login-market-region__brand-row,
+.login-market-region .login-market-region__composition,
+.login-market-region .login-market-region__copy {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.login-market-region .login-market-brand-mark {
+  box-shadow: none !important;
+}
+
+.login-market-region .login-market-region__brand-name,
+.login-market-region .login-market-region__brand-tagline {
+  display: contents;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  text-shadow: none !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.login-market-region .login-market-region__brand-name {
+  font-weight: 700;
+  opacity: 1;
+}
+
+.login-market-region .login-market-region__brand-tagline {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.login-market-region .login-marketing-badge,
+.login-market-region .login-marketing-title,
+.login-market-region .login-marketing-desc {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.login-market-region .login-marketing-badge {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  font-weight: 600 !important;
+  opacity: 0.9 !important;
+}
+
+.login-market-region .login-marketing-title {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  margin-top: 1.5rem;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+}
+
+.login-market-region .login-marketing-desc {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  margin-top: 0.5rem;
+  font-weight: 500 !important;
+  opacity: 0.88 !important;
+}
+
+.login-market-region .login-feature-card__title,
+.login-market-region .login-feature-card__label-en,
+.login-market-region .login-feature-card__desc {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: none !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.login-market-region .login-feature-card__title {
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+.login-market-region .login-feature-card__label-en {
+  font-weight: 500 !important;
+  opacity: 0.82 !important;
+}
+
+.login-market-region .login-feature-card__desc {
+  font-weight: 500 !important;
+  opacity: 0.72 !important;
 }
