@@ -162,6 +162,33 @@ test("wizard step states derived from canonical readiness", () => {
   });
 });
 
+test("persisted campaign has campaignExists and no campaign_missing blocker", () => {
+  const campaign = readyCampaign();
+  const wizard = getCampaignWizardReadiness(campaign);
+  assert.equal(wizard.campaignExists, true);
+  assert.ok(!wizard.confirmationBlockers.some((b) => b.code === "campaign_missing"));
+});
+
+test("null campaign => campaign_missing confirmation blocker", () => {
+  const wizard = getCampaignWizardReadiness(null);
+  assert.equal(wizard.campaignExists, false);
+  assert.equal(wizard.confirmationReady, false);
+  assert.ok(wizard.confirmationBlockers.some((b) => b.code === "campaign_missing"));
+});
+
+test("message-only patch after prepare keeps audience complete in wizard", () => {
+  const campaign = readyCampaign({ subject: "", html_content: "" });
+  const wizardBefore = getCampaignWizardReadiness(campaign);
+  assert.equal(wizardBefore.steps.audience, "complete");
+  assert.equal(wizardBefore.steps.message, "incomplete");
+
+  const updated = { ...campaign, subject: "Saved", html_content: "<p>Body</p>" };
+  assert.equal(campaignPatchInvalidatesSnapshot(campaign, { subject: "Saved", htmlContent: "<p>Body</p>" }), false);
+  const wizardAfter = getCampaignWizardReadiness(updated);
+  assert.equal(wizardAfter.steps.audience, "complete");
+  assert.equal(wizardAfter.confirmationReady, true);
+});
+
 if (process.exitCode) {
   console.error("\nSome launch readiness tests failed.");
   process.exit(process.exitCode);

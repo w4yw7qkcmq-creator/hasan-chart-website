@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAdminFetch } from "../lib/useAdminFetch";
 import { AudienceOptionCards } from "../components/email-ops/AudienceOptionCards";
 import { AudienceMetricGrid } from "../components/email-ops/EmailKpiCard";
@@ -68,6 +68,8 @@ export default function EmailComposePage() {
   const [showLaunchConfirm, setShowLaunchConfirm] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
   const [campaignLoading, setCampaignLoading] = useState(false);
+  const campaignIdRef = useRef("");
+  const saveInFlightRef = useRef(false);
 
   const audienceFilter = useMemo(
     () => ({ userIds: form.selectedUserIds }),
@@ -79,10 +81,19 @@ export default function EmailComposePage() {
     [campaign, prepareResult?.stats]
   );
 
-  const effectiveCampaignId = useMemo(
-    () => String(campaignId || campaign?.id || searchParams?.get("campaign") || "").trim(),
+  const resolveCampaignId = useCallback(
+    () =>
+      String(
+        campaignIdRef.current ||
+          campaignId ||
+          campaign?.id ||
+          searchParams?.get("campaign") ||
+          ""
+      ).trim(),
     [campaignId, campaign?.id, searchParams]
   );
+
+  const effectiveCampaignId = useMemo(() => resolveCampaignId(), [resolveCampaignId]);
 
   const stepStates = useMemo(
     () => deriveComposeWizardStepStates({ step, readiness }),
@@ -97,6 +108,17 @@ export default function EmailComposePage() {
       router.replace(`/admin/email-analytics/compose?${params.toString()}`, { scroll: false });
     },
     [router, searchParams]
+  );
+
+  const commitCampaignIdentity = useCallback(
+    (id, row) => {
+      const nextId = String(id || "").trim();
+      if (nextId) campaignIdRef.current = nextId;
+      if (nextId) setCampaignId(nextId);
+      if (row) setCampaign(row);
+      if (nextId) syncCampaignInUrl(nextId);
+    },
+    [syncCampaignInUrl]
   );
 
   const notify = (text, tone = "info") => {
@@ -115,6 +137,7 @@ export default function EmailComposePage() {
         const res = await adminFetch(`/api/admin/email-campaigns/${id}/readiness`);
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "تعذر التحقق من جاهزية الإطلاق");
+        if (data.campaign?.id) campaignIdRef.current = data.campaign.id;
         setCampaign((prev) => ({ ...(prev || {}), ...data.campaign }));
         setReadiness(data.readiness);
         return data;
@@ -137,6 +160,7 @@ export default function EmailComposePage() {
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "تعذر تحميل الحملة");
         const row = data.campaign || data;
+        campaignIdRef.current = row.id;
         setCampaign(row);
         setForm(campaignToForm(row));
         setCampaignId(row.id);
@@ -156,16 +180,27 @@ export default function EmailComposePage() {
     [adminFetch, loadReadiness]
   );
 
+  const loadPreviewFor = useCallback(
+    async (id) => {
+      const targetId = String(id || resolveCampaignId()).trim();
+      if (!targetId) return false;
+      const res = await adminFetch(`/api/admin/email-campaigns/${targetId}/preview`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "تعذر تحميل المعاينة");
+      setPreviewHtml(data.preview.html);
+      return true;
+    },
+    [adminFetch, resolveCampaignId]
+  );
+
   const loadPreview = useCallback(async () => {
-    if (!effectiveCampaignId) return;
-    const res = await adminFetch(`/api/admin/email-campaigns/${effectiveCampaignId}/preview`);
-    const data = await res.json();
-    if (data.success) setPreviewHtml(data.preview.html);
-  }, [adminFetch, effectiveCampaignId]);
+    await loadPreviewFor();
+  }, [loadPreviewFor]);
 
   useEffect(() => {
     const fromUrl = String(searchParams?.get("campaign") || "").trim();
     if (fromUrl && fromUrl !== campaignId) {
+      campaignIdRef.current = fromUrl;
       setCampaignId(fromUrl);
       void loadCampaign(fromUrl);
     }
@@ -181,45 +216,94 @@ export default function EmailComposePage() {
     if (step === 2 && effectiveCampaignId) loadPreview();
   }, [step, effectiveCampaignId, loadPreview]);
 
-  const saveDraft = useCallback(async () => {
-    setBusy(true);
-    notify("");
-    try {
+  const persistCampaignDraft = useCallback(
+    async ({ includeAudience = true } = {}) => {
+      const existingId = resolveCampaignId();
+      const hasPreparedSnapshot = Boolean(
+        campaign?.metadata?.snapshotAt && campaign?.metadata?.audienceSnapshotStale !== true
+      );
+
       const payload = {
         name: form.name,
         subject: form.subject,
         previewText: form.previewText,
         htmlContent: form.htmlContent,
-        audienceType: form.audienceType,
-        audienceFilter,
       };
 
+      if (includeAudience && !hasPreparedSnapshot) {
+        payload.audienceType = form.audienceType;
+        payload.audienceFilter = audienceFilter;
+      }
+
       const res = await adminFetch(
-        effectiveCampaignId ? `/api/admin/email-campaigns/${effectiveCampaignId}` : "/api/admin/email-campaigns",
+        existingId ? `/api/admin/email-campaigns/${existingId}` : "/api/admin/email-campaigns",
         {
-          method: effectiveCampaignId ? "PATCH" : "POST",
+          method: existingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
       );
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "تعذر حفظ المسودة");
-      setCampaignId(data.campaign.id);
-      setCampaign(data.campaign);
-      syncCampaignInUrl(data.campaign.id);
-      await loadReadiness(data.campaign.id);
+      if (!data.campaign?.id) {
+        throw new Error("تعذر حفظ المسودة — لم يُرجَع معرّف الحملة");
+      }
+
+      commitCampaignIdentity(data.campaign.id, data.campaign);
       if (data.campaign.metadata?.audienceSnapshotStale) {
         setPrepareResult(null);
       }
+
+      return { id: data.campaign.id, campaign: data.campaign };
+    },
+    [adminFetch, audienceFilter, campaign?.metadata, commitCampaignIdentity, form, resolveCampaignId]
+  );
+
+  const saveDraft = useCallback(async () => {
+    setBusy(true);
+    notify("");
+    try {
+      const { id } = await persistCampaignDraft({ includeAudience: true });
+      await loadReadiness(id);
       notify("تم حفظ المسودة", "success");
-      return data.campaign.id;
+      return id;
     } finally {
       setBusy(false);
     }
-  }, [adminFetch, audienceFilter, effectiveCampaignId, form, loadReadiness, syncCampaignInUrl]);
+  }, [loadReadiness, persistCampaignDraft]);
+
+  const saveAndPreview = useCallback(async () => {
+    if (saveInFlightRef.current) return false;
+
+    if (!form.subject.trim() || !form.htmlContent.trim()) {
+      notify("أدخل عنوان البريد ومحتوى الرسالة قبل المعاينة.", "warning");
+      return false;
+    }
+
+    saveInFlightRef.current = true;
+    setBusy(true);
+    notify("");
+    try {
+      const { id } = await persistCampaignDraft({ includeAudience: false });
+      const readinessData = await loadReadiness(id);
+      if (!readinessData?.readiness?.campaignExists) {
+        throw new Error("تعذر التحقق من حالة الحملة بعد الحفظ");
+      }
+      await loadPreviewFor(id);
+      notify("تم حفظ المسودة", "success");
+      setStep(2);
+      return true;
+    } catch (err) {
+      notify(err.message || "تعذر حفظ الحملة", "error");
+      return false;
+    } finally {
+      setBusy(false);
+      saveInFlightRef.current = false;
+    }
+  }, [form.htmlContent, form.subject, loadPreviewFor, loadReadiness, persistCampaignDraft]);
 
   const prepareAudience = useCallback(async () => {
-    const id = campaignId || (await saveDraft());
+    const id = resolveCampaignId() || (await saveDraft());
     setBusy(true);
     notify("");
     try {
@@ -228,6 +312,7 @@ export default function EmailComposePage() {
       if (!data.success) throw new Error(data.error || "تعذر تجهيز الجمهور");
 
       setCampaignId(id);
+      campaignIdRef.current = id;
       setCampaign(data.campaign);
       setPrepareResult({
         stats: data.stats,
@@ -247,7 +332,7 @@ export default function EmailComposePage() {
     } finally {
       setBusy(false);
     }
-  }, [adminFetch, campaignId, loadReadiness, saveDraft, syncCampaignInUrl]);
+  }, [adminFetch, loadReadiness, resolveCampaignId, saveDraft, syncCampaignInUrl]);
 
   useEffect(() => {
     setAudienceLoading(true);
@@ -276,7 +361,7 @@ export default function EmailComposePage() {
   const sendTest = async () => {
     setBusy(true);
     try {
-      const id = campaignId || (await saveDraft());
+      const id = resolveCampaignId() || (await saveDraft());
       const res = await adminFetch(`/api/admin/email-campaigns/${id}/test-send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -293,9 +378,14 @@ export default function EmailComposePage() {
   };
 
   const launch = async () => {
+    const id = resolveCampaignId();
+    if (!id) {
+      notify("احفظ مسودة الحملة أولًا.", "warning");
+      return;
+    }
     setBusy(true);
     try {
-      const res = await adminFetch(`/api/admin/email-campaigns/${campaignId}/launch`, {
+      const res = await adminFetch(`/api/admin/email-campaigns/${id}/launch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirm: true }),
@@ -304,7 +394,7 @@ export default function EmailComposePage() {
       if (!data.success) throw new Error(data.error || "تعذر بدء الحملة");
       notify(`تم إطلاق الحملة — ${data.queuedCount} مستلم في الطابور`, "success");
       setShowLaunchConfirm(false);
-      await loadReadiness(campaignId);
+      await loadReadiness(id);
     } catch (err) {
       notify(err.message, "error");
     } finally {
@@ -313,7 +403,7 @@ export default function EmailComposePage() {
   };
 
   const goToConfirmation = useCallback(async () => {
-    const id = effectiveCampaignId;
+    const id = resolveCampaignId();
     if (!id) {
       notify("احفظ مسودة الحملة أولًا.", "warning");
       return false;
@@ -322,28 +412,45 @@ export default function EmailComposePage() {
     const data = await loadReadiness(id);
     if (!data?.readiness?.confirmationReady) {
       const blocker = data?.readiness?.confirmationBlockers?.[0];
+      if (blocker?.code === "campaign_missing") {
+        notify("تعذر التحقق من الحملة. أعد حفظ المسودة ثم حاول مرة أخرى.", "error");
+        return false;
+      }
       notify(blocker?.message || "أكمل الخطوات السابقة قبل الانتقال للتأكيد.", "warning");
       return false;
     }
 
     setStep(3);
     return true;
-  }, [effectiveCampaignId, loadReadiness]);
+  }, [loadReadiness, resolveCampaignId]);
 
   const handleStepClick = (nextStep) => {
     if (nextStep === 3) {
       void goToConfirmation();
       return;
     }
+    if (nextStep === 2 && step !== 2) {
+      if (!resolveCampaignId()) {
+        notify("احفظ مسودة الحملة أولًا.", "warning");
+        return;
+      }
+    }
     setStep(nextStep);
   };
 
   const launchEnabled = Boolean(
-    readiness?.launchReady && effectiveCampaignId && !busy && !readinessLoading
+    readiness?.launchReady && resolveCampaignId() && !busy && !readinessLoading
   );
 
   const confirmationReady = Boolean(readiness?.confirmationReady && !readinessLoading);
-  const confirmationBlocker = readiness?.confirmationBlockers?.[0];
+  const campaignPersisted = Boolean(resolveCampaignId() || readiness?.campaignExists);
+  const previewTransitionBlocker = useMemo(() => {
+    if (readinessLoading || !readiness || confirmationReady) return null;
+    const blocker = readiness.confirmationBlockers?.[0];
+    if (!blocker) return null;
+    if (blocker.code === "campaign_missing" && campaignPersisted) return null;
+    return blocker;
+  }, [campaignPersisted, confirmationReady, readiness, readinessLoading]);
 
   return (
     <div className="space-y-6">
@@ -470,6 +577,9 @@ export default function EmailComposePage() {
         <section className="space-y-5 rounded-[28px] border border-slate-200/80 bg-white/95 p-5 dark:border-cyan-300/15 dark:bg-[#07142f]/60 md:p-7">
           <div className="rounded-[24px] border border-slate-200 p-5 dark:border-white/10">
             <h3 className="mb-4 font-black">محرر الرسالة</h3>
+            {campaignPersisted ? (
+              <EmailAlertBanner tone="success">تم حفظ المسودة — يمكنك تعديل الرسالة وإعادة الحفظ.</EmailAlertBanner>
+            ) : null}
             <div className="space-y-4">
               <EmailFormField label="عنوان البريد" counter maxLength={120} valueLength={form.subject.length}>
                 <EmailTextInput value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
@@ -486,14 +596,8 @@ export default function EmailComposePage() {
               </EmailFormField>
             </div>
           </div>
-          <EmailPrimaryButton
-            disabled={busy}
-            onClick={async () => {
-              await saveDraft();
-              setStep(2);
-            }}
-          >
-            حفظ والمعاينة
+          <EmailPrimaryButton disabled={busy} onClick={() => void saveAndPreview()}>
+            {busy ? "جاري الحفظ..." : "حفظ والمعاينة"}
           </EmailPrimaryButton>
         </section>
       ) : null}
@@ -501,6 +605,9 @@ export default function EmailComposePage() {
       {step === 2 ? (
         <section className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 dark:border-cyan-300/15 dark:bg-[#07142f]/60">
+            {campaignPersisted ? (
+              <EmailAlertBanner tone="success">معاينة محفوظة من الحملة على الخادم</EmailAlertBanner>
+            ) : null}
             <div className="mb-4 flex items-center gap-2">
               {["desktop", "mobile"].map((mode) => (
                 <button
@@ -519,8 +626,8 @@ export default function EmailComposePage() {
             </div>
             <div className={`mx-auto overflow-hidden rounded-[22px] border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-black/30 ${previewMode === "mobile" ? "max-w-sm" : "w-full"}`}>
               <div className="border-b border-slate-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-[#0a1628]">
-                <p className="font-black">{form.subject || "بدون موضوع"}</p>
-                <p className="text-xs text-slate-500">{form.previewText || "—"}</p>
+                <p className="font-black">{campaign?.subject || form.subject || "بدون موضوع"}</p>
+                <p className="text-xs text-slate-500">{campaign?.preview_text || form.previewText || "—"}</p>
                 <p className="mt-1 text-xs text-slate-400">HasaN CharT World</p>
               </div>
               <iframe title="preview" className="h-[420px] w-full bg-white" srcDoc={previewHtml} />
@@ -537,8 +644,11 @@ export default function EmailComposePage() {
               <IconSend className="h-4 w-4" />
               إرسال نسخة تجريبية
             </EmailPrimaryButton>
-            {confirmationBlocker && !confirmationReady ? (
-              <EmailAlertBanner tone="warning">{confirmationBlocker.message}</EmailAlertBanner>
+            {readinessLoading ? (
+              <EmailAlertBanner tone="info">جاري التحقق من جاهزية الانتقال...</EmailAlertBanner>
+            ) : null}
+            {previewTransitionBlocker ? (
+              <EmailAlertBanner tone="warning">{previewTransitionBlocker.message}</EmailAlertBanner>
             ) : null}
             <EmailPrimaryButton
               variant="secondary"
