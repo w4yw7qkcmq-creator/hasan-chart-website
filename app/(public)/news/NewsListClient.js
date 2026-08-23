@@ -25,6 +25,7 @@ import {
   NewsSearchPanel,
   NewsSkeletonGrid,
 } from "../../components/news/NewsListUi";
+import TelegramChannelCTA from "../../components/news/TelegramChannelCTA";
 import { useMountedRef } from "../../hooks/useMountedRef";
 import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
 
@@ -268,6 +269,8 @@ export default function News() {
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />
+
+        <TelegramChannelCTA />
 
         {loading ? (
           <NewsSkeletonGrid />
