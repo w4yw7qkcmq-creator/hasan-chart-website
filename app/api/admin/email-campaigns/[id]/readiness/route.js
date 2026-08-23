@@ -32,6 +32,10 @@ export async function GET(request, { params }) {
         audience_type: campaign.audience_type,
         eligible_count: campaign.eligible_count,
         audience_snapshot_count: campaign.audience_snapshot_count,
+        queued_count: campaign.queued_count,
+        delivered_count: campaign.delivered_count,
+        failed_count: campaign.failed_count,
+        provider_accepted_count: campaign.provider_accepted_count,
         metadata: {
           snapshotAt: campaign.metadata?.snapshotAt || null,
           audienceStats: campaign.metadata?.audienceStats || null,

@@ -24,7 +24,21 @@ export async function POST(request, { params }) {
 
     await auditCampaignAction(admin.supabase, admin.user, "email.campaign.launched", String(params.id), result);
 
-    return Response.json({ success: true, ...result });
+    return Response.json({
+      success: true,
+      ...result,
+      campaign: result.campaign
+        ? {
+            id: result.campaign.id,
+            name: result.campaign.name,
+            status: result.campaign.status,
+            eligible_count: result.campaign.eligible_count,
+            queued_count: result.campaign.queued_count,
+            delivered_count: result.campaign.delivered_count,
+            failed_count: result.campaign.failed_count,
+          }
+        : null,
+    });
   } catch (error) {
     return Response.json({ success: false, error: error?.message || "Launch failed" }, { status: 400 });
   }

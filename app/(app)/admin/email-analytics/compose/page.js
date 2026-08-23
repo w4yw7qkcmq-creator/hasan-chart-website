@@ -17,6 +17,7 @@ import {
 import { EmailOpsPageHeader } from "../components/email-ops/EmailOpsPageHeader";
 import { deriveComposeWizardStepStates, EmailStepper } from "../components/email-ops/EmailStepper";
 import { LaunchReadinessPanel } from "../components/email-ops/LaunchReadinessPanel";
+import { CampaignRuntimePanel, LaunchingActionBar } from "../components/email-ops/CampaignRuntimePanel";
 import { MarketingPolicyCard } from "../components/email-ops/MarketingPolicyCard";
 import { WIZARD_STEPS } from "../components/email-ops/labels";
 import { getAudienceStatsFromCampaign } from "../components/email-ops/campaign-state";
@@ -72,10 +73,13 @@ export default function EmailComposePage() {
   const [userQuery, setUserQuery] = useState("");
   const [userResults, setUserResults] = useState([]);
   const [showLaunchConfirm, setShowLaunchConfirm] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
   const [campaignLoading, setCampaignLoading] = useState(false);
   const campaignIdRef = useRef("");
   const saveInFlightRef = useRef(false);
+  const launchInFlightRef = useRef(false);
+  const runtimePollRef = useRef(null);
 
   const audienceFilter = useMemo(
     () => ({ userIds: form.selectedUserIds }),
@@ -426,6 +430,9 @@ export default function EmailComposePage() {
       notify("احفظ مسودة الحملة أولًا.", "warning");
       return;
     }
+    if (launchInFlightRef.current) return;
+    launchInFlightRef.current = true;
+    setLaunching(true);
     setBusy(true);
     try {
       const res = await adminFetch(`/api/admin/email-campaigns/${id}/launch`, {
@@ -435,12 +442,17 @@ export default function EmailComposePage() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "تعذر بدء الحملة");
-      notify(`تم إطلاق الحملة — ${data.queuedCount} مستلم في الطابور`, "success");
+      if (data.campaign) {
+        commitCampaignIdentity(data.campaign.id, data.campaign);
+      }
+      notify("تم بدء الحملة بنجاح — الحملة الآن قيد الإرسال", "success");
       setShowLaunchConfirm(false);
       await loadReadiness(id);
     } catch (err) {
       notify(err.message, "error");
     } finally {
+      launchInFlightRef.current = false;
+      setLaunching(false);
       setBusy(false);
     }
   };
@@ -482,8 +494,38 @@ export default function EmailComposePage() {
   };
 
   const launchEnabled = Boolean(
-    readiness?.launchReady && resolveCampaignId() && !busy && !readinessLoading
+    readiness?.launchReady && resolveCampaignId() && !busy && !readinessLoading && !launching
   );
+
+  const isRuntimeCampaign = Boolean(readiness?.runtimeActive);
+  const showPreLaunchReadiness = !isRuntimeCampaign && !launching;
+
+  useEffect(() => {
+    const id = resolveCampaignId();
+    const phase = readiness?.runtimePhase || campaign?.status;
+    const shouldPoll = step === 3 && id && (phase === "sending" || phase === "paused");
+
+    if (!shouldPoll) {
+      if (runtimePollRef.current) {
+        clearInterval(runtimePollRef.current);
+        runtimePollRef.current = null;
+      }
+      return undefined;
+    }
+
+    if (runtimePollRef.current) return undefined;
+
+    runtimePollRef.current = setInterval(() => {
+      void loadReadiness(id);
+    }, 10000);
+
+    return () => {
+      if (runtimePollRef.current) {
+        clearInterval(runtimePollRef.current);
+        runtimePollRef.current = null;
+      }
+    };
+  }, [campaign?.status, loadReadiness, readiness?.runtimePhase, resolveCampaignId, step]);
 
   const confirmationReady = Boolean(readiness?.confirmationReady && !readinessLoading);
   const campaignPersisted = Boolean(resolveCampaignId() || readiness?.campaignExists);
@@ -733,33 +775,50 @@ export default function EmailComposePage() {
             </div>
           </div>
 
-          <LaunchReadinessPanel
-            readiness={readiness}
-            loading={readinessLoading}
-            onGoToAudience={() => setStep(0)}
-            onReprepareAudience={() => {
-              setStep(0);
-              void prepareAudience();
-            }}
-          />
+          {showPreLaunchReadiness ? (
+            <LaunchReadinessPanel
+              readiness={readiness}
+              loading={readinessLoading}
+              onGoToAudience={() => setStep(0)}
+              onReprepareAudience={() => {
+                setStep(0);
+                void prepareAudience();
+              }}
+            />
+          ) : (
+            <CampaignRuntimePanel
+              readiness={readiness}
+              campaignId={effectiveCampaignId}
+              launching={launching}
+            />
+          )}
 
-          <EmailAlertBanner tone="warning">
-            بعد بدء الإرسال لن تتمكن من تعديل محتوى هذه الحملة.
-          </EmailAlertBanner>
+          {!isRuntimeCampaign ? (
+            <EmailAlertBanner tone="warning">
+              بعد بدء الإرسال لن تتمكن من تعديل محتوى هذه الحملة.
+            </EmailAlertBanner>
+          ) : null}
 
-          <div className="flex flex-wrap gap-3">
-            <EmailPrimaryButton variant="secondary" onClick={() => setStep(1)}>
-              العودة للتعديل
-            </EmailPrimaryButton>
-            <EmailPrimaryButton disabled={!launchEnabled} onClick={() => setShowLaunchConfirm(true)}>
-              بدء الحملة
-            </EmailPrimaryButton>
-            {effectiveCampaignId ? (
-              <Link href={`/admin/email-analytics/campaigns/${effectiveCampaignId}`} className="inline-flex items-center text-sm font-bold text-cyan-600">
-                عرض تفاصيل الحملة
-              </Link>
-            ) : null}
-          </div>
+          {showPreLaunchReadiness ? (
+            <LaunchingActionBar
+              launching={launching}
+              launchEnabled={launchEnabled}
+              onLaunch={() => setShowLaunchConfirm(true)}
+              onBack={() => setStep(1)}
+              campaignId={effectiveCampaignId}
+            />
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              <EmailPrimaryButton variant="secondary" onClick={() => setStep(1)} disabled={launching}>
+                العودة للتعديل
+              </EmailPrimaryButton>
+              {effectiveCampaignId ? (
+                <Link href={`/admin/email-analytics/campaigns/${effectiveCampaignId}`} className="inline-flex items-center text-sm font-bold text-cyan-600">
+                  عرض تفاصيل الحملة
+                </Link>
+              ) : null}
+            </div>
+          )}
         </section>
       ) : null}
 
@@ -770,7 +829,7 @@ export default function EmailComposePage() {
         confirmLabel="نعم، ابدأ الحملة"
         cancelLabel="إلغاء"
         danger
-        busy={busy}
+        busy={busy || launching}
         onCancel={() => setShowLaunchConfirm(false)}
         onConfirm={launch}
       />
