@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
   const bootstrapRequestRef = useRef(0);
   const bootstrapAbortRef = useRef(null);
   const mountedRef = useRef(false);
+  const previousAccessTokenRef = useRef(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -158,6 +159,33 @@ export function AuthProvider({ children }) {
     setProfileReady(true);
     setAuthResolved(true);
   }, []);
+
+  const notifyPasswordSecurityChange = useCallback(
+    async (trigger, previousAccessToken = null) => {
+      try {
+        let priorToken = previousAccessToken || previousAccessTokenRef.current || null;
+        if (!priorToken) {
+          const { data } = await supabase.auth.getSession();
+          priorToken = data?.session?.access_token || null;
+        }
+
+        await fetch("/api/auth/password-security-changed", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trigger,
+            previousAccessToken: priorToken,
+          }),
+        });
+      } catch (err) {
+        console.warn("Password security revocation skipped:", err?.message || err);
+      } finally {
+        clearAuthenticatedUser();
+      }
+    },
+    [clearAuthenticatedUser]
+  );
 
   const markAuthErrorForRequest = useCallback(
     (requestId) => {
@@ -386,6 +414,10 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.access_token) {
+        previousAccessTokenRef.current = session.access_token;
+      }
+
       if (event === "INITIAL_SESSION") {
         if (session?.user?.email && !initCompleteRef.current) {
           applyAuthenticatedUser(session.user);
@@ -439,7 +471,7 @@ export function AuthProvider({ children }) {
       active = false;
       subscription.unsubscribe();
     };
-  }, [applyAuthenticatedUser, clearAuthenticatedUser]);
+  }, [applyAuthenticatedUser, clearAuthenticatedUser, notifyPasswordSecurityChange]);
 
   const retryAuth = useCallback(() => {
     const { requestId, signal } = beginAuthBootstrap();
@@ -601,6 +633,7 @@ export function AuthProvider({ children }) {
       acknowledgeSignIn,
       logout,
       retryAuth,
+      notifyPasswordSecurityChange,
       updateUser: setUser,
     }),
     [
@@ -620,6 +653,7 @@ export function AuthProvider({ children }) {
       acknowledgeSignIn,
       logout,
       retryAuth,
+      notifyPasswordSecurityChange,
     ]
   );
 
