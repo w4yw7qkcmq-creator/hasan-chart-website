@@ -102,50 +102,86 @@ function LoginSpinner({ className = "h-5 w-5" }) {
   );
 }
 
+function AmbientBackground() {
+  return (
+    <div className="login-ambient" aria-hidden="true">
+      <div className="login-ambient__base" />
+      <div className="login-ambient__grid" />
+      <div className="login-ambient__glow login-ambient__glow--left" />
+      <div className="login-ambient__glow login-ambient__glow--right" />
+      <div className="login-ambient__glow login-ambient__glow--center" />
+      <svg className="login-ambient__traces hidden lg:block" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" fill="none">
+        <path d="M0 680 Q320 620 640 640 T1280 580 T1920 520" stroke="rgba(34,211,238,0.06)" strokeWidth="2" />
+        <path d="M0 820 Q400 760 800 780 T1600 720" stroke="rgba(59,130,246,0.05)" strokeWidth="1.5" />
+        <circle cx="420" cy="640" r="3" fill="rgba(34,211,238,0.12)" />
+        <circle cx="980" cy="580" r="2.5" fill="rgba(34,211,238,0.1)" />
+        <circle cx="1540" cy="520" r="3" fill="rgba(34,211,238,0.12)" />
+      </svg>
+      <div className="login-ambient__tickers hidden lg:block">
+        <span className="login-ambient__ticker login-ambient__ticker--1">BTC</span>
+        <span className="login-ambient__ticker login-ambient__ticker--2">XAU</span>
+        <span className="login-ambient__ticker login-ambient__ticker--3">EUR/USD</span>
+        <span className="login-ambient__ticker login-ambient__ticker--4">NASDAQ</span>
+      </div>
+    </div>
+  );
+}
+
 function MarketChartVisual() {
+  const chartPoints = [
+    [70, 108],
+    [150, 88],
+    [230, 68],
+    [310, 48],
+    [390, 36],
+    [450, 28],
+  ];
+
   return (
     <div className="pointer-events-none relative mx-auto w-full max-w-lg" aria-hidden="true">
-      <div className="login-market-chart__glow absolute inset-0 rounded-[32px] bg-gradient-to-t from-cyan-400/10 via-blue-500/5 to-transparent blur-2xl" />
-      <svg viewBox="0 0 480 160" className="relative w-full text-cyan-300/70" fill="none">
+      <div className="login-market-chart__glow absolute inset-0 rounded-[32px] blur-2xl" />
+      <svg viewBox="0 0 480 160" className="relative w-full" fill="none">
         <defs>
           <linearGradient id="login-chart-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(34,211,238,0.18)" />
+            <stop offset="0%" className="login-market-chart__fill" stopColor="rgba(34,211,238,0.28)" />
             <stop offset="100%" stopColor="rgba(34,211,238,0)" />
           </linearGradient>
         </defs>
         {[40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440].map((x) => (
-          <line key={x} x1={x} y1="20" x2={x} y2="140" stroke="rgba(148,163,184,0.08)" strokeWidth="1" />
+          <line key={x} x1={x} y1="20" x2={x} y2="140" stroke="rgba(148,163,184,0.14)" strokeWidth="1" />
         ))}
         {[40, 70, 100, 130].map((y) => (
-          <line key={y} x1="30" y1={y} x2="450" y2={y} stroke="rgba(148,163,184,0.06)" strokeWidth="1" />
+          <line key={y} x1="30" y1={y} x2="450" y2={y} stroke="rgba(148,163,184,0.1)" strokeWidth="1" />
         ))}
         <path
-          d="M30 120 L70 108 L110 112 L150 88 L190 92 L230 68 L270 72 L310 48 L350 56 L390 36 L430 42 L450 28"
+          d="M30 120 L70 108 L110 112 L150 88 L190 92 L230 68 L270 72 L310 48 L350 56 L390 36 L430 42 L450 28 L450 140 L30 140 Z"
           fill="url(#login-chart-fill)"
           stroke="none"
         />
         <path
           className="login-market-chart__line"
           d="M30 120 L70 108 L110 112 L150 88 L190 92 L230 68 L270 72 L310 48 L350 56 L390 36 L430 42 L450 28"
-          stroke="currentColor"
-          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <circle cx="450" cy="28" r="4" fill="rgba(34,211,238,0.85)" />
+        {chartPoints.map(([cx, cy]) => (
+          <circle key={`${cx}-${cy}`} className="login-market-chart__dot" cx={cx} cy={cy} r="3.5" />
+        ))}
+        <circle className="login-market-chart__dot" cx="450" cy="28" r="4.5" />
       </svg>
     </div>
   );
 }
 
-function FeatureCard({ icon: Icon, title, description }) {
+function FeatureCard({ icon: Icon, titleAr, labelEn, description }) {
   return (
-    <article className="login-feature-card group rounded-[22px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md transition duration-200 hover:border-cyan-300/25 hover:bg-white/[0.07] md:p-5">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200 transition group-hover:border-cyan-300/35 group-hover:text-cyan-100">
+    <article className="login-feature-card group rounded-[22px] p-4 backdrop-blur-md md:p-5">
+      <div className="login-feature-card__icon mb-3 flex h-10 w-10 items-center justify-center rounded-2xl transition group-hover:border-cyan-300/45">
         <Icon className="h-5 w-5" />
       </div>
-      <h3 className="text-sm font-bold text-white md:text-base">{title}</h3>
-      <p className="mt-1 text-xs leading-relaxed text-slate-400 md:text-sm">{description}</p>
+      <h3 className="login-feature-card__title text-sm font-bold md:text-base">{titleAr}</h3>
+      <p className="login-feature-card__label-en mt-0.5 text-[10px] font-semibold uppercase md:text-[11px]">{labelEn}</p>
+      <p className="login-feature-card__desc mt-1.5 text-xs leading-relaxed md:text-sm">{description}</p>
     </article>
   );
 }
@@ -161,40 +197,38 @@ function MarketingPanel({ compact = false }) {
   }
 
   return (
-    <section className="relative flex flex-col overflow-hidden rounded-[32px] border border-cyan-300/15 bg-gradient-to-br from-[#0b63ff]/18 via-[#07142f]/92 to-[#020617]/96 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur-2xl md:p-8 lg:p-10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(37,99,235,0.35),transparent_38%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.12),transparent_32%)]" />
-      <div className="pointer-events-none absolute -start-24 top-16 h-64 w-64 rounded-full bg-blue-600/15 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-10 end-10 h-72 w-72 rounded-full bg-cyan-400/8 blur-3xl" />
+    <section className="login-marketing-panel relative flex flex-col overflow-hidden rounded-[32px] p-6 backdrop-blur-2xl md:p-8 lg:p-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(37,99,235,0.28),transparent_40%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.14),transparent_34%)]" />
 
       <div className="relative z-10 flex flex-1 flex-col">
         <div className="flex items-center gap-3">
           <BrandMark size="sm" />
           <div>
             <p className="text-lg font-black text-white md:text-xl">HasaN CharT World</p>
-            <p className="text-xs text-slate-400 md:text-sm">Trading Intelligence Platform</p>
+            <p className="text-xs text-slate-300 md:text-sm">Trading Intelligence Platform</p>
           </div>
         </div>
 
-        <div className="my-8 lg:my-10">
-          <span className="inline-flex rounded-full border border-blue-300/20 bg-blue-500/12 px-3 py-1.5 text-xs font-bold text-blue-200 md:text-sm">
+        <div className="my-7 lg:my-9">
+          <span className="login-marketing-badge inline-flex rounded-full px-3.5 py-1.5 text-xs font-bold md:text-sm">
             تجربة سوق متكاملة
           </span>
-          <h1 className="mt-5 max-w-xl text-2xl font-black leading-tight tracking-tight text-white md:text-3xl lg:text-4xl xl:text-[2.6rem] xl:leading-[1.15]">
+          <h1 className="login-marketing-title mt-5 max-w-xl text-2xl font-black leading-[1.25] tracking-tight md:text-3xl lg:text-[2.35rem] lg:leading-[1.2]">
             منصة واحدة. رؤية أوضح للسوق.
           </h1>
-          <p className="mt-4 max-w-lg text-sm leading-7 text-slate-300 md:text-base md:leading-8">
+          <p className="login-marketing-desc mt-4 max-w-lg text-sm leading-7 md:text-base md:leading-8">
             الأسعار المباشرة، التحليلات، التنبيهات والأخبار المالية في تجربة واحدة.
           </p>
         </div>
 
-        <div className="mb-8 lg:mb-10">
+        <div className="mb-7 lg:mb-9">
           <MarketChartVisual />
         </div>
 
         <div className="mt-auto grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-          <FeatureCard icon={IconTrending} title="Live Markets" description="تحركات السوق لحظيًا" />
-          <FeatureCard icon={IconChart} title="Smart Analysis" description="أدوات تحليل متقدمة" />
-          <FeatureCard icon={IconBell} title="24/7 Alerts" description="تنبيهات لا تتوقف" />
+          <FeatureCard icon={IconTrending} titleAr="الأسواق المباشرة" labelEn="Live Markets" description="تحركات السوق لحظيًا" />
+          <FeatureCard icon={IconChart} titleAr="التحليل الذكي" labelEn="Smart Analysis" description="أدوات تحليل متقدمة" />
+          <FeatureCard icon={IconBell} titleAr="تنبيهات 24/7" labelEn="Alerts" description="تنبيهات لا تتوقف" />
         </div>
       </div>
     </section>
@@ -550,36 +584,32 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-[#020617] text-slate-900">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(0,102,255,0.38),transparent_32%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.14),transparent_28%),linear-gradient(145deg,#020617,#07142f_50%,#030712)]" />
-      <div className="pointer-events-none fixed inset-0 opacity-[0.14] bg-[linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:72px_72px]" />
+    <main className="login-page relative min-h-[100dvh] w-full overflow-x-hidden">
+      <AmbientBackground />
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1280px] items-center px-4 py-6 md:px-6 md:py-8 lg:px-8">
-        <div className="grid w-full grid-cols-1 gap-5 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)] lg:gap-6 xl:gap-8">
-          {/* Marketing — desktop left, hidden on mobile */}
-          <div className="hidden lg:block">
+      <div className="login-page__content mx-auto flex min-h-[100dvh] w-full max-w-[min(1360px,100%)] items-center px-4 py-5 sm:px-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
+        <div className="grid w-full grid-cols-1 gap-5 lg:grid-cols-[minmax(0,54fr)_minmax(0,46fr)] lg:gap-7 xl:gap-8">
+          <div className="hidden lg:block lg:order-1">
             <MarketingPanel />
           </div>
 
-          {/* Login panel — first on mobile */}
-          <section className="login-card-hover order-first flex items-center justify-center rounded-[32px] border border-white/20 bg-white/[0.97] p-5 shadow-[0_28px_80px_rgba(2,6,23,0.35)] backdrop-blur-xl transition duration-200 md:p-7 lg:p-8">
-            <div className="w-full max-w-md">
-              {/* Mobile compact marketing */}
+          <section className="login-card order-first rounded-[32px] p-5 transition duration-200 md:p-6 lg:order-2 lg:self-center lg:p-7">
+            <div className="w-full max-w-md mx-auto">
               <div className="lg:hidden">
                 <MarketingPanel compact />
               </div>
 
-              <div className="mb-6 text-center lg:mb-8">
-                <div className="mx-auto mb-4 flex justify-center lg:mb-5">
+              <div className="mb-5 text-center lg:mb-6">
+                <div className="mx-auto mb-3 flex justify-center lg:mb-4">
                   <BrandMark size="sm" />
                 </div>
-                <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-3xl">مرحبًا بعودتك</h1>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500 md:text-base">
+                <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-[1.75rem]">مرحبًا بعودتك</h1>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600 md:text-base">
                   سجّل دخولك للوصول إلى حسابك وأدواتك في HasaN CharT World
                 </p>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-4 md:space-y-5" noValidate>
+              <form onSubmit={handleLogin} className="space-y-4" noValidate>
                 {formError ? (
                   <div
                     role="alert"
@@ -591,7 +621,7 @@ export default function LoginPage() {
                 ) : null}
 
                 <div className="space-y-2">
-                  <label htmlFor="login-email" className="block text-sm font-bold text-slate-700">
+                  <label htmlFor="login-email" className="block text-sm font-bold text-slate-800">
                     البريد الإلكتروني
                   </label>
                   <input
@@ -609,15 +639,15 @@ export default function LoginPage() {
                       if (formError) setFormError("");
                     }}
                     required
-                    className="login-input w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-start text-slate-900 outline-none placeholder:text-slate-400 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/15 md:px-5 md:py-4"
+                    className="login-input w-full rounded-2xl px-4 py-3.5 text-start text-slate-900 outline-none placeholder:text-slate-400 md:px-5 md:py-4"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="login-password" className="block text-sm font-bold text-slate-700">
+                  <label htmlFor="login-password" className="block text-sm font-bold text-slate-800">
                     كلمة المرور
                   </label>
-                  <div className="relative">
+                  <div className="login-password-field">
                     <input
                       id="login-password"
                       name="password"
@@ -631,13 +661,13 @@ export default function LoginPage() {
                         if (formError) setFormError("");
                       }}
                       required
-                      className="login-input w-full rounded-2xl border border-slate-200 bg-white py-3.5 pe-12 ps-4 text-start text-slate-900 outline-none placeholder:text-slate-400 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/15 md:py-4 md:pe-14 md:ps-5"
+                      className="login-input login-password-input w-full rounded-2xl py-3.5 text-slate-900 outline-none placeholder:text-slate-400 md:py-4"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
                       aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-                      className="absolute inset-y-0 end-2 flex h-full min-w-[44px] items-center justify-center rounded-xl text-slate-400 transition hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40 md:end-3"
+                      className="login-password-toggle"
                     >
                       {showPassword ? <IconEyeOff className="h-5 w-5" /> : <IconEye className="h-5 w-5" />}
                     </button>
@@ -672,7 +702,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-6 py-3.5 font-black text-white shadow-[0_16px_40px_rgba(37,99,235,0.32)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-65 md:py-4"
+                  className="login-submit-btn group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-l from-blue-700 via-blue-600 to-cyan-500 px-6 py-3.5 font-black text-white disabled:cursor-not-allowed disabled:opacity-65 md:py-4"
                 >
                   {loading ? (
                     <>
@@ -694,8 +724,8 @@ export default function LoginPage() {
                   </Link>
                 </p>
 
-                <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
-                  <IconLock className="h-3.5 w-3.5 shrink-0" />
+                <p className="login-security-note flex items-center justify-center gap-1.5 text-xs">
+                  <IconLock className="h-3.5 w-3.5 shrink-0 opacity-70" />
                   <span>اتصال آمن</span>
                 </p>
               </form>

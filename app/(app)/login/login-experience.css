@@ -1,7 +1,312 @@
-/* Login Experience — Premium Fintech UI (client-only styling) */
+/* Login Experience Phase 1.1 — Premium Fintech Full-Screen UI */
 
+/* ── Layer 0–2: Full-viewport ambient background ── */
+.login-page {
+  --login-navy: #020617;
+  --login-navy-mid: #07142f;
+  --login-blue: #0b63ff;
+  --login-cyan: #22d3ee;
+  background: var(--login-navy);
+  color: #0f172a;
+}
+
+.login-ambient {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  width: 100vw;
+  min-height: 100dvh;
+}
+
+.login-ambient__base {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 55% at 12% 8%, rgba(11, 99, 255, 0.42), transparent 52%),
+    radial-gradient(ellipse 70% 50% at 88% 12%, rgba(34, 211, 238, 0.2), transparent 48%),
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(67, 56, 202, 0.12), transparent 55%),
+    linear-gradient(155deg, #020617 0%, #07142f 42%, #030712 100%);
+}
+
+.login-ambient__grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.09) 1px, transparent 1px),
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 45%, black 20%, transparent 78%);
+}
+
+.login-ambient__glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+}
+
+.login-ambient__glow--left {
+  width: min(42vw, 520px);
+  height: min(42vw, 520px);
+  left: -8%;
+  top: 18%;
+  background: rgba(37, 99, 235, 0.22);
+}
+
+.login-ambient__glow--right {
+  width: min(38vw, 480px);
+  height: min(38vw, 480px);
+  right: -6%;
+  bottom: 12%;
+  background: rgba(34, 211, 238, 0.14);
+}
+
+.login-ambient__glow--center {
+  width: min(50vw, 640px);
+  height: min(30vw, 360px);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.login-ambient__traces {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+}
+
+.login-ambient__tickers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.login-ambient__ticker {
+  position: absolute;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.07);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.login-ambient__ticker--1 {
+  font-size: clamp(3rem, 8vw, 7rem);
+  left: 2%;
+  top: 22%;
+  transform: rotate(-12deg);
+}
+
+.login-ambient__ticker--2 {
+  font-size: clamp(2.5rem, 6vw, 5.5rem);
+  right: 4%;
+  top: 38%;
+  transform: rotate(8deg);
+}
+
+.login-ambient__ticker--3 {
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  left: 6%;
+  bottom: 18%;
+  transform: rotate(-6deg);
+}
+
+.login-ambient__ticker--4 {
+  font-size: clamp(2.2rem, 5.5vw, 5rem);
+  right: 8%;
+  bottom: 28%;
+  transform: rotate(10deg);
+}
+
+@media (max-width: 1023px) {
+  .login-ambient__tickers,
+  .login-ambient__traces {
+    display: none;
+  }
+
+  .login-ambient__grid {
+    opacity: 0.08;
+  }
+}
+
+@media (max-width: 639px) {
+  .login-ambient__glow--left,
+  .login-ambient__glow--right {
+    opacity: 0.65;
+  }
+}
+
+/* ── Content layer ── */
+.login-page__content {
+  position: relative;
+  z-index: 10;
+}
+
+/* ── Marketing glass panel ── */
+.login-marketing-panel {
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background: linear-gradient(
+    145deg,
+    rgba(11, 99, 255, 0.22) 0%,
+    rgba(7, 20, 47, 0.82) 45%,
+    rgba(2, 6, 23, 0.88) 100%
+  );
+  box-shadow:
+    0 24px 80px rgba(2, 6, 23, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.login-marketing-badge {
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(37, 99, 235, 0.2));
+  color: #e0f2fe;
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.12);
+}
+
+.login-marketing-title {
+  color: #f8fafc;
+}
+
+.login-marketing-desc {
+  color: #cbd5e1;
+}
+
+/* ── Chart ── */
+.login-market-chart__line {
+  stroke: rgba(34, 211, 238, 0.92);
+  stroke-width: 2.75;
+  stroke-dasharray: 1200;
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.35));
+  animation: login-chart-draw 4s ease-out forwards;
+}
+
+.login-market-chart__fill {
+  stop-color: rgba(34, 211, 238, 0.28);
+}
+
+.login-market-chart__glow {
+  background: radial-gradient(ellipse at 70% 30%, rgba(34, 211, 238, 0.18), transparent 65%);
+  animation: login-chart-glow 8s ease-in-out infinite;
+}
+
+.login-market-chart__dot {
+  fill: #22d3ee;
+  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.6));
+}
+
+/* ── Feature cards ── */
+.login-feature-card {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  box-shadow: 0 8px 32px rgba(2, 6, 23, 0.2);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.login-feature-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 12px 40px rgba(2, 6, 23, 0.28), 0 0 20px rgba(34, 211, 238, 0.06);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+}
+
+.login-feature-card__icon {
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: rgba(14, 165, 233, 0.14);
+  color: #67e8f9;
+}
+
+.login-feature-card__title {
+  color: #f1f5f9;
+}
+
+.login-feature-card__label-en {
+  color: rgba(103, 232, 249, 0.75);
+  letter-spacing: 0.12em;
+}
+
+.login-feature-card__desc {
+  color: #94a3b8;
+}
+
+/* ── Login card glass ── */
+.login-card {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 28px 80px rgba(2, 6, 23, 0.32),
+    0 0 0 1px rgba(59, 130, 246, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+}
+
+.login-card:hover {
+  box-shadow:
+    0 32px 88px rgba(2, 6, 23, 0.36),
+    0 0 0 1px rgba(59, 130, 246, 0.08);
+}
+
+/* ── Password field — LTR container, fixed eye on physical right ── */
+.login-password-field {
+  position: relative;
+  direction: ltr;
+}
+
+.login-password-input {
+  padding-right: 3.25rem !important;
+  padding-left: 1rem !important;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .login-password-input {
+    padding-right: 3.5rem !important;
+    padding-left: 1.25rem !important;
+  }
+}
+
+.login-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.375rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 0.75rem;
+  color: #64748b;
+  transition: color 0.15s ease;
+}
+
+.login-password-toggle:hover {
+  color: #334155;
+}
+
+.login-password-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.45);
+}
+
+/* ── Inputs ── */
 .login-input {
+  border-color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.98);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.login-input:focus {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.18);
 }
 
 .login-input:-webkit-autofill,
@@ -19,6 +324,34 @@
   -moz-text-fill-color: #0f172a !important;
 }
 
+/* ── Login button ── */
+.login-submit-btn {
+  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.34);
+  transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login-submit-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 18px 44px rgba(37, 99, 235, 0.4);
+}
+
+.login-submit-btn:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.login-submit-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.28), 0 16px 40px rgba(37, 99, 235, 0.34);
+}
+
+/* ── Security reassurance ── */
+.login-security-note {
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  color: #94a3b8;
+}
+
+/* ── Animations ── */
 @keyframes login-chart-draw {
   from {
     stroke-dashoffset: 1200;
@@ -31,33 +364,10 @@
 @keyframes login-chart-glow {
   0%,
   100% {
-    opacity: 0.35;
+    opacity: 0.45;
   }
   50% {
-    opacity: 0.55;
-  }
-}
-
-.login-market-chart__line {
-  stroke-dasharray: 1200;
-  animation: login-chart-draw 4s ease-out forwards;
-}
-
-.login-market-chart__glow {
-  animation: login-chart-glow 6s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-market-chart__line,
-  .login-market-chart__glow {
-    animation: none;
-    stroke-dashoffset: 0;
-    opacity: 0.4;
-  }
-
-  .login-card-hover,
-  .login-feature-card {
-    transition: none !important;
+    opacity: 0.65;
   }
 }
 
@@ -72,6 +382,26 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .login-market-chart__line,
+  .login-market-chart__glow {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  .login-feature-card,
+  .login-card {
+    transition: none !important;
+  }
+
+  .login-feature-card:hover {
+    transform: none;
+  }
+
+  .login-submit-btn:active:not(:disabled) {
+    transform: none;
+  }
+
   .login-spinner {
     animation: none;
     opacity: 0.7;

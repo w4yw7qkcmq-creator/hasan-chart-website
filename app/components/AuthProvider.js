@@ -508,18 +508,19 @@ export function AuthProvider({ children }) {
     bootstrapAbortRef.current?.abort();
 
     try {
+      // Clear in-memory Supabase session while tokens are still valid; server logout revokes afterward.
+      await supabase.auth.signOut({ scope: "local" });
+    } catch (err) {
+      console.warn("Supabase signOut skipped:", err?.message || err);
+    }
+
+    try {
       await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
     } catch (err) {
       console.warn("Logout cookie clear skipped:", err?.message || err);
-    }
-
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn("Supabase signOut skipped:", err?.message || err);
     }
 
     clearAuthenticatedUser();
