@@ -182,15 +182,20 @@ function MarketRegion() {
     <section className="login-market-region" aria-label="تجربة السوق">
       <div className="login-market-region__glow" aria-hidden="true" />
       <div className="login-market-region__inner">
-        <div className="login-market-region__brand">
-          <BrandMark size="sm" />
-          <div>
-            <p className="text-base font-black text-white md:text-lg">HasaN CharT World</p>
-            <p className="text-[11px] text-slate-300 md:text-xs">Trading Intelligence Platform</p>
+        <div className="login-market-region__header">
+          <div className="login-market-region__brand">
+            <div className="login-market-region__brand-row">
+              <BrandMark size="sm" />
+              <p className="text-base font-black text-white md:text-lg">HasaN CharT World</p>
+            </div>
+            <p className="login-market-region__brand-tagline text-[11px] text-slate-300 md:text-xs">
+              Trading Intelligence Platform
+            </p>
           </div>
         </div>
 
-        <div className="login-market-region__copy">
+        <div className="login-market-region__composition">
+          <div className="login-market-region__copy">
           <span className="login-marketing-badge inline-flex rounded-full px-3 py-1 text-[11px] font-bold md:px-3.5 md:py-1.5 md:text-xs">
             تجربة سوق متكاملة
           </span>
@@ -210,6 +215,7 @@ function MarketRegion() {
           <FeatureCard icon={IconTrending} titleAr="الأسواق المباشرة" labelEn="Live Markets" description="تحركات السوق لحظيًا" />
           <FeatureCard icon={IconChart} titleAr="التحليل الذكي" labelEn="Smart Analysis" description="أدوات تحليل متقدمة" />
           <FeatureCard icon={IconBell} titleAr="تنبيهات 24/7" labelEn="Alerts" description="تنبيهات لا تتوقف" />
+        </div>
         </div>
       </div>
     </section>
