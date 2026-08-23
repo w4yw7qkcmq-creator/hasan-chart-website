@@ -159,9 +159,10 @@
   pointer-events: none;
   position: absolute;
   inset: 0;
+  /* Uniform atmosphere — avoid localized upper hotspots that read as text rectangles */
   background:
-    radial-gradient(circle at 22% 10%, rgba(37, 99, 235, 0.22), transparent 50%),
-    radial-gradient(circle at 78% 82%, rgba(34, 211, 238, 0.08), transparent 42%);
+    radial-gradient(ellipse 130% 95% at 50% -8%, rgba(37, 99, 235, 0.07), transparent 72%),
+    radial-gradient(ellipse 110% 70% at 50% 105%, rgba(34, 211, 238, 0.04), transparent 68%);
 }
 
 .login-market-region__brand {
@@ -177,6 +178,9 @@
   margin-bottom: 0;
   text-align: right;
   flex-shrink: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .login-market-region__header {
@@ -190,6 +194,9 @@
   padding-inline: clamp(1.25rem, 2.2vw, 2.25rem);
   box-sizing: border-box;
   pointer-events: none;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .login-market-region__header .login-market-region__brand {
@@ -203,6 +210,9 @@
   min-height: 0;
   width: 100%;
   padding-top: clamp(11rem, 16.2vh, 12.5rem);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .login-market-region__brand-row {
@@ -210,11 +220,17 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .login-market-region__brand-tagline {
   margin: 0;
   text-align: right;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .login-market-region__copy {
@@ -224,6 +240,10 @@
   padding-top: clamp(0.15rem, 0.35vh, 0.35rem);
   background: transparent;
   text-align: center;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .login-market-region__chart {
@@ -249,20 +269,22 @@
 }
 
 .login-marketing-badge {
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(37, 99, 235, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
   color: #e0f2fe;
   box-shadow: none;
 }
 
 .login-marketing-title {
   color: #f8fafc;
-  text-shadow: 0 1px 28px rgba(2, 6, 23, 0.35);
+  background: transparent;
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.32);
 }
 
 .login-marketing-desc {
   color: #cbd5e1;
-  text-shadow: 0 1px 18px rgba(2, 6, 23, 0.28);
+  background: transparent;
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.24);
 }
 
 /* ── Chart — subtle glass surface ── */
