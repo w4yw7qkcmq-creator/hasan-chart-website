@@ -2,12 +2,14 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "../../../../lib/auth-session.js";
 import { resolveIamContext } from "../../../../lib/iam/resolve-permissions.js";
-import { endAdminSessionLog } from "../../../../lib/iam/session-log.js";
 import { recordAdminLogoutEvent } from "../../../../lib/iam/auth-events.js";
+import { revokeCurrentSession } from "../../../../lib/iam/session-revocation-service.js";
+import { REVOCATION_REASONS } from "../../../../lib/iam/revocation-reasons.js";
 
 export async function POST(request) {
   const cookieStore = await cookies();
   const token = cookieStore.get("hc_access_token")?.value;
+  const refreshToken = cookieStore.get("hc_refresh_token")?.value;
   const supabase = getSupabaseAdmin();
 
   let user = null;
@@ -19,18 +21,29 @@ export async function POST(request) {
     if (user) {
       const iam = await resolveIamContext(supabase, user);
       isAdmin = Boolean(iam.isAdmin);
-      if (isAdmin) {
-        await endAdminSessionLog(supabase, {
-          userId: user.id,
-          token,
-          reason: "logout",
-        });
-      }
+
+      await revokeCurrentSession(supabase, {
+        token,
+        refreshToken,
+        userId: user.id,
+        reason: REVOCATION_REASONS.USER_LOGOUT,
+        endSessionLog: isAdmin,
+        request,
+      });
+
       await recordAdminLogoutEvent(supabase, {
         userId: user.id,
         email: user.email,
         isAdmin,
-        reason: "logout",
+        reason: REVOCATION_REASONS.USER_LOGOUT,
+        request,
+      });
+    } else {
+      await revokeCurrentSession(supabase, {
+        token,
+        refreshToken,
+        reason: REVOCATION_REASONS.USER_LOGOUT,
+        endSessionLog: false,
         request,
       });
     }
