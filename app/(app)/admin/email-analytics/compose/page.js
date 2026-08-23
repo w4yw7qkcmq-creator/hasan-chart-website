@@ -156,6 +156,13 @@ export default function EmailComposePage() {
     [adminFetch, loadReadiness]
   );
 
+  const loadPreview = useCallback(async () => {
+    if (!effectiveCampaignId) return;
+    const res = await adminFetch(`/api/admin/email-campaigns/${effectiveCampaignId}/preview`);
+    const data = await res.json();
+    if (data.success) setPreviewHtml(data.preview.html);
+  }, [adminFetch, effectiveCampaignId]);
+
   useEffect(() => {
     const fromUrl = String(searchParams?.get("campaign") || "").trim();
     if (fromUrl && fromUrl !== campaignId) {
@@ -241,13 +248,6 @@ export default function EmailComposePage() {
       setBusy(false);
     }
   }, [adminFetch, campaignId, loadReadiness, saveDraft, syncCampaignInUrl]);
-
-  const loadPreview = useCallback(async () => {
-    if (!effectiveCampaignId) return;
-    const res = await adminFetch(`/api/admin/email-campaigns/${effectiveCampaignId}/preview`);
-    const data = await res.json();
-    if (data.success) setPreviewHtml(data.preview.html);
-  }, [adminFetch, effectiveCampaignId]);
 
   useEffect(() => {
     setAudienceLoading(true);
