@@ -19,10 +19,12 @@ export async function GET(request) {
 
   try {
     assertNoMockInProduction();
-    await ensureMarketSymbolsRegistry();
-    await ensureMarketDepthConsumer(consumerReason);
-
     const validation = validateMarketDepthQuery(new URL(request.url).searchParams);
+    await Promise.all([
+      ensureMarketSymbolsRegistry(),
+      ensureMarketDepthConsumer(consumerReason),
+    ]);
+
     if (!validation.valid) {
       releaseMarketDepthConsumer(consumerReason);
       return new Response(JSON.stringify({ success: false, error: validation.error }), {
@@ -84,10 +86,7 @@ export async function GET(request) {
       start(controller) {
         const pushSnapshot = () => {
           if (request.signal.aborted) return;
-          const payload = hub.getSnapshot(params);
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ success: true, ...payload })}\n\n`)
-          );
+          controller.enqueue(encoder.encode(hub.getSerializedSseChunk(params)));
         };
 
         controller.enqueue(encoder.encode(": connected\n\n"));
