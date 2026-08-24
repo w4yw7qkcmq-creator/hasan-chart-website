@@ -37,6 +37,9 @@ const ALLOWED_IMPORT_MARKERS = [
   "lib/rate-limit",
 ];
 
+// Shared website/worker shims reachable via IAM auth tree — not news-worker runtime.
+const ALLOWED_WORKER_SHIMS = new Set(["worker/lib/email-recipient-guard.cjs"]);
+
 function collectImportStrings(source) {
   const imports = [];
   const patterns = [
@@ -140,7 +143,7 @@ for (const routeFile of WEBSITE_ENTRY_FILES) {
   for (const filePath of tree.visited) {
     const rel = path.relative(repoRoot, filePath).replace(/\\/g, "/");
     if (routeFile.endsWith("system-status/route.js")) {
-      if (rel.startsWith("worker/")) {
+      if (rel.startsWith("worker/") && !ALLOWED_WORKER_SHIMS.has(rel)) {
         forbiddenHits.push(rel);
       }
       continue;

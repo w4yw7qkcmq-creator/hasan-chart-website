@@ -81,6 +81,12 @@ const {
   recordRssImageResolutionOutcome,
   getRssImageTelemetrySnapshot,
 } = require("./lib/general-rss/rss-image-telemetry");
+const {
+  reviewExternalNewsBeforePublish,
+  getEditorTelemetrySnapshot,
+} = require("./lib/general-rss/external-news-editor");
+const { resolveRssSourceImageWithChartPolicy, getChartPolicyTelemetrySnapshot } = require("./lib/general-rss/chart-visual-policy");
+const { auditRssPostPublish } = require("./lib/general-rss/rss-post-publish-audit");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
 const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
@@ -128,7 +134,7 @@ const { markEligibleRssItemProcessed } = require("./lib/general-rss/pipeline");
 const { getSourceHealthEngine } = require("./lib/news-intelligence/autonomy/source-health");
 const { FAILURE_ATTRIBUTION } = require("./lib/news-intelligence/autonomy/failure-attribution");
 
-const parser = new Parser();
+const RSS_DRAFT_AI_TIMEOUT_MS = Number(process.env.RSS_DRAFT_AI_TIMEOUT_MS || 12000);
 
 let checkpointHydrationPromise = Promise.resolve({ loaded: 0, skipped: true });
 
@@ -3471,6 +3477,7 @@ async function analyzeNewsWithAI(title, link, options = {}) {
           Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
+        timeout: RSS_DRAFT_AI_TIMEOUT_MS,
       }
     );
 
@@ -4024,11 +4031,8 @@ async function fetchForexNews(options = {}) {
             editorialMessage: message,
             imageTitle: aiResult.imageTitle,
           });
-      const publicationMessage = rssPresentation?.telegramMessage || message;
-      const combinedNewsIdentity = rssPresentation
-        ? rssPresentation.dedupeIdentity
-        : `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${message || ""}`;
-      const combinedTopicCluster = getNewsTopicCluster(combinedNewsIdentity);
+      let publicationMessage = rssPresentation?.telegramMessage || message;
+      let approvedRssPresentation = rssPresentation;
 
       if (!latestNews.isTelegramSource) {
         const rssEditorialCheck = validateGeneralRssEditorialOutput({
@@ -4060,7 +4064,40 @@ async function fetchForexNews(options = {}) {
           markEligibleRssItemProcessed(latestNews, "editorial_blocked", { dryRun });
           continue eligibleLoop;
         }
+
+        const editorReview = await reviewExternalNewsBeforePublish(
+          {
+            item: latestNews,
+            editorialMessage: message,
+            rssPresentation,
+            imageTitle: aiResult.imageTitle,
+            impactLevel: latestNews.impactLevel || "MEDIUM",
+          },
+          {
+            disableAi: dryRun || !OPENAI_API_KEY,
+            openAiApiKey: OPENAI_API_KEY,
+            editorTimeoutMs: Number(process.env.RSS_EDITOR_TIMEOUT_MS || 10000),
+          }
+        );
+
+        if (!editorReview.ok) {
+          stats.rejectedFilter += 1;
+          recordRssCandidateDecision(latestNews, editorReview.reasonCode || "EDITOR_BLOCKED", {
+            aiUsed: true,
+            metadata: editorReview.metadata || {},
+          });
+          markEligibleRssItemProcessed(latestNews, "editor_blocked", { dryRun });
+          continue eligibleLoop;
+        }
+
+        publicationMessage = editorReview.publicationMessage;
+        approvedRssPresentation = editorReview.rssPresentation;
       }
+
+      const combinedNewsIdentity = approvedRssPresentation
+        ? approvedRssPresentation.dedupeIdentity
+        : `${latestNews.title || ""} ${aiResult.imageTitle || ""} ${publicationMessage || ""}`;
+      const combinedTopicCluster = getNewsTopicCluster(combinedNewsIdentity);
 
       if (combinedTopicCluster) {
         const alreadyPublishedSameCluster = publishedItems.some((publishedItem) => {
@@ -4103,7 +4140,7 @@ async function fetchForexNews(options = {}) {
         }
       }
 
-      const imageTitle = rssPresentation?.imageTitle || aiResult.imageTitle || latestNews.title;
+      const imageTitle = approvedRssPresentation?.imageTitle || aiResult.imageTitle || latestNews.title;
 
       const rssImagePolicy = resolveNewsImagePolicy({
         sourceType: SOURCE_TYPES.RSS_GENERAL,
@@ -4114,10 +4151,11 @@ async function fetchForexNews(options = {}) {
 
       let sourceImageResult = null;
       if (!latestNews.isTelegramSource) {
-        sourceImageResult = await resolveRssSourceImage({
+        sourceImageResult = await resolveRssSourceImageWithChartPolicy({
           source: latestNews.sourceName,
           item: latestNews,
           articleUrl: latestNews.link,
+          chartPolicy: { supabase: getSupabaseClient() },
         });
         recordRssImageResolutionOutcome(latestNews.sourceName, sourceImageResult);
       }
@@ -4144,8 +4182,8 @@ async function fetchForexNews(options = {}) {
         }
 
         const saveResult = await saveNewsPostToSupabase({
-          title: rssPresentation?.siteTitle || latestNews.title || imageTitle,
-          content: rssPresentation?.siteContent || publicationMessage,
+          title: approvedRssPresentation?.siteTitle || latestNews.title || imageTitle,
+          content: approvedRssPresentation?.siteContent || publicationMessage,
           image_url: finalImage || null,
           impact_level: latestNews.impactLevel || "MEDIUM",
           source_link: latestLink,
@@ -4157,8 +4195,21 @@ async function fetchForexNews(options = {}) {
           stats.dbInserted += 1;
         }
 
+        const rssPostAudit = auditRssPostPublish({
+          sourceLink: latestLink,
+          telegramSent: stats.telegramPublished > 0,
+          siteInserted: !saveResult?.error,
+          expectedTitle: approvedRssPresentation?.siteTitle || latestNews.title,
+          savedTitle: approvedRssPresentation?.siteTitle || latestNews.title,
+          expectedImageUrl: finalImage,
+          savedImageUrl: finalImage,
+        });
+        if (!rssPostAudit.ok) {
+          console.warn("RSS_POST_PUBLISH_AUDIT", JSON.stringify(rssPostAudit));
+        }
+
         await dispatchMarketNewsNotifications({
-          title: rssPresentation?.siteTitle || latestNews.title || imageTitle,
+          title: approvedRssPresentation?.siteTitle || latestNews.title || imageTitle,
           sourceLink: latestLink,
           impactLevel: latestNews.impactLevel || "MEDIUM",
         });
@@ -4363,6 +4414,8 @@ function getNewsWorkerHealthSnapshot() {
       distributedLock: getDistributedLockMetrics(),
       telemetry: getTelemetrySnapshot(),
       rssImage: getRssImageTelemetrySnapshot(),
+      externalNewsEditor: getEditorTelemetrySnapshot(),
+      chartVisualPolicy: getChartPolicyTelemetrySnapshot(),
     },
     running: !isFetchingNews,
     lastCycleCompletedAt,

@@ -204,6 +204,7 @@ module.exports = {
   OFFICIAL_CHANNEL_FOOTER_PATTERN,
   normalizeHeadlineComparable,
   stripOfficialChannelFooter,
+  splitEditorialSections,
   bodyStartsWithEquivalentHeadline,
   removeLeadingHeadlineFromBody,
   removeAllEquivalentHeadlineLines,

@@ -196,6 +196,53 @@ export default function NewsSystemStatusPanel() {
         </p>
       ) : null}
 
+      {(() => {
+        const editor = summary?.editorInChief || last24h?.editorInChief;
+        const chart = summary?.chartVisualPolicy || last24h?.chartVisualPolicy;
+        if (!editor && !chart) return null;
+        const reviewed = editor?.attempted ?? 0;
+        const approved = editor?.approved ?? 0;
+        const repaired = editor?.repairSuccess ?? 0;
+        const blocked = editor?.blocked ?? 0;
+        const timeout = editor?.timeout ?? 0;
+        const approvalRate = reviewed > 0 ? `${Math.round((approved / reviewed) * 100)}%` : "—";
+        const repairRate = reviewed > 0 ? `${Math.round((repaired / reviewed) * 100)}%` : "—";
+        const rejectionReasons = [
+          ["numericMismatch", editor?.numericMismatch],
+          ["roleMismatch", editor?.roleMismatch],
+          ["entityMismatch", editor?.entityMismatch],
+          ["attributionMismatch", editor?.attributionMismatch],
+          ["quoteMismatch", editor?.quoteMismatch],
+          ["uncertaintyMismatch", editor?.uncertaintyMismatch],
+          ["headlineBodyMismatch", editor?.headlineBodyMismatch],
+        ]
+          .filter(([, count]) => (count || 0) > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+        return (
+          <>
+            <h3 className="admin-news-system__subtitle">Editor-in-Chief — آخر 24 ساعة</h3>
+            <div className="admin-news-system__metric-grid">
+              <MetricCard label="تمت مراجعته" value={reviewed} />
+              <MetricCard label="موافق عليه" value={approved} />
+              <MetricCard label="تم إصلاحه" value={repaired} />
+              <MetricCard label="محظور" value={blocked} />
+              <MetricCard label="انتهت المهلة" value={timeout} />
+              <MetricCard label="نسبة الموافقة" value={approvalRate} />
+              <MetricCard label="نسبة الإصلاح" value={repairRate} />
+              {chart ? (
+                <MetricCard label="صور الرسم البياني (24س)" value={chart.chartImagesPublished ?? 0} />
+              ) : null}
+            </div>
+            {rejectionReasons.length ? (
+              <p className="admin-news-page__hint">
+                أبرز أسباب الرفض: {rejectionReasons.map(([key, count]) => `${key} (${count})`).join(" · ")}
+              </p>
+            ) : null}
+          </>
+        );
+      })()}
+
       <h3 className="admin-news-system__subtitle">المصادر</h3>
       {sources.length ? (
         <div className="admin-news-system__table-wrap">

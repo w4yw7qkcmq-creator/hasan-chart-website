@@ -44,6 +44,18 @@ const {
   collapseRepeatedNormalizedPhrase,
   resolveCanonicalHeadline,
 } = require("./publication-format");
+const {
+  reviewExternalNewsBeforePublish,
+  resetExternalNewsEditorStateForTests,
+  getEditorTelemetrySnapshot,
+  EDITOR_REASON_CODES,
+} = require("./external-news-editor");
+const {
+  resolveRssSourceImageWithChartPolicy,
+  getChartPolicyTelemetrySnapshot,
+  resetChartPolicyStateForTests,
+} = require("./chart-visual-policy");
+const { auditRssPostPublish } = require("./rss-post-publish-audit");
 
 module.exports = {
   GENERAL_RSS_FEEDS,
@@ -88,4 +100,12 @@ module.exports = {
   removeAllEquivalentHeadlineLines,
   collapseRepeatedNormalizedPhrase,
   resolveCanonicalHeadline,
+  reviewExternalNewsBeforePublish,
+  resetExternalNewsEditorStateForTests,
+  getEditorTelemetrySnapshot,
+  EDITOR_REASON_CODES,
+  resolveRssSourceImageWithChartPolicy,
+  getChartPolicyTelemetrySnapshot,
+  resetChartPolicyStateForTests,
+  auditRssPostPublish,
 };

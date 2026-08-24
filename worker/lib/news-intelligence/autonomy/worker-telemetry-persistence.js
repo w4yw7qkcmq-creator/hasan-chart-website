@@ -23,6 +23,20 @@ async function flushWorkerTelemetrySnapshot(supabase) {
       global: metrics.global,
       latency: metrics.latency,
       funnel: getCycleFunnel(),
+      externalNewsEditor: (() => {
+        try {
+          return require("../../general-rss/external-news-editor/telemetry").getEditorTelemetrySnapshot();
+        } catch {
+          return null;
+        }
+      })(),
+      chartVisualPolicy: (() => {
+        try {
+          return require("../../general-rss/chart-visual-policy/chart-rate-limit").getChartPolicyTelemetrySnapshot();
+        } catch {
+          return null;
+        }
+      })(),
     },
   };
 
