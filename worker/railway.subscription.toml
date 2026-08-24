@@ -2,6 +2,8 @@
 # Root Directory MUST be: worker
 # Config File MUST be: railway.subscription.toml  (set in Railway Dashboard → Settings → Config)
 # Pass 1 target: stop/suspend this always-on service; use railway.subscription-cron.toml instead.
+# Railway production: GitHub auto-deploy MUST stay DISABLED for this service (serviceInstanceAutoDeployUpdate enabled=false).
+# Main pushes must not redeploy this service; Subscription Worker cron (railway.subscription-cron.toml) is the production path.
 # Do NOT set SUBSCRIPTION_WORKER_ONESHOT on this service.
 
 [build]
