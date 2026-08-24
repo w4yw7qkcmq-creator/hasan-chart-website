@@ -18,5 +18,9 @@ assert.match(processor, /process-email-campaigns/);
 assert.match(processor, /CRON_SECRET/);
 assert.match(processor, /NEXT_PUBLIC_SITE_URL|SITE_URL/);
 assert.match(processor, /EMAIL_CAMPAIGN_PROCESSOR_ENABLED/);
+assert.match(processor, /oneshot-cron-bridge/);
+assert.match(campaignToml, /cronSchedule = "\* \* \* \* \*"/);
+assert.match(campaignToml, /restartPolicyType = "NEVER"/);
+assert.doesNotMatch(campaignToml, /restartPolicyType = "ON_FAILURE"/);
 
 console.log("email campaign processor railway config PASS");

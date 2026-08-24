@@ -12,11 +12,15 @@ function read(path) {
 const apiToml = read("worker/railway.subscription.toml");
 const cronToml = read("worker/railway.subscription-cron.toml");
 const workerToml = read("worker/railway.toml");
+const maintenanceWorker = read("worker/subscription-maintenance-worker.js");
 
 assert.match(apiToml, /node subscription-maintenance-worker\.js/);
 assert.match(apiToml, /healthcheckPath = "\/health"/);
-assert.doesNotMatch(cronToml, /subscription-maintenance-worker\.js/);
-assert.match(cronToml, /node subscription-maintenance-cron-caller\.js/);
+assert.match(cronToml, /SUBSCRIPTION_WORKER_ONESHOT=true node subscription-maintenance-worker\.js/);
+assert.match(cronToml, /cronSchedule = "\*\/15 \* \* \* \*"/);
+assert.doesNotMatch(cronToml, /subscription-maintenance-cron-caller\.js/);
+assert.match(maintenanceWorker, /runOneShotCron/);
+assert.match(maintenanceWorker, /SUBSCRIPTION_WORKER_ONESHOT/);
 assert.match(workerToml, /npm start/);
 assert.doesNotMatch(workerToml, /subscription-maintenance-cron-caller/);
 

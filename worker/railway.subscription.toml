@@ -1,7 +1,7 @@
-# Subscription maintenance worker — Railway service: "Subscription Worker"
+# Subscription maintenance HTTP API (legacy) — Railway service: "Subscription Maintenance API"
 # Root Directory MUST be: worker
 # Config File MUST be: railway.subscription.toml  (set in Railway Dashboard → Settings → Config)
-# Service type MUST be: Web Service (always-on) — NOT Cron Job / one-shot
+# Pass 1 target: stop/suspend this always-on service; use railway.subscription-cron.toml instead.
 # Do NOT set SUBSCRIPTION_WORKER_ONESHOT on this service.
 
 [build]

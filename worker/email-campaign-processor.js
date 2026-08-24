@@ -46,6 +46,74 @@ async function runOnce() {
   return data;
 }
 
+function isPersistentPollingMode() {
+  const value = String(process.env.EMAIL_CAMPAIGN_PROCESSOR_PERSISTENT || "")
+    .trim()
+    .toLowerCase();
+
+  return value === "1" || value === "true" || value === "yes";
+}
+
+async function runOneShotCycle() {
+  const started = Date.now();
+
+  try {
+    const result = await runOnce();
+    log("EMAIL_CAMPAIGN_PROCESSOR_CYCLE", {
+      cycleNumber: 1,
+      mode: "oneshot-cron-bridge",
+      ...result,
+      durationMs: Date.now() - started,
+    });
+    process.exit(0);
+  } catch (error) {
+    log("EMAIL_CAMPAIGN_PROCESSOR_CYCLE_FAILED", {
+      cycleNumber: 1,
+      mode: "oneshot-cron-bridge",
+      error: error.message,
+      durationMs: Date.now() - started,
+    });
+    process.exit(1);
+  }
+}
+
+async function runPersistentPollingLoop() {
+  const pollMs = Math.max(Number(process.env.EMAIL_CAMPAIGN_POLL_INTERVAL_MS || 5000), 2000);
+  let cycle = 0;
+  let shutdown = false;
+
+  process.on("SIGTERM", () => {
+    shutdown = true;
+  });
+  process.on("SIGINT", () => {
+    shutdown = true;
+  });
+
+  log("EMAIL_CAMPAIGN_PROCESSOR_STARTED", { pollMs, mode: "persistent-web-cron-bridge" });
+
+  while (!shutdown) {
+    cycle += 1;
+    const started = Date.now();
+    try {
+      const result = await runOnce();
+      log("EMAIL_CAMPAIGN_PROCESSOR_CYCLE", {
+        cycleNumber: cycle,
+        mode: "persistent-web-cron-bridge",
+        ...result,
+        durationMs: Date.now() - started,
+      });
+    } catch (error) {
+      log("EMAIL_CAMPAIGN_PROCESSOR_CYCLE_FAILED", {
+        cycleNumber: cycle,
+        mode: "persistent-web-cron-bridge",
+        error: error.message,
+        durationMs: Date.now() - started,
+      });
+    }
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
+}
+
 async function main() {
   loadEnv();
 
@@ -55,26 +123,13 @@ async function main() {
     process.exit(0);
   }
 
-  const pollMs = Math.max(Number(process.env.EMAIL_CAMPAIGN_POLL_INTERVAL_MS || 5000), 2000);
-  let cycle = 0;
-  let shutdown = false;
-
-  process.on("SIGTERM", () => { shutdown = true; });
-  process.on("SIGINT", () => { shutdown = true; });
-
-  log("EMAIL_CAMPAIGN_PROCESSOR_STARTED", { pollMs, mode: "web-cron-bridge" });
-
-  while (!shutdown) {
-    cycle += 1;
-    const started = Date.now();
-    try {
-      const result = await runOnce();
-      log("EMAIL_CAMPAIGN_PROCESSOR_CYCLE", { cycleNumber: cycle, ...result, durationMs: Date.now() - started });
-    } catch (error) {
-      log("EMAIL_CAMPAIGN_PROCESSOR_CYCLE_FAILED", { cycleNumber: cycle, error: error.message, durationMs: Date.now() - started });
-    }
-    await new Promise((r) => setTimeout(r, pollMs));
+  if (isPersistentPollingMode()) {
+    await runPersistentPollingLoop();
+    return;
   }
+
+  log("EMAIL_CAMPAIGN_PROCESSOR_STARTED", { mode: "oneshot-cron-bridge" });
+  await runOneShotCycle();
 }
 
 main().catch((error) => {
