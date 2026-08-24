@@ -19,17 +19,15 @@ export async function GET() {
     }
 
     const siteOrigin = getPartnerSiteUrl();
-    const dashboard = await getPartnerDashboard(
-      session.supabase,
-      session.id,
-      session.username
-    );
+    const [dashboard, qualifiedReferralReward] = await Promise.all([
+      getPartnerDashboard(session.supabase, session.id, session.username),
+      getPartnerQualifiedReferralRewardOffer(session.supabase),
+    ]);
     const referralLink = buildReferralLink(dashboard.partner.referral_code, siteOrigin);
     const shortReferralLink = buildShortReferralLink(
       dashboard.partner.referral_code,
       siteOrigin
     );
-    const qualifiedReferralReward = await getPartnerQualifiedReferralRewardOffer(session.supabase);
 
     return NextResponse.json({
       success: true,
