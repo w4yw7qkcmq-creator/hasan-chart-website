@@ -1,5 +1,17 @@
 const path = require("path");
 
+// Railway misconfig guard: profiles-last-sign-in-reconcile must not boot price-alerts worker.
+const railwayServiceName = String(
+  process.env.RAILWAY_SERVICE_NAME || process.env.RAILWAY_SERVICE || ""
+).toLowerCase();
+if (
+  railwayServiceName.includes("profiles-last-sign-in") ||
+  process.env.PROFILES_LAST_SIGN_IN_RECONCILE_CRON === "1"
+) {
+  require("./profiles-last-sign-in-reconcile-cron-caller.js");
+  return;
+}
+
 if (process.env.NODE_ENV !== "production") {
   console.log("WORKER_ENTRY_FILE", __filename);
   console.log("WORKER_ENTRY_REALPATH", path.resolve(__filename));

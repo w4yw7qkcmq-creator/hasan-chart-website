@@ -15,6 +15,7 @@ function read(path) {
 const profilesCronToml = read("worker/railway.profiles-last-sign-in-cron.toml");
 const priceAlertsToml = read("worker/railway.toml");
 const caller = read("worker/profiles-last-sign-in-reconcile-cron-caller.js");
+const workerIndex = read("worker/index.js");
 
 assert.match(profilesCronToml, /startCommand = "node profiles-last-sign-in-reconcile-cron-caller\.js"/);
 assert.match(profilesCronToml, /cronSchedule = "0 3 \* \* \*"/);
@@ -29,5 +30,8 @@ assert.doesNotMatch(priceAlertsToml, /cronSchedule/);
 assert.match(caller, /reconcile-profiles-last-sign-in/);
 assert.match(caller, /x-service-account-id/);
 assert.doesNotMatch(caller, /index\.js/);
+
+assert.match(workerIndex, /profiles-last-sign-in-reconcile-cron-caller\.js/);
+assert.match(workerIndex, /RAILWAY_SERVICE_NAME/);
 
 console.log("profiles-last-sign-in railway config guard PASS");
