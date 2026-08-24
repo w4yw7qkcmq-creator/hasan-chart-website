@@ -64,6 +64,9 @@ export async function POST(request) {
   return response;
 }
 
-export async function GET(request) {
-  return POST(request);
+export async function GET() {
+  return NextResponse.json(
+    { success: false, error: "Method not allowed. Use POST to logout." },
+    { status: 405, headers: { Allow: "POST" } }
+  );
 }
