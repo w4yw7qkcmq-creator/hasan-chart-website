@@ -1,6 +1,9 @@
 const { formatDisplayValue, normalizeEconomicFieldValue } = require("../../economic-releases/normalize");
 const { getInterpretationMetadata, getEventArabicName, getFamilyMetadata } = require("./interpretation-registry");
 
+const OFFICIAL_CHANNEL_FOOTER =
+  "📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi";
+
 const LTR = "\u2066";
 const PDF = "\u2069";
 
@@ -51,51 +54,43 @@ function buildChildFactsBlock(event = {}) {
   return `${label}:\n${facts}`;
 }
 
-function formatSingleEditorial(editorial = {}) {
-  const parts = [];
-  parts.push(`🚨 ${editorial.headline}`);
+function joinSections(sections = []) {
+  return sections.filter((section) => section != null && String(section).trim() !== "").join("\n\n").trim();
+}
+
+function buildHeadlineLine(editorial = {}) {
   if (editorial.countryLine) {
-    parts.push(editorial.countryLine);
+    return `🚨 ${editorial.headline} — ${editorial.countryLine}`;
   }
-  parts.push("");
-  parts.push(editorial.factsBlock);
-  if (editorial.interpretation) {
-    parts.push("");
-    parts.push("📊 القراءة:");
-    parts.push(editorial.interpretation);
-  }
-  if (editorial.marketImpact) {
-    parts.push("");
-    parts.push("💵 التأثير المحتمل:");
-    parts.push(editorial.marketImpact);
-  }
-  return parts.filter((line) => line != null && line !== "").join("\n").trim();
+  return `🚨 ${editorial.headline}`;
+}
+
+function formatSingleEditorial(editorial = {}) {
+  return joinSections([
+    buildHeadlineLine(editorial),
+    editorial.factsBlock,
+    editorial.interpretation ? `📊 القراءة:\n${editorial.interpretation}` : null,
+    editorial.marketImpact ? `التأثير:\n${editorial.marketImpact}` : null,
+    OFFICIAL_CHANNEL_FOOTER,
+  ]);
 }
 
 function formatFamilyEditorial(editorial = {}) {
-  const parts = [];
-  parts.push(`🚨 ${editorial.headline}`);
-  if (editorial.countryLine) {
-    parts.push(editorial.countryLine);
-  }
-  parts.push("");
+  const childBlocks = [];
   for (const child of editorial.children || []) {
     const block = buildChildFactsBlock(child);
     if (block) {
-      parts.push(block);
-      parts.push("");
+      childBlocks.push(block);
     }
   }
-  if (editorial.interpretation) {
-    parts.push("📊 القراءة:");
-    parts.push(editorial.interpretation);
-  }
-  if (editorial.marketImpact) {
-    parts.push("");
-    parts.push("💵 التأثير المحتمل:");
-    parts.push(editorial.marketImpact);
-  }
-  return parts.filter((line) => line != null && line !== "").join("\n").trim();
+
+  return joinSections([
+    buildHeadlineLine(editorial),
+    childBlocks.join("\n\n"),
+    editorial.interpretation ? `📊 القراءة:\n${editorial.interpretation}` : null,
+    editorial.marketImpact ? `التأثير:\n${editorial.marketImpact}` : null,
+    OFFICIAL_CHANNEL_FOOTER,
+  ]);
 }
 
 function buildCountryLine(country = "US") {
@@ -114,7 +109,7 @@ function buildSingleStructuredOutput(event, interpretation) {
     marketImpact: interpretation.impactLine,
     importance: getInterpretationMetadata(event.eventType).importance,
     visualPriority: getInterpretationMetadata(event.eventType).visualPriority || "OPTIONAL",
-    editorialVersion: "phase2-v1",
+    editorialVersion: "phase2-v2",
     children: null,
   };
 }
@@ -129,7 +124,7 @@ function buildFamilyStructuredOutput(family, events, familyInterpretation) {
     marketImpact: familyInterpretation.familyImpact,
     importance: familyMeta.importance || "HIGH",
     visualPriority: familyMeta.visualPriority || "REQUIRED",
-    editorialVersion: "phase2-v1-family",
+    editorialVersion: "phase2-v2-family",
     children: events,
     familyUsdBias: familyInterpretation.familyUsdBias,
   };
@@ -143,4 +138,6 @@ module.exports = {
   buildCountryLine,
   buildSingleStructuredOutput,
   buildFamilyStructuredOutput,
+  OFFICIAL_CHANNEL_FOOTER,
+  joinSections,
 };

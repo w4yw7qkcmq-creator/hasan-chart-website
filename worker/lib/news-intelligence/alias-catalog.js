@@ -16,7 +16,7 @@ const US_ALIASES = {
   US_NFP: alias(/\bnfp\b|nonfarm payrolls|non-farm payrolls/i),
   US_UNEMPLOYMENT_RATE: alias(/unemployment rate/i),
   US_AVERAGE_HOURLY_EARNINGS: alias(/average hourly earnings|hourly earnings/i),
-  US_ADP_EMPLOYMENT: alias(/\badp\b|adp employment|adp nonfarm|adp payroll/i),
+  US_ADP_EMPLOYMENT: alias(/\badp\b|adp employment|adp nonfarm|adp payroll|تقرير adp|وظائف adp/i),
   US_JOLTS_JOB_OPENINGS: alias(/\bjolts\b|job openings/i),
   US_INITIAL_JOBLESS_CLAIMS: alias(
     /initial jobless claims/i,
@@ -55,7 +55,8 @@ const US_ALIASES = {
   US_TRADE_BALANCE: alias(/trade balance/i),
   US_CURRENT_ACCOUNT: alias(/current account/i),
   US_SP_GLOBAL_FLASH_MANUFACTURING_PMI: alias(
-    /s&p global.*manufacturing|sp global.*manufacturing|flash manufacturing pmi/i,
+    /s&p global.*manufacturing|sp global.*manufacturing|standard\s*(?:&|and)\s*poor(?:'?s)?.*manufacturing|flash manufacturing pmi/i,
+    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?).*?(?:التصنيع|manufacturing|الصناع)/i,
     /مؤشر مديري المشتريات الصناعي/i,
     /مؤشر مديري المشتريات التصنيعي/i,
     /مديري المشتريات الصناعي/i,
@@ -64,7 +65,8 @@ const US_ALIASES = {
     /مؤشر مديري المشتريات للقطاع التصنيعي/i
   ),
   US_SP_GLOBAL_FLASH_SERVICES_PMI: alias(
-    /s&p global.*services|sp global.*services|flash services pmi/i,
+    /s&p global.*services|sp global.*services|standard\s*(?:&|and)\s*poor(?:'?s)?.*services|flash services pmi/i,
+    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?).*?(?:الخدمات|services)/i,
     /مؤشر مديري المشتريات الخدمي/i,
     /مؤشر مديري المشتريات للخدمات/i,
     /مديري المشتريات الخدمي/i,
@@ -74,7 +76,12 @@ const US_ALIASES = {
   ),
   US_SP_GLOBAL_FINAL_MANUFACTURING_PMI: alias(/final manufacturing pmi|s&p global.*final.*manufacturing/i),
   US_SP_GLOBAL_FINAL_SERVICES_PMI: alias(/final services pmi|s&p global.*final.*services/i),
-  US_SP_GLOBAL_PMI: alias(/s&p global.*composite|sp global.*composite/i),
+  US_SP_GLOBAL_PMI: alias(
+    /s&p global.*composite|sp global.*composite|standard\s*(?:&|and)\s*poor(?:'?s)?.*composite/i,
+    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?).*?(?:المركب|composite)/i,
+    /مؤشر مديري المشتريات المركب/i,
+    /composite pmi/i
+  ),
   US_PHILADELPHIA_FED_MANUFACTURING: alias(/philadelphia fed|philly fed|مؤشر فيلادelfia|فيلادelfia/i),
   US_EMPIRE_STATE_MANUFACTURING: alias(/empire state manufacturing|empire state index/i),
   US_FED_RATE_DECISION: alias(/\bfomc\b|fed rate decision|interest rate decision|rate decision/i),

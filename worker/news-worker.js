@@ -3618,6 +3618,69 @@ async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
   return false;
 }
 
+let telegramBurstTimer = null;
+let newsPollTimer = null;
+
+async function refreshEconomicFastLane(registry) {
+  const {
+    registerScheduledEvents,
+    getActiveBurstEvents,
+  } = require("./lib/telegram-news/economic-fast-lane");
+  const { prewarmEventImage } = require("./lib/news-images/event-image-cache");
+
+  try {
+    const events = typeof registry.fetchSchedule === "function" ? await registry.fetchSchedule({}) : [];
+    registerScheduledEvents(events || []);
+    for (const event of getActiveBurstEvents()) {
+      await prewarmEventImage(event.eventKey, {
+        country: event.country || "US",
+        title: event.title || event.eventKey,
+        importance: "HIGH",
+      }).catch(() => {});
+    }
+  } catch (error) {
+    console.warn("ECONOMIC_FAST_LANE_REFRESH_FAILED", error.message);
+  }
+}
+
+function syncTelegramBurstPolling() {
+  const { getTelegramBurstPollIntervalMs, recordBurstPoll } = require("./lib/telegram-news/economic-fast-lane");
+  const burstMs = getTelegramBurstPollIntervalMs();
+  if (burstMs && !telegramBurstTimer) {
+    telegramBurstTimer = setInterval(() => {
+      if (isFetchingNews) {
+        return;
+      }
+      recordBurstPoll();
+      fetchForexNews({ skipScheduledAlerts: true }).catch((error) => {
+        console.warn("TELEGRAM_BURST_POLL_FAILED", error.message);
+      });
+    }, burstMs);
+  } else if (!burstMs && telegramBurstTimer) {
+    clearInterval(telegramBurstTimer);
+    telegramBurstTimer = null;
+  }
+}
+
+function getEffectivePollIntervalMs() {
+  const { getTelegramBurstPollIntervalMs } = require("./lib/telegram-news/economic-fast-lane");
+  return getTelegramBurstPollIntervalMs() || getPollIntervalMs();
+}
+
+function scheduleNextNewsCycle() {
+  if (newsPollTimer) {
+    clearTimeout(newsPollTimer);
+  }
+  newsPollTimer = setTimeout(async () => {
+    try {
+      await fetchForexNews();
+    } finally {
+      syncTelegramBurstPolling();
+      scheduleNextNewsCycle();
+    }
+  }, getEffectivePollIntervalMs());
+}
+
 async function fetchForexNews(options = {}) {
   await ensureCheckpointsHydrated();
   const dryRun = options.dryRun === true || NEWS_DRY_RUN;
@@ -3694,6 +3757,8 @@ async function fetchForexNews(options = {}) {
 
     const economicRegistry = getProviderRegistry({ tradingEconomicsClient: TRADING_ECONOMICS_CLIENT });
     mergeProviderMetricsIntoCycle(stats, economicRegistry.getAllMetrics());
+    await refreshEconomicFastLane(economicRegistry);
+    syncTelegramBurstPolling();
 
     try {
       const pendingResults = await processDuePendingReleases({
@@ -4648,9 +4713,5 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
     })
   );
   console.log("🚀 News Worker Started...");
-  const pollMs = getPollIntervalMs();
-  fetchForexNews();
-  setInterval(() => {
-    fetchForexNews();
-  }, pollMs);
+  scheduleNextNewsCycle();
 }

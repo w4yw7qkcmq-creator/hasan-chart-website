@@ -1,3 +1,8 @@
+const {
+  inferEventNumericScale,
+  shouldInferThousandsMultiplier,
+} = require("./numeric-units");
+
 const FORBIDDEN_PLACEHOLDER_PATTERN =
   /(?:^|\s)(?:غير\s*متوفر(?:\s*الآن)?|n\/a|not\s+available|undefined|null)(?:\s|$)/i;
 
@@ -22,7 +27,7 @@ function isMissingEconomicValue(value) {
   return false;
 }
 
-function parseEconomicNumber(value) {
+function parseEconomicNumber(value, options = {}) {
   if (isMissingEconomicValue(value)) {
     return null;
   }
@@ -43,7 +48,45 @@ function parseEconomicNumber(value) {
     return null;
   }
 
-  return number * multiplier;
+  let result = number * multiplier;
+  const scale =
+    options.expectedScale ||
+    options.scale ||
+    inferEventNumericScale(options.eventType, [value, ...(options.peerValues || [])]);
+
+  if (
+    multiplier === 1 &&
+    shouldInferThousandsMultiplier(raw, scale, options.peerValues || [])
+  ) {
+    result = number * 1_000;
+  }
+
+  return result;
+}
+
+function compareEconomicValues(actual, forecast, options = {}) {
+  const peerValues = [actual, forecast, options.previous].filter(Boolean);
+  const scale =
+    options.expectedScale ||
+    options.scale ||
+    inferEventNumericScale(options.eventType, peerValues);
+  const parseOpts = { expectedScale: scale, eventType: options.eventType };
+
+  const actualNum = parseEconomicNumber(actual, { ...parseOpts, peerValues: [forecast, options.previous] });
+  const forecastNum = parseEconomicNumber(forecast, { ...parseOpts, peerValues: [actual, options.previous] });
+
+  if (actualNum === null || forecastNum === null) {
+    return { relation: "UNKNOWN", delta: null, actualNum, forecastNum };
+  }
+  if (actualNum === forecastNum) {
+    return { relation: "INLINE", delta: 0, actualNum, forecastNum };
+  }
+  return {
+    relation: actualNum > forecastNum ? "ABOVE" : "BELOW",
+    delta: actualNum - forecastNum,
+    actualNum,
+    forecastNum,
+  };
 }
 
 function normalizeEconomicFieldValue(value) {
@@ -175,6 +218,7 @@ function containsForbiddenPlaceholder(text) {
 module.exports = {
   isMissingEconomicValue,
   parseEconomicNumber,
+  compareEconomicValues,
   normalizeEconomicFieldValue,
   formatDisplayValue,
   mergeProviderEvents,

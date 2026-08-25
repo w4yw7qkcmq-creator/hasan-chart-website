@@ -5,7 +5,6 @@ function normalizeArabicIndicDigits(value) {
 function normalizeTextForMatching(value) {
   return normalizeArabicIndicDigits(value)
     .toLowerCase()
-    .normalize("NFKC")
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, " ")
     .replace(/[^\p{L}\p{N}%./+\-]/gu, " ")
     .replace(/\s+/g, " ")

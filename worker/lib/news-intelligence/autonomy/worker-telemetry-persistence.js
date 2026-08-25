@@ -44,6 +44,27 @@ async function flushWorkerTelemetrySnapshot(supabase) {
           return null;
         }
       })(),
+      economicLatency: (() => {
+        try {
+          return require("../economic-latency-telemetry").getEconomicLatencyMetrics();
+        } catch {
+          return null;
+        }
+      })(),
+      economicFastLane: (() => {
+        try {
+          return require("../../telegram-news/economic-fast-lane").getFastLaneRuntimeState();
+        } catch {
+          return null;
+        }
+      })(),
+      economicEventImageCache: (() => {
+        try {
+          return require("../news-intelligence/event-image-cache-store").getEventImageCacheMetrics();
+        } catch {
+          return null;
+        }
+      })(),
     },
   };
 

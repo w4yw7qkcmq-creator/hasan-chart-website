@@ -252,6 +252,31 @@ export default function NewsSystemStatusPanel() {
       })()}
 
       {(() => {
+        const latency = status?.economicLatency;
+        const fastLane = status?.economicFastLane;
+        const imageCache = status?.economicEventImageCache;
+        if (!latency && !fastLane) return null;
+        return (
+          <>
+            <h3 className="admin-news-system__subtitle">Economic Release Latency</h3>
+            <div className="admin-news-system__metric-grid">
+              <MetricCard label="Avg source→Telegram" value={formatLatencyMs(latency?.avgMs)} />
+              <MetricCard label="P50" value={formatLatencyMs(latency?.p50Ms)} />
+              <MetricCard label="P95" value={formatLatencyMs(latency?.p95Ms)} />
+              <MetricCard
+                label="Fast lane"
+                value={fastLane?.active ? "ACTIVE" : "inactive"}
+              />
+              <MetricCard label="Burst polls" value={fastLane?.burstPolls ?? 0} />
+              <MetricCard label="Image cache hits" value={imageCache?.hits ?? 0} />
+              <MetricCard label="Image cache misses" value={imageCache?.misses ?? 0} />
+              <MetricCard label="Text-first fallbacks" value={imageCache?.textFirstFallbacks ?? 0} />
+            </div>
+          </>
+        );
+      })()}
+
+      {(() => {
         const v2 = summary?.editorV2 || status?.editorV2 || last24h?.editorV2;
         const v2Mode = summary?.editorV2Mode || status?.editorV2Mode || v2?.mode || "SHADOW";
         const v2Samples = summary?.editorV2Samples || status?.editorV2Samples || [];

@@ -1,20 +1,29 @@
-const { parseEconomicNumber } = require("../../economic-releases/normalize");
+const { compareEconomicValues, parseEconomicNumber } = require("../../economic-releases/normalize");
+const { inferEventNumericScale } = require("../../economic-releases/numeric-units");
 const { getInterpretationMetadata, getEventArabicName } = require("./interpretation-registry");
 
 /** @typedef {'POSITIVE'|'NEGATIVE'|'NEUTRAL'|'MIXED'|'CONTEXTUAL'} UsdBias */
 
-function compareActualToForecast(actual, forecast) {
-  const actualNum = parseEconomicNumber(actual);
-  const forecastNum = parseEconomicNumber(forecast);
-  if (actualNum === null || forecastNum === null) {
+function compareActualToForecast(actual, forecast, eventType = null) {
+  return compareEconomicValues(actual, forecast, { eventType });
+}
+
+function compareActualToPrevious(actual, previous, eventType = null) {
+  if (!actual || !previous) {
     return { relation: "UNKNOWN", delta: null };
   }
-  if (actualNum === forecastNum) {
+  const scale = inferEventNumericScale(eventType, [actual, previous]);
+  const actualNum = parseEconomicNumber(actual, { expectedScale: scale, eventType, peerValues: [previous] });
+  const previousNum = parseEconomicNumber(previous, { expectedScale: scale, eventType, peerValues: [actual] });
+  if (actualNum === null || previousNum === null) {
+    return { relation: "UNKNOWN", delta: null };
+  }
+  if (actualNum === previousNum) {
     return { relation: "INLINE", delta: 0 };
   }
   return {
-    relation: actualNum > forecastNum ? "ABOVE" : "BELOW",
-    delta: actualNum - forecastNum,
+    relation: actualNum > previousNum ? "ABOVE" : "BELOW",
+    delta: actualNum - previousNum,
   };
 }
 
@@ -35,74 +44,101 @@ function resolveLaborSignal(relation, betterWhen) {
   return { signal: "NEUTRAL", usdBias: "NEUTRAL" };
 }
 
-function interpretSingleEvent(event = {}) {
-  const eventType = event.eventType;
-  const meta = getInterpretationMetadata(eventType);
-  const comparison = compareActualToForecast(event.actual, event.forecast);
-  const nameAr = getEventArabicName(eventType);
-
-  if (meta.betterWhen === "CONTEXTUAL" || meta.betterWhen === "RATE_POLICY") {
-    return {
-      eventType,
-      nameAr,
-      comparison,
-      signal: "CONTEXTUAL",
-      usdBias: "CONTEXTUAL",
-      factLine: buildFactComparisonLine(comparison, event),
-      interpretationLine: buildContextualInterpretation(eventType, comparison, event),
-      impactLine: buildPotentialImpact("CONTEXTUAL", meta.marketSensitivity),
-    };
-  }
-
-  const labor = resolveLaborSignal(comparison.relation, meta.betterWhen);
-  return {
-    eventType,
-    nameAr,
-    comparison,
-    signal: labor.signal,
-    usdBias: labor.usdBias,
-    factLine: buildFactComparisonLine(comparison, event),
-    interpretationLine: buildInterpretationLine(eventType, labor.signal, comparison, meta),
-    impactLine: buildPotentialImpact(labor.usdBias, meta.marketSensitivity),
-  };
-}
-
-function buildFactComparisonLine(comparison, event) {
-  if (comparison.relation === "UNKNOWN") {
-    return null;
-  }
+function buildForecastRelationPhrase(comparison) {
   if (comparison.relation === "INLINE") {
-    return "جاءت القراءة مطابقة للمتوقع.";
+    return "جاءت القراءة مطابقة للتوقعات";
+  }
+  if (comparison.relation === "ABOVE") {
+    return "جاءت القراءة أعلى من التوقعات";
   }
   if (comparison.relation === "BELOW") {
-    return "جاءت القراءة أقل من المتوقع.";
+    return "جاءت القراءة دون التوقعات";
   }
-  return "جاءت القراءة أعلى من المتوقع.";
+  return null;
 }
 
-function buildInterpretationLine(eventType, signal, comparison, meta) {
-  if (comparison.relation === "INLINE") {
-    return "القراءة متوافقة مع توقعات الأسواق، مع تأثير محدود غالبًا.";
+function buildPreviousRelationPhrase(previousComparison) {
+  if (previousComparison.relation === "ABOVE") {
+    return "أعلى من القراءة السابقة";
   }
-  if (eventType.includes("JOBLESS") || eventType.includes("UNEMPLOYMENT")) {
+  if (previousComparison.relation === "BELOW") {
+    return "أدنى من القراءة السابقة";
+  }
+  if (previousComparison.relation === "INLINE") {
+    return "مماثلة للقراءة السابقة";
+  }
+  return null;
+}
+
+function buildFactComparisonLine(comparison) {
+  return buildForecastRelationPhrase(comparison);
+}
+
+function buildInterpretationLine(eventType, signal, comparison, meta, previousComparison = null) {
+  const safeEventType = String(eventType || "");
+  if (comparison.relation === "UNKNOWN") {
+    return "تعذر تحديد المقارنة مع التوقعات من البيانات المتاحة.";
+  }
+
+  const forecastPhrase = buildForecastRelationPhrase(comparison);
+  const previousPhrase = buildPreviousRelationPhrase(previousComparison);
+  let combined = forecastPhrase || "";
+  if (previousPhrase && forecastPhrase) {
+    combined = `${forecastPhrase} و${previousPhrase}.`;
+  } else if (previousPhrase) {
+    combined = `جاءت القراءة ${previousPhrase}.`;
+  } else if (forecastPhrase) {
+    combined = `${forecastPhrase}.`;
+  }
+
+  if (comparison.relation === "INLINE") {
+    const suffix =
+      meta.betterWhen === "CONTEXTUAL" || meta.betterWhen === "RATE_POLICY"
+        ? " مع تأثير محدود غالبًا على التسعير قصير الأجل."
+        : " مع تأثير محدود مبدئيًا على الدولار الأمريكي.";
+    return combined.endsWith(".") ? combined.slice(0, -1) + suffix : combined + suffix;
+  }
+
+  if (/CPI|PPI|PCE|INFLATION/i.test(safeEventType)) {
+    if (comparison.relation === "ABOVE") {
+      return `${combined} ما يعيد التركيز على مسار الفائدة والتسعير.`;
+    }
+    if (comparison.relation === "BELOW") {
+      return `${combined} ما يخفف بعض ضغوط التسعير.`;
+    }
+  }
+
+  if (safeEventType.includes("JOBLESS") || safeEventType.includes("UNEMPLOYMENT")) {
     if (signal === "STRONGER") {
-      return "تشير القراءة إلى متانة نسبية في سوق العمل الأمريكي.";
+      return `${combined} ما يشير إلى متانة نسبية في سوق العمل.`;
     }
     if (signal === "WEAKER") {
-      return "تشير القراءة إلى ضعف نسبي في سوق العمل الأمريكي.";
+      return `${combined} ما يشير إلى ضعف نسبي في سوق العمل.`;
     }
   }
+
   if (meta.betterWhen === "HIGHER" && signal === "STRONGER") {
-    return "تشير القراءة إلى زخم اقتصادي أقوى من المتوقع.";
+    return `${combined} ما يشير إلى زخمًا اقتصاديًا أقوى من المتوقع.`;
   }
   if (meta.betterWhen === "HIGHER" && signal === "WEAKER") {
-    return "تشير القراءة إلى زخم اقتصادي أضعف من المتوقع.";
+    return `${combined} ما يشير إلى زخمًا اقتصاديًا أضعف من المتوقع.`;
   }
-  return "تشير القراءة إلى انحراف واضح عن التوقعات.";
+  if (meta.betterWhen === "LOWER" && signal === "STRONGER") {
+    return `${combined} ما يعد ذلك إيجابيًا نسبيًا للاقتصاد.`;
+  }
+  if (meta.betterWhen === "LOWER" && signal === "WEAKER") {
+    return `${combined} ما يعد ذلك سلبيًا نسبيًا للاقتصاد.`;
+  }
+
+  return `${combined} مع متابعة تفاعل الدولار والذهب.`;
 }
 
 function buildContextualInterpretation(eventType, comparison, event) {
-  if (/CPI|PPI|PCE|INFLATION/i.test(eventType)) {
+  const safeEventType = String(eventType || "");
+  if (comparison.relation === "UNKNOWN") {
+    return "تعذر تحديد المقارنة مع التوقعات من البيانات المتاحة.";
+  }
+  if (/CPI|PPI|PCE|INFLATION/i.test(safeEventType)) {
     if (comparison.relation === "ABOVE") {
       return "جاءت قراءة التضخم أعلى من المتوقع، ما يعيد التركيز على مسار الفائدة والتسعير.";
     }
@@ -111,10 +147,19 @@ function buildContextualInterpretation(eventType, comparison, event) {
     }
     return "قراءة التضخم قريبة من التوقعات، مع تأثير محدود على التسعير قصير الأجل.";
   }
-  return "الحدث يحتاج قراءة سياقية قبل استنتاج اتجاه واضح للأسواق.";
+  return buildInterpretationLine(
+    eventType,
+    "NEUTRAL",
+    comparison,
+    { betterWhen: "CONTEXTUAL" },
+    compareActualToPrevious(event.actual, event.previous, eventType)
+  );
 }
 
 function buildPotentialImpact(usdBias, sensitivities = []) {
+  if (usdBias === "NEUTRAL") {
+    return "تأثير محدود مبدئيًا على الدولار الأمريكي.";
+  }
   const markets = [];
   if (sensitivities.includes("USD")) {
     if (usdBias === "POSITIVE") {
@@ -126,20 +171,51 @@ function buildPotentialImpact(usdBias, sensitivities = []) {
     } else if (usdBias === "CONTEXTUAL") {
       markets.push("التأثير على الدولار يعتمد على سياق التضخم والفائدة");
     } else {
-      markets.push("التأثير على الدولار الأمريكي محدود");
+      markets.push("تأثير محدود مبدئيًا على الدولار الأمريكي");
     }
   }
-  if (sensitivities.includes("GOLD")) {
-    if (usdBias === "POSITIVE") {
-      markets.push("مع مراقبة الذهب");
-    } else if (usdBias === "NEGATIVE") {
-      markets.push("مع مراقبة تفاعل الذهب");
-    }
+  if (sensitivities.includes("GOLD") && usdBias !== "NEUTRAL" && usdBias !== "CONTEXTUAL") {
+    markets.push("مع مراقبة الذهب");
   }
   if (!markets.length) {
-    return "التأثير غير واضح حتى الآن";
+    return "تأثير محدود مبدئيًا على الدولار الأمريكي.";
   }
   return `${markets.join("، ")}.`;
+}
+
+function interpretSingleEvent(event = {}) {
+  const eventType = event.eventType;
+  const meta = getInterpretationMetadata(eventType);
+  const comparison = compareActualToForecast(event.actual, event.forecast, eventType);
+  const previousComparison = compareActualToPrevious(event.actual, event.previous, eventType);
+  const nameAr = getEventArabicName(eventType);
+
+  if (meta.betterWhen === "CONTEXTUAL" || meta.betterWhen === "RATE_POLICY") {
+    return {
+      eventType,
+      nameAr,
+      comparison,
+      previousComparison,
+      signal: "CONTEXTUAL",
+      usdBias: "CONTEXTUAL",
+      factLine: buildFactComparisonLine(comparison),
+      interpretationLine: buildContextualInterpretation(eventType, comparison, event),
+      impactLine: buildPotentialImpact("CONTEXTUAL", meta.marketSensitivity),
+    };
+  }
+
+  const labor = resolveLaborSignal(comparison.relation, meta.betterWhen);
+  return {
+    eventType,
+    nameAr,
+    comparison,
+    previousComparison,
+    signal: labor.signal,
+    usdBias: labor.usdBias,
+    factLine: buildFactComparisonLine(comparison),
+    interpretationLine: buildInterpretationLine(eventType, labor.signal, comparison, meta, previousComparison),
+    impactLine: buildPotentialImpact(labor.usdBias, meta.marketSensitivity),
+  };
 }
 
 function interpretEventFamily(children = []) {
@@ -185,7 +261,9 @@ function interpretEventFamily(children = []) {
 
 module.exports = {
   compareActualToForecast,
+  compareActualToPrevious,
   interpretSingleEvent,
   interpretEventFamily,
   buildPotentialImpact,
+  buildForecastRelationPhrase,
 };

@@ -251,9 +251,9 @@ function resolveCanonicalForTelegram(text, options = {}) {
     };
   }
 
-  if (/s&p global|sp global|ratingdog|hsbc manufacturing|caixin pmi/i.test(value)) {
+  if (/s&p global|sp global|standard\s*(?:&|and)\s*poor(?:'?s)?|(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)|ratingdog|hsbc manufacturing|caixin pmi/i.test(value)) {
     const prefix = countryCode || "US";
-    if (/services|الخدم/i.test(value)) {
+    if (/services|الخدم|للخدمات|الخدمات/i.test(value)) {
       const key = `${prefix}_SP_GLOBAL_FLASH_SERVICES_PMI`;
       if (CANONICAL_EVENT_DEFINITIONS[key]) {
         return { eventKey: key, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[key] };
@@ -270,7 +270,7 @@ function resolveCanonicalForTelegram(text, options = {}) {
         return { eventKey: generic, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[generic] };
       }
     }
-    if (/manufacturing|الصناع|التصنيع/i.test(value)) {
+    if (/manufacturing|الصناع|التصنيع|الصناعي/i.test(value)) {
       const key = `${prefix}_SP_GLOBAL_FLASH_MANUFACTURING_PMI`;
       if (CANONICAL_EVENT_DEFINITIONS[key]) {
         return { eventKey: key, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[key] };
@@ -285,6 +285,19 @@ function resolveCanonicalForTelegram(text, options = {}) {
       const generic = `${prefix}_MANUFACTURING_PMI`;
       if (CANONICAL_EVENT_DEFINITIONS[generic]) {
         return { eventKey: generic, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[generic] };
+      }
+    }
+    if (/composite|المركب|مديري المشتريات(?:\s*ال)?(?:المركب)/i.test(value)) {
+      const composite = `${prefix}_SP_GLOBAL_PMI`;
+      if (CANONICAL_EVENT_DEFINITIONS[composite]) {
+        return { eventKey: composite, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[composite] };
+      }
+      if (prefix === "US" && CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_PMI) {
+        return {
+          eventKey: "US_SP_GLOBAL_PMI",
+          country: "US",
+          ...CANONICAL_EVENT_DEFINITIONS.US_SP_GLOBAL_PMI,
+        };
       }
     }
     const composite = `${prefix}_SP_GLOBAL_PMI`;

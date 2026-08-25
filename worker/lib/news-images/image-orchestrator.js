@@ -270,6 +270,28 @@ async function resolvePublicationImageResult(publication = {}, deps = {}) {
     };
   }
 
+  const eventKey = publication.eventKey || publication.eventType || publication.metadata?.premiumImageContext?.eventKey;
+  const country = publication.country || "US";
+  if (eventKey) {
+    const { getCachedEventImage } = require("./event-image-cache");
+    const cached = getCachedEventImage(eventKey, country);
+    if (cached) {
+      const policy = resolveNewsImagePolicy(publication);
+      const telemetry = createEmptyImageTelemetry();
+      telemetry.imagePolicyMode = policy.mode;
+      telemetry.publishedWithCachedImage = true;
+      recordImageTelemetry(telemetry);
+      return {
+        ok: true,
+        policy,
+        imageResult: cached,
+        telemetry,
+        imageStatus: summarizeImageStatus(telemetry),
+        cacheHit: true,
+      };
+    }
+  }
+
   const policy = resolveNewsImagePolicy(publication);
   const telemetry = createEmptyImageTelemetry();
   telemetry.imagePolicyMode = policy.mode;

@@ -33,6 +33,13 @@ const COMPETITOR_PATTERNS = [
 
 const PLACEHOLDER_PATTERNS = [/\bundefined\b/i, /\bnull\b/i, /\[object Object\]/i, /غير متوفر/i];
 
+const OFFICIAL_CHANNEL_FOOTER_PATTERN =
+  /\n\n📢 قناة الأخبار الرسمية:\nhttps?:\/\/t\.me\/EconomicNewsi\/?\s*$/i;
+
+function stripOfficialFooter(body) {
+  return String(body || "").replace(OFFICIAL_CHANNEL_FOOTER_PATTERN, "").trim();
+}
+
 const ACTUAL_MOVE_PATTERNS = [
   /ارتفع الدولار/i,
   /انخفض الدولار/i,
@@ -46,6 +53,7 @@ const ACTUAL_MOVE_PATTERNS = [
 
 function validateQualityGateV2(input = {}) {
   const { structured, body, structuredEvent, deterministic, rawSourceText, isFamily = false } = input;
+  const gateBody = stripOfficialFooter(body);
 
   if (!structured?.headline) {
     return fail(BLOCK_REASONS.MISSING_HEADLINE);
@@ -63,44 +71,44 @@ function validateQualityGateV2(input = {}) {
     return fail(BLOCK_REASONS.MISSING_FACTS_BLOCK);
   }
 
-  if (!body || body.length < 40) {
+  if (!gateBody || gateBody.length < 40) {
     return fail(BLOCK_REASONS.BODY_TOO_SHORT);
   }
 
-  if (body.length > 3500) {
+  if (gateBody.length > 3500) {
     return fail(BLOCK_REASONS.BODY_TOO_LONG);
   }
 
   for (const pattern of COMPETITOR_PATTERNS) {
-    if (pattern.test(body)) {
+    if (pattern.test(gateBody)) {
       return fail(BLOCK_REASONS.COMPETITOR_CHANNEL_PRESENT);
     }
   }
 
   for (const pattern of PLACEHOLDER_PATTERNS) {
-    if (pattern.test(body)) {
+    if (pattern.test(gateBody)) {
       return fail(BLOCK_REASONS.PLACEHOLDER_PRESENT);
     }
   }
 
-  if (/[\u0300-\u036f]{3,}/.test(body)) {
+  if (/[\u0300-\u036f]{3,}/.test(gateBody)) {
     return fail(BLOCK_REASONS.BROKEN_ARABIC);
   }
 
-  const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const paragraphs = gateBody.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const uniqueParagraphs = new Set(paragraphs);
   if (uniqueParagraphs.size !== paragraphs.length) {
     return fail(BLOCK_REASONS.DUPLICATE_PARAGRAPH);
   }
 
   for (const pattern of ACTUAL_MOVE_PATTERNS) {
-    if (pattern.test(body)) {
+    if (pattern.test(gateBody)) {
       return fail(BLOCK_REASONS.IMPACT_CLAIMS_ACTUAL_MOVE);
     }
   }
 
   if (rawSourceText) {
-    const copyCheck = evaluateCopySimilarity(body, rawSourceText);
+    const copyCheck = evaluateCopySimilarity(gateBody, rawSourceText);
     if (!copyCheck.ok) {
       return fail(copyCheck.reason);
     }
@@ -117,7 +125,7 @@ function validateQualityGateV2(input = {}) {
     }
   }
 
-  if (deterministic?.familyUsdBias === "MIXED" && /إيجابي للدولار|positive for the dollar/i.test(body)) {
+  if (deterministic?.familyUsdBias === "MIXED" && /إيجابي للدولار|positive for the dollar/i.test(gateBody)) {
     return fail(BLOCK_REASONS.INTERPRETATION_DIRECTION_MISMATCH);
   }
 

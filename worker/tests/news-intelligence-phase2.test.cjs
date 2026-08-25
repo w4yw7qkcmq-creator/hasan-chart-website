@@ -130,7 +130,11 @@ async function testJoblessClaimsReplayPublication() {
 
   assert.strictEqual(familyResult.ok, true);
   assert.doesNotMatch(familyResult.body, /ForexBreakingNews/i);
-  assert.doesNotMatch(familyResult.body, /https?:\/\//i);
+  assert.match(familyResult.body, /https:\/\/t\.me\/EconomicNewsi/);
+  assert.doesNotMatch(
+    familyResult.body.replace(/https?:\/\/t\.me\/EconomicNewsi\/?/gi, ""),
+    /https?:\/\//i
+  );
   assert.strictEqual(familyResult.aiMeta.aiUsed, false);
   assert.strictEqual(decideImageRequirement({ eventFamily: "US_WEEKLY_LABOR_CLAIMS" }).level, VISUAL_PRIORITY.REQUIRED);
   assert.strictEqual(familyResult.imageMeta?.source, "deferred_to_gateway");

@@ -20,6 +20,9 @@ const phase3 = (() => {
     return null;
   }
 })();
+const { getCachedEventImage, recordTextFirstFallback } = require("./event-image-cache-store");
+const { recordEconomicLatencySample } = require("./economic-latency-telemetry");
+const { isFastLaneActive } = require("../telegram-news/economic-fast-lane");
 
 const BLOCK_REASONS = {
   ...EDITORIAL_BLOCK_REASONS,
@@ -91,13 +94,19 @@ function createNewsPublisherGateway(options = {}) {
 
   async function deliverPublicationLegs(publication, editorial, canonical, publicationRecord, deps = {}) {
     const destination = resolveDestination(publication);
+    const skipTelegram = deps.skipTelegram === true;
+    const skipSite = deps.skipSite === true;
     let telegramSent = publicationRecord.telegramLegStatus === LEG_STATUS.SUCCESS;
     let siteInserted = publicationRecord.siteLegStatus === LEG_STATUS.SUCCESS;
     const imageResult = publication.imageResult || null;
     const photoPath = imageResult?.filePath || publication.image || null;
     const siteImageUrl = imageResult?.imageUrl || publication.imageUrl || null;
 
-    if (shouldDeliverTelegram(destination) && publicationRecord.telegramLegStatus !== LEG_STATUS.SUCCESS) {
+    if (
+      shouldDeliverTelegram(destination) &&
+      !skipTelegram &&
+      publicationRecord.telegramLegStatus !== LEG_STATUS.SUCCESS
+    ) {
       try {
         if (photoPath && deps.sendTelegramPhoto) {
           await deps.sendTelegramPhoto(editorial.body, photoPath);
@@ -123,7 +132,11 @@ function createNewsPublisherGateway(options = {}) {
       }
     }
 
-    if (shouldDeliverSite(destination) && publicationRecord.siteLegStatus !== LEG_STATUS.SUCCESS) {
+    if (
+      shouldDeliverSite(destination) &&
+      !skipSite &&
+      publicationRecord.siteLegStatus !== LEG_STATUS.SUCCESS
+    ) {
       if (deps.saveNewsPostToSupabase) {
         const saveResult = await deps.saveNewsPostToSupabase({
           title: publication.title,
@@ -453,28 +466,80 @@ function createNewsPublisherGateway(options = {}) {
         };
       }
 
-      const publicationForDelivery = await attachPublicationImageResult(
-        {
-          ...publicationForSemantics,
-          eventKey: canonical.eventKey || publication.eventKey || null,
-          eventType: publication.eventType || canonical.eventType || null,
-          importance: publication.importance || "HIGH",
-        },
-        deps
-      );
-      publicationRecord.metadata = buildStoredPublicationMetadata(
-        publicationForDelivery,
-        editorialForDelivery,
-        canonical
-      );
+      const eventKey = canonical.eventKey || publication.eventKey || publication.eventType || null;
+      const country = publication.country || canonical.country || "US";
+      const cachedImage = eventKey ? getCachedEventImage(eventKey, country) : null;
 
-      const delivery = await deliverPublicationLegs(
-        publicationForDelivery,
-        editorialForDelivery,
-        canonical,
-        publicationRecord,
-        deps
-      );
+      let publicationForDelivery = {
+        ...publicationForSemantics,
+        eventKey,
+        eventType: publication.eventType || canonical.eventType || null,
+        importance: publication.importance || "HIGH",
+      };
+
+      if (cachedImage) {
+        publicationForDelivery = {
+          ...publicationForDelivery,
+          imageResult: cachedImage,
+          metadata: {
+            ...(publicationForDelivery.metadata || {}),
+            imageCacheHit: true,
+          },
+        };
+      }
+
+      const useTextFirst =
+        numericEconomic &&
+        publicationType === PUBLICATION_TYPES.RELEASE &&
+        !cachedImage &&
+        (publication.importance === "HIGH" || isFastLaneActive());
+
+      let delivery;
+      if (useTextFirst) {
+        recordTextFirstFallback();
+        delivery = await deliverPublicationLegs(
+          publicationForDelivery,
+          editorialForDelivery,
+          canonical,
+          publicationRecord,
+          deps
+        );
+
+        const withImage = await attachPublicationImageResult(publicationForDelivery, deps);
+        publicationRecord.metadata = buildStoredPublicationMetadata(
+          withImage,
+          editorialForDelivery,
+          canonical
+        );
+
+        if (!delivery.siteInserted && shouldDeliverSite(resolveDestination(publication))) {
+          const siteDelivery = await deliverPublicationLegs(
+            withImage,
+            editorialForDelivery,
+            canonical,
+            publicationRecord,
+            { ...deps, skipTelegram: true }
+          );
+          delivery.siteInserted = siteDelivery.siteInserted;
+        }
+        publicationForDelivery = withImage;
+      } else {
+        publicationForDelivery = cachedImage
+          ? publicationForDelivery
+          : await attachPublicationImageResult(publicationForDelivery, deps);
+        publicationRecord.metadata = buildStoredPublicationMetadata(
+          publicationForDelivery,
+          editorialForDelivery,
+          canonical
+        );
+        delivery = await deliverPublicationLegs(
+          publicationForDelivery,
+          editorialForDelivery,
+          canonical,
+          publicationRecord,
+          deps
+        );
+      }
       await store.updateDeliveryLeg(
         publicationRecord,
         "telegram",
@@ -492,6 +557,25 @@ function createNewsPublisherGateway(options = {}) {
         eventKey: canonical.eventKey,
         telegramSent: delivery.telegramSent,
         siteInserted: delivery.siteInserted,
+      });
+
+      recordEconomicLatencySample({
+        eventKey: canonical.eventKey,
+        eventType: publication.eventType || canonical.eventType,
+        sourceId: publication.sourceId,
+        sourceMessageId: publication.metadata?.rawMessageId || publication.metadata?.sourceMessageId,
+        sourcePublishedAt: publication.releaseDate || publication.receivedAt,
+        sourceObservedAt: publication.metadata?.sourceObservedAt || publication.receivedAt,
+        workerFetchedAt: publication.metadata?.workerFetchedAt || publication.receivedAt,
+        publicationReadyAt: publication.metadata?.publicationReadyAt || new Date().toISOString(),
+        imageReadyAt: publicationForDelivery.metadata?.imageTelemetry?.totalImageWorkflowMs
+          ? new Date().toISOString()
+          : null,
+        telegramSentAt: new Date().toISOString(),
+        siteSavedAt: delivery.siteInserted ? new Date().toISOString() : null,
+        fastLane: isFastLaneActive(),
+        textFirst: useTextFirst === true,
+        imageCacheHit: Boolean(cachedImage),
       });
 
       const successResult = {
