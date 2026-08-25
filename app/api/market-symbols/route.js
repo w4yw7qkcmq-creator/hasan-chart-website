@@ -60,7 +60,13 @@ export async function GET(request) {
       }
     }
 
-    await refreshSymbolRegistry();
+    const snapshotBefore = getSymbolRegistrySnapshot();
+    if (snapshotBefore.available && snapshotBefore.count > 0) {
+      // Serve cached registry immediately; refresh upstream exchanges in background.
+      void refreshSymbolRegistry().catch(() => {});
+    } else {
+      await refreshSymbolRegistry();
+    }
     const snapshot = getSymbolRegistrySnapshot();
     const registryHealth = getSymbolRegistryHealth();
     const symbols = searchRegistrySymbols(query, { limit, minExchanges }).map((entry) => ({
