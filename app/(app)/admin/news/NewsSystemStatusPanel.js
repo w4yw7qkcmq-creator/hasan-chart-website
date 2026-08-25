@@ -251,6 +251,40 @@ export default function NewsSystemStatusPanel() {
         );
       })()}
 
+      {(() => {
+        const v2 = summary?.editorV2 || status?.editorV2 || last24h?.editorV2;
+        const v2Mode = summary?.editorV2Mode || status?.editorV2Mode || v2?.mode || "SHADOW";
+        if (!v2) return null;
+        const attempted = v2.shadowAttempted ?? 0;
+        const passed = v2.shadowPassed ?? 0;
+        const failed = v2.shadowFailed ?? 0;
+        const passRate = attempted > 0 ? `${Math.round((passed / attempted) * 100)}%` : "—";
+        return (
+          <>
+            <h3 className="admin-news-system__subtitle">
+              Editor V2 — آخر 24 ساعة
+              <span className="admin-news-system__count">({v2Mode})</span>
+            </h3>
+            <p className="admin-news-page__hint">
+              Editor V2 Mode: {v2Mode}. V2 لا يؤثر على النشر الحي حالياً.
+            </p>
+            <div className="admin-news-system__metric-grid">
+              <MetricCard label="V2 shadow attempted" value={attempted} />
+              <MetricCard label="V2 shadow passed" value={passed} />
+              <MetricCard label="V2 shadow failed" value={failed} />
+              <MetricCard label="V2 pass rate" value={passRate} />
+              <MetricCard label="V2 role mismatch" value={v2.shadowRoleMismatch ?? 0} />
+              <MetricCard label="V2 numeric mismatch" value={v2.shadowNumericMismatch ?? 0} />
+              <MetricCard label="V2 low information" value={v2.shadowLowInformation ?? 0} />
+              <MetricCard
+                label="V2 avg latency"
+                value={formatLatencyMs(v2.shadowAverageLatencyMs)}
+              />
+            </div>
+          </>
+        );
+      })()}
+
       <h3 className="admin-news-system__subtitle">المصادر</h3>
       {sources.length ? (
         <div className="admin-news-system__table-wrap">

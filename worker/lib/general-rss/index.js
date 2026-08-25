@@ -69,6 +69,25 @@ const {
   scheduleExternalNewsShadowReview,
   RSS_EDITOR_MODE,
 } = require("./external-news-editor/shadow-review");
+const {
+  runEditorV2ShadowReview,
+  scheduleEditorV2ShadowReview,
+  EDITOR_V2_MODE,
+} = require("./editor-v2");
+const {
+  getEditorV2TelemetrySnapshot,
+  resetEditorV2TelemetryForTests,
+} = require("./editor-v2/telemetry");
+const { V2_REASON_CODES } = require("./editor-v2/reason-codes");
+const {
+  buildCanonicalRssEvidence,
+} = require("./editor-v2/canonical-evidence");
+const {
+  buildStructuredFactsV2,
+} = require("./editor-v2/structured-facts");
+const {
+  validateEditorV2FactGuard,
+} = require("./editor-v2/fact-guard");
 
 module.exports = {
   GENERAL_RSS_FEEDS,
@@ -132,4 +151,13 @@ module.exports = {
   reviewExternalNewsInShadowMode,
   scheduleExternalNewsShadowReview,
   RSS_EDITOR_MODE,
+  runEditorV2ShadowReview,
+  scheduleEditorV2ShadowReview,
+  EDITOR_V2_MODE,
+  getEditorV2TelemetrySnapshot,
+  resetEditorV2TelemetryForTests,
+  V2_REASON_CODES,
+  buildCanonicalRssEvidence,
+  buildStructuredFactsV2,
+  validateEditorV2FactGuard,
 };

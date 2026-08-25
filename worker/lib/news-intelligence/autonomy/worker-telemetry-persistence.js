@@ -37,6 +37,13 @@ async function flushWorkerTelemetrySnapshot(supabase) {
           return null;
         }
       })(),
+      editorV2: (() => {
+        try {
+          return require("../../general-rss/editor-v2/telemetry").getEditorV2TelemetrySnapshot();
+        } catch {
+          return null;
+        }
+      })(),
     },
   };
 

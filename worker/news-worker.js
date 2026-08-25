@@ -89,6 +89,8 @@ const {
   getEditorTelemetrySnapshot,
 } = require("./lib/general-rss/external-news-editor");
 const { scheduleExternalNewsShadowReview } = require("./lib/general-rss/external-news-editor/shadow-review");
+const { scheduleEditorV2ShadowReview } = require("./lib/general-rss/editor-v2");
+const { getEditorV2TelemetrySnapshot } = require("./lib/general-rss/editor-v2/telemetry");
 const { resolveRssSourceImageWithChartPolicy, getChartPolicyTelemetrySnapshot } = require("./lib/general-rss/chart-visual-policy");
 const { auditRssPostPublish } = require("./lib/general-rss/rss-post-publish-audit");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
@@ -4116,6 +4118,19 @@ async function fetchForexNews(options = {}) {
               shadowTimeoutMs: Number(process.env.RSS_EDITOR_SHADOW_TIMEOUT_MS || 8000),
             }
           );
+          void scheduleEditorV2ShadowReview(
+            {
+              item: latestNews,
+              imageTitle: aiResult.imageTitle,
+              impactLevel: latestNews.impactLevel || "MEDIUM",
+            },
+            {
+              disableAi: !OPENAI_API_KEY,
+              openAiApiKey: OPENAI_API_KEY,
+              v2TimeoutMs: Number(process.env.RSS_EDITOR_V2_TIMEOUT_MS || 12000),
+              v2ShadowTimeoutMs: Number(process.env.RSS_EDITOR_V2_SHADOW_TIMEOUT_MS || 12000),
+            }
+          );
         }
       } else {
         publicationMessage = message;
@@ -4459,6 +4474,7 @@ function getNewsWorkerHealthSnapshot() {
       telemetry: getTelemetrySnapshot(),
       rssImage: getRssImageTelemetrySnapshot(),
       externalNewsEditor: getEditorTelemetrySnapshot(),
+      editorV2: getEditorV2TelemetrySnapshot(),
       chartVisualPolicy: getChartPolicyTelemetrySnapshot(),
     },
     running: !isFetchingNews,
