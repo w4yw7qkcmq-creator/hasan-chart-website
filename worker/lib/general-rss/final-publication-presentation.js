@@ -22,6 +22,7 @@ function buildAndValidateFinalRssPublication(input = {}) {
     organizations: input.organizations,
     people: input.people,
     instruments: input.instruments,
+    structuredFacts: input.structuredFacts,
   });
   if (!minimumInformation.ok) {
     return { ok: false, presentation: null, reason: minimumInformation.reason, issue: minimumInformation.issue };

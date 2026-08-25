@@ -3,54 +3,60 @@ const {
   EVIDENCE_SUFFICIENCY,
   shouldOverrideAiInsufficientEvidence,
 } = require("./evidence-sufficiency");
+const {
+  buildDeterministicArabicFallback,
+  isPredominantlyArabic,
+} = require("./deterministic-arabic-fallback");
 
 const DEFAULT_V2_TIMEOUT_MS = 12_000;
 const DEFAULT_V2_MODEL = "gpt-4.1-nano";
+const DEFAULT_V2_TEMPERATURE = 0.1;
+
+const V2_EDITOR_JSON_SCHEMA = Object.freeze({
+  name: "editor_v2_editorial",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      headline: { type: "string" },
+      body: { type: "string" },
+      insufficientEvidence: { type: "boolean" },
+      confidence: { type: "number" },
+      usedFacts: {
+        type: "array",
+        items: { type: "string" },
+      },
+      usedEntities: {
+        type: "array",
+        items: { type: "string" },
+      },
+    },
+    required: ["headline", "body", "insufficientEvidence", "confidence"],
+  },
+});
 
 const V2_EDITOR_SYSTEM_PROMPT =
-  "You are a source-grounded Arabic financial news editor. Write ONLY in Arabic script for headline and body. Never copy the English title verbatim. Use ONLY the provided canonical evidence and structured facts. Write concise professional Arabic. Preserve numbers, attribution, roles, and uncertainty exactly. Never invent people, roles, numbers, quotes, institutions, or causal claims. Do not refuse merely because evidence is short. If the source title and snippet contain one clear factual development, write only that development in Arabic and nothing more. If evidence is limited, shorten the story — do not invent context. Set insufficientEvidence=true ONLY when even one conservative factual Arabic sentence cannot be safely supported from the evidence. Return strict JSON only with keys: headline, body, usedFacts, usedEntities, confidence, insufficientEvidence. No markdown.";
+  "You are a source-grounded Arabic financial news editor. Output Arabic script only in headline and body when insufficientEvidence is false. Keep proper nouns and standard transliterations where necessary. Never copy the English source title as the final headline. Use ONLY canonical evidence and structured facts. Preserve numbers, attribution, roles, and uncertainty exactly. Never invent people, roles, numbers, quotes, institutions, or causal claims. If evidence supports one factual sentence, set insufficientEvidence=false and write LESS not MORE. When evidence is minimal, shorten the story; do not invent context. Set insufficientEvidence=true ONLY when no conservative factual Arabic sentence can be safely supported.";
 
 function parseEditorialJson(content = "") {
   const trimmed = String(content || "").trim();
-  const match = trimmed.match(/\{[\s\S]*\}/);
-  if (!match) return null;
+  if (!trimmed) return null;
   try {
-    return JSON.parse(match[0]);
+    return JSON.parse(trimmed);
   } catch (_) {
-    return null;
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch (_error) {
+      return null;
+    }
   }
 }
 
 function buildDeterministicEditorialOutput(evidence = {}, facts = {}) {
-  const title = String(evidence.title || "").trim();
-  const snippet = String(evidence.description || evidence.contentEncoded || "").trim();
-  if (!title || title.length < 12) {
-    return {
-      headline: "",
-      body: "",
-      usedFacts: [],
-      usedEntities: [],
-      confidence: "deterministic",
-      insufficientEvidence: true,
-    };
-  }
-
-  const primaryPerson = (facts.people || [])[0];
-  const headline = primaryPerson?.arabicRole
-    ? `${primaryPerson.arabicRole} ${primaryPerson.name}: ${title.slice(0, 90)}`
-    : title.slice(0, 120);
-  const bodySentence = snippet
-    ? snippet.replace(/https?:\/\/\S+/g, "").slice(0, 220)
-    : title;
-
-  return {
-    headline: headline.slice(0, 140),
-    body: bodySentence,
-    usedFacts: [title, snippet].filter(Boolean),
-    usedEntities: (facts.people || []).map((person) => person.name),
-    confidence: "deterministic",
-    insufficientEvidence: false,
-  };
+  return buildDeterministicArabicFallback(evidence, facts);
 }
 
 function finalizeEditorialResponse(parsed = {}, options = {}) {
@@ -60,7 +66,10 @@ function finalizeEditorialResponse(parsed = {}, options = {}) {
     body: String(parsed.body || "").trim(),
     usedFacts: Array.isArray(parsed.usedFacts) ? parsed.usedFacts : [],
     usedEntities: Array.isArray(parsed.usedEntities) ? parsed.usedEntities : [],
-    confidence: parsed.confidence || "ai",
+    confidence:
+      typeof parsed.confidence === "number"
+        ? `ai_${parsed.confidence.toFixed(2)}`
+        : String(parsed.confidence || "ai"),
     insufficientEvidence: parsed.insufficientEvidence === true,
   };
 
@@ -69,12 +78,10 @@ function finalizeEditorialResponse(parsed = {}, options = {}) {
     shouldOverrideAiInsufficientEvidence(sufficiencyLevel, editorial)
   ) {
     editorial.insufficientEvidence = false;
-    editorial.confidence = parsed.confidence || "ai_overridden_insufficient";
+    editorial.confidence = "ai_overridden_insufficient";
   }
 
-  const arabicChars = (editorial.headline + editorial.body).match(/[\u0600-\u06FF]/g)?.length || 0;
-  const latinChars = (editorial.headline + editorial.body).match(/[A-Za-z]/g)?.length || 0;
-  if (editorial.headline && editorial.body && latinChars > arabicChars * 1.2) {
+  if (editorial.headline && editorial.body && !isPredominantlyArabic(`${editorial.headline} ${editorial.body}`)) {
     editorial.insufficientEvidence = true;
     editorial.confidence = "ai_non_arabic";
   }
@@ -82,18 +89,16 @@ function finalizeEditorialResponse(parsed = {}, options = {}) {
   return editorial;
 }
 
-async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}) {
-  const apiKey = options.openAiApiKey || process.env.OPENAI_API_KEY;
-  if (options.disableAi === true || !apiKey) {
-    return buildDeterministicEditorialOutput(evidence, facts);
-  }
-
+function buildEditorialPayload(evidence = {}, facts = {}, options = {}) {
   const sufficiencyLevel = options.evidenceSufficiencyLevel || EVIDENCE_SUFFICIENCY.SUFFICIENT_MINIMAL;
-  const timeoutMs = options.v2TimeoutMs || options.editorTimeoutMs || DEFAULT_V2_TIMEOUT_MS;
-  const payload = {
+  return {
     model: options.model || DEFAULT_V2_MODEL,
-    temperature: 0.2,
+    temperature: options.temperature ?? DEFAULT_V2_TEMPERATURE,
     max_tokens: 450,
+    response_format: {
+      type: "json_schema",
+      json_schema: V2_EDITOR_JSON_SCHEMA,
+    },
     messages: [
       {
         role: "system",
@@ -104,11 +109,13 @@ async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}
         content: JSON.stringify({
           evidenceSufficiency: sufficiencyLevel,
           editorialContract: {
+            arabicOnlyWhenNotInsufficient: true,
             doNotRefuseForShortEvidence: true,
             writeMinimalStoryWhenLimited: true,
             insufficientEvidenceOnlyWhenNoSafeSentencePossible: true,
             insufficientEvidenceMustBeFalseWhenEvidenceSufficiencyIsNotInsufficient: true,
             includePrimarySubjectFromFactsInArabic: true,
+            neverCopyEnglishTitleAsHeadline: true,
             example:
               "SOURCE: Bank of Korea expected to keep rates unchanged... VALID: يتوقع أن يُبقي بنك كوريا المركزي أسعار الفائدة دون تغيير...",
           },
@@ -132,6 +139,18 @@ async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}
       },
     ],
   };
+}
+
+async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}) {
+  const apiKey = options.openAiApiKey || process.env.OPENAI_API_KEY;
+  const sufficiencyLevel = options.evidenceSufficiencyLevel || EVIDENCE_SUFFICIENCY.SUFFICIENT_MINIMAL;
+
+  if (options.disableAi === true || !apiKey) {
+    return buildDeterministicArabicFallback(evidence, facts);
+  }
+
+  const timeoutMs = options.v2TimeoutMs || options.editorTimeoutMs || DEFAULT_V2_TIMEOUT_MS;
+  const payload = buildEditorialPayload(evidence, facts, options);
 
   try {
     const response = await axios.post("https://api.openai.com/v1/chat/completions", payload, {
@@ -143,16 +162,13 @@ async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}
     });
     const parsed = parseEditorialJson(response.data?.choices?.[0]?.message?.content);
     if (!parsed?.headline || !parsed?.body) {
-      return {
-        headline: "",
-        body: "",
-        usedFacts: [],
-        usedEntities: [],
-        confidence: "ai_invalid",
-        insufficientEvidence: true,
-      };
+      return buildDeterministicArabicFallback(evidence, facts);
     }
-    return finalizeEditorialResponse(parsed, { evidenceSufficiencyLevel: sufficiencyLevel });
+    const finalized = finalizeEditorialResponse(parsed, { evidenceSufficiencyLevel: sufficiencyLevel });
+    if (finalized.insufficientEvidence || !isPredominantlyArabic(`${finalized.headline} ${finalized.body}`)) {
+      return buildDeterministicArabicFallback(evidence, facts);
+    }
+    return finalized;
   } catch (error) {
     if (String(error.code || "").includes("ECONNABORTED") || /timeout/i.test(error.message || "")) {
       return {
@@ -165,23 +181,19 @@ async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}
         timeout: true,
       };
     }
-    return {
-      headline: "",
-      body: "",
-      usedFacts: [],
-      usedEntities: [],
-      confidence: "ai_failed",
-      insufficientEvidence: true,
-    };
+    return buildDeterministicArabicFallback(evidence, facts);
   }
 }
 
 module.exports = {
   DEFAULT_V2_TIMEOUT_MS,
   DEFAULT_V2_MODEL,
+  DEFAULT_V2_TEMPERATURE,
   V2_EDITOR_SYSTEM_PROMPT,
+  V2_EDITOR_JSON_SCHEMA,
   generateEditorV2Editorial,
   buildDeterministicEditorialOutput,
+  buildEditorialPayload,
   parseEditorialJson,
   finalizeEditorialResponse,
 };

@@ -149,6 +149,7 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
     organizations: facts.organizations,
     people: facts.people,
     instruments: facts.instruments,
+    structuredFacts: facts,
   });
 
   if (!finalPublication.ok) {
@@ -181,6 +182,7 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
     facts,
     evidenceSufficiency,
     editorial,
+    usedFallback: Boolean(editorial.fallback),
     presentation: finalPublication.presentation,
     latencyMs: Date.now() - startedAt,
     aiCalls: aiCall ? 1 : 0,
