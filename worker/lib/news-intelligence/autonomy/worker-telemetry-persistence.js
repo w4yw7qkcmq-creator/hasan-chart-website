@@ -60,7 +60,7 @@ async function flushWorkerTelemetrySnapshot(supabase) {
       })(),
       economicEventImageCache: (() => {
         try {
-          return require("../news-intelligence/event-image-cache-store").getEventImageCacheMetrics();
+          return require("../event-image-cache-store").getEventImageCacheMetrics();
         } catch {
           return null;
         }
