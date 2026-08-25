@@ -71,9 +71,18 @@ const {
 } = require("./external-news-editor/shadow-review");
 const {
   runEditorV2ShadowReview,
+  runEditorV2PublicationReview,
   scheduleEditorV2ShadowReview,
-  EDITOR_V2_MODE,
+  resolveEditorV2Mode,
 } = require("./editor-v2");
+const {
+  resolveEditorV2Mode: resolveEditorV2ModeDirect,
+  isEditorV2Off,
+  isEditorV2ShadowMode,
+  isEditorV2LiveMode,
+  isEditorV2Enabled,
+  EDITOR_V2_MODES,
+} = require("./editor-v2/mode");
 const {
   getEditorV2TelemetrySnapshot,
   resetEditorV2TelemetryForTests,
@@ -152,8 +161,15 @@ module.exports = {
   scheduleExternalNewsShadowReview,
   RSS_EDITOR_MODE,
   runEditorV2ShadowReview,
+  runEditorV2PublicationReview,
   scheduleEditorV2ShadowReview,
-  EDITOR_V2_MODE,
+  resolveEditorV2Mode,
+  resolveEditorV2ModeDirect,
+  isEditorV2Off,
+  isEditorV2ShadowMode,
+  isEditorV2LiveMode,
+  isEditorV2Enabled,
+  EDITOR_V2_MODES,
   getEditorV2TelemetrySnapshot,
   resetEditorV2TelemetryForTests,
   V2_REASON_CODES,

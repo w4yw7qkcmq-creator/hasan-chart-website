@@ -6,12 +6,23 @@ const { generateEditorV2Editorial } = require("./editorial-ai");
 const { validateEditorV2FactGuard } = require("./fact-guard");
 const {
   classifyEvidenceSufficiency,
-  EVIDENCE_SUFFICIENCY,
   isEvidenceSufficientForEditorial,
 } = require("./evidence-sufficiency");
-const { recordEditorV2ShadowOutcome } = require("./telemetry");
+const {
+  recordEditorV2ShadowOutcome,
+  recordEditorV2LiveOutcome,
+} = require("./telemetry");
 const { V2_REASON_CODES } = require("./reason-codes");
-const { EDITOR_V2_MODE } = require("./telemetry");
+const {
+  resolveEditorV2Mode,
+  isEditorV2ShadowMode,
+  isEditorV2Enabled,
+  isEditorV2Off,
+  isEditorV2LiveMode,
+  EDITOR_V2_MODES,
+  V2_OUTPUT_PATHS,
+} = require("./mode");
+const crypto = require("crypto");
 
 const OFFICIAL_FOOTER = "\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi";
 
@@ -23,59 +34,59 @@ function formatEditorV2TelegramMessage(editorial = {}) {
   return `${core}${OFFICIAL_FOOTER}`;
 }
 
-async function runEditorV2ShadowReview(input = {}, options = {}) {
+function buildSourceHash(sourceTitle = "", link = "") {
+  return crypto
+    .createHash("sha256")
+    .update(`${String(sourceTitle || "").trim()}|${String(link || "").trim()}`)
+    .digest("hex")
+    .slice(0, 16);
+}
+
+async function runEditorV2Review(input = {}, options = {}) {
   const startedAt = Date.now();
   const source = input.item?.sourceName || input.source || "unknown";
+  const mode = resolveEditorV2Mode(options.env);
 
   const curator = evaluateRssCuratorGate(input.item || {});
   if (!curator.ok) {
-    recordEditorV2ShadowOutcome(source, {
-      curatorSkipped: true,
-      failed: true,
-      reasonCode: V2_REASON_CODES.V2_CURATOR_SKIPPED,
-      latencyMs: Date.now() - startedAt,
-    });
     return {
-      mode: EDITOR_V2_MODE,
+      mode,
       ok: false,
       stage: "curator",
       reasonCode: V2_REASON_CODES.V2_CURATOR_SKIPPED,
       curatorOutcome: curator.outcome,
+      latencyMs: Date.now() - startedAt,
     };
   }
 
   const evidence = input.evidence || buildCanonicalRssEvidence(input.item || {}, source);
   const facts = input.facts || buildStructuredFactsV2(evidence);
   const evidenceSufficiency = input.evidenceSufficiency || classifyEvidenceSufficiency(evidence);
+  const sourceHash = buildSourceHash(evidence.title, input.item?.link);
 
   if ((facts.roleConflicts || []).length) {
-    recordEditorV2ShadowOutcome(source, {
-      failed: true,
-      reasonCode: V2_REASON_CODES.V2_ENTITY_ROLE_CONFLICT,
-      latencyMs: Date.now() - startedAt,
-    });
     return {
-      mode: EDITOR_V2_MODE,
+      mode,
       ok: false,
       stage: "role_conflict",
       reasonCode: V2_REASON_CODES.V2_ENTITY_ROLE_CONFLICT,
       roleConflicts: facts.roleConflicts,
+      sourceTitle: evidence.title,
+      sourceHash,
+      latencyMs: Date.now() - startedAt,
     };
   }
 
   if (!isEvidenceSufficientForEditorial(evidenceSufficiency.level)) {
-    recordEditorV2ShadowOutcome(source, {
-      failed: true,
-      insufficientEvidence: true,
-      reasonCode: V2_REASON_CODES.V2_INSUFFICIENT_EVIDENCE,
-      latencyMs: Date.now() - startedAt,
-    });
     return {
-      mode: EDITOR_V2_MODE,
+      mode,
       ok: false,
       stage: "evidence_sufficiency",
       reasonCode: V2_REASON_CODES.V2_INSUFFICIENT_EVIDENCE,
       evidenceSufficiency,
+      sourceTitle: evidence.title,
+      sourceHash,
+      latencyMs: Date.now() - startedAt,
     };
   }
 
@@ -88,51 +99,46 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
   const aiCall = !options.disableAi && Boolean(options.openAiApiKey || process.env.OPENAI_API_KEY);
 
   if (editorial.timeout) {
-    recordEditorV2ShadowOutcome(source, {
-      failed: true,
-      timeout: true,
-      aiCall,
-      reasonCode: V2_REASON_CODES.V2_EDITORIAL_TIMEOUT,
-      latencyMs: Date.now() - startedAt,
-    });
     return {
-      mode: EDITOR_V2_MODE,
+      mode,
       ok: false,
       stage: "editorial_ai",
       reasonCode: V2_REASON_CODES.V2_EDITORIAL_TIMEOUT,
+      editorial,
+      sourceTitle: evidence.title,
+      sourceHash,
+      latencyMs: Date.now() - startedAt,
+      aiCalls: aiCall ? 1 : 0,
     };
   }
 
   if (editorial.insufficientEvidence) {
-    recordEditorV2ShadowOutcome(source, {
-      failed: true,
-      insufficientEvidence: true,
-      aiCall,
-      reasonCode: V2_REASON_CODES.V2_INSUFFICIENT_EVIDENCE,
-      latencyMs: Date.now() - startedAt,
-    });
     return {
-      mode: EDITOR_V2_MODE,
+      mode,
       ok: false,
       stage: "editorial_ai",
       reasonCode: V2_REASON_CODES.V2_INSUFFICIENT_EVIDENCE,
+      editorial,
+      sourceTitle: evidence.title,
+      sourceHash,
+      latencyMs: Date.now() - startedAt,
+      aiCalls: aiCall ? 1 : 0,
     };
   }
 
   const guard = validateEditorV2FactGuard({ evidence, facts, editorial });
   if (!guard.ok) {
-    recordEditorV2ShadowOutcome(source, {
-      failed: true,
-      aiCall,
-      reasonCode: guard.reasonCode,
-      latencyMs: Date.now() - startedAt,
-    });
     return {
-      mode: EDITOR_V2_MODE,
+      mode,
       ok: false,
       stage: "fact_guard",
       reasonCode: guard.reasonCode,
       issues: guard.issues,
+      editorial,
+      sourceTitle: evidence.title,
+      sourceHash,
+      latencyMs: Date.now() - startedAt,
+      aiCalls: aiCall ? 1 : 0,
     };
   }
 
@@ -153,29 +159,22 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
   });
 
   if (!finalPublication.ok) {
-    recordEditorV2ShadowOutcome(source, {
-      failed: true,
-      aiCall,
-      reasonCode: V2_REASON_CODES.V2_LOW_INFORMATION,
-      latencyMs: Date.now() - startedAt,
-    });
     return {
-      mode: EDITOR_V2_MODE,
+      mode,
       ok: false,
       stage: "minimum_information",
       reasonCode: V2_REASON_CODES.V2_LOW_INFORMATION,
       issue: finalPublication.issue,
+      editorial,
+      sourceTitle: evidence.title,
+      sourceHash,
+      latencyMs: Date.now() - startedAt,
+      aiCalls: aiCall ? 1 : 0,
     };
   }
 
-  recordEditorV2ShadowOutcome(source, {
-    passed: true,
-    aiCall,
-    latencyMs: Date.now() - startedAt,
-  });
-
   return {
-    mode: EDITOR_V2_MODE,
+    mode,
     ok: true,
     stage: "passed",
     evidence,
@@ -183,13 +182,68 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
     evidenceSufficiency,
     editorial,
     usedFallback: Boolean(editorial.fallback),
+    outputPath: editorial.outputPath,
     presentation: finalPublication.presentation,
+    sourceTitle: evidence.title,
+    sourceHash,
     latencyMs: Date.now() - startedAt,
     aiCalls: aiCall ? 1 : 0,
   };
 }
 
+async function runEditorV2ShadowReview(input = {}, options = {}) {
+  const result = await runEditorV2Review(input, options);
+  const source = input.item?.sourceName || input.source || "unknown";
+  const telemetryPayload = {
+    passed: result.ok,
+    failed: !result.ok,
+    aiCall: Boolean(result.aiCalls),
+    latencyMs: result.latencyMs,
+    reasonCode: result.reasonCode,
+    editorial: result.editorial,
+    sourceTitle: result.sourceTitle,
+    headline: result.editorial?.headline,
+    body: result.editorial?.body,
+    outputPath: result.outputPath,
+    sourceHash: result.sourceHash,
+    curatorSkipped: result.reasonCode === V2_REASON_CODES.V2_CURATOR_SKIPPED,
+    insufficientEvidence:
+      result.reasonCode === V2_REASON_CODES.V2_INSUFFICIENT_EVIDENCE ||
+      Boolean(result.editorial?.insufficientEvidence),
+    timeout: result.reasonCode === V2_REASON_CODES.V2_EDITORIAL_TIMEOUT,
+  };
+  recordEditorV2ShadowOutcome(source, telemetryPayload);
+  return result;
+}
+
+async function runEditorV2PublicationReview(input = {}, options = {}) {
+  const result = await runEditorV2Review(input, options);
+  const source = input.item?.sourceName || input.source || "unknown";
+  recordEditorV2LiveOutcome(source, {
+    passed: result.ok,
+    aiCall: Boolean(result.aiCalls),
+    latencyMs: result.latencyMs,
+    reasonCode: result.reasonCode,
+    editorial: result.editorial,
+    sourceTitle: result.sourceTitle,
+    headline: result.editorial?.headline,
+    body: result.editorial?.body,
+    outputPath: result.outputPath,
+    sourceHash: result.sourceHash,
+  });
+  return result;
+}
+
 function scheduleEditorV2ShadowReview(input = {}, options = {}) {
+  if (!isEditorV2Enabled(options.env) || !isEditorV2ShadowMode(options.env)) {
+    return Promise.resolve({
+      mode: resolveEditorV2Mode(options.env),
+      ok: false,
+      stage: "disabled",
+      skipped: true,
+    });
+  }
+
   const timeoutMs = Math.max(250, Number(options.v2ShadowTimeoutMs || options.v2TimeoutMs || 12000));
   return Promise.race([
     runEditorV2ShadowReview(input, options),
@@ -197,7 +251,7 @@ function scheduleEditorV2ShadowReview(input = {}, options = {}) {
       setTimeout(
         () =>
           resolve({
-            mode: EDITOR_V2_MODE,
+            mode: resolveEditorV2Mode(options.env),
             ok: false,
             stage: "timeout",
             reasonCode: V2_REASON_CODES.V2_EDITORIAL_TIMEOUT,
@@ -207,7 +261,7 @@ function scheduleEditorV2ShadowReview(input = {}, options = {}) {
       );
     }),
   ]).catch((error) => ({
-    mode: EDITOR_V2_MODE,
+    mode: resolveEditorV2Mode(options.env),
     ok: false,
     stage: "error",
     error: error.message,
@@ -215,8 +269,16 @@ function scheduleEditorV2ShadowReview(input = {}, options = {}) {
 }
 
 module.exports = {
-  EDITOR_V2_MODE,
+  resolveEditorV2Mode,
+  isEditorV2Off,
+  isEditorV2ShadowMode,
+  isEditorV2LiveMode,
+  isEditorV2Enabled,
+  EDITOR_V2_MODES,
+  V2_OUTPUT_PATHS,
   formatEditorV2TelegramMessage,
+  runEditorV2Review,
   runEditorV2ShadowReview,
+  runEditorV2PublicationReview,
   scheduleEditorV2ShadowReview,
 };

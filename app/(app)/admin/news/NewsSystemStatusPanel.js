@@ -254,25 +254,35 @@ export default function NewsSystemStatusPanel() {
       {(() => {
         const v2 = summary?.editorV2 || status?.editorV2 || last24h?.editorV2;
         const v2Mode = summary?.editorV2Mode || status?.editorV2Mode || v2?.mode || "SHADOW";
+        const v2Samples = summary?.editorV2Samples || status?.editorV2Samples || [];
         if (!v2) return null;
         const attempted = v2.shadowAttempted ?? 0;
         const passed = v2.shadowPassed ?? 0;
         const failed = v2.shadowFailed ?? 0;
         const passRate = attempted > 0 ? `${Math.round((passed / attempted) * 100)}%` : "—";
+        const aiDirectPct =
+          typeof v2.aiDirectRate === "number" ? `${Math.round(v2.aiDirectRate * 100)}%` : "—";
+        const fallbackPct =
+          typeof v2.fallbackRate === "number" ? `${Math.round(v2.fallbackRate * 100)}%` : "—";
+        const failurePct =
+          typeof v2.failureRate === "number" ? `${Math.round(v2.failureRate * 100)}%` : "—";
         return (
           <>
             <h3 className="admin-news-system__subtitle">
-              Editor V2 — آخر 24 ساعة
+              Editor V2 — SHADOW
               <span className="admin-news-system__count">({v2Mode})</span>
             </h3>
             <p className="admin-news-page__hint">
-              Editor V2 Mode: {v2Mode}. V2 لا يؤثر على النشر الحي حالياً.
+              Editor V2 Mode: {v2Mode}. مقاييس would-pass/would-fail لا تغيّر النشر الحي إلا في وضع LIVE.
             </p>
             <div className="admin-news-system__metric-grid">
-              <MetricCard label="V2 shadow attempted" value={attempted} />
-              <MetricCard label="V2 shadow passed" value={passed} />
-              <MetricCard label="V2 shadow failed" value={failed} />
+              <MetricCard label="تمت مراجعته (ظل)" value={attempted} />
+              <MetricCard label="would-pass" value={passed} />
+              <MetricCard label="would-fail" value={failed} />
               <MetricCard label="V2 pass rate" value={passRate} />
+              <MetricCard label="AI Direct %" value={aiDirectPct} />
+              <MetricCard label="Fallback %" value={fallbackPct} />
+              <MetricCard label="Failed %" value={failurePct} />
               <MetricCard label="V2 role mismatch" value={v2.shadowRoleMismatch ?? 0} />
               <MetricCard label="V2 numeric mismatch" value={v2.shadowNumericMismatch ?? 0} />
               <MetricCard label="V2 low information" value={v2.shadowLowInformation ?? 0} />
@@ -281,6 +291,35 @@ export default function NewsSystemStatusPanel() {
                 value={formatLatencyMs(v2.shadowAverageLatencyMs)}
               />
             </div>
+            {v2Samples.length ? (
+              <>
+                <h4 className="admin-news-system__subtitle">أحدث عينات V2</h4>
+                <div className="admin-news-system__table-wrap">
+                  <table className="admin-news-system__table">
+                    <thead>
+                      <tr>
+                        <th scope="col">المصدر</th>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">Headline</th>
+                        <th scope="col">Path</th>
+                        <th scope="col">Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {v2Samples.slice(0, 10).map((sample) => (
+                        <tr key={`${sample.sourceHash || sample.timestamp}:${sample.headline}`}>
+                          <td>{sample.source || "—"}</td>
+                          <td className="admin-news-system__mono">{sample.sourceTitle || "—"}</td>
+                          <td>{sample.headline || "—"}</td>
+                          <td>{sample.outputPath || "—"}</td>
+                          <td>{sample.verdict || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
           </>
         );
       })()}

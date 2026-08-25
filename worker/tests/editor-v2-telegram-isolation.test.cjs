@@ -18,7 +18,9 @@ function run() {
   );
 
   assert(newsWorker.includes("scheduleEditorV2ShadowReview"), "Editor V2 shadow imported");
-  assert(!newsWorker.includes("runEditorV2ShadowReview("), "V2 must not run synchronously on live path");
+  assert(newsWorker.includes("isEditorV2LiveMode"), "V2 live guard present");
+  assert(newsWorker.includes("runEditorV2PublicationReview"), "V2 live review present");
+  assert(!newsWorker.includes("await runEditorV2ShadowReview("), "V2 shadow must stay async");
   assert(!atomicPublish.includes("editor-v2"), "Telegram atomic publish isolated from V2");
   assert(!phase2Integration.includes("editor-v2"), "Phase2 integration isolated from V2");
 

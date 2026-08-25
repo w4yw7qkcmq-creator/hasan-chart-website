@@ -94,6 +94,18 @@ If Worker env vars changed:
 2. Redeploy Worker
 3. Test alert delivery with a staging alert
 
+### Editor V2 instant rollback (no code revert)
+
+RSS live authority returns to the legacy `b2625a7` path when V2 is not in `LIVE` mode.
+
+1. Railway → news worker service → **Variables**
+2. Set `EDITOR_V2_MODE=SHADOW` (observe only) or `EDITOR_V2_MODE=OFF` (disable V2 entirely)
+3. Restart/redeploy the worker (or wait for the next process restart)
+4. Verify `/health` shows `editorV2Mode: "SHADOW"` or `"OFF"`
+5. Confirm live RSS publishes use the legacy editorial path; shadow metrics continue only in `SHADOW`
+
+Do **not** set `EDITOR_V2_MODE=LIVE` unless explicitly authorized. No DB or migration rollback is required.
+
 ---
 
 ## 5. Database Rollback

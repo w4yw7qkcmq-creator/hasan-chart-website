@@ -89,7 +89,12 @@ const {
   getEditorTelemetrySnapshot,
 } = require("./lib/general-rss/external-news-editor");
 const { scheduleExternalNewsShadowReview } = require("./lib/general-rss/external-news-editor/shadow-review");
-const { scheduleEditorV2ShadowReview } = require("./lib/general-rss/editor-v2");
+const {
+  scheduleEditorV2ShadowReview,
+  runEditorV2PublicationReview,
+  resolveEditorV2Mode,
+} = require("./lib/general-rss/editor-v2");
+const { isEditorV2LiveMode, isEditorV2ShadowMode } = require("./lib/general-rss/editor-v2/mode");
 const { getEditorV2TelemetrySnapshot } = require("./lib/general-rss/editor-v2/telemetry");
 const { resolveRssSourceImageWithChartPolicy, getChartPolicyTelemetrySnapshot } = require("./lib/general-rss/chart-visual-policy");
 const { auditRssPostPublish } = require("./lib/general-rss/rss-post-publish-audit");
@@ -3955,11 +3960,49 @@ async function fetchForexNews(options = {}) {
         }
       }
 
-      const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link, {
-        dryRun,
-        telegramItem: latestNews,
-      });
-      stats.aiProcessed += 1;
+      let aiResult;
+      let v2LivePresentation = null;
+      const v2EditorOptions = {
+        disableAi: !OPENAI_API_KEY,
+        openAiApiKey: OPENAI_API_KEY,
+        v2TimeoutMs: Number(process.env.RSS_EDITOR_V2_TIMEOUT_MS || 12000),
+        v2ShadowTimeoutMs: Number(process.env.RSS_EDITOR_V2_SHADOW_TIMEOUT_MS || 12000),
+      };
+
+      if (
+        isEditorV2LiveMode() &&
+        !latestNews.isTelegramSource &&
+        !isEconomicReleaseTitle(latestNews.title)
+      ) {
+        const v2Live = await runEditorV2PublicationReview({ item: latestNews }, v2EditorOptions);
+        stats.aiProcessed += 1;
+        if (!v2Live.ok) {
+          stats.rejectedFilter += 1;
+          recordRejection(stats, v2Live.reasonCode || "V2_LIVE_BLOCKED", latestNews.title);
+          recordRssCandidateDecision(latestNews, v2Live.reasonCode || "V2_LIVE_BLOCKED", {
+            aiUsed: true,
+            metadata: {
+              editorV2Mode: "LIVE",
+              stage: v2Live.stage || null,
+              issue: v2Live.issue || null,
+            },
+          });
+          markEligibleRssItemProcessed(latestNews, "v2_live_blocked", { dryRun });
+          continue eligibleLoop;
+        }
+        aiResult = {
+          message: v2Live.presentation.telegramMessage,
+          imageTitle: v2Live.editorial.headline,
+          editorV2Live: true,
+        };
+        v2LivePresentation = v2Live.presentation;
+      } else {
+        aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link, {
+          dryRun,
+          telegramItem: latestNews,
+        });
+        stats.aiProcessed += 1;
+      }
 
       if (aiResult?.economicAnalysis?.handled) {
         stats.economicEventsDetected += 1;
@@ -4045,64 +4088,69 @@ async function fetchForexNews(options = {}) {
       let approvedRssPresentation = null;
 
       if (!latestNews.isTelegramSource) {
-        const rssEditorialCheck = validateGeneralRssEditorialOutput({
-          title: latestNews.title,
-          body: message,
-          rawSourceText: buildRawSourceText(latestNews),
-        });
-        if (!rssEditorialCheck.ok) {
-          stats.rejectedFilter += 1;
-          recordRejection(stats, rssEditorialCheck.reason, latestNews.title);
-          if (rssEditorialCheck.reason === "RSS_COPY_SIMILARITY_TOO_HIGH") {
-            recordRssCopyBlocked();
+        if (aiResult?.editorV2Live && v2LivePresentation) {
+          approvedRssPresentation = v2LivePresentation;
+          publicationMessage = approvedRssPresentation.telegramMessage;
+        } else {
+          const rssEditorialCheck = validateGeneralRssEditorialOutput({
+            title: latestNews.title,
+            body: message,
+            rawSourceText: buildRawSourceText(latestNews),
+          });
+          if (!rssEditorialCheck.ok) {
+            stats.rejectedFilter += 1;
+            recordRejection(stats, rssEditorialCheck.reason, latestNews.title);
+            if (rssEditorialCheck.reason === "RSS_COPY_SIMILARITY_TOO_HIGH") {
+              recordRssCopyBlocked();
+            }
+            recordRssCandidateDecision(latestNews, rssEditorialCheck.reason, {
+              aiUsed: true,
+              metadata: {
+                similarity: rssEditorialCheck.similarity || null,
+                coverage: rssEditorialCheck.coverage || null,
+              },
+            });
+            console.log(
+              "RSS_EDITORIAL_BLOCKED",
+              JSON.stringify({
+                reason: rssEditorialCheck.reason,
+                titlePreview: String(latestNews.title || "").slice(0, 80),
+                similarity: rssEditorialCheck.similarity || null,
+              })
+            );
+            markEligibleRssItemProcessed(latestNews, "editorial_blocked", { dryRun });
+            continue eligibleLoop;
           }
-          recordRssCandidateDecision(latestNews, rssEditorialCheck.reason, {
-            aiUsed: true,
-            metadata: {
-              similarity: rssEditorialCheck.similarity || null,
-              coverage: rssEditorialCheck.coverage || null,
-            },
+
+          const finalPublication = buildAndValidateFinalRssPublication({
+            sourceTitle: latestNews.title,
+            editorialMessage: message,
+            imageTitle: aiResult.imageTitle,
           });
-          console.log(
-            "RSS_EDITORIAL_BLOCKED",
-            JSON.stringify({
-              reason: rssEditorialCheck.reason,
-              titlePreview: String(latestNews.title || "").slice(0, 80),
-              similarity: rssEditorialCheck.similarity || null,
-            })
-          );
-          markEligibleRssItemProcessed(latestNews, "editorial_blocked", { dryRun });
-          continue eligibleLoop;
+          if (!finalPublication.ok) {
+            stats.rejectedFilter += 1;
+            recordRejection(stats, finalPublication.reason, latestNews.title);
+            recordRssCandidateDecision(latestNews, finalPublication.reason, {
+              aiUsed: true,
+              metadata: { issue: finalPublication.issue || null },
+            });
+            console.log(
+              "RSS_MINIMUM_INFORMATION_BLOCKED",
+              JSON.stringify({
+                reason: finalPublication.reason,
+                issue: finalPublication.issue || null,
+                titlePreview: String(latestNews.title || "").slice(0, 80),
+              })
+            );
+            markEligibleRssItemProcessed(latestNews, "minimum_information_blocked", { dryRun });
+            continue eligibleLoop;
+          }
+
+          approvedRssPresentation = finalPublication.presentation;
+          publicationMessage = approvedRssPresentation.telegramMessage;
         }
 
-        const finalPublication = buildAndValidateFinalRssPublication({
-          sourceTitle: latestNews.title,
-          editorialMessage: message,
-          imageTitle: aiResult.imageTitle,
-        });
-        if (!finalPublication.ok) {
-          stats.rejectedFilter += 1;
-          recordRejection(stats, finalPublication.reason, latestNews.title);
-          recordRssCandidateDecision(latestNews, finalPublication.reason, {
-            aiUsed: true,
-            metadata: { issue: finalPublication.issue || null },
-          });
-          console.log(
-            "RSS_MINIMUM_INFORMATION_BLOCKED",
-            JSON.stringify({
-              reason: finalPublication.reason,
-              issue: finalPublication.issue || null,
-              titlePreview: String(latestNews.title || "").slice(0, 80),
-            })
-          );
-          markEligibleRssItemProcessed(latestNews, "minimum_information_blocked", { dryRun });
-          continue eligibleLoop;
-        }
-
-        approvedRssPresentation = finalPublication.presentation;
-        publicationMessage = approvedRssPresentation.telegramMessage;
-
-        if (!dryRun) {
+        if (!dryRun && isEditorV2ShadowMode() && !aiResult?.editorV2Live) {
           void scheduleExternalNewsShadowReview(
             {
               item: latestNews,
@@ -4485,6 +4533,7 @@ function getNewsWorkerHealthSnapshot() {
     build: process.env.RAILWAY_GIT_COMMIT_SHA
       ? { commit: process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7) }
       : undefined,
+    editorV2Mode: resolveEditorV2Mode(),
     phase3: getNewsSystemStatus(),
     timestamp: new Date().toISOString(),
   };

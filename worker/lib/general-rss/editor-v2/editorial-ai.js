@@ -7,6 +7,7 @@ const {
   buildDeterministicArabicFallback,
   isPredominantlyArabic,
 } = require("./deterministic-arabic-fallback");
+const { V2_OUTPUT_PATHS } = require("./mode");
 
 const DEFAULT_V2_TIMEOUT_MS = 12_000;
 const DEFAULT_V2_MODEL = "gpt-4.1-nano";
@@ -141,12 +142,24 @@ function buildEditorialPayload(evidence = {}, facts = {}, options = {}) {
   };
 }
 
+function withOutputPath(editorial = {}, outputPath = V2_OUTPUT_PATHS.FAILED, aiDirectAttempted = false) {
+  return {
+    ...editorial,
+    outputPath,
+    aiDirectAttempted,
+  };
+}
+
 async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}) {
   const apiKey = options.openAiApiKey || process.env.OPENAI_API_KEY;
   const sufficiencyLevel = options.evidenceSufficiencyLevel || EVIDENCE_SUFFICIENCY.SUFFICIENT_MINIMAL;
 
   if (options.disableAi === true || !apiKey) {
-    return buildDeterministicArabicFallback(evidence, facts);
+    return withOutputPath(
+      buildDeterministicArabicFallback(evidence, facts),
+      V2_OUTPUT_PATHS.DETERMINISTIC_FALLBACK,
+      false
+    );
   }
 
   const timeoutMs = options.v2TimeoutMs || options.editorTimeoutMs || DEFAULT_V2_TIMEOUT_MS;
@@ -162,26 +175,42 @@ async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}
     });
     const parsed = parseEditorialJson(response.data?.choices?.[0]?.message?.content);
     if (!parsed?.headline || !parsed?.body) {
-      return buildDeterministicArabicFallback(evidence, facts);
+      return withOutputPath(
+        buildDeterministicArabicFallback(evidence, facts),
+        V2_OUTPUT_PATHS.DETERMINISTIC_FALLBACK,
+        true
+      );
     }
     const finalized = finalizeEditorialResponse(parsed, { evidenceSufficiencyLevel: sufficiencyLevel });
     if (finalized.insufficientEvidence || !isPredominantlyArabic(`${finalized.headline} ${finalized.body}`)) {
-      return buildDeterministicArabicFallback(evidence, facts);
+      return withOutputPath(
+        buildDeterministicArabicFallback(evidence, facts),
+        V2_OUTPUT_PATHS.DETERMINISTIC_FALLBACK,
+        true
+      );
     }
-    return finalized;
+    return withOutputPath(finalized, V2_OUTPUT_PATHS.AI_DIRECT, true);
   } catch (error) {
     if (String(error.code || "").includes("ECONNABORTED") || /timeout/i.test(error.message || "")) {
-      return {
-        headline: "",
-        body: "",
-        usedFacts: [],
-        usedEntities: [],
-        confidence: "timeout",
-        insufficientEvidence: true,
-        timeout: true,
-      };
+      return withOutputPath(
+        {
+          headline: "",
+          body: "",
+          usedFacts: [],
+          usedEntities: [],
+          confidence: "timeout",
+          insufficientEvidence: true,
+          timeout: true,
+        },
+        V2_OUTPUT_PATHS.FAILED,
+        true
+      );
     }
-    return buildDeterministicArabicFallback(evidence, facts);
+    return withOutputPath(
+      buildDeterministicArabicFallback(evidence, facts),
+      V2_OUTPUT_PATHS.DETERMINISTIC_FALLBACK,
+      true
+    );
   }
 }
 
