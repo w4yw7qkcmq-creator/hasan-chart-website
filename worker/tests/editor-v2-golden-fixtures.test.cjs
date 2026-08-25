@@ -120,6 +120,17 @@ async function testNumericIntegrity() {
   });
   assert(pass.ok, "Equivalent numeric formatting must pass");
 
+  const subset = validateEditorV2FactGuard({
+    evidence,
+    facts,
+    editorial: {
+      headline: "الذهب يرتفع",
+      body: "استقر الذهب قرب 4530 مع تحركات في العائد.",
+      insufficientEvidence: false,
+    },
+  });
+  assert(subset.ok, "Output using subset of source numbers must pass");
+
   const fail = validateEditorV2FactGuard({
     evidence,
     facts,

@@ -4,6 +4,11 @@ const { buildCanonicalRssEvidence } = require("./canonical-evidence");
 const { buildStructuredFactsV2 } = require("./structured-facts");
 const { generateEditorV2Editorial } = require("./editorial-ai");
 const { validateEditorV2FactGuard } = require("./fact-guard");
+const {
+  classifyEvidenceSufficiency,
+  EVIDENCE_SUFFICIENCY,
+  isEvidenceSufficientForEditorial,
+} = require("./evidence-sufficiency");
 const { recordEditorV2ShadowOutcome } = require("./telemetry");
 const { V2_REASON_CODES } = require("./reason-codes");
 const { EDITOR_V2_MODE } = require("./telemetry");
@@ -41,6 +46,7 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
 
   const evidence = input.evidence || buildCanonicalRssEvidence(input.item || {}, source);
   const facts = input.facts || buildStructuredFactsV2(evidence);
+  const evidenceSufficiency = input.evidenceSufficiency || classifyEvidenceSufficiency(evidence);
 
   if ((facts.roleConflicts || []).length) {
     recordEditorV2ShadowOutcome(source, {
@@ -57,7 +63,28 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
     };
   }
 
-  const editorial = input.editorial || (await generateEditorV2Editorial(evidence, facts, options));
+  if (!isEvidenceSufficientForEditorial(evidenceSufficiency.level)) {
+    recordEditorV2ShadowOutcome(source, {
+      failed: true,
+      insufficientEvidence: true,
+      reasonCode: V2_REASON_CODES.V2_INSUFFICIENT_EVIDENCE,
+      latencyMs: Date.now() - startedAt,
+    });
+    return {
+      mode: EDITOR_V2_MODE,
+      ok: false,
+      stage: "evidence_sufficiency",
+      reasonCode: V2_REASON_CODES.V2_INSUFFICIENT_EVIDENCE,
+      evidenceSufficiency,
+    };
+  }
+
+  const editorial =
+    input.editorial ||
+    (await generateEditorV2Editorial(evidence, facts, {
+      ...options,
+      evidenceSufficiencyLevel: evidenceSufficiency.level,
+    }));
   const aiCall = !options.disableAi && Boolean(options.openAiApiKey || process.env.OPENAI_API_KEY);
 
   if (editorial.timeout) {
@@ -114,6 +141,14 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
     sourceTitle: evidence.title,
     editorialMessage,
     imageTitle: editorial.headline,
+    knownEntities: [
+      ...(facts.organizations || []),
+      ...(facts.people || []).map((person) => person.name).filter(Boolean),
+      ...(facts.instruments || []),
+    ],
+    organizations: facts.organizations,
+    people: facts.people,
+    instruments: facts.instruments,
   });
 
   if (!finalPublication.ok) {
@@ -144,6 +179,7 @@ async function runEditorV2ShadowReview(input = {}, options = {}) {
     stage: "passed",
     evidence,
     facts,
+    evidenceSufficiency,
     editorial,
     presentation: finalPublication.presentation,
     latencyMs: Date.now() - startedAt,

@@ -16,7 +16,13 @@ function sealRssFinalPublicationPresentation(input = {}) {
 
 function buildAndValidateFinalRssPublication(input = {}) {
   const sealed = sealRssFinalPublicationPresentation(input);
-  const minimumInformation = validateRssMinimumInformation(sealed);
+  const minimumInformation = validateRssMinimumInformation(sealed, {
+    sourceTitle: input.sourceTitle,
+    knownEntities: input.knownEntities,
+    organizations: input.organizations,
+    people: input.people,
+    instruments: input.instruments,
+  });
   if (!minimumInformation.ok) {
     return { ok: false, presentation: null, reason: minimumInformation.reason, issue: minimumInformation.issue };
   }

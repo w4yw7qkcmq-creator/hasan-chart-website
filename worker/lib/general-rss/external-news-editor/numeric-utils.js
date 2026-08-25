@@ -54,8 +54,51 @@ function numericSetsEqual(sourceTokens = [], draftTokens = []) {
   return { ok: missing.length === 0 && extra.length === 0, missing, extra };
 }
 
+function findEquivalentSourceToken(outputToken, sourceTokens = []) {
+  if (!outputToken) return null;
+  const direct = sourceTokens.find((source) => source.normalized === outputToken.normalized);
+  if (direct) return direct;
+
+  for (const source of sourceTokens) {
+    if (source.isPercent === outputToken.isPercent && source.value === outputToken.value) {
+      return source;
+    }
+    if (
+      !source.isPercent &&
+      !outputToken.isPercent &&
+      Number.isFinite(source.value) &&
+      Number.isFinite(outputToken.value) &&
+      Math.abs(source.value - outputToken.value) <= Math.max(1, Math.abs(source.value) * 0.0001)
+    ) {
+      return source;
+    }
+  }
+  return null;
+}
+
+function validateOutputNumbersSubset(sourceTokens = [], outputTokens = []) {
+  if (!outputTokens.length) {
+    return { ok: true, extra: [], unsupported: [] };
+  }
+
+  const extra = [];
+  for (const outputToken of outputTokens) {
+    if (!findEquivalentSourceToken(outputToken, sourceTokens)) {
+      extra.push(outputToken.normalized || outputToken.raw);
+    }
+  }
+
+  return {
+    ok: extra.length === 0,
+    extra,
+    unsupported: extra,
+  };
+}
+
 module.exports = {
   normalizeNumericToken,
   extractNumericTokens,
   numericSetsEqual,
+  findEquivalentSourceToken,
+  validateOutputNumbersSubset,
 };

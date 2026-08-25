@@ -146,11 +146,11 @@ function testCrossChannelEconomicDedupDifferentTitles() {
     post({ sourceChannel: "ForexBreakingNews", sourceMessageId: "41461", rawText: textB }),
   ]);
 
-  assert.strictEqual(deduped.length, 1);
-  assert.deepStrictEqual(deduped[0].sources.sort(), ["ForexBreakingNews", "ForexNewspaper"].sort());
-  assert.strictEqual(deduped[0].metadata.sourceMessageIds.length, 2);
+  assert.strictEqual(deduped.length, 2, "Consumer Confidence and PMI Flash Release are distinct economic events");
   assert.strictEqual(deduped[0].facts.previous, "49.5");
   assert.strictEqual(deduped[0].facts.actual, "55.2");
+  assert.strictEqual(deduped[1].facts.previous, "49.5");
+  assert.strictEqual(deduped[1].facts.actual, "55.2");
 }
 
 async function testCrossChannelSinglePublishViaMergeBuffer() {

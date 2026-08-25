@@ -1,4 +1,4 @@
-const { extractNumericTokens, numericSetsEqual } = require("../external-news-editor/numeric-utils");
+const { extractNumericTokens, validateOutputNumbersSubset } = require("../external-news-editor/numeric-utils");
 const {
   matchOfficialInText,
   isFedChairTitlePhrase,
@@ -41,17 +41,17 @@ function validateEditorV2FactGuard({ evidence = {}, facts = {}, editorial = {} }
   const sourceCombined = [evidence.title, evidence.description, evidence.contentEncoded].filter(Boolean).join("\n");
   const sourceNumbers = facts.numbers || extractNumericTokens(sourceCombined);
   const outputNumbers = extractNumericTokens(text);
-  if (sourceNumbers.length) {
-    const numericCheck = numericSetsEqual(sourceNumbers, outputNumbers);
+  if (outputNumbers.length) {
+    const numericCheck = validateOutputNumbersSubset(sourceNumbers, outputNumbers);
     if (!numericCheck.ok) {
       issues.push(
         issue(V2_ISSUE_CODES.NUMERIC_MISMATCH, {
-          missing: numericCheck.missing,
           extra: numericCheck.extra,
+          unsupported: numericCheck.unsupported,
         })
       );
     }
-  } else if (outputNumbers.length >= 2) {
+  } else if (sourceNumbers.length === 0 && /\d/.test(text)) {
     issues.push(issue(V2_ISSUE_CODES.UNSUPPORTED_CLAIM, { reason: "unsupported_numeric_density" }));
   }
 
