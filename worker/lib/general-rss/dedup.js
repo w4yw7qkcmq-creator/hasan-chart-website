@@ -40,24 +40,59 @@ function extractEventTypes(text = "") {
   return EVENT_PATTERNS.filter((entry) => entry.pattern.test(value)).map((entry) => entry.type);
 }
 
+const CATALYST_PATTERNS = [
+  { catalyst: "sanctions_escalation", pattern: /sanction|tariff|embargo|export ban|import ban|عقوب/i },
+  { catalyst: "shipping_disruption", pattern: /hormuz|shipping|tanker|vessel|maritime|strait|lane|red sea|ممر|ناقل|موانئ/i },
+  { catalyst: "price_move", pattern: /surge|jump|fall|drop|plunge|rally|retreat|slide|rebound|هبوط|ارتفاع|تراجع|تصحيح/i },
+  { catalyst: "attack_escalation", pattern: /attack|missile|airstrike|strike|drone|shell|هجوم|ضرب|صاروخ/i },
+  { catalyst: "negotiation", pattern: /talks|deal|agreement|negotiation|ceasefire|مفاوضات|اتفاق|وقف/i },
+  { catalyst: "policy_decision", pattern: /rate decision|rate cut|rate hike|approval|decision|policy|قرار|فائدة/i },
+];
+
+function extractCatalysts(text = "") {
+  const value = String(text || "");
+  return CATALYST_PATTERNS.filter((entry) => entry.pattern.test(value)).map((entry) => entry.catalyst);
+}
+
+function normalizeActionKey(text = "") {
+  const value = normalizeTitle(text);
+  const actions = [];
+  if (/sanction|tariff|embargo|عقوب/i.test(value)) actions.push("sanctions");
+  if (/fall|drop|retreat|decline|slide|plunge|هبوط|تراجع/i.test(value)) actions.push("price_fall");
+  if (/surge|jump|rally|rise|climb|ارتفاع|قفز/i.test(value)) actions.push("price_rise");
+  if (/attack|missile|strike|drone|airstrike|هجوم|ضرب/i.test(value)) actions.push("attack");
+  if (/close|closure|block|shutdown|إغلاق|اغلاق|إقفال/i.test(value)) actions.push("closure");
+  if (/talks|deal|agreement|negotiation|مفاوضات|اتفاق/i.test(value)) actions.push("negotiation");
+  if (/warn|threat|signal|حذر|تهديد/i.test(value)) actions.push("warning");
+  return actions.sort().join("+") || value.slice(0, 48);
+}
+
 function buildRssEventFingerprint(item = {}) {
   const text = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""}`;
   const entities = extractEntities(text).sort();
   const events = extractEventTypes(text).sort();
+  const catalysts = extractCatalysts(text).sort();
+  const actionKey = normalizeActionKey(text);
   const normalized = normalizeTitle(item.title || text);
+
+  if (entities.length && (events.length || catalysts.length)) {
+    return `${entities.join("+")}|${events.join("+")}|${catalysts.join("+")}|${actionKey}`;
+  }
 
   if (!entities.length && !events.length) {
     return normalized.slice(0, 80) || null;
   }
 
-  return `${entities.join("+")}|${events.join("+")}|${normalized.slice(0, 60)}`;
+  return `${entities.join("+")}|${events.join("+")}|${catalysts.join("+")}|${normalized.slice(0, 60)}`;
 }
 
 function buildRssDuplicateKey(item = {}) {
-  const text = `${item.title || ""} ${item.contentSnippet || ""}`;
+  const text = `${item.title || ""} ${item.contentSnippet || ""} ${item.summary || ""}`;
   const entities = extractEntities(text).sort();
   const events = extractEventTypes(text).sort();
-  return `${entities.join("+")}::${events.join("+")}`;
+  const catalysts = extractCatalysts(text).sort();
+  const actionKey = normalizeActionKey(text);
+  return `${entities.join("+")}::${events.join("+")}::${catalysts.join("+")}::${actionKey}`;
 }
 
 function tokenOverlapRatio(a = "", b = "") {
@@ -159,6 +194,8 @@ function isDistinctMarketDevelopment(current = {}, previous = {}) {
 module.exports = {
   extractEntities,
   extractEventTypes,
+  extractCatalysts,
+  normalizeActionKey,
   buildRssEventFingerprint,
   buildRssDuplicateKey,
   evaluateRssDuplicate,

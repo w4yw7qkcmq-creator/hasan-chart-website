@@ -198,38 +198,46 @@ export default function NewsSystemStatusPanel() {
 
       {(() => {
         const editor = summary?.editorInChief || last24h?.editorInChief;
+        const editorMode = summary?.editorMode || status?.editorMode || editor?.mode || "SHADOW";
         const chart = summary?.chartVisualPolicy || last24h?.chartVisualPolicy;
         if (!editor && !chart) return null;
-        const reviewed = editor?.attempted ?? 0;
-        const approved = editor?.approved ?? 0;
-        const repaired = editor?.repairSuccess ?? 0;
-        const blocked = editor?.blocked ?? 0;
-        const timeout = editor?.timeout ?? 0;
-        const approvalRate = reviewed > 0 ? `${Math.round((approved / reviewed) * 100)}%` : "—";
-        const repairRate = reviewed > 0 ? `${Math.round((repaired / reviewed) * 100)}%` : "—";
+        const reviewed = editor?.shadowReviewed ?? editor?.attempted ?? 0;
+        const wouldApprove = editor?.shadowWouldApprove ?? editor?.approved ?? 0;
+        const wouldRepair = editor?.shadowWouldRepair ?? editor?.repairSuccess ?? 0;
+        const wouldBlock = editor?.shadowWouldBlock ?? 0;
+        const timeout = editor?.shadowTimeout ?? editor?.timeout ?? 0;
+        const approvalRate = reviewed > 0 ? `${Math.round((wouldApprove / reviewed) * 100)}%` : "—";
+        const repairRate = reviewed > 0 ? `${Math.round((wouldRepair / reviewed) * 100)}%` : "—";
         const rejectionReasons = [
-          ["numericMismatch", editor?.numericMismatch],
-          ["roleMismatch", editor?.roleMismatch],
-          ["entityMismatch", editor?.entityMismatch],
-          ["attributionMismatch", editor?.attributionMismatch],
-          ["quoteMismatch", editor?.quoteMismatch],
-          ["uncertaintyMismatch", editor?.uncertaintyMismatch],
+          ["numericMismatch", editor?.shadowIssueNumeric ?? editor?.numericMismatch],
+          ["roleMismatch", editor?.shadowIssueRole ?? editor?.roleMismatch],
+          ["entityMismatch", editor?.shadowIssueEntity ?? editor?.entityMismatch],
+          ["attributionMismatch", editor?.shadowIssueAttribution ?? editor?.attributionMismatch],
+          ["quoteMismatch", editor?.shadowIssueQuote ?? editor?.quoteMismatch],
+          ["uncertaintyMismatch", editor?.shadowIssueUncertainty ?? editor?.uncertaintyMismatch],
           ["headlineBodyMismatch", editor?.headlineBodyMismatch],
+          ["lowInformation", editor?.shadowIssueLowInformation],
         ]
           .filter(([, count]) => (count || 0) > 0)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5);
         return (
           <>
-            <h3 className="admin-news-system__subtitle">Editor-in-Chief — آخر 24 ساعة</h3>
+            <h3 className="admin-news-system__subtitle">
+              Editor-in-Chief — آخر 24 ساعة
+              <span className="admin-news-system__count">({editorMode === "SHADOW" ? "SHADOW" : editorMode})</span>
+            </h3>
+            <p className="admin-news-page__hint">
+              Editor Mode: {editorMode}. قرارات الظل لا تُحسب ضمن الحظر الفعلي للنشر.
+            </p>
             <div className="admin-news-system__metric-grid">
-              <MetricCard label="تمت مراجعته" value={reviewed} />
-              <MetricCard label="موافق عليه" value={approved} />
-              <MetricCard label="تم إصلاحه" value={repaired} />
-              <MetricCard label="محظور" value={blocked} />
-              <MetricCard label="انتهت المهلة" value={timeout} />
-              <MetricCard label="نسبة الموافقة" value={approvalRate} />
-              <MetricCard label="نسبة الإصلاح" value={repairRate} />
+              <MetricCard label="تمت مراجعته (ظل)" value={reviewed} />
+              <MetricCard label="wouldApprove" value={wouldApprove} />
+              <MetricCard label="wouldRepair" value={wouldRepair} />
+              <MetricCard label="wouldBlock" value={wouldBlock} />
+              <MetricCard label="انتهت المهلة (ظل)" value={timeout} />
+              <MetricCard label="نسبة wouldApprove" value={approvalRate} />
+              <MetricCard label="نسبة wouldRepair" value={repairRate} />
               {chart ? (
                 <MetricCard label="صور الرسم البياني (24س)" value={chart.chartImagesPublished ?? 0} />
               ) : null}

@@ -56,6 +56,19 @@ const {
   resetChartPolicyStateForTests,
 } = require("./chart-visual-policy");
 const { auditRssPostPublish } = require("./rss-post-publish-audit");
+const { evaluateRssCuratorGate, CURATOR_OUTCOMES } = require("./rss-curator-gate");
+const { validateRssMinimumInformation, REASON_CODES: MINIMUM_INFO_REASON_CODES } = require("./minimum-information-gate");
+const {
+  sealRssFinalPublicationPresentation,
+  buildAndValidateFinalRssPublication,
+  assertDeliveryMatchesValidatedPresentation,
+} = require("./final-publication-presentation");
+const { sanitizeRssDraftAiText } = require("./rss-draft-sanitize");
+const {
+  reviewExternalNewsInShadowMode,
+  scheduleExternalNewsShadowReview,
+  RSS_EDITOR_MODE,
+} = require("./external-news-editor/shadow-review");
 
 module.exports = {
   GENERAL_RSS_FEEDS,
@@ -108,4 +121,15 @@ module.exports = {
   getChartPolicyTelemetrySnapshot,
   resetChartPolicyStateForTests,
   auditRssPostPublish,
+  evaluateRssCuratorGate,
+  CURATOR_OUTCOMES,
+  validateRssMinimumInformation,
+  MINIMUM_INFO_REASON_CODES,
+  sealRssFinalPublicationPresentation,
+  buildAndValidateFinalRssPublication,
+  assertDeliveryMatchesValidatedPresentation,
+  sanitizeRssDraftAiText,
+  reviewExternalNewsInShadowMode,
+  scheduleExternalNewsShadowReview,
+  RSS_EDITOR_MODE,
 };

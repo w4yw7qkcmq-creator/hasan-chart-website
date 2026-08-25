@@ -72,8 +72,12 @@ const {
   GENERAL_RSS_FEEDS,
   validateGeneralRssEditorialOutput,
   buildRawSourceText,
+  buildAndValidateFinalRssPublication,
+  assertDeliveryMatchesValidatedPresentation,
+  evaluateRssCuratorGate,
 } = require("./lib/general-rss");
 const { buildRssPublicationPresentation } = require("./lib/general-rss/publication-format");
+const { sanitizeRssDraftAiText } = require("./lib/general-rss/rss-draft-sanitize");
 const {
   resolveRssSourceImage,
 } = require("./lib/general-rss/rss-source-image-resolver");
@@ -82,9 +86,9 @@ const {
   getRssImageTelemetrySnapshot,
 } = require("./lib/general-rss/rss-image-telemetry");
 const {
-  reviewExternalNewsBeforePublish,
   getEditorTelemetrySnapshot,
 } = require("./lib/general-rss/external-news-editor");
+const { scheduleExternalNewsShadowReview } = require("./lib/general-rss/external-news-editor/shadow-review");
 const { resolveRssSourceImageWithChartPolicy, getChartPolicyTelemetrySnapshot } = require("./lib/general-rss/chart-visual-policy");
 const { auditRssPostPublish } = require("./lib/general-rss/rss-post-publish-audit");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
@@ -3487,18 +3491,15 @@ async function analyzeNewsWithAI(title, link, options = {}) {
       throw new Error("Empty AI response");
     }
 
-    const cleanedAiText = aiText
-      .replace(/https?:\/\/\S+/g, "")
-      .replace(/رابط المصدر:?/gi, "")
-      .replace(/المصدر:?/gi, "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .filter((line) => !/[A-Za-z]{4,}/.test(line))
-      .filter((line) => !/التأثير\s*:\s*(غير مؤكد|غير واضح|غير معروف|متباين)/i.test(line.trim()))
-      .filter((line) => isEconomicReleaseTitle(title) || !/^\s*(?:📊\s*)?(?:التأثير|تأثير الخبر|النتيجة)\s*[:：]/i.test(line.trim()))
-      .join("\n")
-      .trim();
+    const sanitizedDraft = sanitizeRssDraftAiText(aiText, {
+      title,
+      isEconomicReleaseTitle,
+    });
+    if (!sanitizedDraft.ok) {
+      throw new Error(sanitizedDraft.reason || "AI response contains English or empty Arabic text");
+    }
+
+    const cleanedAiText = sanitizedDraft.cleanedText;
 
     if (!cleanedAiText || /[A-Za-z]{4,}/.test(cleanedAiText)) {
       throw new Error("AI response contains English or empty Arabic text");
@@ -3938,6 +3939,20 @@ async function fetchForexNews(options = {}) {
       const latestLink = latestNews.link;
       recordRssEditorialEvaluated();
 
+      if (!latestNews.isTelegramSource) {
+        const curatorGate = evaluateRssCuratorGate(latestNews);
+        if (!curatorGate.ok) {
+          stats.rejectedFilter += 1;
+          recordRejection(stats, curatorGate.outcome, latestNews.title);
+          recordRssCandidateDecision(latestNews, curatorGate.outcome, {
+            aiUsed: false,
+            metadata: { curatorReason: curatorGate.reason || null },
+          });
+          markEligibleRssItemProcessed(latestNews, "curator_skipped", { dryRun });
+          continue eligibleLoop;
+        }
+      }
+
       const aiResult = await analyzeNewsWithAI(latestNews.title, latestNews.link, {
         dryRun,
         telegramItem: latestNews,
@@ -4024,15 +4039,8 @@ async function fetchForexNews(options = {}) {
       }
 
       const message = aiResult.message;
-      const rssPresentation = latestNews.isTelegramSource
-        ? null
-        : buildRssPublicationPresentation({
-            sourceTitle: latestNews.title,
-            editorialMessage: message,
-            imageTitle: aiResult.imageTitle,
-          });
-      let publicationMessage = rssPresentation?.telegramMessage || message;
-      let approvedRssPresentation = rssPresentation;
+      let publicationMessage = message;
+      let approvedRssPresentation = null;
 
       if (!latestNews.isTelegramSource) {
         const rssEditorialCheck = validateGeneralRssEditorialOutput({
@@ -4065,33 +4073,52 @@ async function fetchForexNews(options = {}) {
           continue eligibleLoop;
         }
 
-        const editorReview = await reviewExternalNewsBeforePublish(
-          {
-            item: latestNews,
-            editorialMessage: message,
-            rssPresentation,
-            imageTitle: aiResult.imageTitle,
-            impactLevel: latestNews.impactLevel || "MEDIUM",
-          },
-          {
-            disableAi: dryRun || !OPENAI_API_KEY,
-            openAiApiKey: OPENAI_API_KEY,
-            editorTimeoutMs: Number(process.env.RSS_EDITOR_TIMEOUT_MS || 10000),
-          }
-        );
-
-        if (!editorReview.ok) {
+        const finalPublication = buildAndValidateFinalRssPublication({
+          sourceTitle: latestNews.title,
+          editorialMessage: message,
+          imageTitle: aiResult.imageTitle,
+        });
+        if (!finalPublication.ok) {
           stats.rejectedFilter += 1;
-          recordRssCandidateDecision(latestNews, editorReview.reasonCode || "EDITOR_BLOCKED", {
+          recordRejection(stats, finalPublication.reason, latestNews.title);
+          recordRssCandidateDecision(latestNews, finalPublication.reason, {
             aiUsed: true,
-            metadata: editorReview.metadata || {},
+            metadata: { issue: finalPublication.issue || null },
           });
-          markEligibleRssItemProcessed(latestNews, "editor_blocked", { dryRun });
+          console.log(
+            "RSS_MINIMUM_INFORMATION_BLOCKED",
+            JSON.stringify({
+              reason: finalPublication.reason,
+              issue: finalPublication.issue || null,
+              titlePreview: String(latestNews.title || "").slice(0, 80),
+            })
+          );
+          markEligibleRssItemProcessed(latestNews, "minimum_information_blocked", { dryRun });
           continue eligibleLoop;
         }
 
-        publicationMessage = editorReview.publicationMessage;
-        approvedRssPresentation = editorReview.rssPresentation;
+        approvedRssPresentation = finalPublication.presentation;
+        publicationMessage = approvedRssPresentation.telegramMessage;
+
+        if (!dryRun) {
+          void scheduleExternalNewsShadowReview(
+            {
+              item: latestNews,
+              editorialMessage: message,
+              rssPresentation: approvedRssPresentation,
+              imageTitle: aiResult.imageTitle,
+              impactLevel: latestNews.impactLevel || "MEDIUM",
+            },
+            {
+              disableAi: !OPENAI_API_KEY,
+              openAiApiKey: OPENAI_API_KEY,
+              editorTimeoutMs: Number(process.env.RSS_EDITOR_TIMEOUT_MS || 10000),
+              shadowTimeoutMs: Number(process.env.RSS_EDITOR_SHADOW_TIMEOUT_MS || 8000),
+            }
+          );
+        }
+      } else {
+        publicationMessage = message;
       }
 
       const combinedNewsIdentity = approvedRssPresentation
@@ -4161,6 +4188,23 @@ async function fetchForexNews(options = {}) {
       }
       const finalImage = sourceImageResult?.url || null;
 
+      if (!latestNews.isTelegramSource && approvedRssPresentation) {
+        const immutability = assertDeliveryMatchesValidatedPresentation(approvedRssPresentation, {
+          telegramMessage: publicationMessage,
+          siteTitle: approvedRssPresentation.siteTitle,
+          siteContent: approvedRssPresentation.siteContent,
+        });
+        if (!immutability.ok) {
+          stats.rejectedFilter += 1;
+          recordRssCandidateDecision(latestNews, "RSS_PUBLICATION_MUTATED_AFTER_VALIDATION", {
+            aiUsed: true,
+            metadata: { issue: immutability.issue || null },
+          });
+          markEligibleRssItemProcessed(latestNews, "publication_mutated_after_validation", { dryRun });
+          continue eligibleLoop;
+        }
+      }
+
       if (dryRun) {
         console.log("NEWS_DRY_RUN eligible publish-ready item:", latestNews.title);
       } else {
@@ -4216,9 +4260,9 @@ async function fetchForexNews(options = {}) {
         savePublishedNewsLink(latestLink, combinedNewsIdentity);
         await savePublishedNewsToSupabase({
           link: latestLink,
-          title: (rssPresentation?.siteTitle || combinedNewsIdentity).slice(0, 500),
+          title: (approvedRssPresentation?.siteTitle || combinedNewsIdentity).slice(0, 500),
           normalized_title: normalizeNewsTitle(
-            rssPresentation?.siteTitle || combinedNewsIdentity
+            approvedRssPresentation?.siteTitle || combinedNewsIdentity
           ).slice(0, 500),
           topic_cluster: combinedTopicCluster,
           published_at: new Date().toISOString(),

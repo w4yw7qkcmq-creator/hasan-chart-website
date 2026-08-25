@@ -64,20 +64,19 @@ function validateGeneralRssEditorialOutput(input = {}) {
   const title = String(input.title || "").trim();
   const rawSourceText = String(input.rawSourceText || buildRawSourceText(input)).trim();
 
-  if (!body || body.length < 40) {
-    return fail(BLOCK_REASONS.RSS_BODY_TOO_SHORT);
-  }
-
   if (!title) {
     return fail(BLOCK_REASONS.RSS_EDITORIAL_BLOCKED, { issue: "missing_title" });
+  }
+
+  const editorialBody = stripOfficialChannelFooter(body);
+  if (!editorialBody || editorialBody.length < 40) {
+    return fail(BLOCK_REASONS.RSS_BODY_TOO_SHORT);
   }
 
   const disallowedUrls = findDisallowedUrls(body);
   if (disallowedUrls.length) {
     return fail(BLOCK_REASONS.RSS_SOURCE_URL_PRESENT, { url: disallowedUrls[0] });
   }
-
-  const editorialBody = stripOfficialChannelFooter(body);
 
   for (const pattern of COMPETITOR_PATTERNS) {
     if (pattern.test(editorialBody)) {
@@ -119,5 +118,6 @@ module.exports = {
   ALLOWED_CHANNEL_URL_PATTERNS,
   buildRawSourceText,
   findDisallowedUrls,
+  stripOfficialChannelFooter,
   validateGeneralRssEditorialOutput,
 };

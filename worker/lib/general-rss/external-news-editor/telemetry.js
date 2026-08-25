@@ -1,7 +1,10 @@
 const { RSS_IMAGE_SOURCES } = require("../rss-image-telemetry");
 
+const RSS_EDITOR_MODE = "SHADOW";
+
 function createEmptyEditorBucket() {
   return {
+    mode: RSS_EDITOR_MODE,
     attempted: 0,
     approved: 0,
     repairRequested: 0,
@@ -17,6 +20,19 @@ function createEmptyEditorBucket() {
     uncertaintyMismatch: 0,
     headlineBodyMismatch: 0,
     languageRepair: 0,
+    shadowReviewed: 0,
+    shadowWouldApprove: 0,
+    shadowWouldRepair: 0,
+    shadowWouldBlock: 0,
+    shadowTimeout: 0,
+    shadowIssueNumeric: 0,
+    shadowIssueEntity: 0,
+    shadowIssueRole: 0,
+    shadowIssueAttribution: 0,
+    shadowIssueQuote: 0,
+    shadowIssueUncertainty: 0,
+    shadowIssueLanguage: 0,
+    shadowIssueLowInformation: 0,
   };
 }
 
@@ -65,8 +81,25 @@ function recordEditorReviewOutcome(source, outcome = {}) {
   }
 }
 
+function recordEditorShadowOutcome(source, outcome = {}) {
+  if (outcome.reviewed) recordEditorTelemetryEvent(source, "shadowReviewed");
+  if (outcome.wouldApprove) recordEditorTelemetryEvent(source, "shadowWouldApprove");
+  if (outcome.wouldRepair) recordEditorTelemetryEvent(source, "shadowWouldRepair");
+  if (outcome.wouldBlock) recordEditorTelemetryEvent(source, "shadowWouldBlock");
+  if (outcome.timeout) recordEditorTelemetryEvent(source, "shadowTimeout");
+  if (outcome.issueNumeric) recordEditorTelemetryEvent(source, "shadowIssueNumeric");
+  if (outcome.issueEntity) recordEditorTelemetryEvent(source, "shadowIssueEntity");
+  if (outcome.issueRole) recordEditorTelemetryEvent(source, "shadowIssueRole");
+  if (outcome.issueAttribution) recordEditorTelemetryEvent(source, "shadowIssueAttribution");
+  if (outcome.issueQuote) recordEditorTelemetryEvent(source, "shadowIssueQuote");
+  if (outcome.issueUncertainty) recordEditorTelemetryEvent(source, "shadowIssueUncertainty");
+  if (outcome.issueLanguage) recordEditorTelemetryEvent(source, "shadowIssueLanguage");
+  if (outcome.issueLowInformation) recordEditorTelemetryEvent(source, "shadowIssueLowInformation");
+}
+
 function getEditorTelemetrySnapshot() {
   return {
+    mode: RSS_EDITOR_MODE,
     global: { ...globalCounters },
     bySource: Object.fromEntries(RSS_IMAGE_SOURCES.map((source) => [source, { ...bySource[source] }])),
   };
@@ -80,8 +113,10 @@ function resetEditorTelemetryForTests() {
 }
 
 module.exports = {
+  RSS_EDITOR_MODE,
   recordEditorTelemetryEvent,
   recordEditorReviewOutcome,
+  recordEditorShadowOutcome,
   getEditorTelemetrySnapshot,
   resetEditorTelemetryForTests,
 };

@@ -216,9 +216,9 @@ async function run() {
   assert(editorMetrics.global.attempted >= 2, "Editor telemetry attempted");
 
   const workerSource = fs.readFileSync(path.join(root, "news-worker.js"), "utf8");
-  assert(workerSource.includes("reviewExternalNewsBeforePublish"), "news-worker wires editor");
+  assert(workerSource.includes("scheduleExternalNewsShadowReview"), "news-worker wires shadow editor");
   assert(workerSource.includes("if (!latestNews.isTelegramSource)"), "Editor guarded to non-telegram RSS");
-  assert(!/reviewExternalNewsBeforePublish[\s\S]{0,120}isTelegramSource/.test(workerSource), "Editor not called for telegram branch");
+  assert(!workerSource.includes("await reviewExternalNewsBeforePublish"), "Live editor must not block RSS publish");
 
   console.log("external-news-editor-in-chief.test.cjs PASS");
 }
