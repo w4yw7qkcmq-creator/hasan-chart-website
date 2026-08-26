@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { RSS_IMAGE_SOURCES } = require("../rss-image-telemetry");
 const { resolveEditorV2Mode, V2_OUTPUT_PATHS } = require("./mode");
+const { AI_DIRECT_FAILURE_REASONS } = require("./reason-codes");
 
 const MAX_SHADOW_SAMPLES = 25;
 
@@ -39,6 +40,7 @@ function createEmptyV2Bucket(mode = resolveEditorV2Mode()) {
     fallbackFailed: 0,
     finalPassed: 0,
     finalFailed: 0,
+    aiDirectFailureReasons: {},
   };
 }
 
@@ -60,6 +62,12 @@ const REASON_TO_FIELD = {
   V2_CURATOR_SKIPPED: "shadowCuratorSkipped",
   V2_EDITORIAL_TIMEOUT: "shadowEditorialTimeout",
   V2_EDITORIAL_AI_FAILED: "shadowEditorialAiFailed",
+  V2_ACTION_MISMATCH: "shadowActionMismatch",
+  V2_PRIMARY_SUBJECT_MISMATCH: "shadowPrimarySubjectMismatch",
+  V2_EVENT_TYPE_MISMATCH: "shadowEventTypeMismatch",
+  V2_DIRECTION_MISMATCH: "shadowDirectionMismatch",
+  V2_NUMERIC_UNIT_MISMATCH: "shadowNumericUnitMismatch",
+  V2_ATTRIBUTION_SPECIFICITY_LOST: "shadowAttributionSpecificityLost",
 };
 
 function normalizeSource(source = "") {
@@ -69,7 +77,14 @@ function normalizeSource(source = "") {
 
 function bump(bucket, field, amount = 1) {
   if (!bucket || !field) return;
+  if (field === "aiDirectFailureReasons" || typeof field === "object") return;
   bucket[field] = (bucket[field] || 0) + amount;
+}
+
+function bumpNested(bucket, nestedField, key, amount = 1) {
+  if (!bucket) return;
+  if (!bucket[nestedField]) bucket[nestedField] = {};
+  bucket[nestedField][key] = (bucket[nestedField][key] || 0) + amount;
 }
 
 function recordV2TelemetryEvent(source, event, amount = 1) {
@@ -86,6 +101,14 @@ function buildSourceHash(sourceTitle = "", link = "") {
     .slice(0, 16);
 }
 
+function recordAiDirectFailureReason(source, reason = "") {
+  if (!reason) return;
+  const key = String(reason);
+  bumpNested(globalCounters, "aiDirectFailureReasons", key);
+  const sourceKey = normalizeSource(source);
+  if (sourceKey) bumpNested(bySource[sourceKey], "aiDirectFailureReasons", key);
+}
+
 function recordEditorV2PathTelemetry(source, editorial = {}, finalOk = false) {
   const outputPath = editorial.outputPath || V2_OUTPUT_PATHS.FAILED;
   if (editorial.aiDirectAttempted) {
@@ -94,6 +117,11 @@ function recordEditorV2PathTelemetry(source, editorial = {}, finalOk = false) {
       recordV2TelemetryEvent(source, "aiDirectSucceeded");
     } else {
       recordV2TelemetryEvent(source, "aiDirectFailed");
+      if (editorial.aiDirectFailureReason) {
+        recordAiDirectFailureReason(source, editorial.aiDirectFailureReason);
+      } else if (outputPath === V2_OUTPUT_PATHS.DETERMINISTIC_FALLBACK) {
+        recordAiDirectFailureReason(source, AI_DIRECT_FAILURE_REASONS.AI_DIRECT_OTHER);
+      }
     }
   }
   if (outputPath === V2_OUTPUT_PATHS.DETERMINISTIC_FALLBACK) {
@@ -122,6 +150,7 @@ function recordEditorV2Sample(sample = {}) {
     latencyMs: typeof sample.latencyMs === "number" ? sample.latencyMs : null,
     sourceHash: sample.sourceHash || null,
     reviewKind: sample.reviewKind || "SHADOW",
+    aiDirectFailureReason: sample.aiDirectFailureReason || null,
   };
   shadowSamples.unshift(entry);
   if (shadowSamples.length > MAX_SHADOW_SAMPLES) {
@@ -163,6 +192,7 @@ function recordEditorV2ShadowOutcome(source, outcome = {}) {
       latencyMs: outcome.latencyMs,
       sourceHash: outcome.sourceHash,
       reviewKind: "SHADOW",
+      aiDirectFailureReason: outcome.editorial?.aiDirectFailureReason || null,
     });
   }
 }

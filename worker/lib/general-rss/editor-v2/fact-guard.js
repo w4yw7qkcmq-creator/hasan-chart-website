@@ -15,6 +15,10 @@ const {
 } = require("../../news-intelligence/semantic-publication-validation");
 const { normalizeHeadlineComparable } = require("../publication-format");
 const { V2_ISSUE_CODES, ISSUE_TO_V2_REASON } = require("./reason-codes");
+const { extractActionFromEvidence, actionConflictsWithOutput } = require("./action-resolution");
+const { resolvePrimarySubject, primarySubjectMismatch } = require("./primary-subject");
+const { hasNumericUnitMismatch, extractSemanticNumericTokens, filterMaterialSourceNumbers } = require("./numeric-semantics");
+const { extractAttributionHint } = require("./deterministic-arabic-fallback");
 
 function issue(code, evidence = {}) {
   return { code, evidence };
@@ -39,8 +43,11 @@ function validateEditorV2FactGuard({ evidence = {}, facts = {}, editorial = {} }
   }
 
   const sourceCombined = [evidence.title, evidence.description, evidence.contentEncoded].filter(Boolean).join("\n");
-  const sourceNumbers = facts.numbers || extractNumericTokens(sourceCombined);
-  const outputNumbers = extractNumericTokens(text);
+  const sourceNumbers = filterMaterialSourceNumbers(
+    facts.numbers || extractNumericTokens(sourceCombined),
+    sourceCombined
+  );
+  const outputNumbers = extractSemanticNumericTokens(text, sourceNumbers);
   if (outputNumbers.length) {
     const numericCheck = validateOutputNumbersSubset(sourceNumbers, outputNumbers);
     if (!numericCheck.ok) {
@@ -51,8 +58,17 @@ function validateEditorV2FactGuard({ evidence = {}, facts = {}, editorial = {} }
         })
       );
     }
+    if (hasNumericUnitMismatch(sourceNumbers, text)) {
+      issues.push(issue(V2_ISSUE_CODES.NUMERIC_UNIT_MISMATCH, { reason: "missing_currency_or_unit" }));
+    }
   } else if (sourceNumbers.length === 0 && /\d/.test(text)) {
-    issues.push(issue(V2_ISSUE_CODES.UNSUPPORTED_CLAIM, { reason: "unsupported_numeric_density" }));
+    const indexReferenceOnly =
+      /s&p\s*500|sp500/i.test(sourceCombined) &&
+      /s&p\s*500|sp500/i.test(text) &&
+      !/\d/.test(text.replace(/s&p\s*500/ig, "").replace(/sp500/ig, ""));
+    if (!indexReferenceOnly) {
+      issues.push(issue(V2_ISSUE_CODES.UNSUPPORTED_CLAIM, { reason: "unsupported_numeric_density" }));
+    }
   }
 
   const outputOfficials = matchOfficialInText(text);
@@ -101,6 +117,35 @@ function validateEditorV2FactGuard({ evidence = {}, facts = {}, editorial = {} }
 
   if (/بالتأكيد/u.test(text) && /may|might|could|reportedly|قد/u.test(sourceCombined)) {
     issues.push(issue(V2_ISSUE_CODES.ATTRIBUTION_MISMATCH, { reason: "certainty_upgrade" }));
+  }
+
+  const sourceAttribution = extractAttributionHint(evidence);
+  if (sourceAttribution?.type === "ecb_sources") {
+    if (/^المصدر/u.test(text) || (/وفق(?:اً)?\s*للمصدر/u.test(text) && !/مصادر|البنك المركزي الأوروبي/u.test(text))) {
+      issues.push(issue(V2_ISSUE_CODES.ATTRIBUTION_SPECIFICITY_LOST, { expected: sourceAttribution.type }));
+    }
+  }
+
+  const action = extractActionFromEvidence(evidence);
+  const primarySubject = resolvePrimarySubject(evidence, facts, action);
+  const actionConflict = actionConflictsWithOutput(action.actionClass, text);
+  if (actionConflict === "V2_DIRECTION_MISMATCH") {
+    issues.push(issue(V2_ISSUE_CODES.DIRECTION_MISMATCH, { actionClass: action.actionClass }));
+  } else if (actionConflict === "V2_EVENT_TYPE_MISMATCH") {
+    issues.push(issue(V2_ISSUE_CODES.EVENT_TYPE_MISMATCH, { actionClass: action.actionClass }));
+  }
+  const subjectConflict = primarySubjectMismatch(primarySubject, text);
+  if (subjectConflict) {
+    issues.push(issue(V2_ISSUE_CODES.PRIMARY_SUBJECT_MISMATCH, { expected: primarySubject.label }));
+  }
+
+  if (editorial.semanticMeta?.actionClass && editorial.semanticMeta.actionClass !== action.actionClass) {
+    issues.push(
+      issue(V2_ISSUE_CODES.ACTION_MISMATCH, {
+        expected: action.actionClass,
+        found: editorial.semanticMeta.actionClass,
+      })
+    );
   }
 
   if (hasDuplicateGenericPrimaryLabels(text) || hasContradictoryMovement(text)) {
