@@ -100,7 +100,11 @@ const US_INFLATION = Object.fromEntries([
   }),
   releaseDef("US", "PCE", {
     priority: 20,
-    patterns: [/\bpce\b|personal consumption expenditures/i],
+    patterns: [
+      /\bpce\b|personal consumption expenditures/i,
+      /مؤشر\s*أسعار\s*نفقات\s*(?:ال)?(?:إ|ا)ستهلاك\s*الشخصي/i,
+      /(?:مؤشر\s*)?نفقات\s*(?:ال)?(?:إ|ا)ستهلاك\s*الشخصي/i,
+    ],
     arabicName: "مؤشر PCE الأمريكي",
   }),
 ]);
@@ -146,7 +150,12 @@ const US_LABOR = Object.fromEntries([
 const US_GROWTH = Object.fromEntries([
   releaseDef("US", "GDP_QOQ", {
     priority: 10,
-    patterns: [/\bgdp\b[\s\S]*\b(q\/q|qoq|quarter|advance|prelim|final)\b/i, /gross domestic product|الناتج المحلي/i],
+    patterns: [
+      /\bgdp\b[\s\S]*\b(q\/q|qoq|quarter|advance|prelim|final)\b/i,
+      /gross domestic product/i,
+      /الناتج\s*(?:الإجمالي\s*)?المحلي(?:\s*الإجمالي)?(?:\s*الأمريكي)?/i,
+      /الناتج\s*المحلي\s*الإجمالي(?:\s*الأمريكي)?/i,
+    ],
     arabicName: "الناتج المحلي الإجمالي الأمريكي",
   }),
   releaseDef("US", "RETAIL_SALES", {

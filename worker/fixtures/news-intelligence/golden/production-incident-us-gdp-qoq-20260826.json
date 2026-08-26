@@ -1,0 +1,18 @@
+{
+  "name": "production-incident-us-gdp-qoq-20260826",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "42063",
+    "sourceUrl": "https://t.me/ForexBreakingNews/42063",
+    "sourcePublishedAt": "2026-08-26T12:30:21+00:00",
+    "rawText": ""
+  },
+  "sourceText": "صدر الآن :\nأمريكا -\nالناتج الإجمالي المحلي\n▪️ السابق : %2.1\n▪️ التقدير : %1.5\n▫️ الحالي : %1.5\nالنتيجة : سلبي للدولار الأمريكي\nلمتابعة أَخبار الأَسهم والذهب والعملات إِنضم للقناة من الرابط:",
+  "expected": {
+    "canonicalEventKey": "US_GDP_QOQ",
+    "previous": "%2.1",
+    "forecast": "%1.5",
+    "actual": "%1.5",
+    "titleContains": "الناتج"
+  }
+}

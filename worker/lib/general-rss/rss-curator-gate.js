@@ -1,3 +1,5 @@
+const { evaluateAnalysisDeliverableGate } = require("./analysis-deliverable-gate");
+
 const CURATOR_OUTCOMES = {
   PUBLISH: "PUBLISH",
   SKIP_LOW_VALUE: "SKIP_LOW_VALUE",
@@ -8,6 +10,7 @@ const CURATOR_OUTCOMES = {
   SKIP_PERSONAL_FINANCE: "SKIP_PERSONAL_FINANCE",
   SKIP_NEWSLETTER: "SKIP_NEWSLETTER",
   SKIP_EVERGREEN: "SKIP_EVERGREEN",
+  SKIP_ANALYSIS_PROMISE_WITHOUT_DELIVERABLE: "SKIP_ANALYSIS_PROMISE_WITHOUT_DELIVERABLE",
 };
 
 const LISTICLE_PATTERNS = [
@@ -107,6 +110,15 @@ function evaluateRssCuratorGate(item = {}) {
   const title = String(item.title || "").trim();
   if (!text) {
     return { ok: false, outcome: CURATOR_OUTCOMES.SKIP_LOW_VALUE, reason: "empty_source_text" };
+  }
+
+  const analysisGate = evaluateAnalysisDeliverableGate(item);
+  if (!analysisGate.ok) {
+    return {
+      ok: false,
+      outcome: CURATOR_OUTCOMES.SKIP_ANALYSIS_PROMISE_WITHOUT_DELIVERABLE,
+      reason: analysisGate.reason,
+    };
   }
 
   if (matchesAny(title, NEWSLETTER_PATTERNS)) {

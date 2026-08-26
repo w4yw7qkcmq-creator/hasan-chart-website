@@ -12,7 +12,11 @@ const US_ALIASES = {
   US_CORE_PPI: alias(/\bcore ppi\b/i),
   US_PPI: alias(/\bppi\b|producer price index/i),
   US_CORE_PCE_MOM: alias(/\bcore pce\b/i),
-  US_PCE: alias(/\bpce\b|personal consumption expenditures/i),
+  US_PCE: alias(
+    /\bpce\b|personal consumption expenditures/i,
+    /مؤشر\s*أسعار\s*نفقات\s*(?:ال)?(?:إ|ا)ستهلاك\s*الشخصي/i,
+    /(?:مؤشر\s*)?نفقات\s*(?:ال)?(?:إ|ا)ستهلاك\s*الشخصي/i
+  ),
   US_NFP: alias(/\bnfp\b|nonfarm payrolls|non-farm payrolls/i),
   US_UNEMPLOYMENT_RATE: alias(/unemployment rate/i),
   US_AVERAGE_HOURLY_EARNINGS: alias(/average hourly earnings|hourly earnings/i),
@@ -37,7 +41,11 @@ const US_ALIASES = {
     /طلبات إعانة البطالة المستمرة/i,
     /المطالبات المستمرة/i
   ),
-  US_GDP_QOQ: alias(/\bgdp\b|gross domestic product/i),
+  US_GDP_QOQ: alias(
+    /\bgdp\b|gross domestic product/i,
+    /الناتج\s*(?:الإجمالي\s*)?المحلي(?:\s*الإجمالي)?/i,
+    /الناتج\s*المحلي\s*الإجمالي/i
+  ),
   US_RETAIL_SALES: alias(/retail sales(?!.*core)/i),
   US_CORE_RETAIL_SALES: alias(/core retail sales|retail sales ex autos/i),
   US_CONSUMER_CONFIDENCE: alias(/consumer confidence(?!.*michigan)/i),

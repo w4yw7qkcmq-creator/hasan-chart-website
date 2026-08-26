@@ -267,6 +267,12 @@ async function publishValidatedTelegramNewsCandidate(candidate, ctx = {}, deps =
   const publication = buildTelegramPublicationRequest(candidate, validation, ctx);
   const phase2Result = await maybeApplyPhase2Editorial(publication, deps);
   if (!phase2Result.ok) {
+    try {
+      const { recordTelegramEconomicQualityBlocked } = require("../../news-ingestion/cycle-funnel");
+      recordTelegramEconomicQualityBlocked(1);
+    } catch (_) {
+      // non-blocking
+    }
     releaseMemoryReservation(fingerprint);
     publishStates.delete(fingerprint);
     recordTerminalEconomicDecision(candidate, publication, ctx, {

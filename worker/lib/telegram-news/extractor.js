@@ -149,6 +149,20 @@ function isCountryOnlyLine(cleaned) {
   );
 }
 
+function isPromotionalOrFooterLine(line) {
+  const value = normalizeTitleText(stripLeadingDecorations(line));
+  if (!value) {
+    return true;
+  }
+  return /(?:تابع|إنضم|انضم|join our|subscribe|telegram\.me|t\.me\/|لمتابعة|قناة|forexbreaking|forexnewspaper|@forex|اشترك|الرابط|tele\.me)/i.test(
+    value
+  );
+}
+
+function isResultCommentaryLine(line) {
+  return /^النتيجة\s*[:：]/i.test(String(line || "").trim());
+}
+
 function isLikelyStructuredReleaseTitle(cleaned, fullText = "") {
   const value = normalizeTitleText(cleaned);
   if (!value || isGenericTitle(value) || isCountryOnlyLine(value)) {
@@ -176,8 +190,17 @@ function scoreEventTitleCandidate(cleaned, fullText) {
   if (isCountryOnlyLine(cleaned)) {
     score -= 200;
   }
+  if (isPromotionalOrFooterLine(cleaned)) {
+    score -= 500;
+  }
+  if (isResultCommentaryLine(cleaned)) {
+    score -= 300;
+  }
   if (isLikelyStructuredReleaseTitle(cleaned, fullText)) {
     score += 250;
+  }
+  if (/^صدر\s*الآ?ن/i.test(String(fullText || "")) && isLikelyStructuredReleaseTitle(cleaned, fullText)) {
+    score += 50;
   }
   return score;
 }
@@ -195,7 +218,10 @@ function extractEventTitle(text) {
     if (isBreakingHeaderOnlyLine(line)) {
       continue;
     }
-    if (/السابق|المتوقع|التقدير|الحالي|النتيجة|actual|forecast|previous/i.test(line)) {
+    if (isPromotionalOrFooterLine(line) || isResultCommentaryLine(line)) {
+      continue;
+    }
+    if (/السابق|المتوقع|التقدير|الحالي|actual|forecast|previous/i.test(line)) {
       continue;
     }
     if (/^[•▪️▫️⬅️👉📊💎🔵🔴]/.test(line)) {
@@ -230,6 +256,9 @@ function extractEventTitle(text) {
 
   for (const line of lines) {
     const cleaned = stripLeadingDecorations(line);
+    if (isPromotionalOrFooterLine(cleaned) || isResultCommentaryLine(cleaned)) {
+      continue;
+    }
     if (cleaned.length >= 4 && cleaned.length <= 120 && !isGenericTitle(cleaned)) {
       return cleaned;
     }

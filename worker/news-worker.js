@@ -3224,7 +3224,11 @@ async function sendScheduledMarketAlerts() {
       );
 
       if (photoPath) {
-        await sendTelegramPhoto(alertMessage, photoPath);
+        await sendTelegramPhoto(alertMessage, photoPath, {
+          isGeneratedNewsCard: true,
+          imageTitle: currentAlert.imageTitle,
+          contextText: alertMessage,
+        });
       } else {
         await sendTelegramMessage(alertMessage);
       }
@@ -3250,6 +3254,50 @@ async function sendTelegramPhoto(message, photoPath, options = {}) {
   if (NEWS_DRY_RUN) {
     console.log("NEWS_DRY_RUN skip sendTelegramPhoto:", photoPath);
     return { skipped: true, reason: "dry_run" };
+  }
+
+  const {
+    classifyImageVisualType,
+    consumesPublicChartQuota,
+  } = require("./lib/general-rss/chart-visual-policy/chart-classifier");
+  const {
+    tryReservePublicChartQuota,
+    isPublicChartQuotaBlocked,
+    loadPublicChartQuotaState,
+  } = require("./lib/general-rss/chart-visual-policy/public-chart-quota");
+
+  let visualType = options.visualType || null;
+  if (!visualType) {
+    visualType = classifyImageVisualType(options.imageUrl || photoPath, {
+      title: options.imageTitle,
+      contextText: options.contextText || message,
+      isGeneratedNewsCard: options.isGeneratedNewsCard === true,
+    });
+  }
+
+  if (consumesPublicChartQuota(visualType)) {
+    const state = await loadPublicChartQuotaState({ supabase: getSupabaseClient() });
+    if (isPublicChartQuotaBlocked(Date.now(), state)) {
+      console.log(
+        "CHART_QUOTA_BLOCKED",
+        JSON.stringify({ reason: "CHART_RATE_LIMITED", visualType, imageTitle: options.imageTitle || null })
+      );
+      if (!options.skipTextFallback) {
+        await sendTelegramMessage(message);
+      }
+      return { blocked: true, reason: "CHART_RATE_LIMITED", visualType };
+    }
+    const reservation = await tryReservePublicChartQuota({ getSupabaseClient });
+    if (!reservation.granted) {
+      console.log(
+        "CHART_QUOTA_BLOCKED",
+        JSON.stringify({ reason: reservation.reason, visualType, imageTitle: options.imageTitle || null })
+      );
+      if (!options.skipTextFallback) {
+        await sendTelegramMessage(message);
+      }
+      return { blocked: true, reason: reservation.reason || "CHART_RATE_LIMITED", visualType };
+    }
   }
 
   try {
@@ -4341,7 +4389,12 @@ async function fetchForexNews(options = {}) {
           const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
 
           if (photoPath) {
-            await sendTelegramPhoto(publicationMessage, photoPath);
+            await sendTelegramPhoto(publicationMessage, photoPath, {
+              visualType: sourceImageResult?.visualType,
+              imageTitle,
+              contextText: publicationMessage,
+              imageUrl: finalImage,
+            });
             stats.telegramPublished += 1;
           } else {
             console.log("⏭️ Image rejected or unavailable. Sending text only.");

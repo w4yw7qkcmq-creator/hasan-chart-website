@@ -1,9 +1,17 @@
 const { resolveRssSourceImage, collectRssMediaCandidates, pickFirstValidatedCandidate } = require("../rss-source-image-resolver");
-const { classifyImageVisualType, VISUAL_TYPES } = require("./chart-classifier");
 const {
-  loadChartPolicyState,
-  isChartRateLimited,
-  recordChartImagePublished,
+  classifyImageVisualType,
+  VISUAL_TYPES,
+  consumesPublicChartQuota,
+} = require("./chart-classifier");
+const {
+  tryReservePublicChartQuota,
+  isPublicChartQuotaBlocked,
+  loadPublicChartQuotaState,
+  getPublicChartQuotaTelemetrySnapshot,
+  resetPublicChartQuotaForTests,
+} = require("./public-chart-quota");
+const {
   recordChartCandidate,
   recordChartRateLimited,
   recordChartFallback,
@@ -13,16 +21,20 @@ const {
 
 async function resolveRssSourceImageWithChartPolicy(params = {}) {
   const { source, item, articleUrl, chartPolicy = {}, ...options } = params;
-  const state = await loadChartPolicyState(chartPolicy);
-  const chartLimited = isChartRateLimited(Date.now(), state);
+  const state = await loadPublicChartQuotaState(chartPolicy);
+  const chartLimited = isPublicChartQuotaBlocked(Date.now(), state);
   const candidates = collectRssMediaCandidates(item, articleUrl);
 
   const ordered = [];
   const charts = [];
   for (const candidate of candidates) {
-    const visualType = classifyImageVisualType(candidate.url, candidate);
+    const visualType = classifyImageVisualType(candidate.url, {
+      ...candidate,
+      title: item?.title,
+      contextText: item?.contentSnippet || item?.content,
+    });
     const enriched = { ...candidate, visualType };
-    if (visualType === VISUAL_TYPES.CHART) {
+    if (consumesPublicChartQuota(visualType)) {
       recordChartCandidate();
       charts.push(enriched);
     } else {
@@ -36,9 +48,15 @@ async function resolveRssSourceImageWithChartPolicy(params = {}) {
       recordChartRateLimited();
       recordChartFallback("source_photo");
     } else {
-      result = await pickFirstValidatedCandidate(charts, { ...options, source });
-      if (result) {
-        await recordChartImagePublished(Date.now(), chartPolicy);
+      const reservation = await tryReservePublicChartQuota(chartPolicy);
+      if (!reservation.granted) {
+        recordChartRateLimited();
+        recordChartFallback("source_photo");
+      } else {
+        result = await pickFirstValidatedCandidate(charts, { ...options, source });
+        if (!result) {
+          recordChartFallback("source_photo");
+        }
       }
     }
   }
@@ -46,14 +64,23 @@ async function resolveRssSourceImageWithChartPolicy(params = {}) {
   if (!result) {
     result = await resolveRssSourceImage({ source, item, articleUrl, ...options });
     if (result?.url) {
-      const visualType = classifyImageVisualType(result.url, result);
-      if (visualType === VISUAL_TYPES.CHART && chartLimited) {
-        recordChartRateLimited();
-        recordChartFallback("text_only");
-        return null;
-      }
-      if (visualType === VISUAL_TYPES.CHART) {
-        await recordChartImagePublished(Date.now(), chartPolicy);
+      const visualType = classifyImageVisualType(result.url, {
+        ...result,
+        title: item?.title,
+        contextText: item?.contentSnippet || item?.content,
+      });
+      if (consumesPublicChartQuota(visualType)) {
+        if (chartLimited) {
+          recordChartRateLimited();
+          recordChartFallback("text_only");
+          return null;
+        }
+        const reservation = await tryReservePublicChartQuota(chartPolicy);
+        if (!reservation.granted) {
+          recordChartRateLimited();
+          recordChartFallback("text_only");
+          return null;
+        }
       }
     } else {
       recordChartFallback("text_only");
@@ -62,20 +89,39 @@ async function resolveRssSourceImageWithChartPolicy(params = {}) {
   }
 
   if (result?.url) {
-    const visualType = classifyImageVisualType(result.url, result);
+    const visualType = classifyImageVisualType(result.url, {
+      ...result,
+      title: item?.title,
+      contextText: item?.contentSnippet || item?.content,
+    });
     result.visualType = visualType;
-    if (visualType === VISUAL_TYPES.CHART && !chartLimited) {
-      await recordChartImagePublished(Date.now(), chartPolicy);
-    }
   }
 
   return result;
 }
 
+function getChartPolicyTelemetrySnapshotMerged() {
+  return {
+    ...getChartPolicyTelemetrySnapshot(),
+    ...getPublicChartQuotaTelemetrySnapshot(),
+  };
+}
+
+function resetChartPolicyStateForTestsMerged() {
+  resetChartPolicyStateForTests();
+  resetPublicChartQuotaForTests();
+}
+
 module.exports = {
   resolveRssSourceImageWithChartPolicy,
   VISUAL_TYPES,
-  getChartPolicyTelemetrySnapshot,
-  resetChartPolicyStateForTests,
+  getChartPolicyTelemetrySnapshot: getChartPolicyTelemetrySnapshotMerged,
+  resetChartPolicyStateForTests: resetChartPolicyStateForTestsMerged,
   classifyImageVisualType,
+  consumesPublicChartQuota,
+  tryReservePublicChartQuota,
+  isPublicChartQuotaBlocked,
+  loadPublicChartQuotaState,
+  getPublicChartQuotaTelemetrySnapshot,
+  resetPublicChartQuotaForTests,
 };

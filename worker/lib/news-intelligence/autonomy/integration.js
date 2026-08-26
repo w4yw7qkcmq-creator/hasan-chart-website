@@ -214,12 +214,20 @@ function observeCycleStart() {
 
 function observeCycleEnd(durationMs, stats = {}) {
   const funnel = stats.funnel || require("../../news-ingestion/cycle-funnel").getCycleFunnel();
+  const stallEligible = Math.max(
+    0,
+    (funnel.rssEligible || 0) +
+      (funnel.telegramEconomicEligible || 0) -
+      (funnel.telegramEconomicQualityBlocked || 0) -
+      (funnel.rssRateLimited || 0)
+  );
   pipelineStallWindow.push({
     at: Date.now(),
-    eligible: (funnel.rssEligible || 0) + (funnel.telegramCandidates || 0),
+    eligible: stallEligible,
     editorialEvaluated: funnel.editorialEvaluated || 0,
     published: funnel.publicationsSuccess || 0,
     newObserved: (funnel.rssNew || 0) + (funnel.telegramNew || 0),
+    telegramEconomicQualityBlocked: funnel.telegramEconomicQualityBlocked || 0,
   });
   if (pipelineStallWindow.length > ANOMALY_THRESHOLDS.pipelineStallWindowCycles) {
     pipelineStallWindow.shift();

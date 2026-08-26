@@ -4,6 +4,7 @@ const {
   splitEditorialSections,
 } = require("./publication-format");
 const { hasClearDevelopment, hasIdentifiableSubject } = require("./editor-v2/evidence-sufficiency");
+const { evaluateAnalysisDeliverableGate } = require("./analysis-deliverable-gate");
 
 const REASON_CODES = {
   RSS_MINIMUM_INFORMATION_FAILED: "RSS_MINIMUM_INFORMATION_FAILED",
@@ -178,6 +179,20 @@ function hasStandaloneFactCommunication(headline = "", body = "", context = {}) 
 function validateRssMinimumInformation(presentation = {}, context = {}) {
   const { headline, body, combined } = extractEditorialContent(presentation);
   const editorialOnly = stripOfficialChannelFooter(combined);
+
+  const analysisGate = evaluateAnalysisDeliverableGate({
+    title: headline,
+    contentSnippet: body,
+    content: body,
+    summary: combined,
+  });
+  if (!analysisGate.ok) {
+    return {
+      ok: false,
+      reason: analysisGate.outcome,
+      issue: analysisGate.reason,
+    };
+  }
 
   if (!editorialOnly || editorialOnly.replace(/[^\u0600-\u06FFa-z0-9]/gi, "").length < 12) {
     return { ok: false, reason: REASON_CODES.RSS_MINIMUM_INFORMATION_FAILED, issue: "empty_editorial_content" };

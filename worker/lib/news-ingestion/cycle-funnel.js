@@ -24,6 +24,7 @@ function createEmptyFunnel() {
     telegramFactCheckFailed: 0,
     telegramDuplicates: 0,
     telegramEconomicEligible: 0,
+    telegramEconomicQualityBlocked: 0,
     telegramPublished: 0,
     candidates: 0,
     normalized: 0,
@@ -100,6 +101,10 @@ function recordRssPublished(count = 1) {
   currentFunnel.rssPublished += count;
 }
 
+function recordTelegramEconomicQualityBlocked(count = 1) {
+  currentFunnel.telegramEconomicQualityBlocked += count;
+}
+
 function recordPublicationFailure() {
   currentFunnel.publicationFailures += 1;
 }
@@ -120,6 +125,7 @@ module.exports = {
   recordPublicationAttempt,
   recordPublicationSuccess,
   recordRssPublished,
+  recordTelegramEconomicQualityBlocked,
   recordPublicationFailure,
   resetCycleFunnelForTests,
 };
