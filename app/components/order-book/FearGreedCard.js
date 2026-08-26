@@ -205,10 +205,6 @@ export default function FearGreedCard({ variant = "default" }) {
             {displayPayload.staleNotice}
           </p>
         ) : null}
-
-        {displayPayload?.attribution ? (
-          <p className={`mt-2 text-center text-[10px] ${ob.textSubtle}`}>{displayPayload.attribution}</p>
-        ) : null}
       </div>
     );
   }
@@ -259,10 +255,6 @@ export default function FearGreedCard({ variant = "default" }) {
                 />
               ))}
             </div>
-          ) : null}
-
-          {displayPayload.attribution ? (
-            <p className="site-price-card__meta mt-4 text-xs">{displayPayload.attribution}</p>
           ) : null}
         </>
       )}

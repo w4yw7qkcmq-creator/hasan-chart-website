@@ -825,8 +825,6 @@ export function StatTile({
   const iconGlyph =
     icon || (tone === "buy" ? STAT_ICONS.buy : tone === "sell" ? STAT_ICONS.sell : STAT_ICONS.default);
 
-  const showCoverage =
-    partial && Number.isFinite(coveragePercent) && coveragePercent > 0 && coveragePercent < 99;
   const showSkeleton = initialLoading && (value == null || value === "");
 
   return (
@@ -843,7 +841,6 @@ export function StatTile({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {isRefreshing ? <RefreshSpinner /> : null}
-          {showCoverage ? <CoverageBadge partial coveragePercent={coveragePercent} compact /> : null}
         </div>
       </div>
       <div className="mt-auto pt-2">
