@@ -3264,6 +3264,7 @@ async function sendTelegramPhoto(message, photoPath, options = {}) {
     tryReservePublicChartQuota,
     isPublicChartQuotaBlocked,
     loadPublicChartQuotaState,
+    recordChartQuotaTextFallback,
   } = require("./lib/general-rss/chart-visual-policy/public-chart-quota");
 
   let visualType = options.visualType || null;
@@ -3276,27 +3277,35 @@ async function sendTelegramPhoto(message, photoPath, options = {}) {
   }
 
   if (consumesPublicChartQuota(visualType)) {
-    const state = await loadPublicChartQuotaState({ supabase: getSupabaseClient() });
-    if (isPublicChartQuotaBlocked(Date.now(), state)) {
+    const quotaOptions = { getSupabaseClient };
+    const state = await loadPublicChartQuotaState(quotaOptions);
+    if (isPublicChartQuotaBlocked(Date.now(), state, quotaOptions)) {
       console.log(
         "CHART_QUOTA_BLOCKED",
         JSON.stringify({ reason: "CHART_RATE_LIMITED", visualType, imageTitle: options.imageTitle || null })
       );
+      recordChartQuotaTextFallback(quotaOptions);
       if (!options.skipTextFallback) {
         await sendTelegramMessage(message);
       }
-      return { blocked: true, reason: "CHART_RATE_LIMITED", visualType };
+      return { blocked: true, reason: "CHART_RATE_LIMITED", visualType, textFallback: !options.skipTextFallback };
     }
-    const reservation = await tryReservePublicChartQuota({ getSupabaseClient });
+    const reservation = await tryReservePublicChartQuota(quotaOptions);
     if (!reservation.granted) {
       console.log(
         "CHART_QUOTA_BLOCKED",
         JSON.stringify({ reason: reservation.reason, visualType, imageTitle: options.imageTitle || null })
       );
+      recordChartQuotaTextFallback(quotaOptions);
       if (!options.skipTextFallback) {
         await sendTelegramMessage(message);
       }
-      return { blocked: true, reason: reservation.reason || "CHART_RATE_LIMITED", visualType };
+      return {
+        blocked: true,
+        reason: reservation.reason || "CHART_RATE_LIMITED",
+        visualType,
+        textFallback: !options.skipTextFallback,
+      };
     }
   }
 

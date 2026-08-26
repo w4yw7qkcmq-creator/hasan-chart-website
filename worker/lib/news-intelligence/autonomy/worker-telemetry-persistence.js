@@ -32,7 +32,7 @@ async function flushWorkerTelemetrySnapshot(supabase) {
       })(),
       chartVisualPolicy: (() => {
         try {
-          return require("../../general-rss/chart-visual-policy/chart-rate-limit").getChartPolicyTelemetrySnapshot();
+          return require("../../general-rss/chart-visual-policy").getChartPolicyTelemetrySnapshot();
         } catch {
           return null;
         }

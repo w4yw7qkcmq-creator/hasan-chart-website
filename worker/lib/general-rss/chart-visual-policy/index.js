@@ -10,6 +10,7 @@ const {
   loadPublicChartQuotaState,
   getPublicChartQuotaTelemetrySnapshot,
   resetPublicChartQuotaForTests,
+  recordChartQuotaTextFallback,
 } = require("./public-chart-quota");
 const {
   recordChartCandidate,
@@ -73,12 +74,14 @@ async function resolveRssSourceImageWithChartPolicy(params = {}) {
         if (chartLimited) {
           recordChartRateLimited();
           recordChartFallback("text_only");
+          recordChartQuotaTextFallback(chartPolicy);
           return null;
         }
         const reservation = await tryReservePublicChartQuota(chartPolicy);
         if (!reservation.granted) {
           recordChartRateLimited();
           recordChartFallback("text_only");
+          recordChartQuotaTextFallback(chartPolicy);
           return null;
         }
       }

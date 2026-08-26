@@ -197,6 +197,47 @@ export default function NewsSystemStatusPanel() {
       ) : null}
 
       {(() => {
+        const chartPolicy = status?.chartVisualPolicy;
+        if (!chartPolicy) return null;
+        const quotaLabel =
+          chartPolicy.quotaStatus === "available"
+            ? "متاح"
+            : chartPolicy.quotaStatus === "exhausted"
+              ? "مستنفد"
+              : "سلطة غير سليمة";
+        return (
+          <>
+            <h3 className="admin-news-system__subtitle">
+              Chart Visual Policy — آخر 24 ساعة
+            </h3>
+            <p className="admin-news-page__hint">
+              المصدر: {chartPolicy.sourceOfTruth || "news_system_metric_snapshots"}. الحالة: {quotaLabel}.
+            </p>
+            <div className="admin-news-system__metric-grid">
+              <MetricCard label="حالة الحصة" value={quotaLabel} />
+              <MetricCard label="رسوم منشورة (24س)" value={chartPolicy.chartsPublishedInRolling24h ?? 0} />
+              <MetricCard
+                label="آخر رسم"
+                value={formatGregorianDateTime(chartPolicy.lastChartPublishedAt, { compact: true })}
+              />
+              <MetricCard
+                label="التالي المؤهل"
+                value={formatGregorianDateTime(chartPolicy.nextChartEligibleAt, { compact: true })}
+              />
+              <MetricCard label="quota checked" value={chartPolicy.chartQuotaChecked ?? 0} />
+              <MetricCard label="quota granted" value={chartPolicy.chartQuotaGranted ?? 0} />
+              <MetricCard label="quota blocked" value={chartPolicy.chartQuotaBlocked ?? 0} />
+              <MetricCard label="text-only fallback" value={chartPolicy.chartFallbackTextOnly ?? 0} />
+              <MetricCard
+                label="سلطة الحصة"
+                value={chartPolicy.authorityHealthy ? "سليمة" : "غير سليمة"}
+              />
+            </div>
+          </>
+        );
+      })()}
+
+      {(() => {
         const editor = summary?.editorInChief || last24h?.editorInChief;
         const editorMode = summary?.editorMode || status?.editorMode || editor?.mode || "SHADOW";
         const chart = summary?.chartVisualPolicy || last24h?.chartVisualPolicy;

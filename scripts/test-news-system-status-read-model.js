@@ -44,6 +44,7 @@ function createMockSupabase(config = {}) {
     publishedNews = [],
     funnelSnapshots = [],
     heartbeat = null,
+    chartQuotaAuthority = null,
     errors = {},
   } = config;
 
@@ -158,11 +159,13 @@ function createMockSupabase(config = {}) {
 
       if (table === "news_system_metric_snapshots") {
         let mode = "single";
+        const filters = {};
         const builder = {
           select() {
             return builder;
           },
-          eq() {
+          eq(field, value) {
+            filters[field] = value;
             return builder;
           },
           gte() {
@@ -180,6 +183,12 @@ function createMockSupabase(config = {}) {
             return Promise.resolve({ data: funnelSnapshots, error: null });
           },
           maybeSingle() {
+            if (
+              filters.window_key === "public_chart_quota" &&
+              filters.bucket_start === "authority"
+            ) {
+              return Promise.resolve({ data: chartQuotaAuthority, error: null });
+            }
             return Promise.resolve({ data: heartbeat, error: null });
           },
           then(resolve, reject) {
@@ -272,6 +281,33 @@ function createMockSupabase(config = {}) {
   assert.equal(status.runtime.phase2.phase2Editorial, true);
   assert.equal(status.runtime.phase3.phase3Autonomy, true);
   assert.ok(status.heartbeat.lastCycleCompletedAt);
+}
+
+// Chart visual policy from persistent authority
+{
+  const recentChartAt = new Date(Date.now() - 60 * 60_000).toISOString();
+  const status = await getNewsSystemStatusFromDb(
+    createMockSupabase({
+      chartQuotaAuthority: {
+        metrics: {
+          lastChartPublishedAt: recentChartAt,
+          chartRolling24hCount: 1,
+          chartQuotaChecked: 4,
+          chartQuotaGranted: 1,
+          chartQuotaBlocked: 3,
+          chartFallbackTextOnly: 2,
+          authorityHealthy: true,
+          authorityMode: "distributed",
+        },
+        updated_at: recentChartAt,
+      },
+    })
+  );
+  assert.equal(status.chartVisualPolicy.quotaStatus, "exhausted");
+  assert.equal(status.chartVisualPolicy.chartsPublishedInRolling24h, 1);
+  assert.equal(status.chartVisualPolicy.chartQuotaBlocked, 3);
+  assert.equal(status.chartVisualPolicy.authorityHealthy, true);
+  assert.ok(status.chartVisualPolicy.nextChartEligibleAt);
 }
 
 // B. No worker heartbeat snapshot
