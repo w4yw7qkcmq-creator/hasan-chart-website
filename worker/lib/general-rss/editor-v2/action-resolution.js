@@ -26,10 +26,24 @@ const ACTION_CLASSES = Object.freeze({
   LICENSE_APPLICATION: "LICENSE_APPLICATION",
   EARNINGS: "EARNINGS",
   GUIDANCE: "GUIDANCE",
+  TECHNICAL_ANALYSIS: "TECHNICAL_ANALYSIS",
   OTHER: "OTHER",
 });
 
+const { isTechnicalAnalysisTitle } = require("./evidence-scope");
+
 const ACTION_RULES = Object.freeze([
+  {
+    class: ACTION_CLASSES.TECHNICAL_ANALYSIS,
+    patterns: [
+      /\btechnical\s+(?:look|analysis)\b/i,
+      /\bbias,\s*risk\s+and\s+targets\b/i,
+      /\bkickstart\s+the\s+trading\s+day\b/i,
+      /\bEURUSD\b.*\bUSDJPY\b/i,
+      /\bUSDJPY\b.*\bGBPUSD\b/i,
+    ],
+    titleOnly: true,
+  },
   {
     class: ACTION_CLASSES.RATE_HIKE,
     patterns: [
@@ -55,12 +69,19 @@ const ACTION_RULES = Object.freeze([
     ],
   },
   {
+    class: ACTION_CLASSES.OTHER,
+    patterns: [
+      /\b(?:sell|sells|sold|trades?|traded)\s+at\s+\$/i,
+      /\bfutures?\s+(?:sell|trade)\s+at\b/i,
+    ],
+  },
+  {
     class: ACTION_CLASSES.FALL,
     patterns: [
-      /\b(?:oil|crude|gold|bitcoin|futures?|stocks?)\b[^.\n]{0,80}\b(?:slides?|falls?|fell|drops?|sell(?:s)?\s+at)\b/i,
-      /\b(?:slides?|falls?|fell|drops?|sell(?:s)?\s+at)\b[^.\n]{0,40}\$\d/i,
+      /\b(?:oil|crude|gold|bitcoin|futures?|stocks?)\b[^.\n]{0,80}\b(?:slides?|falls?|fell|drops?)\b/i,
+      /\b(?:slides?|falls?|fell|drops?)\b[^.\n]{0,40}\$\d/i,
     ],
-    excludeIf: /\bhiking?\b|\brate\s+hike\b|\braise\s+rates?\b/i,
+    excludeIf: /\bhiking?\b|\brate\s+hike\b|\braise\s+rates?\b|\bsell(?:s)?\s+at\b|\btrad(?:e|ed|es)\s+at\b/i,
   },
   {
     class: ACTION_CLASSES.COUNTER_TARIFF,
@@ -171,6 +192,7 @@ const ACTION_ARABIC = Object.freeze({
   [ACTION_CLASSES.LICENSE_APPLICATION]: "طلب ترخيص مصرفي",
   [ACTION_CLASSES.EARNINGS]: "نتائج أرباح",
   [ACTION_CLASSES.GUIDANCE]: "توجيهات",
+  [ACTION_CLASSES.TECHNICAL_ANALYSIS]: "تحليل فني",
   [ACTION_CLASSES.OTHER]: "تطور",
 });
 
@@ -191,16 +213,43 @@ function extractActionFromEvidence(evidence = {}) {
   const title = String(evidence.title || "");
   const combined = combinedEvidenceText(evidence);
   const titleLower = title.toLowerCase();
+  const technicalTitle = isTechnicalAnalysisTitle(title);
 
   for (const rule of ACTION_RULES) {
     if (rule.excludeIf && rule.excludeIf.test(combined)) continue;
     for (const pattern of rule.patterns) {
-      if (pattern.test(title) || pattern.test(combined)) {
+      if (pattern.test(title)) {
         return {
           actionClass: rule.class,
           actionArabic: ACTION_ARABIC[rule.class] || ACTION_ARABIC.OTHER,
           direction: ACTION_DIRECTION[rule.class] || null,
-          matchedInTitle: pattern.test(title),
+          matchedInTitle: true,
+          sourceText: titleLower,
+        };
+      }
+    }
+  }
+
+  if (technicalTitle) {
+    return {
+      actionClass: ACTION_CLASSES.TECHNICAL_ANALYSIS,
+      actionArabic: ACTION_ARABIC.TECHNICAL_ANALYSIS,
+      direction: null,
+      matchedInTitle: true,
+      sourceText: titleLower,
+    };
+  }
+
+  for (const rule of ACTION_RULES) {
+    if (rule.titleOnly) continue;
+    if (rule.excludeIf && rule.excludeIf.test(combined)) continue;
+    for (const pattern of rule.patterns) {
+      if (pattern.test(combined)) {
+        return {
+          actionClass: rule.class,
+          actionArabic: ACTION_ARABIC[rule.class] || ACTION_ARABIC.OTHER,
+          direction: ACTION_DIRECTION[rule.class] || null,
+          matchedInTitle: false,
           sourceText: titleLower,
         };
       }

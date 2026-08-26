@@ -17,8 +17,9 @@ const { normalizeHeadlineComparable } = require("../publication-format");
 const { V2_ISSUE_CODES, ISSUE_TO_V2_REASON } = require("./reason-codes");
 const { extractActionFromEvidence, actionConflictsWithOutput } = require("./action-resolution");
 const { resolvePrimarySubject, primarySubjectMismatch } = require("./primary-subject");
-const { hasNumericUnitMismatch, extractSemanticNumericTokens, filterMaterialSourceNumbers } = require("./numeric-semantics");
+const { hasNumericUnitMismatch, extractSemanticNumericTokens, filterMaterialSourceNumbers, hasNumericSemanticRoleMismatch } = require("./numeric-semantics");
 const { extractAttributionHint } = require("./deterministic-arabic-fallback");
+const { outputContainsUnsupportedEntity } = require("./evidence-scope");
 
 function issue(code, evidence = {}) {
   return { code, evidence };
@@ -60,6 +61,15 @@ function validateEditorV2FactGuard({ evidence = {}, facts = {}, editorial = {} }
     }
     if (hasNumericUnitMismatch(sourceNumbers, text)) {
       issues.push(issue(V2_ISSUE_CODES.NUMERIC_UNIT_MISMATCH, { reason: "missing_currency_or_unit" }));
+    }
+    const roleMismatch = hasNumericSemanticRoleMismatch(sourceNumbers, text, sourceCombined);
+    if (roleMismatch) {
+      issues.push(
+        issue(V2_ISSUE_CODES.NUMERIC_SEMANTIC_ROLE_MISMATCH, {
+          raw: roleMismatch.raw,
+          role: roleMismatch.role,
+        })
+      );
     }
   } else if (sourceNumbers.length === 0 && /\d/.test(text)) {
     const indexReferenceOnly =
@@ -124,6 +134,16 @@ function validateEditorV2FactGuard({ evidence = {}, facts = {}, editorial = {} }
     if (/^المصدر/u.test(text) || (/وفق(?:اً)?\s*للمصدر/u.test(text) && !/مصادر|البنك المركزي الأوروبي/u.test(text))) {
       issues.push(issue(V2_ISSUE_CODES.ATTRIBUTION_SPECIFICITY_LOST, { expected: sourceAttribution.type }));
     }
+  }
+
+  const contamination = outputContainsUnsupportedEntity(text, null, evidence);
+  if (contamination) {
+    issues.push(
+      issue(V2_ISSUE_CODES.EVIDENCE_CONTAMINATION, {
+        unsupported: contamination.unsupported,
+        reason: contamination.reason,
+      })
+    );
   }
 
   const action = extractActionFromEvidence(evidence);

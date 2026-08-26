@@ -12,7 +12,7 @@
     "test:general-rss": "node tests/general-rss.test.cjs",
     "test:rss-source-image": "node tests/rss-source-image-resolver.test.cjs",
     "test:external-news-editor": "node tests/external-news-editor-in-chief.test.cjs && node tests/rss-editor-telegram-isolation.test.cjs && node tests/rss-incident-shadow-rollback.test.cjs",
-    "test:editor-v2": "node tests/editor-v2-golden-fixtures.test.cjs && node tests/editor-v2-calibration-fixtures.test.cjs && node tests/editor-v2-calibration-pass2.test.cjs && node tests/editor-v2-mode-switch.test.cjs && node tests/editor-v2-telegram-isolation.test.cjs && node tests/editor-v2-p0-semantic-fixtures.test.cjs",
+    "test:editor-v2": "node tests/editor-v2-golden-fixtures.test.cjs && node tests/editor-v2-calibration-fixtures.test.cjs && node tests/editor-v2-calibration-pass2.test.cjs && node tests/editor-v2-mode-switch.test.cjs && node tests/editor-v2-telegram-isolation.test.cjs && node tests/editor-v2-p0-semantic-fixtures.test.cjs && node tests/editor-v2-schema-contract.test.cjs",
     "test:news-images": "node tests/news-images.test.cjs",
     "start:subscription": "node subscription-maintenance-worker.js",
     "start:subscription:server": "node subscription-maintenance-worker.js",

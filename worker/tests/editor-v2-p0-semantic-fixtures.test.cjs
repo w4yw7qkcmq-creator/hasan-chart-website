@@ -118,7 +118,7 @@ const P0_FIXTURES = [
       sourceName: "ForexLive",
       link: "https://investinglive.com/crude-8236",
     },
-    expectAction: ACTION_CLASSES.FALL,
+    expectAction: ACTION_CLASSES.OTHER,
     mustMatch: /82\.36|النفط/u,
   },
   {

@@ -11,22 +11,32 @@ function joinParts(parts = []) {
 function buildMarketMoveTemplate({ subject, action, numbers = [], evidence = {} }) {
   const title = String(evidence.title || "");
   const uncertain = /unconfirmed|rumou?rs?|reportedly|may|might|could/i.test(title);
-  const amount = numbers.find((n) => /دولار/.test(n)) || numbers[0] || "";
-  const headline = amount
-    ? `${subject.arabic}: ${action.actionArabic} بمقدار ${amount}`.slice(0, 140)
-    : `${subject.arabic}: ${action.actionArabic}`.slice(0, 140);
+  const moveAmount = numbers.find((n) => n.role === "ABSOLUTE_MOVE" || n.role === "PERCENT_MOVE");
+  const priceLevel = numbers.find((n) => n.role === "PRICE_LEVEL");
+  const amountDisplay = moveAmount?.display || moveAmount?.arabic || "";
+  const levelDisplay = priceLevel?.display || priceLevel?.arabic || "";
+
+  const headline = amountDisplay
+    ? `${subject.arabic}: ${action.actionArabic} بمقدار ${amountDisplay}`.slice(0, 140)
+    : levelDisplay
+      ? `${subject.arabic}: ${action.actionArabic} ${levelDisplay}`.slice(0, 140)
+      : `${subject.arabic}: ${action.actionArabic}`.slice(0, 140);
 
   let body = uncertain
-    ? `سجل ${subject.arabic} ${action.actionArabic}${amount ? ` بمقدار ${amount}` : ""} وسط تقارير غير مؤكدة وردت في المصدر.`
-    : `سجل ${subject.arabic} ${action.actionArabic}${amount ? ` بمقدار ${amount}` : ""} وفق ما ورد في المصدر.`;
+    ? `سجل ${subject.arabic} ${action.actionArabic}${amountDisplay ? ` بمقدار ${amountDisplay}` : levelDisplay ? ` ${levelDisplay}` : ""} وسط تقارير غير مؤكدة وردت في المصدر.`
+    : `سجل ${subject.arabic} ${action.actionArabic}${amountDisplay ? ` بمقدار ${amountDisplay}` : levelDisplay ? ` ${levelDisplay}` : ""} وفق ما ورد في المصدر.`;
 
-  const extra = numbers.filter((n) => n !== amount);
+  const extra = numbers
+    .filter((n) => n !== moveAmount && n !== priceLevel)
+    .map((n) => n.display || n.arabic)
+    .filter(Boolean);
   if (extra.length) body += ` وذكر المصدر أيضاً: ${extra.join("، ")}.`;
   return { headline, body: body.slice(0, 320) };
 }
 
 function buildCentralBankTemplate({ subject, action, numbers = [], evidence = {} }) {
-  const rate = numbers.find((n) => /%/.test(n) || /^\d+(\.\d+)?$/.test(n)) || "";
+  const rateEntry = numbers.find((n) => n.role === "RATE" || /%/.test(n.arabic || n.raw || "")) || numbers[0];
+  const rate = rateEntry?.display || rateEntry?.arabic || "";
   const headline = rate
     ? `${subject.arabic}: توقعات ب${action.actionArabic}${rate ? ` إلى ${rate}` : ""}`.slice(0, 140)
     : `${subject.arabic}: ${action.actionArabic}`.slice(0, 140);
@@ -50,7 +60,8 @@ function buildRegulatoryTemplate({ subject, action, evidence = {} }) {
 }
 
 function buildTariffTemplate({ subject, action, numbers = [] }) {
-  const amount = numbers.find((n) => /مليار/.test(n)) || numbers[0] || "";
+  const amountEntry = numbers.find((n) => /مليار/.test(n.arabic || "")) || numbers[0];
+  const amount = amountEntry?.display || amountEntry?.arabic || "";
   const headline = amount
     ? `${subject.arabic}: ${action.actionArabic} على واردات بقيمة ${amount}`.slice(0, 140)
     : `${subject.arabic}: ${action.actionArabic}`.slice(0, 140);
@@ -84,7 +95,8 @@ function buildCompanyComparisonTemplate({ subject, action, evidence = {} }) {
 }
 
 function buildLaunchTemplate({ subject, numbers = [] }) {
-  const token = numbers.find((n) => /^[A-Z]{2,5}$/.test(n)) || "";
+  const tokenEntry = numbers.find((n) => /^[A-Z]{2,5}$/.test(n.raw || n.arabic || ""));
+  const token = tokenEntry?.raw || tokenEntry?.arabic || "";
   const headline = token
     ? `${subject.arabic}: إطلاق بنية تداول${token ? ` (${token})` : ""}`.slice(0, 140)
     : `${subject.arabic}: إطلاق`.slice(0, 140);
@@ -103,8 +115,22 @@ function buildGenericTemplate({ subject, action, numbers = [] }) {
   let body = subject.arabic
     ? `ورد في المصدر ${action.actionArabic} يتعلق بـ${subject.arabic}.`
     : `ورد في المصدر ${action.actionArabic}.`;
-  if (numbers.length) body += ` وذكر المصدر: ${numbers.join("، ")}.`;
+  if (numbers.length) {
+    const rendered = numbers.map((n) => n.display || n.arabic).filter(Boolean);
+    if (rendered.length) body += ` وذكر المصدر: ${rendered.join("، ")}.`;
+  }
   return { headline, body: body.slice(0, 320) };
+}
+
+function buildTechnicalAnalysisTemplate({ subject, evidence = {} }) {
+  const title = String(evidence.title || "");
+  const pairs = subject.arabic || "أزواج العملات الرئيسية";
+  const headline = `${pairs}: تحليل فني للجلسة`.slice(0, 140);
+  const body = `يقدم المصدر نظرة فنية على ${pairs} تشمل التحيز والمخاطر والأهداف، دون إضافة تفاصيل جديدة بخلاف العنوان.`.slice(
+    0,
+    320
+  );
+  return { headline, body };
 }
 
 function buildEquityStoryTemplate({ subject, evidence = {} }) {
@@ -130,6 +156,18 @@ function buildEquityStoryTemplate({ subject, evidence = {} }) {
   return null;
 }
 
+function buildPriceQuoteTemplate({ subject, numbers = [] }) {
+  const level = numbers.find((n) => n.role === "PRICE_LEVEL") || numbers[0];
+  const display = level?.display || level?.arabic || "";
+  const headline = display
+    ? `${subject.arabic}: ${display}`.slice(0, 140)
+    : `${subject.arabic}: مستوى سعري`.slice(0, 140);
+  const body = display
+    ? `سجل ${subject.arabic} ${display} وفق ما ورد في المصدر.`
+    : `ورد في المصدر مستوى سعري يتعلق بـ${subject.arabic}.`;
+  return { headline, body: body.slice(0, 320) };
+}
+
 function buildFallbackFromSemantics({ subject, action, numbers = [], evidence = {}, facts = {} }) {
   const title = String(evidence.title || "");
 
@@ -140,7 +178,13 @@ function buildFallbackFromSemantics({ subject, action, numbers = [], evidence = 
     return buildCompanyComparisonTemplate({ subject, action, evidence });
   }
 
+  if (/\b(?:sell|sells|sold|trades?|traded)\s+at\s+\$/i.test(title)) {
+    return buildPriceQuoteTemplate({ subject, numbers, evidence });
+  }
+
   switch (action.actionClass) {
+    case ACTION_CLASSES.TECHNICAL_ANALYSIS:
+      return buildTechnicalAnalysisTemplate({ subject, evidence });
     case ACTION_CLASSES.RATE_HIKE:
     case ACTION_CLASSES.RATE_CUT:
     case ACTION_CLASSES.RATE_HOLD:

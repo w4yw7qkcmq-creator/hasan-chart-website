@@ -2,6 +2,7 @@
  * Primary subject resolution — headline protagonist must not be replaced by comparators.
  */
 
+const { findFxPairsInText, isTechnicalAnalysisTitle, personAppearsInTitle } = require("./evidence-scope");
 const { ACTION_CLASSES } = require("./action-resolution");
 
 const COMPANY_ENTITIES = Object.freeze([
@@ -56,7 +57,20 @@ function resolvePrimarySubject(evidence = {}, facts = {}, action = {}) {
     };
   }
 
-  const primaryPerson = (facts.people || [])[0];
+  if (isTechnicalAnalysisTitle(title)) {
+    const pairs = findFxPairsInText(title);
+    if (pairs.length) {
+      return {
+        id: "fx_pairs",
+        label: pairs.map((p) => p.label).join(", "),
+        arabic: pairs.map((p) => p.arabic).join(" و"),
+        comparators: [],
+        kind: "fx",
+      };
+    }
+  }
+
+  const primaryPerson = (facts.people || []).find((person) => personAppearsInTitle(person, title));
   if (primaryPerson?.name && /\bsaid\b|\bsays\b|\bwarns\b|\bannounces\b/i.test(combined)) {
     return {
       id: primaryPerson.id || primaryPerson.name,

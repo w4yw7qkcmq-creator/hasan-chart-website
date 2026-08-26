@@ -2,6 +2,7 @@ const { extractActionFromEvidence } = require("./action-resolution");
 const { resolvePrimarySubject } = require("./primary-subject");
 const { formatMaterialNumbers } = require("./numeric-semantics");
 const { buildFallbackFromSemantics } = require("./fallback-templates");
+const { isTechnicalAnalysisTitle } = require("./evidence-scope");
 
 function isPredominantlyArabic(text = "") {
   const arabic = (String(text || "").match(/[\u0600-\u06FF]/g) || []).length;
@@ -10,7 +11,10 @@ function isPredominantlyArabic(text = "") {
 }
 
 function extractAttributionHint(evidence = {}) {
-  const combined = [evidence.title, evidence.description, evidence.contentEncoded].filter(Boolean).join("\n");
+  const title = String(evidence.title || "");
+  const combined = isTechnicalAnalysisTitle(title)
+    ? title
+    : [evidence.title, evidence.description, evidence.contentEncoded].filter(Boolean).join("\n");
   if (/\becb\s+sources?\b/i.test(combined)) {
     return { type: "ecb_sources", arabic: "مصادر في البنك المركزي الأوروبي" };
   }

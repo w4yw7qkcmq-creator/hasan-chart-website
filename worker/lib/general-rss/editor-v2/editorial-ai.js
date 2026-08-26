@@ -29,14 +29,6 @@ const V2_EDITOR_JSON_SCHEMA = Object.freeze({
       body: { type: "string" },
       insufficientEvidence: { type: "boolean" },
       confidence: { type: "number" },
-      usedFacts: {
-        type: "array",
-        items: { type: "string" },
-      },
-      usedEntities: {
-        type: "array",
-        items: { type: "string" },
-      },
     },
     required: ["headline", "body", "insufficientEvidence", "confidence"],
   },
@@ -59,6 +51,34 @@ function parseEditorialJson(content = "") {
       return { parsed: null, failure: AI_DIRECT_FAILURE_REASONS.AI_DIRECT_MALFORMED_JSON };
     }
   }
+}
+
+function validateLocalEditorialSchema(parsed = {}) {
+  if (!parsed || typeof parsed !== "object") {
+    return AI_DIRECT_FAILURE_REASONS.AI_DIRECT_LOCAL_SCHEMA_VALIDATION_FAILED;
+  }
+  if (typeof parsed.headline !== "string" || typeof parsed.body !== "string") {
+    return AI_DIRECT_FAILURE_REASONS.AI_DIRECT_LOCAL_SCHEMA_VALIDATION_FAILED;
+  }
+  if (typeof parsed.insufficientEvidence !== "boolean") {
+    return AI_DIRECT_FAILURE_REASONS.AI_DIRECT_LOCAL_SCHEMA_VALIDATION_FAILED;
+  }
+  if (typeof parsed.confidence !== "number" || Number.isNaN(parsed.confidence)) {
+    return AI_DIRECT_FAILURE_REASONS.AI_DIRECT_LOCAL_SCHEMA_VALIDATION_FAILED;
+  }
+  return null;
+}
+
+function classifyAiDirectApiFailure(error = {}) {
+  const status = error.response?.status;
+  const message = String(error.response?.data?.error?.message || error.message || "");
+  if (status === 400 && /json_schema|response_format|schema|strict/i.test(message)) {
+    return AI_DIRECT_FAILURE_REASONS.AI_DIRECT_SCHEMA_REJECTED_BY_API;
+  }
+  if (status === 400) {
+    return AI_DIRECT_FAILURE_REASONS.AI_DIRECT_SCHEMA_INVALID;
+  }
+  return AI_DIRECT_FAILURE_REASONS.AI_DIRECT_API_ERROR;
 }
 
 function buildDeterministicEditorialOutput(evidence = {}, facts = {}) {
@@ -220,11 +240,22 @@ async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}
       },
     });
     const { parsed, failure: parseFailure } = parseEditorialJson(response.data?.choices?.[0]?.message?.content);
-    if (!parsed?.headline || !parsed?.body) {
+    if (!parsed) {
       return fallbackFromAiFailure(
         evidence,
         facts,
-        parseFailure || AI_DIRECT_FAILURE_REASONS.AI_DIRECT_EMPTY_OUTPUT
+        parseFailure || AI_DIRECT_FAILURE_REASONS.AI_DIRECT_RESPONSE_PARSE_FAILED
+      );
+    }
+    const localSchemaFailure = validateLocalEditorialSchema(parsed);
+    if (localSchemaFailure) {
+      return fallbackFromAiFailure(evidence, facts, localSchemaFailure);
+    }
+    if (!parsed.headline || !parsed.body) {
+      return fallbackFromAiFailure(
+        evidence,
+        facts,
+        AI_DIRECT_FAILURE_REASONS.AI_DIRECT_EMPTY_OUTPUT
       );
     }
     const finalized = finalizeEditorialResponse(parsed, { evidenceSufficiencyLevel: sufficiencyLevel });
@@ -257,9 +288,7 @@ async function generateEditorV2Editorial(evidence = {}, facts = {}, options = {}
         true
       );
     }
-    const apiReason = error.response?.status === 400
-      ? AI_DIRECT_FAILURE_REASONS.AI_DIRECT_SCHEMA_INVALID
-      : AI_DIRECT_FAILURE_REASONS.AI_DIRECT_API_ERROR;
+    const apiReason = classifyAiDirectApiFailure(error);
     return fallbackFromAiFailure(evidence, facts, apiReason);
   }
 }
@@ -277,4 +306,6 @@ module.exports = {
   buildSemanticContext,
   parseEditorialJson,
   finalizeEditorialResponse,
+  validateLocalEditorialSchema,
+  classifyAiDirectApiFailure,
 };

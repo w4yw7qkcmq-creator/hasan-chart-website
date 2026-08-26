@@ -68,6 +68,8 @@ const REASON_TO_FIELD = {
   V2_DIRECTION_MISMATCH: "shadowDirectionMismatch",
   V2_NUMERIC_UNIT_MISMATCH: "shadowNumericUnitMismatch",
   V2_ATTRIBUTION_SPECIFICITY_LOST: "shadowAttributionSpecificityLost",
+  V2_NUMERIC_SEMANTIC_ROLE_MISMATCH: "shadowNumericSemanticRoleMismatch",
+  V2_EVIDENCE_CONTAMINATION: "shadowEvidenceContamination",
 };
 
 function normalizeSource(source = "") {
