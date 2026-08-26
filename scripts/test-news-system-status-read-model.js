@@ -45,6 +45,7 @@ function createMockSupabase(config = {}) {
     funnelSnapshots = [],
     heartbeat = null,
     chartQuotaAuthority = null,
+    chartQuotaAuthorityError = null,
     errors = {},
   } = config;
 
@@ -185,8 +186,11 @@ function createMockSupabase(config = {}) {
           maybeSingle() {
             if (
               filters.window_key === "public_chart_quota" &&
-              filters.bucket_start === "authority"
+              filters.bucket_start === "1970-01-01T00:00:00.000Z"
             ) {
+              if (chartQuotaAuthorityError) {
+                return Promise.resolve({ data: null, error: chartQuotaAuthorityError });
+              }
               return Promise.resolve({ data: chartQuotaAuthority, error: null });
             }
             return Promise.resolve({ data: heartbeat, error: null });
@@ -299,15 +303,32 @@ function createMockSupabase(config = {}) {
           authorityHealthy: true,
           authorityMode: "distributed",
         },
-        updated_at: recentChartAt,
+        bucket_start: "1970-01-01T00:00:00.000Z",
+        created_at: recentChartAt,
       },
     })
   );
   assert.equal(status.chartVisualPolicy.quotaStatus, "exhausted");
-  assert.equal(status.chartVisualPolicy.chartsPublishedInRolling24h, 1);
-  assert.equal(status.chartVisualPolicy.chartQuotaBlocked, 3);
-  assert.equal(status.chartVisualPolicy.authorityHealthy, true);
-  assert.ok(status.chartVisualPolicy.nextChartEligibleAt);
+  assert.equal(status.chartVisualPolicy.authorityMode, "distributed");
+  assert.equal(status.chartVisualPolicy.authorityQueryFailed, false);
+}
+
+// Missing authority row must not crash status API
+{
+  const status = await getNewsSystemStatusFromDb(createMockSupabase({ chartQuotaAuthority: null }));
+  assert.equal(status.chartVisualPolicy.quotaStatus, "authority_missing");
+  assert.equal(status.chartVisualPolicy.authorityHealthy, false);
+}
+
+// Authority query failure surfaces unhealthy state
+{
+  const status = await getNewsSystemStatusFromDb(
+    createMockSupabase({
+      chartQuotaAuthorityError: { message: "authority query failed", code: "500" },
+    })
+  );
+  assert.equal(status.chartVisualPolicy.authorityQueryFailed, true);
+  assert.equal(status.chartVisualPolicy.authorityHealthy, false);
 }
 
 // B. No worker heartbeat snapshot

@@ -96,7 +96,11 @@ const {
 } = require("./lib/general-rss/editor-v2");
 const { isEditorV2LiveMode, isEditorV2ShadowMode } = require("./lib/general-rss/editor-v2/mode");
 const { getEditorV2TelemetrySnapshot } = require("./lib/general-rss/editor-v2/telemetry");
-const { resolveRssSourceImageWithChartPolicy, getChartPolicyTelemetrySnapshot } = require("./lib/general-rss/chart-visual-policy");
+const {
+  resolveRssSourceImageWithChartPolicy,
+  getChartPolicyTelemetrySnapshot,
+  getChartPolicyTelemetrySnapshotFromAuthority,
+} = require("./lib/general-rss/chart-visual-policy");
 const { auditRssPostPublish } = require("./lib/general-rss/rss-post-publish-audit");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
@@ -383,6 +387,7 @@ function createEmptyCycleStats() {
 
 let lastCycleStats = createEmptyCycleStats();
 let lastCycleCompletedAt = null;
+let cachedChartAuthorityPolicy = null;
 let lastSuccessfulFetchAt = null;
 let consecutiveFailures = 0;
 
@@ -4504,6 +4509,7 @@ async function fetchForexNews(options = {}) {
     reconcileOperationalState(getSupabaseClient(), { staleAgeMs: 30 * 60_000 }).catch(() => {});
     flushIngestionCheckpoints(getSupabaseClient()).catch(() => {});
     flushSourceHealthStates(getSupabaseClient()).catch(() => {});
+    await refreshCachedChartAuthorityPolicy().catch(() => {});
     const completedAt = new Date().toISOString();
     const cycleStatus =
       stats.lastErrorSafe && stats.cycleDurationMs > 0
@@ -4612,6 +4618,16 @@ async function runNewsCycleDiagnostic(options = {}) {
   };
 }
 
+async function refreshCachedChartAuthorityPolicy() {
+  try {
+    cachedChartAuthorityPolicy = await getChartPolicyTelemetrySnapshotFromAuthority({
+      getSupabaseClient,
+    });
+  } catch (_) {
+    cachedChartAuthorityPolicy = getChartPolicyTelemetrySnapshot({ getSupabaseClient });
+  }
+}
+
 function getNewsWorkerHealthSnapshot() {
   const environmentValidation = startupValidation || validateNewsWorkerEnvironment();
   const ready =
@@ -4650,7 +4666,7 @@ function getNewsWorkerHealthSnapshot() {
       rssImage: getRssImageTelemetrySnapshot(),
       externalNewsEditor: getEditorTelemetrySnapshot(),
       editorV2: getEditorV2TelemetrySnapshot(),
-      chartVisualPolicy: getChartPolicyTelemetrySnapshot(),
+      chartVisualPolicy: cachedChartAuthorityPolicy || getChartPolicyTelemetrySnapshot({ getSupabaseClient }),
     },
     running: !isFetchingNews,
     lastCycleCompletedAt,
@@ -4759,6 +4775,7 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
     return result;
   });
   startHealthServer();
+  refreshCachedChartAuthorityPolicy().catch(() => {});
   maybeCleanupOldTelemetry(getSupabaseClient).then((result) => {
     if (result?.cleaned) {
       console.log("NEWS_WORKER_TELEMETRY_CLEANUP", JSON.stringify({ deleted: result.deleted, retentionDays: result.retentionDays }));

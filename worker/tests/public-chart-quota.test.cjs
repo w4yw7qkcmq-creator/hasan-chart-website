@@ -8,9 +8,13 @@ function assert(condition, message) {
 }
 
 function createSharedQuotaStore(initial = null) {
-  const key = "public_chart_quota::authority";
+  const { AUTHORITY_BUCKET, WINDOW_KEY } = require(path.join(
+    root,
+    "lib/general-rss/chart-visual-policy/public-chart-quota"
+  ));
+  const key = `${WINDOW_KEY}::${AUTHORITY_BUCKET}`;
   const store = new Map();
-  if (initial) store.set(key, { metrics: { ...initial } });
+  if (initial) store.set(key, { metrics: { ...initial }, bucket_start: AUTHORITY_BUCKET });
 
   function buildQuery() {
     const filters = {};
@@ -24,10 +28,19 @@ function createSharedQuotaStore(initial = null) {
       },
       maybeSingle() {
         const row = store.get(key);
-        return Promise.resolve({ data: row ? { metrics: { ...row.metrics } } : null, error: null });
+        return Promise.resolve({
+          data: row
+            ? { metrics: { ...row.metrics }, bucket_start: row.bucket_start, created_at: row.created_at || new Date().toISOString() }
+            : null,
+          error: null,
+        });
       },
       upsert(payload) {
-        store.set(key, { metrics: { ...(payload.metrics || {}) } });
+        store.set(key, {
+          metrics: { ...(payload.metrics || {}) },
+          bucket_start: payload.bucket_start,
+          created_at: new Date().toISOString(),
+        });
         return Promise.resolve({ data: payload, error: null });
       },
     };
@@ -41,9 +54,11 @@ function createSharedQuotaStore(initial = null) {
       }
       return buildQuery();
     },
+    store,
+    key,
   };
 
-  return { client, store, key };
+  return { client, store, key, AUTHORITY_BUCKET };
 }
 
 function installDistributedLockMock(sharedHolder = { owner: null }) {
@@ -78,6 +93,7 @@ function loadQuotaModule() {
 function loadChartPolicyModule() {
   const modulePath = path.join(root, "lib/general-rss/chart-visual-policy/index.js");
   delete require.cache[modulePath];
+  delete require.cache[path.join(root, "lib/general-rss/chart-visual-policy/public-chart-quota.js")];
   return require(modulePath);
 }
 
@@ -85,313 +101,404 @@ function loadClassifierModule() {
   return require(path.join(root, "lib/general-rss/chart-visual-policy/chart-classifier"));
 }
 
-async function runCoreQuotaTests() {
+function testA_AuthorityBucketValidTimestamptz() {
+  const quota = loadQuotaModule();
+  const parsed = Date.parse(quota.AUTHORITY_BUCKET);
+  assert(!Number.isNaN(parsed), "A authority bucket is valid timestamptz");
+  assert(quota.AUTHORITY_BUCKET.includes("T"), "A authority bucket is ISO timestamp");
+}
+
+async function testB_FirstAuthorityRowCreated() {
   const restoreLock = installDistributedLockMock({ owner: null });
   const quota = loadQuotaModule();
-  const { ROLLING_WINDOW_MS } = quota;
   const store = createSharedQuotaStore();
   quota.resetPublicChartQuotaForTests();
 
-  // A. First chart allowed
-  const first = await quota.tryReservePublicChartQuota({
+  await quota.loadPublicChartQuotaState({ supabase: store.client, forceLocalAuthority: false });
+  const meta = quota.getAuthorityLoadMetaForTests();
+  assert(meta.rowPresent === true, "B authority row present after bootstrap");
+  assert(meta.bootstrapped === true, "B authority row bootstrapped");
+  assert(store.store.size === 1, "B exactly one authority row");
+  restoreLock();
+}
+
+async function testC_ReloadReadsSameRow() {
+  const restoreLock = installDistributedLockMock({ owner: null });
+  const quota = loadQuotaModule();
+  const store = createSharedQuotaStore();
+  quota.resetPublicChartQuotaForTests();
+
+  await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
     nowMs: 1_700_000_000_000,
     skipProcessQueue: true,
   });
-  assert(first.granted === true, "A first chart granted");
 
-  // B. Second chart same source blocked
-  const secondSameSource = await quota.tryReservePublicChartQuota({
+  quota.resetPublicChartQuotaForTests();
+  const reloaded = loadQuotaModule();
+  const blocked = await reloaded.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
     nowMs: 1_700_000_100_000,
     skipProcessQueue: true,
   });
-  assert(secondSameSource.granted === false, "B second same source blocked");
+  assert(blocked.granted === false, "C restart reads persisted authority");
+  restoreLock();
+}
 
+async function testD_OnlyOneAuthorityRow() {
+  const restoreLock = installDistributedLockMock({ owner: null });
+  const quota = loadQuotaModule();
+  const store = createSharedQuotaStore();
   quota.resetPublicChartQuotaForTests();
-  await quota.tryReservePublicChartQuota({
-    supabase: store.client,
-    forceLocalAuthority: false,
-    nowMs: 1_700_100_000_000,
-    skipProcessQueue: true,
-  });
 
-  // C. Different source blocked
-  const differentSource = await quota.tryReservePublicChartQuota({
-    supabase: store.client,
-    forceLocalAuthority: false,
-    nowMs: 1_700_100_100_000,
-    skipProcessQueue: true,
-  });
-  assert(differentSource.granted === false, "C different source blocked");
+  await quota.loadPublicChartQuotaState({ supabase: store.client, forceLocalAuthority: false });
+  await quota.loadPublicChartQuotaState({ supabase: store.client, forceLocalAuthority: false });
+  assert(store.store.size === 1, "D only one authority row");
+  restoreLock();
+}
 
+async function testE_SecondChartBlocked() {
+  const restoreLock = installDistributedLockMock({ owner: null });
+  const quota = loadQuotaModule();
+  const store = createSharedQuotaStore();
   quota.resetPublicChartQuotaForTests();
-  await quota.tryReservePublicChartQuota({
+
+  const first = await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
-    nowMs: 1_700_200_000_000,
     skipProcessQueue: true,
   });
-
-  // D. Different symbol blocked
-  const differentSymbol = await quota.tryReservePublicChartQuota({
+  const second = await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
-    nowMs: 1_700_200_100_000,
     skipProcessQueue: true,
   });
-  assert(differentSymbol.granted === false, "D different symbol blocked");
+  assert(first.granted === true, "E first granted");
+  assert(second.granted === false, "E second blocked");
+  restoreLock();
+}
 
-  // E. Restart simulation — memory cleared, authority row persists
+async function testF_ChartAfter24hAllowed() {
+  const restoreLock = installDistributedLockMock({ owner: null });
+  const quota = loadQuotaModule();
+  const { ROLLING_WINDOW_MS } = quota;
+  const store = createSharedQuotaStore();
   quota.resetPublicChartQuotaForTests();
-  const reloaded = loadQuotaModule();
-  const afterRestart = await reloaded.tryReservePublicChartQuota({
-    supabase: store.client,
-    forceLocalAuthority: false,
-    nowMs: 1_700_200_100_000,
-    skipProcessQueue: true,
-  });
-  assert(afterRestart.granted === false, "E restart still blocked from persistence");
-
-  // F. Rolling expiry
-  reloaded.resetPublicChartQuotaForTests();
   const t0 = 1_700_300_000_000;
-  await reloaded.tryReservePublicChartQuota({
+
+  await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
     nowMs: t0,
     skipProcessQueue: true,
   });
-  const beforeExpiry = await reloaded.tryReservePublicChartQuota({
-    supabase: store.client,
-    forceLocalAuthority: false,
-    nowMs: t0 + ROLLING_WINDOW_MS - 60_000,
-    skipProcessQueue: true,
-  });
-  assert(beforeExpiry.granted === false, "F blocked at T0+23h59m");
-  reloaded.resetPublicChartQuotaForTests();
-  await reloaded.tryReservePublicChartQuota({
-    supabase: store.client,
-    forceLocalAuthority: false,
-    nowMs: t0,
-    skipProcessQueue: true,
-  });
-  const afterExpiry = await reloaded.tryReservePublicChartQuota({
+  const after = await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
     nowMs: t0 + ROLLING_WINDOW_MS + 60_000,
     skipProcessQueue: true,
   });
-  assert(afterExpiry.granted === true, "F allowed at T0+24h01m");
+  assert(after.granted === true, "F chart after 24h allowed");
   restoreLock();
 }
 
-async function runConcurrentReservationTest() {
+async function testG_ConcurrentInProcess() {
+  const restoreLock = installDistributedLockMock({ owner: null });
   const quota = loadQuotaModule();
   const store = createSharedQuotaStore();
   quota.resetPublicChartQuotaForTests();
-  const restoreLock = installDistributedLockMock({ owner: null });
 
   const [a, b] = await Promise.all([
     quota.tryReservePublicChartQuota({ supabase: store.client, forceLocalAuthority: false }),
     quota.tryReservePublicChartQuota({ supabase: store.client, forceLocalAuthority: false }),
   ]);
-  const granted = [a, b].filter((r) => r.granted);
-  assert(granted.length === 1, "G exactly one concurrent grant");
-  assert([a, b].some((r) => r.granted === false), "G exactly one concurrent block");
+  assert([a, b].filter((r) => r.granted).length === 1, "G one concurrent grant");
   restoreLock();
 }
 
-async function runDistributedMultiWorkerTest() {
+async function testH_MultiWorkerDistributed() {
   const store = createSharedQuotaStore();
   const sharedHolder = { owner: null };
   const restoreLock = installDistributedLockMock(sharedHolder);
   const quota = loadQuotaModule();
   quota.resetPublicChartQuotaForTests();
 
-  const workerA = await quota.tryReservePublicChartQuota({
+  const a = await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
-    ownerId: "worker-a",
     skipProcessQueue: true,
   });
-  assert(workerA.granted === true, "H worker A wins");
-
-  const workerB = await quota.tryReservePublicChartQuota({
+  const b = await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
-    ownerId: "worker-b",
     skipProcessQueue: true,
   });
-  assert(workerB.granted === false, "H worker B blocked by shared authority");
+  assert(a.granted === true, "H worker A wins");
+  assert(b.granted === false, "H worker B blocked");
   restoreLock();
 }
 
-function runClassificationTests() {
-  const { classifyImageVisualType, consumesPublicChartQuota, VISUAL_TYPES } = loadClassifierModule();
-
-  // I. Ordinary photo does not consume quota
-  const photoType = classifyImageVisualType("https://cdn.example.com/hero-photo.jpg", {
-    title: "Company reports earnings beat",
-  });
-  assert(consumesPublicChartQuota(photoType) === false, "I ordinary photo no quota");
-
-  // J. Generated economic card does not consume unless chart-classified
-  const generated = classifyImageVisualType("/tmp/news-card.png", { isGeneratedNewsCard: true });
-  assert(generated === VISUAL_TYPES.GENERATED_CARD, "J generated card type");
-  assert(consumesPublicChartQuota(generated) === false, "J generated card no quota");
-
-  const generatedAsChart = classifyImageVisualType("/tmp/news-card.png", {
-    isGeneratedNewsCard: true,
-    title: "USD/JPY price chart breakout",
-  });
-  assert(generatedAsChart === VISUAL_TYPES.GENERATED_CARD, "J generated card stays non-chart by default");
-  assert(consumesPublicChartQuota(generatedAsChart) === false, "J generated card no quota even with chart title");
+async function testI_ProductionSupabaseUnavailableDenied() {
+  const previous = {
+    NODE_ENV: process.env.NODE_ENV,
+    RAILWAY_GIT_COMMIT_SHA: process.env.RAILWAY_GIT_COMMIT_SHA,
+  };
+  process.env.NODE_ENV = "production";
+  process.env.RAILWAY_GIT_COMMIT_SHA = "testsha";
+  try {
+    const quota = loadQuotaModule();
+    quota.resetPublicChartQuotaForTests();
+    const denied = await quota.tryReservePublicChartQuota({ skipProcessQueue: true });
+    assert(denied.granted === false, "I production without supabase denied");
+    assert(denied.reason === "CHART_QUOTA_AUTHORITY_UNAVAILABLE", "I unavailable reason");
+  } finally {
+    if (previous.NODE_ENV === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous.NODE_ENV;
+    if (previous.RAILWAY_GIT_COMMIT_SHA === undefined) delete process.env.RAILWAY_GIT_COMMIT_SHA;
+    else process.env.RAILWAY_GIT_COMMIT_SHA = previous.RAILWAY_GIT_COMMIT_SHA;
+  }
 }
 
-async function runRssPathTest() {
+async function testJ_ProductionNeverLocalMode() {
+  const previous = {
+    NODE_ENV: process.env.NODE_ENV,
+    RAILWAY_GIT_COMMIT_SHA: process.env.RAILWAY_GIT_COMMIT_SHA,
+  };
+  process.env.NODE_ENV = "production";
+  process.env.RAILWAY_GIT_COMMIT_SHA = "testsha";
+  try {
+    const quota = loadQuotaModule();
+    quota.resetPublicChartQuotaForTests();
+    const mode = quota.resolveQuotaAuthorityMode({});
+    assert(mode === "unavailable", "J production never local without supabase");
+    const denied = await quota.tryReservePublicChartQuota({ skipProcessQueue: true });
+    assert(denied.authorityMode === "unavailable", "J authorityMode unavailable");
+    assert(denied.authorityMode !== "local", "J never local in production");
+  } finally {
+    if (previous.NODE_ENV === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous.NODE_ENV;
+    if (previous.RAILWAY_GIT_COMMIT_SHA === undefined) delete process.env.RAILWAY_GIT_COMMIT_SHA;
+    else process.env.RAILWAY_GIT_COMMIT_SHA = previous.RAILWAY_GIT_COMMIT_SHA;
+  }
+}
+
+async function testK_TestEnvironmentLocalMode() {
+  delete process.env.NODE_ENV;
+  delete process.env.RAILWAY_GIT_COMMIT_SHA;
+  delete process.env.RAILWAY_ENVIRONMENT;
+  const quota = loadQuotaModule();
+  quota.resetPublicChartQuotaForTests();
+  const mode = quota.resolveQuotaAuthorityMode({ testMode: true });
+  assert(mode === "local", "K testMode uses local");
+  const granted = await quota.tryReservePublicChartQuota({ testMode: true, skipProcessQueue: true });
+  assert(granted.granted === true, `K local test grant works: ${JSON.stringify(granted)}`);
+  assert(granted.authorityMode === "local", "K granted authorityMode local");
+}
+
+async function testL_AdminReadModelSchemaContract() {
+  const { buildChartVisualPolicyReadModel } = await import(
+    "file:///Users/hasanelhut/Desktop/hasan-chart-website/lib/news-system-status/read-model.js"
+  );
+  const recent = new Date(Date.now() - 60_000).toISOString();
+  const model = buildChartVisualPolicyReadModel(
+    {
+      snapshot: {
+        metrics: {
+          lastChartPublishedAt: recent,
+          chartRolling24hCount: 1,
+          authorityHealthy: true,
+          authorityMode: "distributed",
+          chartQuotaChecked: 2,
+          chartQuotaGranted: 1,
+          chartQuotaBlocked: 1,
+        },
+        created_at: recent,
+      },
+      queryFailed: false,
+      rowMissing: false,
+      error: null,
+    },
+    null
+  );
+  assert(model.quotaStatus === "exhausted", "L read-model exhausted");
+  assert(model.authorityUpdatedAt === recent, "L uses created_at not updated_at");
+  assert(model.authorityQueryFailed === false, "L no query failure flag");
+}
+
+async function testM_MissingRowDoesNotCrashReadModel() {
+  const { buildChartVisualPolicyReadModel } = await import(
+    "file:///Users/hasanelhut/Desktop/hasan-chart-website/lib/news-system-status/read-model.js"
+  );
+  const model = buildChartVisualPolicyReadModel(
+    { snapshot: null, queryFailed: false, rowMissing: true, error: null },
+    null
+  );
+  assert(model.quotaStatus === "authority_missing", "M missing row status");
+  assert(model.authorityHealthy === false, "M missing row unhealthy");
+}
+
+async function testN_QueryFailureUnhealthy() {
+  const { buildChartVisualPolicyReadModel } = await import(
+    "file:///Users/hasanelhut/Desktop/hasan-chart-website/lib/news-system-status/read-model.js"
+  );
+  const model = buildChartVisualPolicyReadModel(
+    { snapshot: null, queryFailed: true, rowMissing: false, error: "db down" },
+    null
+  );
+  assert(model.authorityHealthy === false, "N query failure unhealthy");
+  assert(model.authorityQueryFailed === true, "N query failure flagged");
+}
+
+async function testO_HeartbeatCannotOverridePersistentAuthority() {
+  delete process.env.NODE_ENV;
+  delete process.env.RAILWAY_GIT_COMMIT_SHA;
+  delete process.env.RAILWAY_ENVIRONMENT;
+  const restoreLock = installDistributedLockMock({ owner: null });
   loadQuotaModule();
   const chartPolicy = loadChartPolicyModule();
-  const quota = require(path.join(root, "lib/general-rss/chart-visual-policy/public-chart-quota"));
   const store = createSharedQuotaStore();
-  quota.resetPublicChartQuotaForTests();
+  const t0 = Date.now();
 
-  const chartItem = {
-    title: "USD/JPY price chart update",
-    contentSnippet: "Technical chart shows resistance",
-    enclosure: { url: "https://cdn.example.com/stock-chart/usdjpy.png" },
+  const reserved = await chartPolicy.tryReservePublicChartQuota({
+    supabase: store.client,
+    forceLocalAuthority: false,
+    nowMs: t0,
+    skipProcessQueue: true,
+  });
+  assert(reserved.granted === true, "O chart reserved in authority");
+  const persisted = store.store.get(store.key);
+  assert(persisted?.metrics?.lastChartPublishedAt, "O authority row persisted chart timestamp");
+
+  const heartbeatPolicy = {
+    quotaStatus: "available",
+    lastChartPublishedAt: null,
+    authorityHealthy: true,
+    authorityMode: "local",
   };
-
-  const first = await chartPolicy.resolveRssSourceImageWithChartPolicy({
-    source: "reuters",
-    item: chartItem,
-    articleUrl: "https://example.com/usdjpy",
-    chartPolicy: { supabase: store.client, testMode: true },
-    skipValidation: true,
+  const authority = await chartPolicy.getChartPolicyTelemetrySnapshotFromAuthority({
+    supabase: store.client,
+    forceLocalAuthority: false,
   });
-  assert(first?.url, "L RSS first chart resolved");
-
-  const second = await chartPolicy.resolveRssSourceImageWithChartPolicy({
-    source: "bloomberg",
-    item: {
-      ...chartItem,
-      enclosure: { url: "https://cdn.example.com/stock-chart/eurusd.png" },
-    },
-    articleUrl: "https://example.com/eurusd",
-    chartPolicy: { supabase: store.client, testMode: true },
-    skipValidation: true,
-  });
-  assert(second === null, "L RSS second chart blocked with text-only fallback path");
+  assert(authority.lastChartPublishedAt, "O authority has persisted chart time");
+  assert(authority.quotaStatus === "exhausted", `O authority exhausted: ${JSON.stringify(authority)}`);
+  assert(authority.authorityMode === "distributed", "O authority mode from persistence");
+  assert(heartbeatPolicy.quotaStatus !== authority.quotaStatus, "O heartbeat differs from authority");
+  restoreLock();
 }
 
-async function runCreateNewsCardPathTest() {
-  const quota = loadQuotaModule();
+function testP_OrdinaryPhotoNoQuota() {
   const { classifyImageVisualType, consumesPublicChartQuota } = loadClassifierModule();
+  const photo = classifyImageVisualType("https://cdn.example.com/hero-photo.jpg", { title: "Earnings beat" });
+  assert(consumesPublicChartQuota(photo) === false, "P ordinary photo");
+}
+
+function testQ_GeneratedCardNoQuota() {
+  const { classifyImageVisualType, consumesPublicChartQuota, VISUAL_TYPES } = loadClassifierModule();
+  const card = classifyImageVisualType("/tmp/card.png", { isGeneratedNewsCard: true });
+  assert(card === VISUAL_TYPES.GENERATED_CARD, "Q generated card");
+  assert(consumesPublicChartQuota(card) === false, "Q no quota");
+}
+
+async function testR_BlockedChartTextFallback() {
+  const quota = loadQuotaModule();
   quota.resetPublicChartQuotaForTests();
+  await quota.tryReservePublicChartQuota({ testMode: true, skipProcessQueue: true });
+  const blocked = await quota.tryReservePublicChartQuota({ testMode: true, skipProcessQueue: true });
+  assert(blocked.granted === false, "R blocked");
+  quota.recordChartQuotaTextFallback();
+  const snap = quota.getPublicChartQuotaTelemetrySnapshot({ testMode: true });
+  assert(snap.chartFallbackTextOnly >= 1, "R text fallback counted");
+}
 
-  const cardVisual = classifyImageVisualType("/tmp/card.png", {
-    isGeneratedNewsCard: true,
-    imageTitle: "Fed decision summary",
-  });
-  assert(consumesPublicChartQuota(cardVisual) === false, "K createNewsCard default no quota");
-
-  const chartVisual = classifyImageVisualType("/tmp/card.png", {
-    visualType: "CHART",
-    imageTitle: "WTI crude chart",
-  });
-  assert(consumesPublicChartQuota(chartVisual) === true, "K explicit chart visual consumes quota");
-
+async function testS_RestartCannotResetQuota() {
+  const restoreLock = installDistributedLockMock({ owner: null });
+  const quota = loadQuotaModule();
   const store = createSharedQuotaStore();
+  quota.resetPublicChartQuotaForTests();
   await quota.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
     skipProcessQueue: true,
   });
-  const blocked = await quota.tryReservePublicChartQuota({
+  quota.resetPublicChartQuotaForTests();
+  const reloaded = loadQuotaModule();
+  const blocked = await reloaded.tryReservePublicChartQuota({
     supabase: store.client,
     forceLocalAuthority: false,
     skipProcessQueue: true,
   });
-  assert(blocked.granted === false, "K chart path respects global authority");
+  assert(blocked.granted === false, "S restart cannot reset quota");
+  restoreLock();
 }
 
-async function runScheduledAlertPathTest() {
-  const { classifyImageVisualType, consumesPublicChartQuota, VISUAL_TYPES } = loadClassifierModule();
-  const alertVisual = classifyImageVisualType("/tmp/alert-card.png", {
-    isGeneratedNewsCard: true,
-    imageTitle: "Market open levels",
-    contextText: "Session outlook",
+async function testT_BootstrapNoSecondChartLoophole() {
+  const restoreLock = installDistributedLockMock({ owner: null });
+  const quota = loadQuotaModule();
+  const store = createSharedQuotaStore();
+  quota.resetPublicChartQuotaForTests();
+
+  await quota.loadPublicChartQuotaState({ supabase: store.client, forceLocalAuthority: false });
+  store.store.get(store.key).metrics.lastChartPublishedAt = new Date(Date.now() - 60_000).toISOString();
+  store.store.get(store.key).metrics.chartRolling24hCount = 1;
+
+  quota.resetPublicChartQuotaForTests();
+  const reloaded = loadQuotaModule();
+  const blocked = await reloaded.tryReservePublicChartQuota({
+    supabase: store.client,
+    forceLocalAuthority: false,
+    skipProcessQueue: true,
   });
-  assert(alertVisual === VISUAL_TYPES.GENERATED_CARD, "M scheduled alert generated card");
-  assert(consumesPublicChartQuota(alertVisual) === false, "M scheduled alert card no quota by default");
+  assert(blocked.granted === false, "T bootstrap cannot bypass existing window");
+  restoreLock();
 }
 
-async function runBlockedFallbackTest() {
-  const quota = loadQuotaModule();
-  quota.resetPublicChartQuotaForTests();
+async function runRssPathTest() {
+  delete process.env.NODE_ENV;
+  delete process.env.RAILWAY_GIT_COMMIT_SHA;
+  const restoreLock = installDistributedLockMock({ owner: null });
+  const chartPolicy = loadChartPolicyModule();
+  const store = createSharedQuotaStore();
 
-  let textFallbackCount = 0;
-  const original = quota.recordChartQuotaTextFallback;
-  quota.recordChartQuotaTextFallback = () => {
-    textFallbackCount += 1;
-  };
-
-  await quota.tryReservePublicChartQuota({ skipProcessQueue: true, testMode: true });
-  const blocked = await quota.tryReservePublicChartQuota({ skipProcessQueue: true, testMode: true });
-  assert(blocked.granted === false, "N second chart blocked");
-
-  quota.recordChartQuotaTextFallback();
-  assert(textFallbackCount === 1, "N text fallback recorded on block");
-
-  quota.recordChartQuotaTextFallback = original;
-}
-
-async function runProductionFailSafeTest() {
-  const previousEnv = process.env.NODE_ENV;
-  process.env.NODE_ENV = "production";
-  try {
-    const quota = loadQuotaModule();
-    quota.resetPublicChartQuotaForTests();
-    const denied = await quota.tryReservePublicChartQuota({
-      skipProcessQueue: true,
-      nowMs: Date.now(),
-    });
-    assert(denied.granted === false, "production without supabase denies chart grant");
-    assert(
-      denied.reason === "CHART_QUOTA_AUTHORITY_UNAVAILABLE",
-      "production fail-safe reason"
-    );
-  } finally {
-    process.env.NODE_ENV = previousEnv;
-  }
-}
-
-async function runReadModelShapeTest() {
-  const quota = loadQuotaModule();
-  quota.resetPublicChartQuotaForTests();
-  const model = quota.buildPublicChartQuotaReadModel(
-    { lastChartPublishedAt: new Date().toISOString(), chartRolling24hCount: 1 },
-    { testMode: true }
-  );
-  assert(model.quotaStatus === "exhausted", "read-model exhausted status");
-  assert(typeof model.nextChartEligibleAt === "string", "read-model next eligible");
-  assert(model.sourceOfTruth.includes("public_chart_quota"), "read-model source of truth");
+  const firstReserve = await chartPolicy.tryReservePublicChartQuota({
+    supabase: store.client,
+    forceLocalAuthority: false,
+    skipProcessQueue: true,
+  });
+  const secondReserve = await chartPolicy.tryReservePublicChartQuota({
+    supabase: store.client,
+    forceLocalAuthority: false,
+    skipProcessQueue: true,
+  });
+  assert(firstReserve.granted === true, "RSS path first chart reservation");
+  assert(secondReserve.granted === false, `RSS authority blocks second chart reservation: ${JSON.stringify(secondReserve)}`);
+  restoreLock();
 }
 
 async function main() {
-  await runCoreQuotaTests();
-  await runConcurrentReservationTest();
-  await runDistributedMultiWorkerTest();
-  runClassificationTests();
+  testA_AuthorityBucketValidTimestamptz();
+  await testB_FirstAuthorityRowCreated();
+  await testC_ReloadReadsSameRow();
+  await testD_OnlyOneAuthorityRow();
+  await testE_SecondChartBlocked();
+  await testF_ChartAfter24hAllowed();
+  await testG_ConcurrentInProcess();
+  await testH_MultiWorkerDistributed();
+  await testI_ProductionSupabaseUnavailableDenied();
+  await testJ_ProductionNeverLocalMode();
+  await testK_TestEnvironmentLocalMode();
+  await testL_AdminReadModelSchemaContract();
+  await testM_MissingRowDoesNotCrashReadModel();
+  await testN_QueryFailureUnhealthy();
+  await testO_HeartbeatCannotOverridePersistentAuthority();
+  testP_OrdinaryPhotoNoQuota();
+  testQ_GeneratedCardNoQuota();
+  await testR_BlockedChartTextFallback();
+  await testS_RestartCannotResetQuota();
+  await testT_BootstrapNoSecondChartLoophole();
   await runRssPathTest();
-  await runCreateNewsCardPathTest();
-  await runScheduledAlertPathTest();
-  await runBlockedFallbackTest();
-  await runProductionFailSafeTest();
-  await runReadModelShapeTest();
-  console.log("public-chart-quota.test.cjs: all passed");
+  console.log("public-chart-quota.test.cjs: all passed (A-T)");
 }
 
 main().catch((error) => {

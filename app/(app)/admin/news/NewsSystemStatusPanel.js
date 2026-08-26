@@ -204,7 +204,9 @@ export default function NewsSystemStatusPanel() {
             ? "متاح"
             : chartPolicy.quotaStatus === "exhausted"
               ? "مستنفد"
-              : "سلطة غير سليمة";
+              : chartPolicy.quotaStatus === "authority_missing"
+                ? "سلطة مفقودة"
+                : "سلطة غير سليمة";
         return (
           <>
             <h3 className="admin-news-system__subtitle">

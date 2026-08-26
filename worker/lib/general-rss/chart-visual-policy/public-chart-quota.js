@@ -3,29 +3,36 @@
  *
  * Authority row: news_system_metric_snapshots
  *   window_key = "public_chart_quota"
- *   bucket_start = "authority" (fixed singleton bucket)
+ *   bucket_start = AUTHORITY_BUCKET (fixed timestamptz singleton)
  *
  * Rolling window: 24h from lastChartPublishedAt (max 1 chart per window).
  *
- * Concurrency: distributed lock (public_chart_quota_reserve) wraps read-check-write.
- * In-process reservationChain serializes reservations within one worker.
+ * Bootstrap: when no authority row exists and Supabase is available, create one
+ * with lastChartPublishedAt=null. No reliable persisted chart evidence exists
+ * in legacy tables (rss_chart_image_policy / public_chart_quota both empty in prod),
+ * so fail-closed recovery from publication history is not attempted.
  *
- * Production fail-safe:
- *   - Distributed mode when Supabase client is available.
- *   - Local-only grants ONLY in test/dev (NODE_ENV=test, testMode, forceLocalAuthority, NEWS_DRY_RUN).
- *   - If Supabase is unavailable in production: deny chart grants (text-only news still allowed upstream).
- *   - Never allow independent multi-worker grants without shared authority.
+ * Production fail-closed: if Supabase authority cannot be read/written/locked,
+ * deny chart grants (CHART_QUOTA_AUTHORITY_UNAVAILABLE). Text-only news continues.
+ * Production never reports authorityMode=local unless testMode/forceLocalAuthority.
  */
 const { ROLLING_WINDOW_MS } = require("./chart-rate-limit");
 
 const WINDOW_KEY = "public_chart_quota";
-const AUTHORITY_BUCKET = "authority";
+const AUTHORITY_BUCKET = "1970-01-01T00:00:00.000Z";
 const RESERVE_LOCK_NAME = "public_chart_quota_reserve";
 const RESERVE_LOCK_TTL_SECONDS = 8;
 
 let memoryState = {
   lastChartPublishedAt: null,
   chartRolling24hCount: 0,
+};
+
+let authorityLoadMeta = {
+  rowPresent: false,
+  queryFailed: false,
+  queryError: null,
+  bootstrapped: false,
 };
 
 let reservationChain = Promise.resolve();
@@ -38,8 +45,16 @@ const telemetry = {
   chartLastPublishedAt: null,
   chartRolling24hCount: 0,
   authorityHealthy: true,
-  authorityMode: "local",
+  authorityMode: "unknown",
 };
+
+function isProductionRuntime() {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.RAILWAY_ENVIRONMENT === "production" ||
+    Boolean(process.env.RAILWAY_GIT_COMMIT_SHA)
+  );
+}
 
 function isWithinRollingWindow(lastAtIso, nowMs = Date.now()) {
   const lastAt = lastAtIso ? Date.parse(lastAtIso) : null;
@@ -68,17 +83,16 @@ function resolveSupabaseClient(options = {}) {
 function resolveQuotaAuthorityMode(options = {}) {
   if (options.forceLocalAuthority === true) return "local";
   if (options.testMode === true) return "local";
+
+  const supabase = resolveSupabaseClient(options);
+  if (supabase) {
+    return "distributed";
+  }
+
   if (process.env.NODE_ENV === "test") return "local";
   if (process.env.NEWS_DRY_RUN === "true") return "local";
 
-  const supabase = resolveSupabaseClient(options);
-  if (!supabase) {
-    if (process.env.NODE_ENV === "production") {
-      return "unavailable";
-    }
-    return "local";
-  }
-  return "distributed";
+  return isProductionRuntime() ? "unavailable" : "local";
 }
 
 function syncTelemetryFromMetrics(metrics = {}) {
@@ -91,9 +105,13 @@ function syncTelemetryFromMetrics(metrics = {}) {
   if (typeof metrics.authorityHealthy === "boolean") {
     telemetry.authorityHealthy = metrics.authorityHealthy;
   }
+  if (typeof metrics.authorityMode === "string") {
+    telemetry.authorityMode = metrics.authorityMode;
+  }
 }
 
-function buildPersistedMetrics(state = memoryState) {
+function buildPersistedMetrics(state = memoryState, options = {}) {
+  const authorityMode = resolveQuotaAuthorityMode(options);
   return {
     lastChartPublishedAt: state.lastChartPublishedAt,
     chartRolling24hCount: Number(state.chartRolling24hCount || 0),
@@ -101,41 +119,104 @@ function buildPersistedMetrics(state = memoryState) {
     chartQuotaGranted: telemetry.chartQuotaGranted,
     chartQuotaBlocked: telemetry.chartQuotaBlocked,
     chartFallbackTextOnly: telemetry.chartFallbackTextOnly,
-    authorityHealthy: telemetry.authorityHealthy,
-    authorityMode: telemetry.authorityMode,
+    authorityHealthy: authorityMode !== "unavailable" && telemetry.authorityHealthy !== false,
+    authorityMode,
     lastAuthoritySyncAt: new Date().toISOString(),
   };
+}
+
+function applyAuthorityMetrics(metrics = {}) {
+  memoryState = {
+    lastChartPublishedAt: metrics.lastChartPublishedAt || null,
+    chartRolling24hCount: Number(metrics.chartRolling24hCount || 0),
+  };
+  syncTelemetryFromMetrics(metrics);
+  telemetry.chartLastPublishedAt = memoryState.lastChartPublishedAt;
+  telemetry.chartRolling24hCount = memoryState.chartRolling24hCount;
+}
+
+async function bootstrapAuthorityRow(supabase, options = {}) {
+  const metrics = buildPersistedMetrics(
+    { lastChartPublishedAt: null, chartRolling24hCount: 0 },
+    options
+  );
+  metrics.bootstrapReason = "initial_authority_row";
+  metrics.bootstrapAt = new Date().toISOString();
+
+  const { error } = await supabase.from("news_system_metric_snapshots").upsert(
+    {
+      window_key: WINDOW_KEY,
+      bucket_start: AUTHORITY_BUCKET,
+      metrics,
+    },
+    { onConflict: "window_key,bucket_start" }
+  );
+  if (error) {
+    throw error;
+  }
+  authorityLoadMeta.bootstrapped = true;
+  authorityLoadMeta.rowPresent = true;
+  applyAuthorityMetrics(metrics);
+  telemetry.authorityHealthy = true;
+  telemetry.authorityMode = resolveQuotaAuthorityMode(options);
+  return { ...memoryState };
 }
 
 async function loadPublicChartQuotaState(options = {}) {
   if (options.stateOverride) {
     return { ...memoryState, ...options.stateOverride };
   }
+
   const supabase = resolveSupabaseClient(options);
-  if (supabase) {
-    try {
-      const { data } = await supabase
-        .from("news_system_metric_snapshots")
-        .select("metrics")
-        .eq("window_key", WINDOW_KEY)
-        .eq("bucket_start", AUTHORITY_BUCKET)
-        .maybeSingle();
-      if (data?.metrics) {
-        memoryState = {
-          lastChartPublishedAt: data.metrics.lastChartPublishedAt || null,
-          chartRolling24hCount: Number(data.metrics.chartRolling24hCount || 0),
-        };
-        syncTelemetryFromMetrics(data.metrics);
-      }
-      telemetry.authorityHealthy = true;
-    } catch (_) {
+  const authorityMode = resolveQuotaAuthorityMode(options);
+  telemetry.authorityMode = authorityMode;
+
+  if (!supabase) {
+    if (authorityMode === "unavailable") {
       telemetry.authorityHealthy = false;
+      authorityLoadMeta.queryFailed = true;
     }
-  } else if (resolveQuotaAuthorityMode(options) === "unavailable") {
+    return { ...memoryState };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("news_system_metric_snapshots")
+      .select("metrics,bucket_start,created_at")
+      .eq("window_key", WINDOW_KEY)
+      .eq("bucket_start", AUTHORITY_BUCKET)
+      .maybeSingle();
+
+    if (error) {
+      authorityLoadMeta.queryFailed = true;
+      authorityLoadMeta.queryError = error.message;
+      authorityLoadMeta.rowPresent = false;
+      telemetry.authorityHealthy = false;
+      return { ...memoryState };
+    }
+
+    authorityLoadMeta.queryFailed = false;
+    authorityLoadMeta.queryError = null;
+
+    if (!data?.metrics) {
+      authorityLoadMeta.rowPresent = false;
+      if (authorityMode === "distributed") {
+        return bootstrapAuthorityRow(supabase, options);
+      }
+      return { ...memoryState };
+    }
+
+    authorityLoadMeta.rowPresent = true;
+    applyAuthorityMetrics(data.metrics);
+    telemetry.authorityHealthy = true;
+    telemetry.authorityMode = authorityMode;
+  } catch (error) {
+    authorityLoadMeta.queryFailed = true;
+    authorityLoadMeta.queryError = error.message;
+    authorityLoadMeta.rowPresent = false;
     telemetry.authorityHealthy = false;
   }
-  telemetry.chartLastPublishedAt = memoryState.lastChartPublishedAt;
-  telemetry.chartRolling24hCount = memoryState.chartRolling24hCount;
+
   return { ...memoryState };
 }
 
@@ -147,23 +228,34 @@ async function persistPublicChartQuotaState(state = {}, options = {}) {
   const authorityMode = resolveQuotaAuthorityMode(options);
   telemetry.authorityMode = authorityMode;
 
-  if (supabase) {
+  if (supabase && authorityMode === "distributed") {
     try {
-      await supabase.from("news_system_metric_snapshots").upsert(
+      const { error } = await supabase.from("news_system_metric_snapshots").upsert(
         {
           window_key: WINDOW_KEY,
           bucket_start: AUTHORITY_BUCKET,
-          metrics: buildPersistedMetrics(memoryState),
+          metrics: buildPersistedMetrics(memoryState, options),
         },
         { onConflict: "window_key,bucket_start" }
       );
-      telemetry.authorityHealthy = true;
-    } catch (_) {
+      if (error) {
+        telemetry.authorityHealthy = false;
+        authorityLoadMeta.queryFailed = true;
+        authorityLoadMeta.queryError = error.message;
+      } else {
+        telemetry.authorityHealthy = true;
+        authorityLoadMeta.rowPresent = true;
+        authorityLoadMeta.queryFailed = false;
+      }
+    } catch (error) {
       telemetry.authorityHealthy = false;
+      authorityLoadMeta.queryFailed = true;
+      authorityLoadMeta.queryError = error.message;
     }
   } else if (authorityMode === "unavailable") {
     telemetry.authorityHealthy = false;
   }
+
   return memoryState;
 }
 
@@ -199,9 +291,13 @@ async function acquireQuotaReservationLock(getSupabaseClient, options = {}) {
       lockName: RESERVE_LOCK_NAME,
       ttlSeconds: RESERVE_LOCK_TTL_SECONDS,
     });
+    if (!lock.acquired) {
+      return { ...lock, mode: "distributed", reason: lock.reason || "CHART_QUOTA_CONTENTION" };
+    }
     return { ...lock, mode: "distributed" };
   } catch (_) {
     telemetry.authorityHealthy = false;
+    authorityLoadMeta.queryFailed = true;
     return {
       acquired: false,
       reason: "CHART_QUOTA_AUTHORITY_UNAVAILABLE",
@@ -235,7 +331,20 @@ async function tryReservePublicChartQuota(options = {}) {
   const nowMs = options.nowMs || Date.now();
   const getSupabaseClient = options.getSupabaseClient || null;
   const supabase = resolveSupabaseClient(options);
-  telemetry.authorityMode = resolveQuotaAuthorityMode(options);
+  const authorityMode = resolveQuotaAuthorityMode(options);
+  telemetry.authorityMode = authorityMode;
+
+  if (authorityMode === "unavailable") {
+    telemetry.chartQuotaBlocked += 1;
+    telemetry.authorityHealthy = false;
+    return {
+      granted: false,
+      reason: "CHART_QUOTA_AUTHORITY_UNAVAILABLE",
+      state: { ...memoryState },
+      authorityHealthy: false,
+      authorityMode,
+    };
+  }
 
   const run = async () => {
     const lock = await acquireQuotaReservationLock(() => supabase, options);
@@ -256,6 +365,18 @@ async function tryReservePublicChartQuota(options = {}) {
 
     try {
       const state = await loadPublicChartQuotaState({ supabase, getSupabaseClient, stateOverride: options.stateOverride });
+      if (authorityLoadMeta.queryFailed) {
+        telemetry.chartQuotaBlocked += 1;
+        telemetry.authorityHealthy = false;
+        return {
+          granted: false,
+          reason: "CHART_QUOTA_AUTHORITY_UNAVAILABLE",
+          state,
+          authorityHealthy: false,
+          authorityMode: telemetry.authorityMode,
+        };
+      }
+
       if (isWithinRollingWindow(state.lastChartPublishedAt, nowMs)) {
         telemetry.chartQuotaBlocked += 1;
         await persistTelemetryCounters({ supabase, getSupabaseClient, ...options });
@@ -273,6 +394,16 @@ async function tryReservePublicChartQuota(options = {}) {
         chartRolling24hCount: 1,
       };
       await persistPublicChartQuotaState(nextState, { supabase, getSupabaseClient, ...options });
+      if (!telemetry.authorityHealthy) {
+        telemetry.chartQuotaBlocked += 1;
+        return {
+          granted: false,
+          reason: "CHART_QUOTA_AUTHORITY_UNAVAILABLE",
+          state: memoryState,
+          authorityHealthy: false,
+          authorityMode: telemetry.authorityMode,
+        };
+      }
       telemetry.chartQuotaGranted += 1;
       return {
         granted: true,
@@ -302,17 +433,70 @@ function isPublicChartQuotaBlocked(nowMs = Date.now(), state = memoryState, opti
   if (mode === "unavailable") {
     return true;
   }
+  if (authorityLoadMeta.queryFailed) {
+    return true;
+  }
   return isWithinRollingWindow(state.lastChartPublishedAt, nowMs);
 }
 
 function buildPublicChartQuotaReadModel(state = memoryState, options = {}) {
   const nowMs = options.nowMs || Date.now();
   const mode = resolveQuotaAuthorityMode(options);
-  const blocked = isPublicChartQuotaBlocked(nowMs, state, options);
+  const blocked = isWithinRollingWindow(state.lastChartPublishedAt, nowMs);
   const chartsInWindow = blocked && state.lastChartPublishedAt ? 1 : 0;
 
+  if (options.authorityQueryFailed || authorityLoadMeta.queryFailed) {
+    return {
+      quotaStatus: "authority_unhealthy",
+      chartsPublishedInRolling24h: chartsInWindow,
+      lastChartPublishedAt: state.lastChartPublishedAt || null,
+      nextChartEligibleAt: blocked ? computeNextChartEligibleAt(state.lastChartPublishedAt) : null,
+      chartQuotaChecked: telemetry.chartQuotaChecked,
+      chartQuotaGranted: telemetry.chartQuotaGranted,
+      chartQuotaBlocked: telemetry.chartQuotaBlocked,
+      chartFallbackTextOnly: telemetry.chartFallbackTextOnly,
+      chartImagesPublished: chartsInWindow,
+      authorityHealthy: false,
+      authorityMode: "unavailable",
+      authorityQueryFailed: true,
+      authorityRowMissing: false,
+      rollingWindowMs: ROLLING_WINDOW_MS,
+      sourceOfTruth: `news_system_metric_snapshots.${WINDOW_KEY}.${AUTHORITY_BUCKET}`,
+    };
+  }
+
+  if (mode === "unavailable") {
+    return {
+      quotaStatus: "authority_unhealthy",
+      chartsPublishedInRolling24h: chartsInWindow,
+      lastChartPublishedAt: state.lastChartPublishedAt || null,
+      nextChartEligibleAt: blocked ? computeNextChartEligibleAt(state.lastChartPublishedAt) : null,
+      chartQuotaChecked: telemetry.chartQuotaChecked,
+      chartQuotaGranted: telemetry.chartQuotaGranted,
+      chartQuotaBlocked: telemetry.chartQuotaBlocked,
+      chartFallbackTextOnly: telemetry.chartFallbackTextOnly,
+      chartImagesPublished: chartsInWindow,
+      authorityHealthy: false,
+      authorityMode: "unavailable",
+      authorityQueryFailed: false,
+      authorityRowMissing: !authorityLoadMeta.rowPresent,
+      rollingWindowMs: ROLLING_WINDOW_MS,
+      sourceOfTruth: `news_system_metric_snapshots.${WINDOW_KEY}.${AUTHORITY_BUCKET}`,
+    };
+  }
+
+  const rowMissing = options.authorityRowMissing === true || !authorityLoadMeta.rowPresent;
+  const authorityHealthy =
+    mode === "distributed" && telemetry.authorityHealthy !== false && !rowMissing;
+
   return {
-    quotaStatus: mode === "unavailable" ? "authority_unhealthy" : blocked ? "exhausted" : "available",
+    quotaStatus: !authorityHealthy
+      ? rowMissing
+        ? "authority_missing"
+        : "authority_unhealthy"
+      : blocked
+        ? "exhausted"
+        : "available",
     chartsPublishedInRolling24h: chartsInWindow,
     lastChartPublishedAt: state.lastChartPublishedAt || null,
     nextChartEligibleAt: blocked ? computeNextChartEligibleAt(state.lastChartPublishedAt) : null,
@@ -321,29 +505,45 @@ function buildPublicChartQuotaReadModel(state = memoryState, options = {}) {
     chartQuotaBlocked: telemetry.chartQuotaBlocked,
     chartFallbackTextOnly: telemetry.chartFallbackTextOnly,
     chartImagesPublished: chartsInWindow,
-    authorityHealthy: mode !== "unavailable" && telemetry.authorityHealthy !== false,
+    authorityHealthy,
     authorityMode: mode,
+    authorityQueryFailed: false,
+    authorityRowMissing: rowMissing,
     rollingWindowMs: ROLLING_WINDOW_MS,
-    sourceOfTruth: "news_system_metric_snapshots.public_chart_quota.authority",
+    sourceOfTruth: `news_system_metric_snapshots.${WINDOW_KEY}.${AUTHORITY_BUCKET}`,
   };
 }
 
 async function loadPublicChartQuotaReadModel(options = {}) {
-  const state = await loadPublicChartQuotaState(options);
-  return buildPublicChartQuotaReadModel(state, options);
+  await loadPublicChartQuotaState(options);
+  return buildPublicChartQuotaReadModel(memoryState, options);
 }
 
-function getPublicChartQuotaTelemetrySnapshot() {
+async function syncPublicChartQuotaAuthority(options = {}) {
+  await loadPublicChartQuotaState(options);
+  return buildPublicChartQuotaReadModel(memoryState, options);
+}
+
+function getPublicChartQuotaTelemetrySnapshot(options = {}) {
   return {
-    ...telemetry,
-    ...buildPublicChartQuotaReadModel(memoryState),
+    ...buildPublicChartQuotaReadModel(memoryState, options),
     chartImageLastPublishedAt: memoryState.lastChartPublishedAt,
   };
+}
+
+function getAuthorityLoadMetaForTests() {
+  return { ...authorityLoadMeta };
 }
 
 function resetPublicChartQuotaForTests() {
   memoryState = { lastChartPublishedAt: null, chartRolling24hCount: 0 };
   reservationChain = Promise.resolve();
+  authorityLoadMeta = {
+    rowPresent: false,
+    queryFailed: false,
+    queryError: null,
+    bootstrapped: false,
+  };
   telemetry.chartQuotaChecked = 0;
   telemetry.chartQuotaGranted = 0;
   telemetry.chartQuotaBlocked = 0;
@@ -351,15 +551,17 @@ function resetPublicChartQuotaForTests() {
   telemetry.chartLastPublishedAt = null;
   telemetry.chartRolling24hCount = 0;
   telemetry.authorityHealthy = true;
-  telemetry.authorityMode = "local";
+  telemetry.authorityMode = "unknown";
 }
 
 module.exports = {
   WINDOW_KEY,
   AUTHORITY_BUCKET,
   ROLLING_WINDOW_MS,
+  isProductionRuntime,
   loadPublicChartQuotaState,
   persistPublicChartQuotaState,
+  bootstrapAuthorityRow,
   tryReservePublicChartQuota,
   isPublicChartQuotaBlocked,
   isWithinRollingWindow,
@@ -368,6 +570,8 @@ module.exports = {
   recordChartQuotaTextFallback,
   buildPublicChartQuotaReadModel,
   loadPublicChartQuotaReadModel,
+  syncPublicChartQuotaAuthority,
   getPublicChartQuotaTelemetrySnapshot,
+  getAuthorityLoadMetaForTests,
   resetPublicChartQuotaForTests,
 };

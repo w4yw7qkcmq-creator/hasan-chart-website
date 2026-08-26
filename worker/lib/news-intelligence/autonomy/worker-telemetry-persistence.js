@@ -15,6 +15,16 @@ async function flushWorkerTelemetrySnapshot(supabase) {
 
   const heartbeat = getHeartbeat();
   const metrics = getMetricsAggregator().getSnapshot();
+  let chartVisualPolicy = null;
+  try {
+    const chartPolicy = require("../../general-rss/chart-visual-policy");
+    chartVisualPolicy = await chartPolicy.getChartPolicyTelemetrySnapshotFromAuthority({
+      supabase,
+    });
+  } catch (_) {
+    chartVisualPolicy = null;
+  }
+
   const row = {
     window_key: HEARTBEAT_WINDOW_KEY,
     bucket_start: currentHeartbeatBucketStart(),
@@ -30,13 +40,7 @@ async function flushWorkerTelemetrySnapshot(supabase) {
           return null;
         }
       })(),
-      chartVisualPolicy: (() => {
-        try {
-          return require("../../general-rss/chart-visual-policy").getChartPolicyTelemetrySnapshot();
-        } catch {
-          return null;
-        }
-      })(),
+      chartVisualPolicy,
       editorV2: (() => {
         try {
           return require("../../general-rss/editor-v2/telemetry").getEditorV2TelemetrySnapshot();

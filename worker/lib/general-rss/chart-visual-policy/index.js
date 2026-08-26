@@ -11,6 +11,7 @@ const {
   getPublicChartQuotaTelemetrySnapshot,
   resetPublicChartQuotaForTests,
   recordChartQuotaTextFallback,
+  syncPublicChartQuotaAuthority,
 } = require("./public-chart-quota");
 const {
   recordChartCandidate,
@@ -23,7 +24,7 @@ const {
 async function resolveRssSourceImageWithChartPolicy(params = {}) {
   const { source, item, articleUrl, chartPolicy = {}, ...options } = params;
   const state = await loadPublicChartQuotaState(chartPolicy);
-  const chartLimited = isPublicChartQuotaBlocked(Date.now(), state);
+  const chartLimited = isPublicChartQuotaBlocked(Date.now(), state, chartPolicy);
   const candidates = collectRssMediaCandidates(item, articleUrl);
 
   const ordered = [];
@@ -103,10 +104,19 @@ async function resolveRssSourceImageWithChartPolicy(params = {}) {
   return result;
 }
 
-function getChartPolicyTelemetrySnapshotMerged() {
+function getChartPolicyTelemetrySnapshotMerged(options = {}) {
   return {
     ...getChartPolicyTelemetrySnapshot(),
-    ...getPublicChartQuotaTelemetrySnapshot(),
+    ...getPublicChartQuotaTelemetrySnapshot(options),
+  };
+}
+
+async function getChartPolicyTelemetrySnapshotFromAuthority(options = {}) {
+  const authorityPolicy = await syncPublicChartQuotaAuthority(options);
+  return {
+    ...getChartPolicyTelemetrySnapshot(),
+    ...authorityPolicy,
+    telemetrySource: "persistent_authority",
   };
 }
 
@@ -119,6 +129,7 @@ module.exports = {
   resolveRssSourceImageWithChartPolicy,
   VISUAL_TYPES,
   getChartPolicyTelemetrySnapshot: getChartPolicyTelemetrySnapshotMerged,
+  getChartPolicyTelemetrySnapshotFromAuthority,
   resetChartPolicyStateForTests: resetChartPolicyStateForTestsMerged,
   classifyImageVisualType,
   consumesPublicChartQuota,
