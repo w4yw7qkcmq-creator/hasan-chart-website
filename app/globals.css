@@ -8765,15 +8765,21 @@ html.dark .subscriptions-page .subscriptions-plan-card__actions .subscriptions-b
   inset: 0;
   z-index: 9998;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 1.25rem;
+  padding: max(1.25rem, env(safe-area-inset-top, 0px)) 1.25rem
+    max(1.25rem, env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: rgba(2, 6, 23, 0.6);
   backdrop-filter: blur(8px);
 }
 
 .subscriptions-modal {
   width: min(100%, 36rem);
+  margin: auto;
+  flex-shrink: 0;
   padding: 1.5rem;
   border-radius: 1.75rem;
   border: 1px solid #e2e8f0;
