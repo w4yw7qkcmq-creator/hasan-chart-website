@@ -219,4 +219,110 @@ describe("SEO Phase 2A — vip-forex internal links", () => {
   });
 });
 
+describe("SEO Phase 2C — P1 service landing SSR wrappers", () => {
+  const P1_PAGES = [
+    {
+      route: "/vip-forex",
+      page: "app/(app)/vip-forex/page.js",
+      client: "app/(app)/vip-forex/VipForexPageClient.js",
+      pageKey: "vip-forex",
+      gate: "AuthGuestLandingGate",
+    },
+    {
+      route: "/vip-spot",
+      page: "app/(app)/vip-spot/page.js",
+      client: "app/(app)/vip-spot/VipSpotPageClient.js",
+      pageKey: "vip-spot",
+      gate: "AuthGuestLandingGate",
+    },
+    {
+      route: "/vip-futures",
+      page: "app/(app)/vip-futures/page.js",
+      client: "app/(app)/vip-futures/VipFuturesPageClient.js",
+      pageKey: "vip-futures",
+      gate: "AuthGuestLandingGate",
+    },
+    {
+      route: "/subscriptions",
+      page: "app/(app)/subscriptions/page.js",
+      client: "app/(app)/subscriptions/SubscriptionsPageClient.js",
+      pageKey: "subscriptions",
+      gate: "RequireAuthGuestLandingGate",
+    },
+    {
+      route: "/partner-center",
+      page: "app/(app)/partner-center/page.js",
+      client: "app/(app)/partner-center/PartnerCenterClient.js",
+      pageKey: "partner-center",
+      gate: "RequireAuthGuestLandingGate",
+    },
+    {
+      route: "/account-management",
+      page: "app/(app)/account-management/page.js",
+      client: "app/(app)/account-management/AccountManagementClient.js",
+      pageKey: "account-management",
+      gate: "RequireAuthGuestLandingGate",
+    },
+  ];
+
+  for (const entry of P1_PAGES) {
+    it(`${entry.route} server page uses renderPublicSeoP1Page without ssr:false`, () => {
+      const page = readFileSync(entry.page, "utf8");
+      assert.doesNotMatch(page, /["']use client["']/);
+      assert.match(page, /renderPublicSeoP1Page/);
+      assert.match(page, new RegExp(`pageKey: "${entry.pageKey}"`));
+      assert.doesNotMatch(page, /ssr:\s*false/);
+    });
+
+    it(`${entry.route} client gate uses ${entry.gate} with initialAuthenticated`, () => {
+      const client = readFileSync(entry.client, "utf8");
+      assert.match(client, new RegExp(entry.gate));
+      assert.match(client, /initialAuthenticated/);
+      assert.doesNotMatch(client, /PublicServiceLanding.*ssr:\s*false/);
+      assert.doesNotMatch(client, /dynamic\([\s\S]*PublicServiceLanding[\s\S]*ssr:\s*false/);
+    });
+  }
+
+  it("forex-signals remains the known-good server import pattern", () => {
+    const page = readFileSync("app/(app)/forex-signals/page.js", "utf8");
+    assert.doesNotMatch(page, /["']use client["']/);
+    assert.match(page, /PublicServiceLanding/);
+    assert.doesNotMatch(page, /ssr:\s*false/);
+  });
+});
+
+describe("SEO Phase 2C — authenticated flash mitigation", () => {
+  it("server auth helper validates session via getOptionalSessionUser only", () => {
+    const helper = readFileSync("lib/public-seo-server-auth.js", "utf8");
+    assert.match(helper, /getOptionalSessionUser/);
+    assert.doesNotMatch(helper, /cookieStore\.get\(/);
+    assert.doesNotMatch(helper, /return\s*\{\s*email/);
+  });
+
+  it("renderPublicSeoP1Page branches guest landing vs authenticated shell", () => {
+    const renderer = readFileSync("lib/render-public-seo-p1-page.js", "utf8");
+    assert.match(renderer, /getPublicSeoInitialAuth/);
+    assert.match(renderer, /isAuthenticated/);
+    assert.match(renderer, /initialAuthenticated/);
+    assert.match(renderer, /PublicServiceLanding/);
+  });
+
+  it("AuthGuestLandingGate skips landing when initialAuthenticated", () => {
+    const gate = readFileSync("app/components/public-seo/GuestPublicLandingGate.js", "utf8");
+    assert.match(gate, /initialAuthenticated/);
+    assert.match(gate, /authResolved && !user\?\.email/);
+  });
+
+  it("RequireAuthGuestLandingGate uses authenticatedPendingFallback not marketing landing", () => {
+    const gate = readFileSync("app/components/public-seo/GuestPublicLandingGate.js", "utf8");
+    assert.match(gate, /authenticatedPendingFallback/);
+  });
+
+  it("subscriptions passes authenticated pending shell for server-authenticated users", () => {
+    const client = readFileSync("app/(app)/subscriptions/SubscriptionsPageClient.js", "utf8");
+    assert.match(client, /authenticatedPendingFallback/);
+    assert.match(client, /SubscriptionsAuthenticatedPendingShell/);
+  });
+});
+
 console.log("SEO Phase 1 regression tests loaded");
