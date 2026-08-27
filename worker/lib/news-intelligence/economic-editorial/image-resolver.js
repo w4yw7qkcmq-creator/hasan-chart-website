@@ -86,8 +86,20 @@ async function resolvePublicationImage(editorialContext = {}, options = {}) {
   if (decision.level === VISUAL_PRIORITY.REQUIRED) {
     logPhase2Event(PHASE2_EVENTS.IMAGE_REQUIRED_UNAVAILABLE, {
       eventType: editorialContext.eventType,
-      warning: "IMAGE_DEFERRED_TEXT_ONLY",
+      warning: "IMAGE_REQUIRED_UNAVAILABLE",
     });
+    return {
+      ok: false,
+      required: true,
+      image: null,
+      imageUrl: null,
+      warning: "IMAGE_REQUIRED_UNAVAILABLE",
+      meta: {
+        source: "required_missing",
+        latencyMs: Date.now() - startedAt,
+        advisory: false,
+      },
+    };
   }
 
   return {

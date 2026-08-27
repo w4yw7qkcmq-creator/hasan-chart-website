@@ -168,6 +168,8 @@ async function testDuplicateBlockedBeforeAiInGateway() {
     registry: makeOpenAiRegistry(),
     cacheDir: TEST_CACHE_DIR,
     outputDir: TEST_OUTPUT_DIR,
+    resolvePublicationImageResult,
+    sendTelegramPhoto: async () => ({ ok: true }),
     sendTelegramMessage: async () => ({ ok: true }),
     saveNewsPostToSupabase: async () => ({}),
     savePublishedNewsToSupabase: async () => ({}),
@@ -190,10 +192,11 @@ async function testDuplicateBlockedBeforeAiInGateway() {
   assert.strictEqual(getOpenAiImageCallCountForTests(), callsAfterFirst);
 }
 
-async function testImageFailureDoesNotBlockPublication() {
+async function testImageFailureBlocksRequiredPublication() {
   const gateway = createNewsPublisherGateway({ runtimeMode: "test", forceMemory: true });
   const publication = {
     eventType: "US_INITIAL_JOBLESS_CLAIMS",
+    eventFamily: "US_WEEKLY_LABOR_CLAIMS",
     country: "US",
     releaseDate: "2026-08-06T12:30:00.000Z",
     publicationType: PT.RELEASE,
@@ -204,6 +207,7 @@ async function testImageFailureDoesNotBlockPublication() {
     destination: "both",
     sourceLink: "telegram:ForexBreakingNews/jobless-1",
     importance: "HIGH",
+    visualPriority: "REQUIRED",
     facts: { actual: "199K", forecast: "203K", previous: "197K" },
     metadata: {
       premiumImageContext: {
@@ -215,18 +219,24 @@ async function testImageFailureDoesNotBlockPublication() {
     },
   };
 
+  let textCalls = 0;
   const result = await gateway.publish(publication, {
     registry: createNewsImageProviderRegistryBroken(),
     cacheDir: TEST_CACHE_DIR,
     outputDir: TEST_OUTPUT_DIR,
-    sendTelegramMessage: async () => ({ ok: true }),
+    sendTelegramPhoto: async () => ({ ok: true }),
+    sendTelegramMessage: async () => {
+      textCalls += 1;
+      return { ok: true };
+    },
     saveNewsPostToSupabase: async () => ({}),
     savePublishedNewsToSupabase: async () => ({}),
     savePublishedNewsLink: () => {},
   });
 
-  assert.notStrictEqual(result.blocked, true);
-  assert.ok(result.telegramSent || result.partial || result.published);
+  assert.strictEqual(result.blocked, true);
+  assert.strictEqual(result.reason, "IMAGE_REQUIRED_UNAVAILABLE");
+  assert.strictEqual(textCalls, 0);
 }
 
 async function testPostPublishAuditorAcceptsTextOnlyWarning() {
@@ -249,7 +259,7 @@ async function run() {
   await testImportantTelegramUsesAiPrimary();
   await testEconomicReleaseAiPrimaryTextOnlyOnFailure();
   await testDuplicateBlockedBeforeAiInGateway();
-  await testImageFailureDoesNotBlockPublication();
+  await testImageFailureBlocksRequiredPublication();
   await testPostPublishAuditorAcceptsTextOnlyWarning();
   console.log("news-image-policy.test.cjs: all tests passed");
 }

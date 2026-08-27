@@ -1,6 +1,10 @@
 const crypto = require("crypto");
 
-const { normalizeFingerprintText, normalizeEconomicFieldValue } = require("../economic-releases/text-normalization");
+const {
+  normalizeFingerprintText,
+  normalizeEconomicFieldValue,
+  extractLeadingEconomicNumericToken,
+} = require("../economic-releases/text-normalization");
 
 function extractNumbers(text) {
   return [...String(text || "").matchAll(/-?\d+(?:[.,]\d+)?%?|\d+(?:\.\d+)?[KMB]/gi)].map((m) => m[0]);
@@ -22,9 +26,9 @@ function buildScheduledBucket(scheduledAt) {
 }
 
 function buildEconomicMergeKey(facts = {}) {
-  const previous = normalizeEconomicFieldValue(facts.previous || facts.revisedPrevious);
-  const forecast = normalizeEconomicFieldValue(facts.forecast);
-  const actual = normalizeEconomicFieldValue(facts.actual);
+  const previous = extractLeadingEconomicNumericToken(facts.previous || facts.revisedPrevious);
+  const forecast = extractLeadingEconomicNumericToken(facts.forecast);
+  const actual = extractLeadingEconomicNumericToken(facts.actual);
 
   if (!previous || !forecast || !actual) {
     return null;
@@ -49,9 +53,9 @@ function normalizeEconomicField(value) {
 }
 
 function buildEconomicTripleKey(facts = {}) {
-  const previous = normalizeEconomicFieldValue(facts.previous || facts.revisedPrevious);
-  const forecast = normalizeEconomicFieldValue(facts.forecast);
-  const actual = normalizeEconomicFieldValue(facts.actual);
+  const previous = extractLeadingEconomicNumericToken(facts.previous || facts.revisedPrevious);
+  const forecast = extractLeadingEconomicNumericToken(facts.forecast);
+  const actual = extractLeadingEconomicNumericToken(facts.actual);
 
   if (!previous || !forecast || !actual) {
     return null;
@@ -82,14 +86,13 @@ function buildExactFingerprint(post = {}) {
 }
 
 function buildEventFingerprint(facts = {}) {
-  const scheduled = facts.scheduledAt || facts.sourcePublishedAt || "unknown";
-  const scheduledBucket =
-    typeof scheduled === "string" && scheduled.length >= 10 ? scheduled.slice(0, 10) : scheduled;
+  const scheduled = facts.scheduledAt || facts.sourcePublishedAt || facts.releaseDate || "unknown";
+  const scheduledBucket = buildScheduledBucket(scheduled);
   const payload = [
     facts.country || "unknown",
-    facts.canonicalEventKey || "general",
+    facts.canonicalEventKey || facts.eventType || "general",
     scheduledBucket,
-    facts.period || "",
+    normalizeFingerprintText(facts.period || ""),
   ].join("|");
   return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 24);
 }

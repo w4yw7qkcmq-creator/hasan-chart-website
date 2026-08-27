@@ -23,13 +23,60 @@ const phase3 = (() => {
 const { getCachedEventImage, recordTextFirstFallback } = require("./event-image-cache-store");
 const { recordEconomicLatencySample } = require("./economic-latency-telemetry");
 const { isFastLaneActive } = require("../telegram-news/economic-fast-lane");
+const { buildEventFingerprint } = require("../telegram-news/fingerprint");
+const { decideImageRequirement, VISUAL_PRIORITY } = require("./economic-editorial/image-decision");
+const { resolveVisualPriority } = require("./economic-editorial/interpretation-registry");
+const {
+  recordTelegramEconomicPublicationAttempt,
+  recordTelegramEconomicPublicationSuccess,
+  recordTelegramEconomicPublicationFailure,
+} = require("../news-ingestion/cycle-funnel");
 
 const BLOCK_REASONS = {
   ...EDITORIAL_BLOCK_REASONS,
   ...SOURCE_BLOCK_REASONS,
   ...STORE_BLOCK_REASONS,
   ...SEMANTIC_BLOCK_REASONS,
+  IMAGE_REQUIRED_UNAVAILABLE: "IMAGE_REQUIRED_UNAVAILABLE",
 };
+
+function buildPublicationEventFingerprint(canonical, publication = {}) {
+  return buildEventFingerprint({
+    country: canonical.country,
+    canonicalEventKey: canonical.eventType,
+    eventType: canonical.eventType,
+    scheduledAt: canonical.releaseDate,
+    sourcePublishedAt: publication.releaseDate || publication.metadata?.sourcePublishedAt,
+    period: publication.facts?.period || publication.metadata?.period || "",
+  });
+}
+
+function resolveRequiredImageGate(publication, canonical) {
+  const explicitPriority = publication.visualPriority || publication.metadata?.visualPriority || null;
+  if (explicitPriority === VISUAL_PRIORITY.OPTIONAL || explicitPriority === "OPTIONAL") {
+    return {
+      requiresImage: false,
+      visualPriority: VISUAL_PRIORITY.OPTIONAL,
+      imageRequirement: { level: VISUAL_PRIORITY.OPTIONAL, reason: "explicit_optional" },
+    };
+  }
+
+  const visualPriority =
+    explicitPriority || resolveVisualPriority(canonical.eventType, canonical.eventFamily || publication.eventFamily);
+  const imageRequirement = decideImageRequirement({
+    eventType: canonical.eventType || publication.eventType,
+    eventFamily: canonical.eventFamily || publication.eventFamily,
+    importance: publication.importance,
+  });
+  const requiresImage =
+    visualPriority === VISUAL_PRIORITY.REQUIRED || imageRequirement.level === VISUAL_PRIORITY.REQUIRED;
+  return { requiresImage, visualPriority, imageRequirement };
+}
+
+function hasDeliverablePublicationImage(publication) {
+  const imageResult = publication.imageResult || null;
+  return Boolean(imageResult?.filePath || publication.image || imageResult?.imageUrl || publication.imageUrl);
+}
 
 function resolveDestination(publication) {
   if (publication.destination) {
@@ -47,6 +94,11 @@ function shouldDeliverSite(destination) {
 }
 
 function buildStoredPublicationMetadata(publication, editorial, canonical) {
+  const eventFingerprint =
+    publication.metadata?.eventFingerprint ||
+    publication.eventFingerprint ||
+    (canonical.eventType ? buildPublicationEventFingerprint(canonical, publication) : null);
+
   return {
     ...(publication.metadata || {}),
     title: publication.title,
@@ -57,6 +109,12 @@ function buildStoredPublicationMetadata(publication, editorial, canonical) {
     facts: publication.facts || {},
     eventType: canonical.eventType,
     eventKey: canonical.eventKey,
+    country: canonical.country || publication.country || null,
+    releaseDate: canonical.releaseDate || publication.releaseDate || null,
+    period: publication.facts?.period || publication.metadata?.period || null,
+    eventFingerprint,
+    sourceMessageId: publication.metadata?.rawMessageId || publication.metadata?.sourceMessageId || null,
+    sourcePublishedAt: publication.releaseDate || publication.metadata?.sourcePublishedAt || canonical.releaseDate,
     image: publication.image || null,
     imageUrl: publication.imageUrl || null,
     imageResult: publication.imageResult || null,
@@ -101,6 +159,7 @@ function createNewsPublisherGateway(options = {}) {
     const imageResult = publication.imageResult || null;
     const photoPath = imageResult?.filePath || publication.image || null;
     const siteImageUrl = imageResult?.imageUrl || publication.imageUrl || null;
+    const imageGate = resolveRequiredImageGate(publication, canonical);
 
     if (
       shouldDeliverTelegram(destination) &&
@@ -111,6 +170,8 @@ function createNewsPublisherGateway(options = {}) {
         if (photoPath && deps.sendTelegramPhoto) {
           await deps.sendTelegramPhoto(editorial.body, photoPath);
           telegramSent = true;
+        } else if (imageGate.requiresImage) {
+          throw new Error(BLOCK_REASONS.IMAGE_REQUIRED_UNAVAILABLE);
         } else if (deps.sendTelegramMessage) {
           const delivery = await deps.sendTelegramMessage(editorial.body);
           telegramSent = delivery?.ok !== false;
@@ -121,7 +182,7 @@ function createNewsPublisherGateway(options = {}) {
           telegramSent ? LEG_STATUS.SUCCESS : LEG_STATUS.FAILED
         );
       } catch (error) {
-        if (deps.sendTelegramMessage) {
+        if (!imageGate.requiresImage && deps.sendTelegramMessage) {
           await deps.sendTelegramMessage(editorial.body);
           telegramSent = true;
           await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.SUCCESS);
@@ -346,12 +407,51 @@ function createNewsPublisherGateway(options = {}) {
     }
 
     if (numericEconomic && publicationType === PUBLICATION_TYPES.RELEASE && canonical.eventKey) {
+      const eventFingerprint = buildPublicationEventFingerprint(canonical, publicationForSemantics);
+      const releaseIdentityInput = {
+        eventKey: canonical.eventKey,
+        eventFingerprint,
+        country: canonical.country,
+        eventType: canonical.eventType,
+        releaseDate: canonical.releaseDate,
+        period: publication.facts?.period || publicationForSemantics.metadata?.period || null,
+        publicationType,
+      };
+      const existingRelease = await store.findPublishedReleaseIdentity?.(releaseIdentityInput);
+      if (existingRelease) {
+        logNewsEvent(NEWS_EVENTS.DUPLICATE_BLOCKED, {
+          reason: BLOCK_REASONS.DUPLICATE_BLOCKED,
+          eventKey: canonical.eventKey,
+          eventFingerprint,
+          publicationType,
+          destination,
+          duplicateBy: existingRelease.duplicateBy || "event_fingerprint",
+        });
+        const duplicateBlocked = {
+          blocked: true,
+          reason: BLOCK_REASONS.DUPLICATE_BLOCKED,
+          stage: existingRelease.duplicateBy || "event_fingerprint",
+          eventKey: canonical.eventKey,
+          eventFingerprint,
+          publicationRecord: existingRelease.record,
+        };
+        phase3?.observeEvaluationBlocked(publicationWithCorrelation, duplicateBlocked, {
+          ...deps,
+          correlationId,
+          latency: { totalMs: Date.now() - ingestStartedAt },
+        });
+        return duplicateBlocked;
+      }
+
       const identity = await store.acquirePublicationIdentity({
         eventKey: canonical.eventKey,
         publicationType,
         sourceType: publication.sourceType,
         sourceId: publication.sourceId,
-        metadata: buildStoredPublicationMetadata(publicationForSemantics, editorialForDelivery, canonical),
+        metadata: {
+          ...buildStoredPublicationMetadata(publicationForSemantics, editorialForDelivery, canonical),
+          eventFingerprint,
+        },
       });
 
       if (!identity.acquired) {
@@ -488,11 +588,19 @@ function createNewsPublisherGateway(options = {}) {
         };
       }
 
+      const imageGate = resolveRequiredImageGate(publicationForDelivery, canonical);
       const useTextFirst =
         numericEconomic &&
         publicationType === PUBLICATION_TYPES.RELEASE &&
         !cachedImage &&
+        !imageGate.requiresImage &&
         (publication.importance === "HIGH" || isFastLaneActive());
+
+      const trackEconomicRelease =
+        numericEconomic && publicationType === PUBLICATION_TYPES.RELEASE && !deps.dryRun;
+      if (trackEconomicRelease) {
+        recordTelegramEconomicPublicationAttempt();
+      }
 
       let delivery;
       if (useTextFirst) {
@@ -532,6 +640,28 @@ function createNewsPublisherGateway(options = {}) {
           editorialForDelivery,
           canonical
         );
+
+        if (imageGate.requiresImage && !hasDeliverablePublicationImage(publicationForDelivery)) {
+          const blocked = {
+            blocked: true,
+            reason: BLOCK_REASONS.IMAGE_REQUIRED_UNAVAILABLE,
+            stage: "image",
+            eventKey: canonical.eventKey,
+            publicationRecord,
+          };
+          await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.FAILED);
+          await store.updateDeliveryLeg(publicationRecord, "site", LEG_STATUS.FAILED);
+          if (trackEconomicRelease) {
+            recordTelegramEconomicPublicationFailure();
+          }
+          phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+            ...deps,
+            correlationId,
+            latency: { totalMs: Date.now() - ingestStartedAt },
+          });
+          return blocked;
+        }
+
         delivery = await deliverPublicationLegs(
           publicationForDelivery,
           editorialForDelivery,
@@ -558,6 +688,12 @@ function createNewsPublisherGateway(options = {}) {
         telegramSent: delivery.telegramSent,
         siteInserted: delivery.siteInserted,
       });
+
+      if (trackEconomicRelease && (delivery.telegramSent || delivery.siteInserted)) {
+        recordTelegramEconomicPublicationSuccess();
+      } else if (trackEconomicRelease && !delivery.telegramSent && !delivery.siteInserted) {
+        recordTelegramEconomicPublicationFailure();
+      }
 
       recordEconomicLatencySample({
         eventKey: canonical.eventKey,
@@ -596,6 +732,9 @@ function createNewsPublisherGateway(options = {}) {
       });
       return successResult;
     } catch (error) {
+      if (numericEconomic && publicationType === PUBLICATION_TYPES.RELEASE && !deps.dryRun) {
+        recordTelegramEconomicPublicationFailure();
+      }
       logNewsEvent(NEWS_EVENTS.PUBLICATION_FAILED, {
         eventKey: canonical.eventKey,
         reason: error.message,

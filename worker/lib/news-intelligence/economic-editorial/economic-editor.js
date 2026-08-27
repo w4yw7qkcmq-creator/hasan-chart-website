@@ -11,6 +11,7 @@ const { validateQualityGateV2, BLOCK_REASONS } = require("./quality-gate-v2");
 const { validateNumericTokenIntegrity } = require("./numeric-integrity");
 const { resolveVisualPriority } = require("./interpretation-registry");
 const { getEventFamily } = require("../event-registry");
+const { buildScheduledBucket } = require("../../telegram-news/fingerprint");
 
 const EDITORIAL_VERSION = "phase2-v1";
 
@@ -190,7 +191,7 @@ async function composeFamilyEditorial(family, children, options = {}) {
     imageMeta: { source: "deferred_to_gateway", visualPriority: structured.visualPriority },
     visualPriority: structured.visualPriority,
     editorialVersion: EDITORIAL_VERSION,
-    familyPublicationKey: `${children[0]?.country || "US"}:${family}:${children[0]?.releaseTime}`,
+    familyPublicationKey: `${children[0]?.country || "US"}:${family}:${buildScheduledBucket(children[0]?.releaseTime)}`,
     latency: {
       totalMs: latencyMs,
       deterministicMs: aiResult.deterministicMs || latencyMs,

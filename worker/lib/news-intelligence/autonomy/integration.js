@@ -65,7 +65,10 @@ function observeEvaluationBlocked(publication = {}, evaluation = {}, options = {
     attribution,
   };
 
-  if (attribution === FAILURE_ATTRIBUTION.SOURCE_CAUSED) {
+  if (evaluation.stage === "source_policy") {
+    healthSample.attribution = FAILURE_ATTRIBUTION.EXPECTED_NO_DATA;
+    healthSample.parseFailure = 0;
+  } else if (attribution === FAILURE_ATTRIBUTION.SOURCE_CAUSED) {
     if (evaluation.stage === "fact_integrity" || evaluation.stage === "copy_similarity") {
       healthSample.invalidStructure = 1;
     } else {
@@ -214,16 +217,23 @@ function observeCycleStart() {
 
 function observeCycleEnd(durationMs, stats = {}) {
   const funnel = stats.funnel || require("../../news-ingestion/cycle-funnel").getCycleFunnel();
-  const stallEligible = Math.max(
+  const economicEligible = Math.max(
     0,
-    (funnel.rssEligible || 0) +
-      (funnel.telegramEconomicEligible || 0) -
-      (funnel.telegramEconomicQualityBlocked || 0) -
-      (funnel.rssRateLimited || 0)
+    (funnel.telegramEconomicEligible || 0) - (funnel.telegramEconomicQualityBlocked || 0)
   );
   pipelineStallWindow.push({
     at: Date.now(),
-    eligible: stallEligible,
+    eligible: Math.max(
+      0,
+      (funnel.rssEligible || 0) +
+        (funnel.telegramEconomicEligible || 0) -
+        (funnel.telegramEconomicQualityBlocked || 0) -
+        (funnel.rssRateLimited || 0)
+    ),
+    economicEligible,
+    economicPublished: funnel.telegramEconomicPublished || 0,
+    economicPublicationAttempts: funnel.telegramEconomicPublicationAttempts || 0,
+    economicPublicationFailures: funnel.telegramEconomicPublicationFailures || 0,
     editorialEvaluated: funnel.editorialEvaluated || 0,
     published: funnel.publicationsSuccess || 0,
     newObserved: (funnel.rssNew || 0) + (funnel.telegramNew || 0),
@@ -374,22 +384,34 @@ function detectSilentFailures() {
   }
 
   if (pipelineStallWindow.length >= ANOMALY_THRESHOLDS.pipelineStallWindowCycles) {
-    const eligibleSum = pipelineStallWindow.reduce((sum, entry) => sum + entry.eligible, 0);
-    const publishedSum = pipelineStallWindow.reduce((sum, entry) => sum + entry.published, 0);
+    const economicEligibleSum = pipelineStallWindow.reduce((sum, entry) => sum + (entry.economicEligible || 0), 0);
+    const economicPublishedSum = pipelineStallWindow.reduce((sum, entry) => sum + (entry.economicPublished || 0), 0);
+    const economicAttemptsSum = pipelineStallWindow.reduce(
+      (sum, entry) => sum + (entry.economicPublicationAttempts || 0),
+      0
+    );
+    const economicFailuresSum = pipelineStallWindow.reduce(
+      (sum, entry) => sum + (entry.economicPublicationFailures || 0),
+      0
+    );
     const newSum = pipelineStallWindow.reduce((sum, entry) => sum + entry.newObserved, 0);
     if (
-      eligibleSum >= ANOMALY_THRESHOLDS.pipelineStallEligibleMin &&
-      publishedSum <= ANOMALY_THRESHOLDS.pipelineStallPublicationMax
+      economicEligibleSum >= ANOMALY_THRESHOLDS.pipelineStallEligibleMin &&
+      economicAttemptsSum > 0 &&
+      economicPublishedSum <= ANOMALY_THRESHOLDS.pipelineStallPublicationMax &&
+      economicFailuresSum > 0
     ) {
       checks.push({
         silent: true,
         kind: "publication_pipeline_stall",
-        eligibleSum,
-        publishedSum,
+        economicEligibleSum,
+        economicPublishedSum,
+        economicAttemptsSum,
+        economicFailuresSum,
         newObservedSum: newSum,
         windowCycles: pipelineStallWindow.length,
       });
-    } else if (newSum === 0 && eligibleSum === 0) {
+    } else if (newSum === 0 && economicEligibleSum === 0) {
       checks.push({ silent: false, kind: "quiet_market", newObservedSum: newSum });
     }
   }

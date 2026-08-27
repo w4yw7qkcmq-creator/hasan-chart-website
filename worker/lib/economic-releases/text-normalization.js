@@ -23,9 +23,19 @@ function normalizeEconomicFieldValue(value) {
     .toLowerCase();
 }
 
+function extractLeadingEconomicNumericToken(value) {
+  const raw = normalizeArabicIndicDigits(String(value || "")).trim();
+  const match = raw.match(/^(-?\d+(?:[.,]\d+)?(?:[KMBkmb%]|%)?)/);
+  if (match) {
+    return normalizeEconomicFieldValue(match[1]);
+  }
+  return normalizeEconomicFieldValue(raw);
+}
+
 module.exports = {
   normalizeArabicIndicDigits,
   normalizeTextForMatching,
   normalizeFingerprintText,
   normalizeEconomicFieldValue,
+  extractLeadingEconomicNumericToken,
 };

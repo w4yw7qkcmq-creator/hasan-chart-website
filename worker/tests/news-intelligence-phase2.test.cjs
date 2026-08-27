@@ -104,7 +104,7 @@ async function testFamilyMergeAndTimeout() {
   assert.match(first.body, /199K/);
   assert.match(first.body, /1\.801M|1801K/i);
   assert.match(first.body, /مختلطة/);
-  assert.strictEqual(first.familyPublicationKey, `US:US_WEEKLY_LABOR_CLAIMS:${RELEASE_TIME}`);
+  assert.strictEqual(first.familyPublicationKey, `US:US_WEEKLY_LABOR_CLAIMS:2026-08-06T12:30`);
 }
 
 async function testFamilyTimeoutSingleChild() {

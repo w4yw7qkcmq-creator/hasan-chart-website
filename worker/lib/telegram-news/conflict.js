@@ -1,9 +1,7 @@
+const { extractLeadingEconomicNumericToken } = require("../economic-releases/text-normalization");
+
 function normalizeComparableNumber(value) {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/,/g, ".")
-    .toLowerCase();
+  return extractLeadingEconomicNumericToken(value);
 }
 
 function detectFactConflict(factsA, factsB) {

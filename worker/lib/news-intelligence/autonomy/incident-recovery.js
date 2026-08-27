@@ -12,15 +12,40 @@ const { ANOMALY_THRESHOLDS } = require("./config");
 
 function evaluatePipelineStallWindow(window = []) {
   if (window.length < ANOMALY_THRESHOLDS.pipelineStallWindowCycles) {
-    return { active: false, eligibleSum: 0, publishedSum: 0, newObservedSum: 0 };
+    return {
+      active: false,
+      eligibleSum: 0,
+      publishedSum: 0,
+      newObservedSum: 0,
+      economicEligibleSum: 0,
+      economicPublishedSum: 0,
+      economicAttemptsSum: 0,
+      economicFailuresSum: 0,
+    };
   }
   const eligibleSum = window.reduce((sum, entry) => sum + (entry.eligible || 0), 0);
   const publishedSum = window.reduce((sum, entry) => sum + (entry.published || 0), 0);
   const newObservedSum = window.reduce((sum, entry) => sum + (entry.newObserved || 0), 0);
+  const economicEligibleSum = window.reduce((sum, entry) => sum + (entry.economicEligible || 0), 0);
+  const economicPublishedSum = window.reduce((sum, entry) => sum + (entry.economicPublished || 0), 0);
+  const economicAttemptsSum = window.reduce((sum, entry) => sum + (entry.economicPublicationAttempts || 0), 0);
+  const economicFailuresSum = window.reduce((sum, entry) => sum + (entry.economicPublicationFailures || 0), 0);
   const active =
-    eligibleSum >= ANOMALY_THRESHOLDS.pipelineStallEligibleMin &&
-    publishedSum <= ANOMALY_THRESHOLDS.pipelineStallPublicationMax;
-  return { active, eligibleSum, publishedSum, newObservedSum, windowCycles: window.length };
+    economicEligibleSum >= ANOMALY_THRESHOLDS.pipelineStallEligibleMin &&
+    economicAttemptsSum > 0 &&
+    economicPublishedSum <= ANOMALY_THRESHOLDS.pipelineStallPublicationMax &&
+    economicFailuresSum > 0;
+  return {
+    active,
+    eligibleSum,
+    publishedSum,
+    newObservedSum,
+    economicEligibleSum,
+    economicPublishedSum,
+    economicAttemptsSum,
+    economicFailuresSum,
+    windowCycles: window.length,
+  };
 }
 
 function isPollingHealthy(options = {}) {
@@ -53,16 +78,23 @@ function countHealthyRecoveryWindows(window = []) {
     return 0;
   }
   return recent.filter((entry) => {
-    const eligible = entry.eligible || 0;
-    const published = entry.published || 0;
+    const economicEligible = entry.economicEligible || 0;
+    const economicPublished = entry.economicPublished || 0;
+    const economicAttempts = entry.economicPublicationAttempts || 0;
+    const economicFailures = entry.economicPublicationFailures || 0;
     const newObserved = entry.newObserved || 0;
-    if (eligible >= ANOMALY_THRESHOLDS.pipelineStallEligibleMin && published <= ANOMALY_THRESHOLDS.pipelineStallPublicationMax) {
+    if (
+      economicEligible >= ANOMALY_THRESHOLDS.pipelineStallEligibleMin &&
+      economicAttempts > 0 &&
+      economicPublished <= ANOMALY_THRESHOLDS.pipelineStallPublicationMax &&
+      economicFailures > 0
+    ) {
       return false;
     }
-    if (newObserved === 0 && eligible === 0) {
+    if (newObserved === 0 && economicEligible === 0) {
       return true;
     }
-    return published > 0 || eligible < ANOMALY_THRESHOLDS.pipelineStallEligibleMin;
+    return economicPublished > 0 || economicEligible < ANOMALY_THRESHOLDS.pipelineStallEligibleMin;
   }).length;
 }
 

@@ -36,7 +36,16 @@ function resetAll() {
 function buildHealthyWindow(cycles = 3) {
   const window = [];
   for (let i = 0; i < cycles; i += 1) {
-    window.push({ eligible: 0, published: 1, newObserved: 1, at: Date.now() });
+    window.push({
+      eligible: 0,
+      economicEligible: 0,
+      economicPublished: 1,
+      economicPublicationAttempts: 1,
+      economicPublicationFailures: 0,
+      published: 1,
+      newObserved: 1,
+      at: Date.now(),
+    });
   }
   return window;
 }
@@ -44,7 +53,16 @@ function buildHealthyWindow(cycles = 3) {
 function buildStallWindow() {
   const window = [];
   for (let i = 0; i < 6; i += 1) {
-    window.push({ eligible: 4, published: 0, newObserved: 2, at: Date.now() });
+    window.push({
+      eligible: 4,
+      economicEligible: 4,
+      economicPublished: 0,
+      economicPublicationAttempts: 2,
+      economicPublicationFailures: 2,
+      published: 0,
+      newObserved: 2,
+      at: Date.now(),
+    });
   }
   return window;
 }

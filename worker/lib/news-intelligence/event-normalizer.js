@@ -5,6 +5,8 @@ const {
 } = require("../economic-releases/canonical-events");
 const { resolveEventTypeFromAliases, getEventFamily, normalizeAliasText, isFamilyPublicationEventType } = require("./event-registry");
 const { resolveCountryCode } = require("../economic-releases/country-resolver");
+const { buildScheduledBucket } = require("../telegram-news/fingerprint");
+const { extractLeadingEconomicNumericToken } = require("../economic-releases/text-normalization");
 
 function normalizeReleaseInstant(value) {
   if (!value) {
@@ -18,11 +20,23 @@ function normalizeReleaseInstant(value) {
 }
 
 function normalizeEconomicValue(value) {
+  return extractLeadingEconomicNumericToken(value);
+}
+
+function normalizePeriod(value) {
   return String(value || "")
     .trim()
     .replace(/\s+/g, "")
-    .replace(/,/g, ".")
     .toUpperCase();
+}
+
+function buildStableReleaseEventKey({ country, eventType, releaseDate, period }) {
+  const bucket = buildScheduledBucket(releaseDate);
+  if (!eventType || !bucket || bucket === "unknown") {
+    return null;
+  }
+  const periodPart = period ? `:${normalizePeriod(period)}` : "";
+  return `${country}:${eventType}:${bucket}${periodPart}`;
 }
 
 function buildCanonicalEventFromCandidate(candidate = {}) {
@@ -43,14 +57,17 @@ function buildCanonicalEventFromCandidate(candidate = {}) {
     candidate.releaseDate || candidate.scheduledAt || candidate.sourcePublishedAt || candidate.receivedAt
   );
 
+  const period = candidate.period || candidate.facts?.period || null;
+
   const facts = {
     actual: normalizeEconomicValue(candidate.actual ?? candidate.facts?.actual),
     forecast: normalizeEconomicValue(candidate.forecast ?? candidate.facts?.forecast),
     previous: normalizeEconomicValue(candidate.previous ?? candidate.facts?.previous),
     unit: candidate.unit || candidate.facts?.unit || null,
+    period,
   };
 
-  const eventKey = eventType && releaseDate ? `${country}:${eventType}:${releaseDate}` : null;
+  const eventKey = buildStableReleaseEventKey({ country, eventType, releaseDate, period });
   const legacyIdempotencyKey =
     eventType && releaseDate
       ? buildIdempotencyKey({ country, eventKey: eventType, scheduledAt: releaseDate })
@@ -94,5 +111,6 @@ module.exports = {
   buildCanonicalEventFromCandidate,
   normalizeReleaseInstant,
   normalizeEconomicValue,
+  buildStableReleaseEventKey,
   isNumericEconomicRelease,
 };

@@ -1,5 +1,10 @@
 const crypto = require("crypto");
 const { allowMemoryIdempotencyFallback, isProductionRuntime } = require("./runtime-mode");
+const { PUBLICATION_TYPES } = require("./publication-types");
+const {
+  buildReleaseBucketIdentity,
+  legacyEventKeyMatchesReleaseBucket,
+} = require("./release-identity-compat");
 
 const LEG_STATUS = {
   PENDING: "pending",
@@ -18,6 +23,10 @@ function buildIdentityKey({ eventKey, publicationType }) {
   return `${eventKey}|${publicationType}`;
 }
 
+function buildEventFingerprintKey({ eventFingerprint, publicationType }) {
+  return `${eventFingerprint}|${publicationType}`;
+}
+
 function createPublicationRecord(input) {
   return {
     id: input.id || crypto.randomUUID(),
@@ -32,20 +41,99 @@ function createPublicationRecord(input) {
   };
 }
 
+function findLegacyBucketIdentityMatch(identities, targetIdentity, publicationType) {
+  if (!targetIdentity || publicationType !== PUBLICATION_TYPES.RELEASE) {
+    return null;
+  }
+
+  for (const record of identities.values()) {
+    if (record.publicationType !== publicationType) {
+      continue;
+    }
+    if (legacyEventKeyMatchesReleaseBucket(record.eventKey, targetIdentity)) {
+      return record;
+    }
+  }
+
+  return null;
+}
+
 function createInMemoryPublicationStore(options = {}) {
   const identities = new Map();
+  const eventFingerprints = new Map();
+
+  function findPublishedReleaseIdentity(input = {}) {
+    const targetIdentity = buildReleaseBucketIdentity(input);
+    const publicationType = input.publicationType;
+
+    if (input.eventFingerprint) {
+      const existingFingerprint = eventFingerprints.get(
+        buildEventFingerprintKey({ eventFingerprint: input.eventFingerprint, publicationType })
+      );
+      if (existingFingerprint) {
+        return { record: existingFingerprint, duplicateBy: "event_fingerprint" };
+      }
+    }
+
+    if (input.eventKey) {
+      const exact = identities.get(buildIdentityKey({ eventKey: input.eventKey, publicationType }));
+      if (exact) {
+        return { record: exact, duplicateBy: "event_key" };
+      }
+    }
+
+    const legacyMatch = findLegacyBucketIdentityMatch(identities, targetIdentity, publicationType);
+    if (legacyMatch) {
+      return { record: legacyMatch, duplicateBy: "legacy_event_key_bucket" };
+    }
+
+    return null;
+  }
 
   return {
     mode: "memory",
+    findPublishedReleaseIdentity,
     async acquirePublicationIdentity(record) {
-      const key = buildIdentityKey(record);
-      const existing = identities.get(key);
-      if (existing) {
-        return { acquired: false, reason: BLOCK_REASONS.DUPLICATE_BLOCKED, record: existing, memoryOnly: true };
+      const existingRelease = findPublishedReleaseIdentity({
+        eventKey: record.eventKey,
+        eventFingerprint: record.metadata?.eventFingerprint || null,
+        country: record.metadata?.country || null,
+        eventType: record.metadata?.eventType || null,
+        releaseDate: record.metadata?.sourcePublishedAt || record.metadata?.releaseDate || null,
+        period: record.metadata?.facts?.period || record.metadata?.period || null,
+        publicationType: record.publicationType,
+      });
+      if (existingRelease) {
+        return {
+          acquired: false,
+          reason: BLOCK_REASONS.DUPLICATE_BLOCKED,
+          record: existingRelease.record,
+          memoryOnly: true,
+          duplicateBy: existingRelease.duplicateBy,
+        };
       }
+
+      const eventFingerprint = record.metadata?.eventFingerprint || null;
+      const key = buildIdentityKey(record);
       const created = createPublicationRecord(record);
       identities.set(key, created);
+      if (eventFingerprint) {
+        eventFingerprints.set(
+          buildEventFingerprintKey({
+            eventFingerprint,
+            publicationType: record.publicationType,
+          }),
+          created
+        );
+      }
       return { acquired: true, record: created, memoryOnly: true };
+    },
+    async hasPublishedEventFingerprint(eventFingerprint, publicationType) {
+      if (!eventFingerprint) {
+        return null;
+      }
+      const existing = findPublishedReleaseIdentity({ eventFingerprint, publicationType });
+      return existing?.record || null;
     },
     async getPublicationIdentity(record) {
       return identities.get(buildIdentityKey(record)) || null;
@@ -65,6 +153,7 @@ function createInMemoryPublicationStore(options = {}) {
       return existing;
     },
     _identities: identities,
+    _eventFingerprints: eventFingerprints,
   };
 }
 
@@ -73,7 +162,100 @@ function createSupabasePublicationStore(supabase, options = {}) {
   const production = isProductionRuntime(options);
   const allowMemoryFallback = allowMemoryIdempotencyFallback(options);
 
+  async function hasPublishedEventFingerprint(eventFingerprint, publicationType) {
+    if (!eventFingerprint) {
+      return null;
+    }
+    const existing = await findPublishedReleaseIdentity({ eventFingerprint, publicationType });
+    return existing?.record || null;
+  }
+
+  async function findPublishedReleaseIdentity(input = {}) {
+    const targetIdentity = buildReleaseBucketIdentity(input);
+    const publicationType = input.publicationType;
+
+    if (input.eventFingerprint) {
+      if (!supabase) {
+        const existing = await memoryStore.findPublishedReleaseIdentity(input);
+        if (existing) {
+          return existing;
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("news_event_publications")
+          .select("*")
+          .eq("publication_type", publicationType)
+          .filter("metadata->>eventFingerprint", "eq", input.eventFingerprint)
+          .maybeSingle();
+
+        if (error?.code === "42P01") {
+          if (allowMemoryFallback) {
+            return memoryStore.findPublishedReleaseIdentity(input);
+          }
+        } else if (data) {
+          return { record: mapDbRow(data), duplicateBy: "event_fingerprint" };
+        }
+      }
+    }
+
+    if (input.eventKey) {
+      const exact = await getPublicationIdentity({ eventKey: input.eventKey, publicationType });
+      if (exact) {
+        return { record: exact, duplicateBy: "event_key" };
+      }
+    }
+
+    if (!targetIdentity || publicationType !== PUBLICATION_TYPES.RELEASE) {
+      return null;
+    }
+
+    if (!supabase) {
+      return memoryStore.findPublishedReleaseIdentity(input);
+    }
+
+    const prefix = `${targetIdentity.country}:${targetIdentity.eventType}:`;
+    const { data, error } = await supabase
+      .from("news_event_publications")
+      .select("*")
+      .eq("publication_type", publicationType)
+      .like("event_key", `${prefix}%`);
+
+    if (error?.code === "42P01") {
+      if (allowMemoryFallback) {
+        return memoryStore.findPublishedReleaseIdentity(input);
+      }
+      return null;
+    }
+
+    for (const row of data || []) {
+      if (legacyEventKeyMatchesReleaseBucket(row.event_key, targetIdentity)) {
+        return { record: mapDbRow(row), duplicateBy: "legacy_event_key_bucket" };
+      }
+    }
+
+    return null;
+  }
+
   async function acquirePublicationIdentity(record) {
+    const existingRelease = await findPublishedReleaseIdentity({
+      eventKey: record.eventKey,
+      eventFingerprint: record.metadata?.eventFingerprint || null,
+      country: record.metadata?.country || null,
+      eventType: record.metadata?.eventType || null,
+      releaseDate: record.metadata?.sourcePublishedAt || record.metadata?.releaseDate || null,
+      period: record.metadata?.facts?.period || record.metadata?.period || null,
+      publicationType: record.publicationType,
+    });
+    if (existingRelease) {
+      return {
+        acquired: false,
+        reason: BLOCK_REASONS.DUPLICATE_BLOCKED,
+        dbBacked: Boolean(supabase),
+        record: existingRelease.record,
+        duplicateBy: existingRelease.duplicateBy,
+      };
+    }
+
     if (!supabase) {
       if (production && !allowMemoryFallback) {
         return { acquired: false, reason: BLOCK_REASONS.IDEMPOTENCY_STORE_UNAVAILABLE, detail: "supabase_unconfigured" };
@@ -204,6 +386,8 @@ function createSupabasePublicationStore(supabase, options = {}) {
   return {
     mode: production ? "production" : "supabase",
     acquirePublicationIdentity,
+    findPublishedReleaseIdentity,
+    hasPublishedEventFingerprint,
     getPublicationIdentity,
     updateDeliveryLeg,
   };
@@ -229,8 +413,10 @@ module.exports = {
   LEG_STATUS,
   BLOCK_REASONS,
   buildIdentityKey,
+  buildEventFingerprintKey,
   createPublicationRecord,
   createInMemoryPublicationStore,
   createSupabasePublicationStore,
   createPublicationStore,
+  findLegacyBucketIdentityMatch,
 };

@@ -13,7 +13,7 @@ const {
   BLOCK_REASONS,
   LEG_STATUS,
 } = require(root);
-const { validateNumericEconomicSourcePolicy, isApprovedTelegramSourceChannel } = require(path.join(root, "source-policy"));
+const { validateNumericEconomicSourcePolicy, isApprovedTelegramSourceChannel, isApprovedNumericEconomicTelegramSource, BLOCK_REASONS: SOURCE_POLICY_BLOCK_REASONS } = require(path.join(root, "source-policy"));
 const { detectNumericEconomicReleaseCandidate } = require(path.join(root, "economic-event-detector"));
 const { handleManualSendNewsRequest } = require(path.join(__dirname, "..", "..", "lib", "news-intelligence", "manual-publish"));
 const { mergeProviderEvents } = require(path.join(__dirname, "..", "lib", "economic-releases", "normalize"));
@@ -101,15 +101,28 @@ function buildPublication(overrides = {}) {
 
 function testSourcePolicy() {
   assert.strictEqual(isApprovedTelegramSourceChannel("ForexBreakingNews"), true);
+  assert.strictEqual(isApprovedTelegramSourceChannel("ForexNewspaper"), true);
   assert.strictEqual(isApprovedTelegramSourceChannel("RandomChannel"), false);
+  assert.strictEqual(isApprovedNumericEconomicTelegramSource("ForexBreakingNews"), true);
+  assert.strictEqual(isApprovedNumericEconomicTelegramSource("ForexNewspaper"), false);
 
   const approved = validateNumericEconomicSourcePolicy({
+    eventType: "US_INITIAL_JOBLESS_CLAIMS",
+    sourceType: SOURCE_TYPES.TELEGRAM_ECONOMIC,
+    sourceId: "ForexBreakingNews",
+    publicationType: PUBLICATION_TYPES.RELEASE,
+  });
+  assert.strictEqual(approved.ok, true);
+
+  const forexNewspaperBlocked = validateNumericEconomicSourcePolicy({
     eventType: "US_INITIAL_JOBLESS_CLAIMS",
     sourceType: SOURCE_TYPES.TELEGRAM_ECONOMIC,
     sourceId: "ForexNewspaper",
     publicationType: PUBLICATION_TYPES.RELEASE,
   });
-  assert.strictEqual(approved.ok, true);
+  assert.strictEqual(forexNewspaperBlocked.ok, false);
+  assert.strictEqual(forexNewspaperBlocked.reason, SOURCE_POLICY_BLOCK_REASONS.ECONOMIC_SOURCE_NOT_ALLOWED);
+  assert.strictEqual(forexNewspaperBlocked.detail, "numeric_economic_channel_not_allowed");
 
   const rss = validateNumericEconomicSourcePolicy({
     eventType: "US_CPI_MOM",
@@ -206,7 +219,7 @@ async function testConcurrentIdentityAcquisition() {
 async function testDeliveryRetryDoesNotRetelegram() {
   const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
   const gateway = createNewsPublisherGateway({ store, runtimeMode: "test" });
-  const publication = buildPublication();
+  const publication = buildPublication({ visualPriority: "OPTIONAL" });
   let telegramCalls = 0;
 
   const first = await gateway.publish(publication, {
@@ -239,6 +252,61 @@ async function testDeliveryRetryDoesNotRetelegram() {
   assert.strictEqual(retry.publicationRecord.telegramLegStatus, LEG_STATUS.SUCCESS);
 }
 
+async function testRequiredReleaseBlocksTextOnlyPartialDelivery() {
+  const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
+  const gateway = createNewsPublisherGateway({ store, runtimeMode: "test" });
+  let telegramCalls = 0;
+
+  const result = await gateway.publish(buildPublication({ visualPriority: "REQUIRED" }), {
+    sendTelegramMessage: async () => {
+      telegramCalls += 1;
+      return { ok: true };
+    },
+    saveNewsPostToSupabase: async () => ({ error: "db_failed" }),
+  });
+
+  assert.strictEqual(result.blocked, true);
+  assert.strictEqual(result.reason, BLOCK_REASONS.IMAGE_REQUIRED_UNAVAILABLE);
+  assert.strictEqual(telegramCalls, 0);
+}
+
+async function testRequiredReleaseRetryDoesNotDuplicate() {
+  const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
+  const gateway = createNewsPublisherGateway({ store, runtimeMode: "test" });
+  const publication = buildPublication({ visualPriority: "REQUIRED" });
+
+  const blocked = await gateway.publish(publication, {
+    resolvePublicationImageResult: async () => ({
+      ok: true,
+      policy: { mode: "AI_PRIMARY" },
+      imageResult: { generationAttempted: true, delivery: "text", filePath: null, imageUrl: null },
+      telemetry: {},
+      imageStatus: "missing",
+    }),
+    sendTelegramMessage: async () => ({ ok: true }),
+    saveNewsPostToSupabase: async () => ({}),
+  });
+  assert.strictEqual(blocked.blocked, true);
+  assert.strictEqual(blocked.reason, BLOCK_REASONS.IMAGE_REQUIRED_UNAVAILABLE);
+
+  const retry = await gateway.publish(
+    buildPublication({ visualPriority: "REQUIRED", sourceLink: "telegram:ForexBreakingNews/required-retry" }),
+    {
+      resolvePublicationImageResult: async () => ({
+        ok: true,
+        policy: { mode: "AI_PRIMARY" },
+        imageResult: { generationAttempted: true, delivery: "text", filePath: null, imageUrl: null },
+        telemetry: {},
+        imageStatus: "missing",
+      }),
+      sendTelegramMessage: async () => ({ ok: true }),
+      saveNewsPostToSupabase: async () => ({}),
+    }
+  );
+  assert.strictEqual(retry.blocked, true);
+  assert.strictEqual(retry.reason, BLOCK_REASONS.DUPLICATE_BLOCKED);
+}
+
 async function testManualApiBlocked() {
   const result = await handleManualSendNewsRequest(
     {
@@ -263,7 +331,9 @@ async function testAtomicRetryUsesGatewayRecord() {
   const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
   let telegramCalls = 0;
 
-  const first = await createNewsPublisherGateway({ store, runtimeMode: "test" }).publish(buildPublication(), {
+  const first = await createNewsPublisherGateway({ store, runtimeMode: "test" }).publish(
+    buildPublication({ visualPriority: "OPTIONAL" }),
+    {
     sendTelegramMessage: async () => {
       telegramCalls += 1;
       return { ok: true };
@@ -309,6 +379,8 @@ async function run() {
   await testProductionFailClosedWithoutDb();
   await testConcurrentIdentityAcquisition();
   await testDeliveryRetryDoesNotRetelegram();
+  await testRequiredReleaseBlocksTextOnlyPartialDelivery();
+  await testRequiredReleaseRetryDoesNotDuplicate();
   await testManualApiBlocked();
   await testAtomicRetryUsesGatewayRecord();
   console.log("news-intelligence-phase1.test.cjs: all tests passed");

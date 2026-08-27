@@ -1,4 +1,5 @@
-const { buildFingerprintBundle } = require("./fingerprint");
+const { buildFingerprintBundle, buildScheduledBucket } = require("./fingerprint");
+const { extractLeadingEconomicNumericToken, normalizeFingerprintText } = require("../economic-releases/text-normalization");
 const { extractFactsFromTelegramPost } = require("./extractor");
 const { detectFactConflict } = require("./conflict");
 const { formatTelegramPost } = require("./format");
@@ -136,8 +137,45 @@ function withinMergeWindow(entryA, entryB) {
   return delta <= Math.max(getMergeWindowMs(entryA.facts), getMergeWindowMs(entryB.facts));
 }
 
+function sameSourceEconomicRepost(anchor, entry) {
+  if (!anchor.facts?.isStructuredTriple || !entry.facts?.isStructuredTriple) {
+    return false;
+  }
+  if (anchor.post.sourceChannel !== entry.post.sourceChannel) {
+    return false;
+  }
+  if (!withinMergeWindow(anchor, entry)) {
+    return false;
+  }
+
+  const normalizeReleaseFacts = (facts, post) => ({
+    country: normalizeFingerprintText(facts.country || "unknown"),
+    eventType: facts.canonicalEventKey || facts.eventType || "ECONOMIC_RELEASE",
+    previous: extractLeadingEconomicNumericToken(facts.previous || facts.revisedPrevious),
+    forecast: extractLeadingEconomicNumericToken(facts.forecast),
+    actual: extractLeadingEconomicNumericToken(facts.actual),
+    bucket: buildScheduledBucket(facts.scheduledAt || post.sourcePublishedAt),
+  });
+
+  const left = normalizeReleaseFacts(anchor.facts, anchor.post);
+  const right = normalizeReleaseFacts(entry.facts, entry.post);
+
+  return (
+    left.country === right.country &&
+    left.eventType === right.eventType &&
+    left.previous === right.previous &&
+    left.forecast === right.forecast &&
+    left.actual === right.actual &&
+    left.bucket === right.bucket
+  );
+}
+
 function shouldMergeEntries(anchor, entry) {
   if (anchor.fingerprints.exact === entry.fingerprints.exact) {
+    return true;
+  }
+
+  if (sameSourceEconomicRepost(anchor, entry)) {
     return true;
   }
 

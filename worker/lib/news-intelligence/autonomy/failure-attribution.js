@@ -32,6 +32,7 @@ const SOURCE_REASON_CODES = new Set([
 ]);
 
 function classifyBlockReason(reasonCode, stage = null) {
+  if (stage === "source_policy") return FAILURE_ATTRIBUTION.EXPECTED_NO_DATA;
   if (!reasonCode) return FAILURE_ATTRIBUTION.PIPELINE_CAUSED;
   if (PIPELINE_REASON_CODES.has(reasonCode)) return FAILURE_ATTRIBUTION.PIPELINE_CAUSED;
   if (SOURCE_REASON_CODES.has(reasonCode)) return FAILURE_ATTRIBUTION.SOURCE_CAUSED;

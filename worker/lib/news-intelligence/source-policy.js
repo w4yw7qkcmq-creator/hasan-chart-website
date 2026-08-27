@@ -10,12 +10,18 @@ const BLOCK_REASONS = {
 
 const APPROVED_TELEGRAM_CHANNEL_NAMES = new Set(TELEGRAM_SOURCE_CHANNELS.map((channel) => channel.name));
 
+const NUMERIC_ECONOMIC_TELEGRAM_SOURCES = Object.freeze(["ForexBreakingNews"]);
+
 function normalizeSourceChannel(value) {
   return String(value || "")
     .trim()
     .replace(/^@/, "")
     .toLowerCase();
 }
+
+const NUMERIC_ECONOMIC_TELEGRAM_SOURCE_SET = new Set(
+  NUMERIC_ECONOMIC_TELEGRAM_SOURCES.map((channel) => normalizeSourceChannel(channel))
+);
 
 function isApprovedTelegramSourceChannel(sourceId) {
   const normalized = normalizeSourceChannel(sourceId);
@@ -30,6 +36,14 @@ function isApprovedTelegramSourceChannel(sourceId) {
   return false;
 }
 
+function isApprovedNumericEconomicTelegramSource(sourceId) {
+  const normalized = normalizeSourceChannel(sourceId);
+  if (!normalized) {
+    return false;
+  }
+  return NUMERIC_ECONOMIC_TELEGRAM_SOURCE_SET.has(normalized);
+}
+
 function validateNumericEconomicSourcePolicy({ eventType, sourceType, sourceId, publicationType }) {
   if (!isNumericEconomicRelease(eventType)) {
     return { ok: true };
@@ -39,7 +53,7 @@ function validateNumericEconomicSourcePolicy({ eventType, sourceType, sourceId, 
     return { ok: true };
   }
 
-  if (sourceType === SOURCE_TYPES.TELEGRAM_ECONOMIC && isApprovedTelegramSourceChannel(sourceId)) {
+  if (sourceType === SOURCE_TYPES.TELEGRAM_ECONOMIC && isApprovedNumericEconomicTelegramSource(sourceId)) {
     return { ok: true, approvedChannel: sourceId };
   }
 
@@ -52,7 +66,10 @@ function validateNumericEconomicSourcePolicy({ eventType, sourceType, sourceId, 
   }
 
   if (sourceType === SOURCE_TYPES.TELEGRAM_ECONOMIC || sourceType === SOURCE_TYPES.TELEGRAM_GENERAL) {
-    return { ok: false, reason: BLOCK_REASONS.ECONOMIC_SOURCE_NOT_ALLOWED, detail: "unapproved_telegram_channel" };
+    const detail = isApprovedTelegramSourceChannel(sourceId)
+      ? "numeric_economic_channel_not_allowed"
+      : "unapproved_telegram_channel";
+    return { ok: false, reason: BLOCK_REASONS.ECONOMIC_SOURCE_NOT_ALLOWED, detail };
   }
 
   return { ok: false, reason: BLOCK_REASONS.ECONOMIC_SOURCE_NOT_ALLOWED, detail: sourceType || "unknown_source" };
@@ -61,6 +78,8 @@ function validateNumericEconomicSourcePolicy({ eventType, sourceType, sourceId, 
 module.exports = {
   BLOCK_REASONS,
   APPROVED_TELEGRAM_CHANNEL_NAMES,
+  NUMERIC_ECONOMIC_TELEGRAM_SOURCES,
   isApprovedTelegramSourceChannel,
+  isApprovedNumericEconomicTelegramSource,
   validateNumericEconomicSourcePolicy,
 };
