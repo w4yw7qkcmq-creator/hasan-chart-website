@@ -8,7 +8,6 @@ import {
   NEWS_SSR_INITIAL_SIZE,
 } from "../../../lib/public-cache-config";
 import { scheduleAfterPaint } from "../../../lib/schedule-after-paint";
-import Breadcrumbs from "../../components/seo/Breadcrumbs";
 import {
   getHighImpactNews,
   matchesNewsListFilter,
@@ -18,19 +17,17 @@ import { mergeNewsLists } from "../../../lib/news-list-merge";
 import {
   extractArabicTitle,
   formatNewsDate,
-  NEWS_BREADCRUMBS,
 } from "../../components/news/newsListFormatting";
 import {
   NewsCard,
   NewsEmptyState,
   NewsHighImpactSection,
-  NewsHubLinks,
   NewsSearchPanel,
   NewsSkeletonGrid,
 } from "../../components/news/NewsListUi";
-import TelegramChannelCTA from "../../components/news/TelegramChannelCTA";
 import { useMountedRef } from "../../hooks/useMountedRef";
 import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
+import { NewsListProvider } from "./NewsListContext";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SILENT_REFRESH_COOLDOWN_MS = 30_000;
@@ -53,7 +50,7 @@ function getNewestHeldItem(items = []) {
   return mergeNewsLists([], items, 1)[0] || null;
 }
 
-export default function NewsListClient({ initialNews = [] }) {
+export default function NewsListClient({ initialNews = [], children = null, middleSlot = null }) {
   const hasInitialNews = Array.isArray(initialNews) && initialNews.length > 0;
   const [news, setNews] = useState(() => (hasInitialNews ? initialNews : []));
   const [loading, setLoading] = useState(!hasInitialNews);
@@ -380,49 +377,34 @@ export default function NewsListClient({ initialNews = [] }) {
     setDebouncedSearchQuery("");
   }
 
+  const contextValue = useMemo(
+    () => ({
+      loading,
+      refreshing,
+      lastUpdated,
+      onManualRefresh: () => fetchFullNews({ force: true }),
+    }),
+    [fetchFullNews, lastUpdated, loading, refreshing]
+  );
+
   return (
-    <main className="news-page">
-      <div className="news-page__bg" aria-hidden="true" />
+    <NewsListProvider value={contextValue}>
+      <main className="news-page">
+        <div className="news-page__bg" aria-hidden="true" />
 
-      <div className="news-page__inner">
-        <div className="news-page-breadcrumb">
-          <Breadcrumbs items={NEWS_BREADCRUMBS} variant="dark" />
-        </div>
+        <div className="news-page__inner">
+          {children}
 
-        <header className="news-page-hero">
-          <span className="news-page-hero__eyebrow">تغطية مالية مباشرة</span>
-          <h1 className="news-page-hero__title">الأخبار الاقتصادية العاجلة</h1>
-          <p className="news-page-hero__text">
-            تغطية يومية لأهم تحركات الأسواق العالمية، العملات الرقمية، الفوركس، الذهب والسلع،
-            النفط والطاقة، والبيانات الاقتصادية المؤثرة على قرارات التداول.
-          </p>
+          <NewsSearchPanel
+            value={searchQuery}
+            onChange={setSearchQuery}
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+          />
 
-          <div className="news-page-hero__actions">
-            <button
-              type="button"
-              onClick={() => fetchFullNews({ force: true })}
-              disabled={loading || refreshing}
-              className="news-page-hero__refresh"
-            >
-              {loading || refreshing ? "جاري التحديث…" : "تحديث الأخبار الآن"}
-            </button>
-            {lastUpdated ? (
-              <span className="news-page-hero__updated">آخر تحديث: {lastUpdated}</span>
-            ) : null}
-          </div>
-        </header>
+          {middleSlot}
 
-        <NewsHubLinks />
-        <NewsSearchPanel
-          value={searchQuery}
-          onChange={setSearchQuery}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
-
-        <TelegramChannelCTA />
-
-        {loading ? (
+          {loading ? (
           <NewsSkeletonGrid />
         ) : errorMessage ? (
           <div className="news-page-state news-page-state--error" role="alert">
@@ -472,7 +454,8 @@ export default function NewsListClient({ initialNews = [] }) {
             )}
           </>
         )}
-      </div>
-    </main>
+        </div>
+      </main>
+    </NewsListProvider>
   );
 }

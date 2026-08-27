@@ -6,7 +6,9 @@ import {
 } from "../../../lib/seo";
 import { NEWS_SSR_INITIAL_SIZE } from "../../../lib/public-cache-config";
 import { getCachedNewsList } from "../../../lib/server-news-cache";
+import TelegramChannelCTA from "../../components/news/TelegramChannelCTA";
 import NewsListClient from "./NewsListClient";
+import NewsPageShell from "./NewsPageShell";
 
 export const revalidate = 120;
 
@@ -55,7 +57,9 @@ export default async function NewsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(NEWS_LIST_JSON_LD) }}
       />
-      <NewsListClient initialNews={initialNews} />
+      <NewsListClient initialNews={initialNews} middleSlot={<TelegramChannelCTA />}>
+        <NewsPageShell />
+      </NewsListClient>
     </>
   );
 }

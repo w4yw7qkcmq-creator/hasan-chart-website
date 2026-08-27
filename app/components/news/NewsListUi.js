@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import {
   detectNewsCategory,
@@ -11,7 +12,6 @@ import {
   getNewsCardAssets,
   getNewsMarketLabel,
   isMetalsNews,
-  NEWS_HUB_LINKS,
   NEWS_LIST_FILTERS,
 } from "./newsListHelpers";
 import {
@@ -59,18 +59,6 @@ export function NewsCategoryNav({ selectedCategory, onSelectCategory }) {
           </button>
         );
       })}
-    </nav>
-  );
-}
-
-export function NewsHubLinks() {
-  return (
-    <nav className="news-page-hub-links" aria-label="روابط الأسواق والأخبار">
-      {NEWS_HUB_LINKS.map((link) => (
-        <Link key={link.href} href={link.href} className="news-page-hub-link">
-          {link.label}
-        </Link>
-      ))}
     </nav>
   );
 }
@@ -125,7 +113,7 @@ export function NewsSearchPanel({ value, onChange, selectedCategory, onSelectCat
   );
 }
 
-export function NewsCard({ item, index, compact = false, priority = false }) {
+export const NewsCard = memo(function NewsCard({ item, index, compact = false, priority = false }) {
   const newsImpact = item.impact_level || "MEDIUM";
   const isHighImpact = newsImpact === "HIGH";
   const newsTitle = extractArabicTitle(item);
@@ -193,7 +181,7 @@ export function NewsCard({ item, index, compact = false, priority = false }) {
       </div>
     </article>
   );
-}
+});
 
 export function NewsHighImpactSection({ items = [] }) {
   if (!items.length) {
