@@ -22,10 +22,15 @@ assert.match(layout, /\/favicon-192\.png/);
 
 const pushLib = read("lib/push-notifications.js");
 assert.match(pushLib, /WEB_PUSH_NOTIFICATION_ICON/);
+assert.match(pushLib, /WEB_PUSH_NOTIFICATION_BADGE/);
+assert.match(pushLib, /badge: WEB_PUSH_NOTIFICATION_BADGE/);
 assert.doesNotMatch(pushLib, /\/logo\.png/);
 
 const pushWorker = read("worker/push-sender.js");
+assert.match(pushWorker, /WEB_PUSH_NOTIFICATION_BADGE = "\/icons\/notification-badge\.png"/);
+assert.match(pushWorker, /badge: WEB_PUSH_NOTIFICATION_BADGE/);
 assert.match(pushWorker, /\/favicon-192\.png/);
+assert.doesNotMatch(pushWorker, /badge.*\/favicon-192\.png/);
 assert.doesNotMatch(pushWorker, /\/logo\.png/);
 
 const sw = read("public/sw.js");
