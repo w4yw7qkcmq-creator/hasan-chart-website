@@ -59,7 +59,7 @@ export const ethAssetConfig = {
   relatedAssets: [
     { symbol: "BTC", name: "البيتكوين", description: "المرجع الأول لسوق الكريبتو.", href: "/btc" },
     { symbol: "SOL", name: "سولانا", description: "بلوكتشين عالي السرعة للتطبيقات اللامركزية.", href: "/crypto" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/gold" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/xauusd" },
     { symbol: "FX", name: "الفوركس", description: "أسواق العملات — ارتباط الدولار بالكريبتو.", href: "/forex" },
   ],
   links: {

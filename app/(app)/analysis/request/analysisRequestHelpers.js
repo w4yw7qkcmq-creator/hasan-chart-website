@@ -11,7 +11,7 @@ export const ANALYSIS_REQUEST_HUB_LINKS = [
 export const ANALYSIS_REQUEST_ASSET_LINKS = [
   { label: "البيتكوين", href: "/btc" },
   { label: "الإيثريوم", href: "/eth" },
-  { label: "الذهب", href: "/xau" },
+  { label: "الذهب", href: "/xauusd" },
   { label: "اليورو دولار", href: "/eurusd" },
   { label: "جميع الأصول", href: "/assets" },
 ];

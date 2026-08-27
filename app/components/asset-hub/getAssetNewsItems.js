@@ -1,4 +1,5 @@
 import { getCachedNewsList } from "../../../lib/server-news-cache";
+import { getCanonicalNewsPath } from "../../../lib/news-urls";
 
 function cleanNewsText(text) {
   if (!text) return "";
@@ -62,6 +63,6 @@ export async function getAssetNewsItems(config, limit = 8) {
       impactLevel: item.impact_level,
       title: getNewsTitle(item),
       excerpt: shortText(item.title || ""),
-      href: `/news/${item?.slug || item?.id}`,
+      href: getCanonicalNewsPath(item),
     }));
 }

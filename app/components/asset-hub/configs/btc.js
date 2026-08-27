@@ -67,7 +67,7 @@ export const btcAssetConfig = {
       symbol: "XAU",
       name: "الذهب",
       description: "ملاذ آمن يتأثر أحياناً بحركة البيتكوين والدولار.",
-      href: "/gold",
+      href: "/xauusd",
     },
     {
       symbol: "OIL",
@@ -108,7 +108,7 @@ export const btcAssetConfig = {
       { name: "VIP Spot", url: "/vip-spot" },
       { name: "VIP Futures", url: "/vip-futures" },
       { name: "إدارة الحسابات", url: "/account-management" },
-      { name: "الذهب", url: "/gold" },
+      { name: "الذهب", url: "/xauusd" },
       { name: "الفوركس", url: "/forex" },
     ],
     marketSummary: [

@@ -74,7 +74,7 @@ export const goldAssetConfig = {
       { label: "الفوركس", href: "/forex" },
     ],
     jsonLd: [
-      { name: "الذهب XAU", url: "/xau" },
+      { name: "الذهب XAU", url: "/xauusd" },
       { name: "الذهب", url: "/gold" },
       { name: "أخبار الذهب", url: "/news/tag/gold" },
       { name: "التحليلات اليومية", url: "/daily-analysis" },
@@ -127,6 +127,6 @@ export const goldAssetConfig = {
     { label: "الرئيسية", href: "/" },
     { label: "الأسواق المالية", href: "/markets" },
     { label: "الذهب", href: "/gold" },
-    { label: "مركز الذهب", href: "/xau" },
+    { label: "مركز الذهب", href: "/xauusd" },
   ],
 };

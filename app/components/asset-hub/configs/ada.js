@@ -60,7 +60,7 @@ export const adaAssetConfig = {
     { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
     { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية.", href: "/crypto" },
     { symbol: "SOL", name: "سولانا", description: "بلوكتشين عالي الأداء.", href: "/crypto" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/gold" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/xauusd" },
   ],
   links: {
     internal: [

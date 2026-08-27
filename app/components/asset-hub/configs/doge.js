@@ -60,7 +60,7 @@ export const dogeAssetConfig = {
     { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
     { symbol: "SOL", name: "سولانا", description: "عملة بديلة عالية الزخم.", href: "/crypto" },
     { symbol: "BNB", name: "BNB", description: "عملة منصة Binance.", href: "/crypto" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/gold" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/xauusd" },
   ],
   links: {
     internal: [

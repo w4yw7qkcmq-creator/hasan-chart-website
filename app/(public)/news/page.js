@@ -4,8 +4,9 @@ import {
   buildPublicMetadata,
   serializeJsonLd,
 } from "../../../lib/seo";
-import { Suspense } from "react";
-import NewsListClientOnly from "./NewsListClientOnly";
+import { NEWS_LIST_MAX_PAGE_SIZE } from "../../../lib/public-cache-config";
+import { getCachedNewsList } from "../../../lib/server-news-cache";
+import NewsListClient from "./NewsListClient";
 
 export const revalidate = 120;
 
@@ -40,7 +41,10 @@ const NEWS_LIST_JSON_LD = buildNewsListPageJsonLd({
     "قائمة الأخبار الاقتصادية والمالية المحدثة لحظياً: كريبتو، فوركس، ذهب، نفط، أسهم، واقتصاد أمريكي.",
 });
 
-export default function NewsPage() {
+export default async function NewsPage() {
+  const initialResult = await getCachedNewsList({ limit: NEWS_LIST_MAX_PAGE_SIZE });
+  const initialNews = initialResult?.items || [];
+
   return (
     <>
       <script
@@ -51,19 +55,7 @@ export default function NewsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(NEWS_LIST_JSON_LD) }}
       />
-      <Suspense
-        fallback={
-          <main className="news-list-page min-h-screen px-4 py-10" aria-busy="true" aria-live="polite">
-            <div className="mx-auto max-w-7xl">
-              <div className="news-list-skeleton rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-slate-300">
-                جاري تحميل الأخبار...
-              </div>
-            </div>
-          </main>
-        }
-      >
-        <NewsListClientOnly />
-      </Suspense>
+      <NewsListClient initialNews={initialNews} />
     </>
   );
 }

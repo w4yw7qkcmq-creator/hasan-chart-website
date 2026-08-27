@@ -11,7 +11,7 @@ export const DAILY_ANALYSIS_FILTERS = [
 export const TRENDING_MARKET_LINKS = [
   { label: "البيتكوين", symbol: "BTC", href: "/btc" },
   { label: "الإيثريوم", symbol: "ETH", href: "/eth" },
-  { label: "الذهب", symbol: "XAU", href: "/xau" },
+  { label: "الذهب", symbol: "XAU", href: "/xauusd" },
   { label: "اليورو دولار", symbol: "EURUSD", href: "/eurusd" },
   { label: "ناسداك", symbol: "NASDAQ", href: "/nasdaq" },
   { label: "جميع الأصول", symbol: "ASSETS", href: "/assets" },

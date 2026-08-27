@@ -60,7 +60,7 @@ export const xrpAssetConfig = {
     { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
     { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية.", href: "/crypto" },
     { symbol: "FX", name: "الفوركس", description: "أسواق المدفوعات والعملات.", href: "/forex" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/gold" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن عالمي.", href: "/xauusd" },
   ],
   links: {
     internal: [

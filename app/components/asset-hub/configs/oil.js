@@ -57,7 +57,7 @@ export const oilAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالتضخم — مركز XAU.", href: "/xau" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالتضخم — مركز XAU.", href: "/xauusd" },
     { symbol: "XAG", name: "الفضة", description: "معدن ثمين مرتبط بالصناعة — مركز XAG.", href: "/xag" },
     { symbol: "FX", name: "الفوركس", description: "الدولار والعملات النفطية.", href: "/forex" },
     { symbol: "BTC", name: "البيتكوين", description: "أصل رقمي يتأثر بمعنويات المخاطرة.", href: "/btc" },
@@ -66,7 +66,7 @@ export const oilAssetConfig = {
     internal: [
       { label: "الأسواق المالية", href: "/markets" },
       { label: "النفط", href: "/oil" },
-      { label: "الذهب XAU", href: "/xau" },
+      { label: "الذهب XAU", href: "/xauusd" },
       { label: "الفضة XAG", href: "/xag" },
       { label: "السلع", href: "/commodities" },
       { label: "أخبار النفط", href: "/news/tag/oil" },
@@ -77,14 +77,14 @@ export const oilAssetConfig = {
     ],
     jsonLd: [
       { name: "النفط الأمريكي USOIL", url: "/usoil" },
-      { name: "الذهب XAU", url: "/xau" },
+      { name: "الذهب XAU", url: "/xauusd" },
       { name: "الفضة XAG", url: "/xag" },
       { name: "أخبار النفط", url: "/news/tag/oil" },
       { name: "التحليلات اليومية", url: "/daily-analysis" },
       { name: "السلع", url: "/commodities" },
     ],
     marketSummary: [
-      { label: "الذهب XAU", href: "/xau" },
+      { label: "الذهب XAU", href: "/xauusd" },
       { label: "أخبار النفط", href: "/news/tag/oil" },
       { label: "السلع", href: "/commodities" },
     ],

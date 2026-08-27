@@ -59,7 +59,7 @@ export const usdjpyAssetConfig = {
   relatedAssets: [
     { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — مرجع الفوركس.", href: "/eurusd" },
     { symbol: "GBP", name: "الجنيه دولار", description: "زوج GBP/USD — الكابل.", href: "/gbpusd" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالدولار.", href: "/xau" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالدولار.", href: "/xauusd" },
     { symbol: "BTC", name: "البيتكوين", description: "أصل رقمي يتأثر بمعنويات المخاطرة.", href: "/btc" },
   ],
   links: {

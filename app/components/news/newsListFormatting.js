@@ -61,6 +61,4 @@ export function extractArabicTitle(item) {
   return title || "خبر اقتصادي عاجل";
 }
 
-export function getNewsHref(item) {
-  return `/news/${item?.slug || item?.id}`;
-}
+export { getCanonicalNewsPath as getNewsHref } from "../../../lib/news-urls";

@@ -60,7 +60,7 @@ export const solAssetConfig = {
     { symbol: "BTC", name: "البيتكوين", description: "المرجع الرئيسي لسوق الكريبتو.", href: "/btc" },
     { symbol: "ETH", name: "الإيثيريوم", description: "منصة العقود الذكية الرائدة.", href: "/crypto" },
     { symbol: "BNB", name: "BNB", description: "عملة منصة Binance ونظامها البيئي.", href: "/crypto" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/gold" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بمعنويات المخاطرة.", href: "/xauusd" },
   ],
   links: {
     internal: [

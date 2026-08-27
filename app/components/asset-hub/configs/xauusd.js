@@ -67,7 +67,7 @@ export const xauusdAssetConfig = {
       { label: "الأسواق المالية", href: "/markets" },
       { label: "مؤشر الدولار DXY", href: "/dxy" },
       { label: "EUR/USD", href: "/eurusd" },
-      { label: "الذهب XAU", href: "/xau" },
+      { label: "الذهب XAU", href: "/xauusd" },
       { label: "أخبار الذهب", href: "/news/tag/gold" },
       { label: "التحليلات اليومية", href: "/daily-analysis" },
       { label: "طلب تحليل", href: "/analysis/request" },
@@ -78,7 +78,7 @@ export const xauusdAssetConfig = {
       { name: "XAU/USD", url: "/xauusd" },
       { name: "مؤشر الدولار DXY", url: "/dxy" },
       { name: "EUR/USD", url: "/eurusd" },
-      { name: "الذهب XAU", url: "/xau" },
+      { name: "الذهب XAU", url: "/xauusd" },
       { name: "التحليلات اليومية", url: "/daily-analysis" },
     ],
     marketSummary: [

@@ -59,7 +59,7 @@ export const gbpusdAssetConfig = {
   relatedAssets: [
     { symbol: "EUR", name: "اليورو دولار", description: "زوج EUR/USD — الأكثر تداولاً.", href: "/eurusd" },
     { symbol: "JPY", name: "الدولار ين", description: "زوج USD/JPY — ملاذ الين الياباني.", href: "/usdjpy" },
-    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالدولار.", href: "/xau" },
+    { symbol: "XAU", name: "الذهب", description: "ملاذ آمن مرتبط بالدولار.", href: "/xauusd" },
     { symbol: "OIL", name: "النفط", description: "سلعة طاقة مؤثرة على الجنيه.", href: "/usoil" },
   ],
   links: {

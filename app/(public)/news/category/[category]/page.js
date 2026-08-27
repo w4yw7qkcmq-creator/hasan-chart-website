@@ -10,6 +10,7 @@ import {
 } from "../../../../../lib/seo";
 import { REVALIDATE_PUBLIC_NEWS } from "../../../../../lib/public-cache-config";
 import { getCachedNewsList } from "../../../../../lib/server-news-cache";
+import { getCanonicalNewsPath } from "../../../../../lib/news-urls";
 import { NEWS_CATEGORY_LIST_LIMIT } from "../../../../../lib/public-cache-config";
 
 export const revalidate = 120;
@@ -138,7 +139,7 @@ function detectCategory(item) {
 }
 
 function getNewsHref(item) {
-  return `/news/${item?.slug || item?.id}`;
+  return getCanonicalNewsPath(item);
 }
 
 export async function generateMetadata({ params }) {

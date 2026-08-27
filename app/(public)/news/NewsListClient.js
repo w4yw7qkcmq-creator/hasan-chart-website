@@ -42,9 +42,10 @@ function logNewsFetchIssue(error) {
   console.warn("News fetch skipped:", error?.message || error);
 }
 
-export default function News() {
-  const [news, setNews] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function NewsListClient({ initialNews = [] }) {
+  const hasInitialNews = Array.isArray(initialNews) && initialNews.length > 0;
+  const [news, setNews] = useState(() => (hasInitialNews ? initialNews : []));
+  const [loading, setLoading] = useState(!hasInitialNews);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -192,6 +193,13 @@ export default function News() {
   );
 
   useEffect(() => {
+    if (hasInitialNews) {
+      setLastUpdated(formatNewsDate(new Date()));
+      lastFetchAtRef.current = Date.now();
+      lastFetchKeyRef.current = `initial:${INITIAL_NEWS_LIMIT}:background:${BACKGROUND_NEWS_LIMIT}`;
+      return undefined;
+    }
+
     fetchNews({ force: true });
 
     return () => {
@@ -199,7 +207,7 @@ export default function News() {
         abortControllerRef.current.abort();
       }
     };
-  }, [fetchNews]);
+  }, [fetchNews, hasInitialNews]);
 
   useVisibilityRefresh(() => fetchNews({ silent: true }), {
     intervalMs: 60000,

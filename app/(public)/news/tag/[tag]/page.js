@@ -8,6 +8,7 @@ import {
 } from "../../../../../lib/seo";
 import { REVALIDATE_PUBLIC_NEWS } from "../../../../../lib/public-cache-config";
 import { getCachedNewsList } from "../../../../../lib/server-news-cache";
+import { getCanonicalNewsPath } from "../../../../../lib/news-urls";
 import { NEWS_TAG_LIST_LIMIT } from "../../../../../lib/public-cache-config";
 
 export const revalidate = 120;
@@ -98,7 +99,7 @@ function shortText(text, maxLength = 240) {
 }
 
 function getNewsHref(item) {
-  return `/news/${item?.slug || item?.id}`;
+  return getCanonicalNewsPath(item);
 }
 
 function matchesTag(item, config) {

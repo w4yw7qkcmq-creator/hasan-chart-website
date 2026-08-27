@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { cache } from "react";
 import CopyArticleButtonClientOnly from "../CopyArticleButtonClientOnly";
@@ -43,6 +43,10 @@ import {
   getCachedNewsPost,
   getCachedRelatedNews,
 } from "../../../../lib/server-news-cache";
+import {
+  getCanonicalNewsPath,
+  shouldRedirectToCanonicalNewsPath,
+} from "../../../../lib/news-urls";
 
 export const revalidate = 120;
 
@@ -133,10 +137,6 @@ function getCategoryVisual(category) {
 }
 
 
-function getNewsHref(news) {
-  return `/news/${news?.slug || news?.id}`;
-}
-
 function detectTags(news = {}) {
   const text = `${news.title || ""} ${news.content || ""} ${news.slug || ""}`.toLowerCase();
   const tags = [];
@@ -161,6 +161,10 @@ export async function generateMetadata({ params }) {
     return buildPrivateMetadata({ title: "خبر غير موجود - HasaN CharT World" });
   }
 
+  if (shouldRedirectToCanonicalNewsPath(resolvedParams.id, news)) {
+    permanentRedirect(getCanonicalNewsPath(news));
+  }
+
   const title = getNewsTitle(news);
   const description = cleanText(news.content || title).slice(0, 160);
   const rawImage = getNewsImage(news);
@@ -169,7 +173,7 @@ export async function generateMetadata({ params }) {
   const updatedAtRaw = getNewsUpdatedAt(news);
 
   return buildArticleMetadata({
-    path: getNewsHref(news),
+    path: getCanonicalNewsPath(news),
     title,
     description,
     keywords: [
@@ -196,6 +200,10 @@ export default async function NewsDetailsPage({ params }) {
     notFound();
   }
 
+  if (shouldRedirectToCanonicalNewsPath(resolvedParams.id, news)) {
+    permanentRedirect(getCanonicalNewsPath(news));
+  }
+
   const currentCategory = detectCategory(news);
   const [relatedNews, adjacentNews] = await Promise.all([
     getCachedRelatedNews({ excludeId: news.id, category: currentCategory, limit: 12 }),
@@ -215,7 +223,7 @@ export default async function NewsDetailsPage({ params }) {
     Boolean(updatedAtRaw) &&
     new Date(updatedAtRaw).getTime() !== new Date(news.created_at).getTime();
   const isHighImpact = news.impact_level === "HIGH";
-  const articleUrl = `${SITE_URL}${getNewsHref(news)}`;
+  const articleUrl = `${SITE_URL}${getCanonicalNewsPath(news)}`;
   const category = detectCategory(news);
   const categoryLabel = getCategoryLabel(category);
   const categoryVisual = getCategoryVisual(category);
@@ -231,15 +239,15 @@ export default async function NewsDetailsPage({ params }) {
     { label: "الرئيسية", href: "/" },
     { label: "الأخبار", href: "/news" },
     { label: categoryLabel, href: `/news/category/${category}` },
-    { label: title, href: getNewsHref(news) },
+    { label: title, href: getCanonicalNewsPath(news) },
   ];
 
   const dateModified = updatedAtRaw || news.created_at;
 
-  const breadcrumbJsonLd = buildBreadcrumbJsonLd(newsBreadcrumbs, getNewsHref(news));
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(newsBreadcrumbs, getCanonicalNewsPath(news));
 
   const jsonLd = buildNewsArticleJsonLd({
-    path: getNewsHref(news),
+    path: getCanonicalNewsPath(news),
     title,
     description: content,
     content,
@@ -367,7 +375,7 @@ export default async function NewsDetailsPage({ params }) {
         <section className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2" dir="rtl">
           {adjacentNews.previous ? (
             <Link
-              href={getNewsHref(adjacentNews.previous)}
+              href={getCanonicalNewsPath(adjacentNews.previous)}
               className="rounded-[1.5rem] border border-white/50 bg-white/75 p-5 no-underline shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
             >
               <div className="mb-3 text-sm font-black text-cyan-600">الخبر السابق</div>
@@ -381,7 +389,7 @@ export default async function NewsDetailsPage({ params }) {
 
           {adjacentNews.next ? (
             <Link
-              href={getNewsHref(adjacentNews.next)}
+              href={getCanonicalNewsPath(adjacentNews.next)}
               className="rounded-[1.5rem] border border-white/50 bg-white/75 p-5 no-underline shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
             >
               <div className="mb-3 text-sm font-black text-cyan-600">الخبر التالي</div>
@@ -414,7 +422,7 @@ export default async function NewsDetailsPage({ params }) {
             {relatedNews.map((item) => (
               <Link
                 key={item.id}
-                href={getNewsHref(item)}
+                href={getCanonicalNewsPath(item)}
                 className="group rounded-3xl border border-slate-200 bg-white/85 p-5 no-underline shadow-sm transition hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl"
               >
                 <div className="mb-3 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">

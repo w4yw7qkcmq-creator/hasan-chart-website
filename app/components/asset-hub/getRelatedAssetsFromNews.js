@@ -21,7 +21,7 @@ const MARKET_PAGES = {
     id: "market-gold",
     symbol: "GOLD",
     name: "الذهب",
-    path: "/gold",
+    path: "/xauusd",
     kind: "market",
   },
   energy: {

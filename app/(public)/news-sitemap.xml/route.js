@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getCanonicalNewsPath } from "../../../lib/news-urls";
 import { buildAbsoluteUrl, SITE_ORGANIZATION_NAME } from "../../../lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -15,18 +16,8 @@ function escapeXml(value) {
 }
 
 function getNewsPath(item) {
-  const slug = String(item?.slug || "").trim();
-  const id = String(item?.id || "").trim();
-
-  if (slug) {
-    return `/news/${slug}`;
-  }
-
-  if (id) {
-    return `/news/${id}`;
-  }
-
-  return null;
+  const path = getCanonicalNewsPath(item);
+  return path === "/news" ? null : path;
 }
 
 function cleanNewsSitemapTitle(item) {

@@ -57,7 +57,7 @@ export const silverAssetConfig = {
     },
   ],
   relatedAssets: [
-    { symbol: "XAU", name: "الذهب", description: "المعدن الثمين المرجعي — مركز XAU.", href: "/xau" },
+    { symbol: "XAU", name: "الذهب", description: "المعدن الثمين المرجعي — مركز XAU.", href: "/xauusd" },
     { symbol: "OIL", name: "النفط الأمريكي", description: "سلعة طاقة WTI — مركز USOIL.", href: "/usoil" },
     { symbol: "FX", name: "الفوركس", description: "الدولار يؤثر على أسعار المعادن.", href: "/forex" },
     { symbol: "BTC", name: "البيتكوين", description: "أصل رقمي مرتبط بمعنويات المخاطرة.", href: "/btc" },
@@ -66,7 +66,7 @@ export const silverAssetConfig = {
     internal: [
       { label: "الأسواق المالية", href: "/markets" },
       { label: "السلع", href: "/commodities" },
-      { label: "الذهب XAU", href: "/xau" },
+      { label: "الذهب XAU", href: "/xauusd" },
       { label: "النفط USOIL", href: "/usoil" },
       { label: "التحليلات اليومية", href: "/daily-analysis" },
       { label: "طلب تحليل", href: "/analysis/request" },
@@ -75,13 +75,13 @@ export const silverAssetConfig = {
     ],
     jsonLd: [
       { name: "الفضة XAG", url: "/xag" },
-      { name: "الذهب XAU", url: "/xau" },
+      { name: "الذهب XAU", url: "/xauusd" },
       { name: "النفط USOIL", url: "/usoil" },
       { name: "السلع", url: "/commodities" },
       { name: "التحليلات اليومية", url: "/daily-analysis" },
     ],
     marketSummary: [
-      { label: "الذهب XAU", href: "/xau" },
+      { label: "الذهب XAU", href: "/xauusd" },
       { label: "السلع", href: "/commodities" },
       { label: "الفوركس", href: "/forex" },
     ],
