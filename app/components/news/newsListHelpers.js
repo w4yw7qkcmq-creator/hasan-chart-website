@@ -1,5 +1,8 @@
 import { detectNewsCategory } from "../../../lib/news-images";
+import { mergeNewsLists, compareNewsByRecency } from "../../../lib/news-list-merge";
 import { getRelatedAssetsFromNews } from "../asset-hub/getRelatedAssetsFromNews";
+
+export { mergeNewsLists, compareNewsByRecency };
 
 export const NEWS_LIST_FILTERS = [
   { key: "all", label: "الكل" },

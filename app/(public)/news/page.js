@@ -4,7 +4,7 @@ import {
   buildPublicMetadata,
   serializeJsonLd,
 } from "../../../lib/seo";
-import { NEWS_LIST_MAX_PAGE_SIZE } from "../../../lib/public-cache-config";
+import { NEWS_SSR_INITIAL_SIZE } from "../../../lib/public-cache-config";
 import { getCachedNewsList } from "../../../lib/server-news-cache";
 import NewsListClient from "./NewsListClient";
 
@@ -42,7 +42,7 @@ const NEWS_LIST_JSON_LD = buildNewsListPageJsonLd({
 });
 
 export default async function NewsPage() {
-  const initialResult = await getCachedNewsList({ limit: NEWS_LIST_MAX_PAGE_SIZE });
+  const initialResult = await getCachedNewsList({ limit: NEWS_SSR_INITIAL_SIZE });
   const initialNews = initialResult?.items || [];
 
   return (

@@ -3,15 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  NEWS_LIST_MAX_PAGE_SIZE,
-  NEWS_LIST_PAGE_SIZE,
+  NEWS_BACKGROUND_FILL_SIZE,
+  NEWS_FULL_LIST_SIZE,
+  NEWS_SSR_INITIAL_SIZE,
 } from "../../../lib/public-cache-config";
+import { scheduleAfterPaint } from "../../../lib/schedule-after-paint";
 import Breadcrumbs from "../../components/seo/Breadcrumbs";
 import {
   getHighImpactNews,
   matchesNewsListFilter,
   matchesNewsSearch,
 } from "../../components/news/newsListHelpers";
+import { mergeNewsLists } from "../../../lib/news-list-merge";
 import {
   extractArabicTitle,
   formatNewsDate,
@@ -31,8 +34,8 @@ import { useVisibilityRefresh } from "../../hooks/useVisibilityRefresh";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SILENT_REFRESH_COOLDOWN_MS = 30_000;
-const INITIAL_NEWS_LIMIT = NEWS_LIST_MAX_PAGE_SIZE;
-const BACKGROUND_NEWS_LIMIT = 0;
+const BACKGROUND_FILL_IDLE_TIMEOUT_MS = 800;
+const REFRESH_NEWS_LIMIT = NEWS_FULL_LIST_SIZE;
 
 function logNewsFetchIssue(error) {
   if (process.env.NODE_ENV === "production") {
@@ -55,6 +58,8 @@ export default function NewsListClient({ initialNews = [] }) {
   const mountedRef = useMountedRef();
   const fetchPromiseRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const backgroundAbortControllerRef = useRef(null);
+  const backgroundFillDoneRef = useRef(false);
   const lastFetchAtRef = useRef(0);
   const lastFetchKeyRef = useRef("");
   const newsCountRef = useRef(0);
@@ -93,7 +98,7 @@ export default function NewsListClient({ initialNews = [] }) {
 
   const fetchNews = useCallback(
     async ({ silent = false, force = false } = {}) => {
-      const fetchKey = `initial:${INITIAL_NEWS_LIMIT}:background:${BACKGROUND_NEWS_LIMIT}`;
+      const fetchKey = `refresh:${REFRESH_NEWS_LIMIT}`;
 
       if (
         silent &&
@@ -129,8 +134,8 @@ export default function NewsListClient({ initialNews = [] }) {
 
           setErrorMessage("");
 
-          const initialItems = await fetchNewsPage({
-            limit: INITIAL_NEWS_LIMIT,
+          const latestItems = await fetchNewsPage({
+            limit: REFRESH_NEWS_LIMIT,
             offset: 0,
             signal: controller.signal,
           });
@@ -139,28 +144,8 @@ export default function NewsListClient({ initialNews = [] }) {
             return;
           }
 
-          let mergedItems = initialItems;
-
-          if (BACKGROUND_NEWS_LIMIT > 0) {
-            const backgroundItems = await fetchNewsPage({
-              limit: BACKGROUND_NEWS_LIMIT,
-              offset: INITIAL_NEWS_LIMIT,
-              signal: controller.signal,
-            });
-
-            if (!mountedRef.current || controller.signal.aborted) {
-              return;
-            }
-
-            if (backgroundItems.length > 0) {
-              const seenIds = new Set(mergedItems.map((item) => item.id));
-              mergedItems = mergedItems.concat(
-                backgroundItems.filter((item) => !seenIds.has(item.id))
-              );
-            }
-          }
-
-          setNews(mergedItems);
+          setNews(latestItems.slice(0, NEWS_FULL_LIST_SIZE));
+          backgroundFillDoneRef.current = true;
           setLastUpdated(formatNewsDate(new Date()));
           lastFetchAtRef.current = Date.now();
           lastFetchKeyRef.current = fetchKey;
@@ -192,12 +177,76 @@ export default function NewsListClient({ initialNews = [] }) {
     [fetchNewsPage]
   );
 
+  const runBackgroundFill = useCallback(async () => {
+    if (
+      backgroundFillDoneRef.current ||
+      NEWS_BACKGROUND_FILL_SIZE <= 0 ||
+      newsCountRef.current >= NEWS_FULL_LIST_SIZE
+    ) {
+      return;
+    }
+
+    if (backgroundAbortControllerRef.current) {
+      backgroundAbortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    backgroundAbortControllerRef.current = controller;
+
+    try {
+      const backgroundItems = await fetchNewsPage({
+        limit: NEWS_BACKGROUND_FILL_SIZE,
+        offset: NEWS_SSR_INITIAL_SIZE,
+        signal: controller.signal,
+      });
+
+      if (!mountedRef.current || controller.signal.aborted) {
+        return;
+      }
+
+      if (backgroundItems.length === 0) {
+        backgroundFillDoneRef.current = true;
+        return;
+      }
+
+      setNews((currentItems) =>
+        mergeNewsLists(currentItems, backgroundItems, NEWS_FULL_LIST_SIZE)
+      );
+      backgroundFillDoneRef.current = true;
+    } catch (error) {
+      if (!mountedRef.current || controller.signal.aborted) {
+        return;
+      }
+
+      logNewsFetchIssue(error);
+    } finally {
+      if (backgroundAbortControllerRef.current === controller) {
+        backgroundAbortControllerRef.current = null;
+      }
+    }
+  }, [fetchNewsPage]);
+
   useEffect(() => {
     if (hasInitialNews) {
       setLastUpdated(formatNewsDate(new Date()));
       lastFetchAtRef.current = Date.now();
-      lastFetchKeyRef.current = `initial:${INITIAL_NEWS_LIMIT}:background:${BACKGROUND_NEWS_LIMIT}`;
-      return undefined;
+      lastFetchKeyRef.current = `ssr:${NEWS_SSR_INITIAL_SIZE}`;
+
+      if (NEWS_BACKGROUND_FILL_SIZE <= 0 || initialNews.length >= NEWS_FULL_LIST_SIZE) {
+        backgroundFillDoneRef.current = true;
+        return undefined;
+      }
+
+      const cancelScheduledFill = scheduleAfterPaint(() => {
+        void runBackgroundFill();
+      }, BACKGROUND_FILL_IDLE_TIMEOUT_MS);
+
+      return () => {
+        cancelScheduledFill();
+        if (backgroundAbortControllerRef.current) {
+          backgroundAbortControllerRef.current.abort();
+        }
+      };
     }
 
     fetchNews({ force: true });
@@ -207,7 +256,7 @@ export default function NewsListClient({ initialNews = [] }) {
         abortControllerRef.current.abort();
       }
     };
-  }, [fetchNews, hasInitialNews]);
+  }, [fetchNews, hasInitialNews, initialNews.length, runBackgroundFill]);
 
   useVisibilityRefresh(() => fetchNews({ silent: true }), {
     intervalMs: 60000,
