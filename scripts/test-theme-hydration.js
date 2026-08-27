@@ -15,6 +15,7 @@ const bootScriptSource = fs.readFileSync(
   "utf8"
 );
 const themeSharedSource = fs.readFileSync(path.join(rootDir, "lib/theme-shared.js"), "utf8");
+const globalsCssSource = fs.readFileSync(path.join(rootDir, "app/globals.css"), "utf8");
 
 function getSafeTheme(value) {
   return value === "light" ? "light" : "dark";
@@ -54,7 +55,6 @@ function testThemeProviderDoesNotReadDocumentDuringRender() {
 function testSuppressHydrationWarningScope() {
   assert.match(layoutSource, /suppressHydrationWarning/);
   assert.match(layoutSource, /<html[\s\S]*suppressHydrationWarning/);
-  assert.match(layoutSource, /id="theme-boot-loader"[\s\S]*suppressHydrationWarning/);
   assert.doesNotMatch(layoutSource, /<body[^>]*suppressHydrationWarning/);
 }
 
@@ -104,18 +104,53 @@ function testModulePackageJsonBoundaries() {
   assert.notEqual(rootPackageJson.type, "module");
 }
 
+function testNoFullScreenThemeBootLoader() {
+  assert.doesNotMatch(layoutSource, /theme-boot-loader/);
+  assert.doesNotMatch(bootScriptSource, /theme-boot-loader/);
+  assert.doesNotMatch(bootScriptSource, /themeBootSpin/);
+}
+
+function testSiteRootNotBlockedDuringBoot() {
+  assert.doesNotMatch(bootScriptSource, /pointer-events:\s*none/);
+  assert.doesNotMatch(bootScriptSource, /overflow:\s*hidden/);
+  assert.doesNotMatch(globalsCssSource, /html\.theme-pending body/);
+}
+
+function testNoRevealFallbackTimers() {
+  assert.doesNotMatch(bootScriptSource, /THEME_BOOT_SCRIPT/);
+  assert.doesNotMatch(bootScriptSource, /setTimeout\(revealTheme,\s*1200\)/);
+  assert.doesNotMatch(themeProviderSource, /THEME_REVEAL_TIMEOUT/);
+  assert.doesNotMatch(themeProviderSource, /setTimeout\(reveal/);
+  assert.doesNotMatch(themeProviderSource, /markThemeReady/);
+}
+
+function testThemeCookieBootstrapBeforeHydration() {
+  assert.match(layoutSource, /THEME_COOKIE_BOOT_SCRIPT/);
+  assert.match(bootScriptSource, /document\.documentElement\.setAttribute\("data-theme"/);
+}
+
+function testThemePersistenceIntact() {
+  assert.match(themeProviderSource, /writeThemeCookie/);
+  assert.match(themeProviderSource, /fetch\("\/api\/theme"/);
+}
+
 const tests = [
   ["boot script uses shared cookie key", testBootScriptUsesSharedCookieKey],
   ["invalid theme values normalize to fallback", testInvalidThemeFallback],
   ["layout reads theme from server cookies", testLayoutReadsServerThemeCookie],
   ["layout avoids browser-only reads during SSR", testLayoutDoesNotReadBrowserStorageDuringSsr],
   ["ThemeProvider avoids document reads during render", testThemeProviderDoesNotReadDocumentDuringRender],
-  ["suppressHydrationWarning limited to html and boot loader", testSuppressHydrationWarningScope],
+  ["suppressHydrationWarning limited to html", testSuppressHydrationWarningScope],
   ["layout avoids hardcoded dark body classes", testLayoutDoesNotUseHardcodedDarkBodyClasses],
   ["layout uses dynamic viewport theme color", testLayoutUsesDynamicViewportThemeColor],
   ["ThemeProvider syncs theme-color meta", testThemeProviderSyncsThemeColorMeta],
   ["initial theme does not use random or date values", testLayoutDoesNotUseNonDeterministicInitialTheme],
   ["module package.json boundaries stay scoped to scripts", testModulePackageJsonBoundaries],
+  ["no full-screen theme boot loader", testNoFullScreenThemeBootLoader],
+  ["site root not blocked during boot", testSiteRootNotBlockedDuringBoot],
+  ["no reveal fallback timers", testNoRevealFallbackTimers],
+  ["theme cookie bootstrap before hydration", testThemeCookieBootstrapBeforeHydration],
+  ["theme persistence intact", testThemePersistenceIntact],
 ];
 
 for (const [name, run] of tests) {

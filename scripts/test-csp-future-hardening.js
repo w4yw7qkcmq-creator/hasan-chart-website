@@ -7,13 +7,9 @@ import {
 } from "../lib/security-headers.js";
 import {
   CSP_STATIC_INLINE_SCRIPT_HASHES,
-  CSP_THEME_BOOT_HASH,
   CSP_THEME_COOKIE_BOOT_HASH,
 } from "../lib/csp-inline-script-hashes.js";
-import {
-  THEME_BOOT_SCRIPT,
-  THEME_COOKIE_BOOT_SCRIPT,
-} from "../lib/theme-critical-styles.js";
+import { THEME_COOKIE_BOOT_SCRIPT } from "../lib/theme-critical-styles.js";
 
 function expectedHash(source) {
   const digest = crypto.createHash("sha256").update(source, "utf8").digest("base64");
@@ -21,8 +17,7 @@ function expectedHash(source) {
 }
 
 assert.equal(CSP_THEME_COOKIE_BOOT_HASH, expectedHash(THEME_COOKIE_BOOT_SCRIPT));
-assert.equal(CSP_THEME_BOOT_HASH, expectedHash(THEME_BOOT_SCRIPT));
-assert.equal(CSP_STATIC_INLINE_SCRIPT_HASHES.length, 2);
+assert.equal(CSP_STATIC_INLINE_SCRIPT_HASHES.length, 1);
 
 const enforced = buildContentSecurityPolicy();
 const strict = buildStrictContentSecurityPolicy();

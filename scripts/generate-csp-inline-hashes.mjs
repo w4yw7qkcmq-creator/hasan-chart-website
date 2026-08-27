@@ -4,10 +4,7 @@
  * Used by strict/report-only CSP — not the enforced Next 15 production policy.
  */
 import crypto from "node:crypto";
-import {
-  THEME_BOOT_SCRIPT,
-  THEME_COOKIE_BOOT_SCRIPT,
-} from "../lib/theme-critical-styles.js";
+import { THEME_COOKIE_BOOT_SCRIPT } from "../lib/theme-critical-styles.js";
 
 function hashSource(source) {
   const digest = crypto.createHash("sha256").update(source, "utf8").digest("base64");
@@ -16,7 +13,6 @@ function hashSource(source) {
 
 const entries = [
   { id: "CSP_THEME_COOKIE_BOOT_HASH", source: THEME_COOKIE_BOOT_SCRIPT, purpose: "theme cookie boot" },
-  { id: "CSP_THEME_BOOT_HASH", source: THEME_BOOT_SCRIPT, purpose: "theme reveal boot" },
 ];
 
 console.log("// Trusted static inline scripts for strict/report-only CSP");

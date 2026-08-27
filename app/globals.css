@@ -2,15 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-html.theme-pending body {
-  overflow: hidden;
-}
-
-html.theme-ready body {
+html body {
   overflow-x: hidden;
 }
 
-html.theme-ready #site-root {
+#site-root {
   min-height: 100vh;
 }
 
@@ -100,7 +96,7 @@ body {
   color: inherit;
 }
 
-html.theme-ready body {
+html body {
   transition: background 0.25s ease, color 0.25s ease;
 }
 

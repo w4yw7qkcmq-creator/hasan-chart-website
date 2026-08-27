@@ -1,9 +1,5 @@
 import "./globals.css";
-import {
-  THEME_BOOT_SCRIPT,
-  THEME_COOKIE_BOOT_SCRIPT,
-  THEME_CRITICAL_CSS,
-} from "../lib/theme-critical-styles";
+import { THEME_COOKIE_BOOT_SCRIPT, THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
 import { readThemeFromRequestCookies } from "../lib/theme-server";
 import { resolveThemeColor } from "../lib/theme-shared";
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -83,7 +79,6 @@ export default async function RootLayout({ children }) {
       lang="ar"
       dir="rtl"
       data-theme={initialTheme}
-      className="theme-pending"
       suppressHydrationWarning
     >
       <head>
@@ -95,7 +90,6 @@ export default async function RootLayout({ children }) {
         <link rel="dns-prefetch" href="https://s.tradingview.com" />
         {supabaseOrigin ? <link rel="dns-prefetch" href={supabaseOrigin} /> : null}
         <style dangerouslySetInnerHTML={{ __html: THEME_CRITICAL_CSS }} />
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -103,19 +97,7 @@ export default async function RootLayout({ children }) {
           }}
         />
       </head>
-      <body className="site-body min-h-screen antialiased theme-pending-body">
-        <div
-          id="theme-boot-loader"
-          aria-live="polite"
-          aria-busy="true"
-          aria-label="جاري تحميل منصة HasaN CharT World"
-          suppressHydrationWarning
-        >
-          <div className="theme-boot-logo">HC</div>
-          <div className="theme-boot-spinner" aria-hidden="true" />
-          <p className="theme-boot-title">HasaN CharT World</p>
-          <p className="theme-boot-subtitle">جاري تجهيز الواجهة...</p>
-        </div>
+      <body className="site-body min-h-screen antialiased">
         <ThemeProvider initialTheme={initialTheme}>
           <div id="site-root">{children}</div>
         </ThemeProvider>

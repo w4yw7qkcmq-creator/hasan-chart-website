@@ -4,22 +4,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { getSafeTheme, resolveThemeColor, writeThemeCookie } from "../../lib/theme-shared";
 
 const ThemeContext = createContext(null);
-const THEME_REVEAL_TIMEOUT_MS = 2500;
-
-function markThemeReady() {
-  const root = document.documentElement;
-  root.classList.remove("theme-pending");
-  root.classList.add("theme-ready");
-
-  const loader = document.getElementById("theme-boot-loader");
-  if (loader) {
-    loader.setAttribute("aria-busy", "false");
-  }
-}
-
-function isThemeAlreadyReady() {
-  return document.documentElement.classList.contains("theme-ready");
-}
 
 function syncThemeColorMeta(theme) {
   const color = resolveThemeColor(theme);
@@ -37,46 +21,11 @@ function syncThemeColorMeta(theme) {
 export function ThemeProvider({ children, initialTheme = "dark" }) {
   const resolvedInitialTheme = getSafeTheme(initialTheme);
   const [theme, setTheme] = useState(resolvedInitialTheme);
-  const [themeReady, setThemeReady] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     syncThemeColorMeta(theme);
   }, [theme]);
-
-  useEffect(() => {
-    if (isThemeAlreadyReady()) {
-      setThemeReady(true);
-      return undefined;
-    }
-
-    let revealed = false;
-
-    const reveal = () => {
-      if (revealed) return;
-      revealed = true;
-      markThemeReady();
-      setThemeReady(true);
-    };
-
-    if (document.readyState === "complete") {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(reveal);
-      });
-    } else {
-      window.addEventListener("load", reveal, { once: true });
-      requestAnimationFrame(() => {
-        requestAnimationFrame(reveal);
-      });
-    }
-
-    const fallbackTimer = window.setTimeout(reveal, THEME_REVEAL_TIMEOUT_MS);
-
-    return () => {
-      window.clearTimeout(fallbackTimer);
-      window.removeEventListener("load", reveal);
-    };
-  }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((currentTheme) => {
@@ -97,10 +46,10 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
     () => ({
       theme,
       initialTheme: resolvedInitialTheme,
-      themeReady,
+      themeReady: true,
       toggleTheme,
     }),
-    [theme, resolvedInitialTheme, themeReady, toggleTheme]
+    [theme, resolvedInitialTheme, toggleTheme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
