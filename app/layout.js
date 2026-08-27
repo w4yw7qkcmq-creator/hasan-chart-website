@@ -1,7 +1,6 @@
 import "./globals.css";
 import { THEME_COOKIE_BOOT_SCRIPT, THEME_CRITICAL_CSS } from "../lib/theme-critical-styles";
-import { readThemeFromRequestCookies } from "../lib/theme-server";
-import { resolveThemeColor } from "../lib/theme-shared";
+import { THEME_COLOR_DARK } from "../lib/theme-shared";
 import { ThemeProvider } from "./components/ThemeProvider";
 import {
   SITE_ORGANIZATION_NAME,
@@ -62,23 +61,20 @@ export const metadata = {
   },
 };
 
-export async function generateViewport() {
-  const initialTheme = await readThemeFromRequestCookies();
-
+export function generateViewport() {
   return {
-    themeColor: resolveThemeColor(initialTheme),
+    themeColor: THEME_COLOR_DARK,
   };
 }
 
-export default async function RootLayout({ children }) {
+export default function RootLayout({ children }) {
   const supabaseOrigin = getSupabaseOrigin();
-  const initialTheme = await readThemeFromRequestCookies();
 
   return (
     <html
       lang="ar"
       dir="rtl"
-      data-theme={initialTheme}
+      data-theme="dark"
       suppressHydrationWarning
     >
       <head>
@@ -98,7 +94,7 @@ export default async function RootLayout({ children }) {
         />
       </head>
       <body className="site-body min-h-screen antialiased">
-        <ThemeProvider initialTheme={initialTheme}>
+        <ThemeProvider>
           <div id="site-root">{children}</div>
         </ThemeProvider>
       </body>

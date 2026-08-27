@@ -35,10 +35,11 @@ function testInvalidThemeFallback() {
   assert.equal(getSafeTheme(null), "dark");
 }
 
-function testLayoutReadsServerThemeCookie() {
-  assert.match(layoutSource, /readThemeFromRequestCookies/);
-  assert.match(layoutSource, /data-theme=\{initialTheme\}/);
-  assert.doesNotMatch(layoutSource, /data-theme="dark"/);
+function testLayoutUsesStaticNeutralTheme() {
+  assert.doesNotMatch(layoutSource, /readThemeFromRequestCookies/);
+  assert.doesNotMatch(layoutSource, /theme-server/);
+  assert.match(layoutSource, /data-theme="dark"/);
+  assert.doesNotMatch(layoutSource, /data-theme=\{initialTheme\}/);
 }
 
 function testLayoutDoesNotReadBrowserStorageDuringSsr() {
@@ -47,9 +48,14 @@ function testLayoutDoesNotReadBrowserStorageDuringSsr() {
   assert.doesNotMatch(layoutSource, /document\./);
 }
 
-function testThemeProviderDoesNotReadDocumentDuringRender() {
-  assert.doesNotMatch(themeProviderSource, /readBootTheme/);
-  assert.doesNotMatch(themeProviderSource, /document\.documentElement\.getAttribute\("data-theme"\)/);
+function testThemeProviderAdoptsPrepaintTheme() {
+  assert.match(themeProviderSource, /readPrepaintTheme/);
+  assert.match(
+    themeProviderSource,
+    /document\.documentElement\.getAttribute\("data-theme"\)/
+  );
+  assert.match(themeProviderSource, /useState\(readPrepaintTheme\)/);
+  assert.doesNotMatch(themeProviderSource, /initialTheme\s*=\s*"dark"/);
 }
 
 function testSuppressHydrationWarningScope() {
@@ -64,10 +70,10 @@ function testLayoutDoesNotUseHardcodedDarkBodyClasses() {
   assert.doesNotMatch(layoutSource, /text-white/);
 }
 
-function testLayoutUsesDynamicViewportThemeColor() {
+function testLayoutUsesStaticViewportThemeColor() {
   assert.match(layoutSource, /generateViewport/);
-  assert.match(layoutSource, /readThemeFromRequestCookies/);
-  assert.doesNotMatch(layoutSource, /themeColor:\s*"#020617"/);
+  assert.match(layoutSource, /themeColor:\s*THEME_COLOR_DARK/);
+  assert.doesNotMatch(layoutSource, /readThemeFromRequestCookies/);
 }
 
 function testThemeProviderSyncsThemeColorMeta() {
@@ -137,12 +143,12 @@ function testThemePersistenceIntact() {
 const tests = [
   ["boot script uses shared cookie key", testBootScriptUsesSharedCookieKey],
   ["invalid theme values normalize to fallback", testInvalidThemeFallback],
-  ["layout reads theme from server cookies", testLayoutReadsServerThemeCookie],
+  ["layout uses static neutral theme", testLayoutUsesStaticNeutralTheme],
   ["layout avoids browser-only reads during SSR", testLayoutDoesNotReadBrowserStorageDuringSsr],
-  ["ThemeProvider avoids document reads during render", testThemeProviderDoesNotReadDocumentDuringRender],
+  ["ThemeProvider adopts prepaint theme from DOM", testThemeProviderAdoptsPrepaintTheme],
   ["suppressHydrationWarning limited to html", testSuppressHydrationWarningScope],
   ["layout avoids hardcoded dark body classes", testLayoutDoesNotUseHardcodedDarkBodyClasses],
-  ["layout uses dynamic viewport theme color", testLayoutUsesDynamicViewportThemeColor],
+  ["layout uses static viewport theme color", testLayoutUsesStaticViewportThemeColor],
   ["ThemeProvider syncs theme-color meta", testThemeProviderSyncsThemeColorMeta],
   ["initial theme does not use random or date values", testLayoutDoesNotUseNonDeterministicInitialTheme],
   ["module package.json boundaries stay scoped to scripts", testModulePackageJsonBoundaries],

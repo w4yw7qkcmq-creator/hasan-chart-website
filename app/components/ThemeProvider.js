@@ -18,9 +18,16 @@ function syncThemeColorMeta(theme) {
   meta.setAttribute("content", color);
 }
 
-export function ThemeProvider({ children, initialTheme = "dark" }) {
-  const resolvedInitialTheme = getSafeTheme(initialTheme);
-  const [theme, setTheme] = useState(resolvedInitialTheme);
+function readPrepaintTheme() {
+  if (typeof document === "undefined") {
+    return "dark";
+  }
+
+  return getSafeTheme(document.documentElement.getAttribute("data-theme"));
+}
+
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState(readPrepaintTheme);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -45,11 +52,11 @@ export function ThemeProvider({ children, initialTheme = "dark" }) {
   const value = useMemo(
     () => ({
       theme,
-      initialTheme: resolvedInitialTheme,
+      initialTheme: theme,
       themeReady: true,
       toggleTheme,
     }),
-    [theme, resolvedInitialTheme, toggleTheme]
+    [theme, toggleTheme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
