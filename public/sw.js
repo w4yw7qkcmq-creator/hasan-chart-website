@@ -15,7 +15,7 @@ function parsePushPayload(event) {
     body: "وصلك إشعار جديد",
     url: "/notifications",
     icon: "/favicon-192.png",
-    badge: "/favicon-192.png",
+    badge: "/icons/notification-badge.png",
     type: "general",
     tag: null,
     alertId: null,
@@ -222,7 +222,7 @@ self.addEventListener("push", (event) => {
       self.registration.showNotification(payload.title || "HasaN CharT World", {
         body: payload.body || "",
         icon: payload.icon || "/favicon-192.png",
-        badge: payload.badge || "/favicon-192.png",
+        badge: payload.badge || "/icons/notification-badge.png",
         dir: "rtl",
         lang: "ar",
         tag,

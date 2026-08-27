@@ -8,7 +8,7 @@ const SUBSCRIPTION_COLUMNS =
   "id, endpoint, p256dh, auth, email, anonymous_id, user_id, created_at, updated_at";
 
 const WEB_PUSH_NOTIFICATION_ICON = "/favicon-192.png";
-const WEB_PUSH_NOTIFICATION_BADGE = "/favicon-192.png";
+const WEB_PUSH_NOTIFICATION_BADGE = "/icons/notification-badge.png";
 
 function isWebPushConfigured() {
   return getVapidEnvStatus().configured;
