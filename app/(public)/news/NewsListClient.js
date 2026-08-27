@@ -45,6 +45,14 @@ function logNewsFetchIssue(error) {
   console.warn("News fetch skipped:", error?.message || error);
 }
 
+function getNewestHeldItem(items = []) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+
+  return mergeNewsLists([], items, 1)[0] || null;
+}
+
 export default function NewsListClient({ initialNews = [] }) {
   const hasInitialNews = Array.isArray(initialNews) && initialNews.length > 0;
   const [news, setNews] = useState(() => (hasInitialNews ? initialNews : []));
@@ -56,8 +64,11 @@ export default function NewsListClient({ initialNews = [] }) {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
   const mountedRef = useMountedRef();
+  const newsRef = useRef(news);
   const fetchPromiseRef = useRef(null);
+  const deltaFetchPromiseRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const deltaAbortControllerRef = useRef(null);
   const backgroundAbortControllerRef = useRef(null);
   const backgroundFillDoneRef = useRef(false);
   const lastFetchAtRef = useRef(0);
@@ -65,8 +76,9 @@ export default function NewsListClient({ initialNews = [] }) {
   const newsCountRef = useRef(0);
 
   useEffect(() => {
+    newsRef.current = news;
     newsCountRef.current = news.length;
-  }, [news.length]);
+  }, [news]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -96,18 +108,30 @@ export default function NewsListClient({ initialNews = [] }) {
     return payload?.items || [];
   }, []);
 
-  const fetchNews = useCallback(
+  const fetchNewsDeltaPage = useCallback(async ({ afterCreatedAt, afterId, signal }) => {
+    const params = new URLSearchParams({
+      afterCreatedAt,
+      afterId,
+      limit: String(REFRESH_NEWS_LIMIT),
+    });
+    const response = await fetch(`/api/news?${params.toString()}`, {
+      method: "GET",
+      signal,
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error || "تعذر تحميل الأخبار من قاعدة البيانات.");
+    }
+
+    const payload = await response.json();
+    return payload?.items || [];
+  }, []);
+
+  const fetchFullNews = useCallback(
     async ({ silent = false, force = false } = {}) => {
       const fetchKey = `refresh:${REFRESH_NEWS_LIMIT}`;
-
-      if (
-        silent &&
-        !force &&
-        Date.now() - lastFetchAtRef.current < SILENT_REFRESH_COOLDOWN_MS &&
-        newsCountRef.current > 0
-      ) {
-        return;
-      }
 
       if (!force && fetchPromiseRef.current) {
         return fetchPromiseRef.current;
@@ -175,6 +199,75 @@ export default function NewsListClient({ initialNews = [] }) {
       return requestPromise;
     },
     [fetchNewsPage]
+  );
+
+  const runNewsDeltaRefresh = useCallback(
+    async ({ force = false } = {}) => {
+      if (
+        !force &&
+        Date.now() - lastFetchAtRef.current < SILENT_REFRESH_COOLDOWN_MS &&
+        newsCountRef.current > 0
+      ) {
+        return;
+      }
+
+      if (!force && deltaFetchPromiseRef.current) {
+        return deltaFetchPromiseRef.current;
+      }
+
+      const newest = getNewestHeldItem(newsRef.current);
+      if (!newest?.created_at || !newest?.id) {
+        return fetchFullNews({ silent: true, force });
+      }
+
+      if (deltaAbortControllerRef.current) {
+        deltaAbortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      deltaAbortControllerRef.current = controller;
+
+      const requestPromise = (async () => {
+        try {
+          const deltaItems = await fetchNewsDeltaPage({
+            afterCreatedAt: String(newest.created_at),
+            afterId: String(newest.id),
+            signal: controller.signal,
+          });
+
+          if (!mountedRef.current || controller.signal.aborted) {
+            return;
+          }
+
+          if (deltaItems.length === 0) {
+            lastFetchAtRef.current = Date.now();
+            return;
+          }
+
+          setNews((currentItems) =>
+            mergeNewsLists(currentItems, deltaItems, NEWS_FULL_LIST_SIZE)
+          );
+          setLastUpdated(formatNewsDate(new Date()));
+          lastFetchAtRef.current = Date.now();
+        } catch (error) {
+          if (!mountedRef.current || controller.signal.aborted) {
+            return;
+          }
+
+          logNewsFetchIssue(error);
+        } finally {
+          if (deltaAbortControllerRef.current === controller) {
+            deltaAbortControllerRef.current = null;
+          }
+
+          deltaFetchPromiseRef.current = null;
+        }
+      })();
+
+      deltaFetchPromiseRef.current = requestPromise;
+      return requestPromise;
+    },
+    [fetchFullNews, fetchNewsDeltaPage]
   );
 
   const runBackgroundFill = useCallback(async () => {
@@ -249,16 +342,16 @@ export default function NewsListClient({ initialNews = [] }) {
       };
     }
 
-    fetchNews({ force: true });
+    fetchFullNews({ force: true });
 
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [fetchNews, hasInitialNews, initialNews.length, runBackgroundFill]);
+  }, [fetchFullNews, hasInitialNews, initialNews.length, runBackgroundFill]);
 
-  useVisibilityRefresh(() => fetchNews({ silent: true }), {
+  useVisibilityRefresh(() => runNewsDeltaRefresh(), {
     intervalMs: 60000,
     refreshOnFocus: false,
   });
@@ -307,7 +400,7 @@ export default function NewsListClient({ initialNews = [] }) {
           <div className="news-page-hero__actions">
             <button
               type="button"
-              onClick={() => fetchNews({ force: true })}
+              onClick={() => fetchFullNews({ force: true })}
               disabled={loading || refreshing}
               className="news-page-hero__refresh"
             >
@@ -339,7 +432,7 @@ export default function NewsListClient({ initialNews = [] }) {
             <h2 className="news-page-state__title">تعذر تحميل الأخبار حالياً</h2>
             <p className="news-page-state__text">{errorMessage}</p>
             <div className="news-page-state__actions">
-              <button type="button" onClick={() => fetchNews({ force: true })} className="news-page-state__action">
+              <button type="button" onClick={() => fetchFullNews({ force: true })} className="news-page-state__action">
                 إعادة المحاولة
               </button>
               <Link href="/" className="news-page-state__action news-page-state__action--link">
@@ -352,7 +445,7 @@ export default function NewsListClient({ initialNews = [] }) {
             selectedCategory={selectedCategory}
             searchQuery={debouncedSearchQuery}
             onResetFilters={resetFilters}
-            onRefresh={() => fetchNews({ force: true })}
+            onRefresh={() => fetchFullNews({ force: true })}
           />
         ) : (
           <>
@@ -363,7 +456,7 @@ export default function NewsListClient({ initialNews = [] }) {
                 selectedCategory={selectedCategory}
                 searchQuery={debouncedSearchQuery}
                 onResetFilters={resetFilters}
-                onRefresh={() => fetchNews({ force: true })}
+                onRefresh={() => fetchFullNews({ force: true })}
               />
             ) : (
               <section className="news-page-grid" aria-label="قائمة الأخبار">

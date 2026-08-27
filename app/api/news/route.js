@@ -1,11 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
-import { CACHE_PUBLIC_CONTENT, jsonError, jsonOk } from "../../../lib/api-response";
+import { jsonError, jsonOk } from "../../../lib/api-response";
 import { runApiRoute } from "../../../lib/api-route";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import {
   applyCreatedAtIdCursor,
+  applyNewerThanCreatedAtIdCursor,
   buildPaginationResult,
   decodeCursor,
+  parseDeltaRefreshParams,
   parseLimit,
   parseOffset,
 } from "../../../lib/pagination.js";
@@ -42,6 +44,7 @@ function parseListParams(searchParams) {
   const includeTotal = searchParams.get("includeTotal") === "true";
   const legacyPosts = searchParams.get("legacyPosts") === "true";
   const search = String(searchParams.get("search") || searchParams.get("q") || "").trim();
+  const delta = parseDeltaRefreshParams(searchParams);
 
   if (search.length > 0 && search.length < 2) {
     const error = new Error("Search query must be at least 2 characters");
@@ -53,7 +56,13 @@ function parseListParams(searchParams) {
     decodeCursor(cursor);
   }
 
-  return { limit, cursor, offset, includeTotal, legacyPosts, search };
+  if (delta && cursor) {
+    const error = new Error("cursor cannot be combined with afterCreatedAt/afterId");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { limit, cursor, offset, includeTotal, legacyPosts, search, delta };
 }
 
 function buildNewsListResponse({ items, pagination, legacyPosts }) {
@@ -70,7 +79,7 @@ function buildNewsListResponse({ items, pagination, legacyPosts }) {
   return body;
 }
 
-async function fetchNewsList({ limit, cursor, offset, includeTotal, legacyPosts, search }) {
+async function fetchNewsList({ limit, cursor, offset, includeTotal, legacyPosts, search, delta }) {
   const supabase = getSupabaseClient();
   const fetchLimit = limit + 1;
 
@@ -85,7 +94,10 @@ async function fetchNewsList({ limit, cursor, offset, includeTotal, legacyPosts,
     query = query.or(`title.ilike.%${escaped}%,slug.ilike.%${escaped}%`);
   }
 
-  if (cursor) {
+  if (delta) {
+    query = applyNewerThanCreatedAtIdCursor(query, delta);
+    query = query.limit(fetchLimit);
+  } else if (cursor) {
     query = applyCreatedAtIdCursor(query, cursor);
     query = query.limit(fetchLimit);
   } else {
@@ -123,6 +135,14 @@ async function fetchNewsList({ limit, cursor, offset, includeTotal, legacyPosts,
   return buildNewsListResponse({ items, pagination, legacyPosts });
 }
 
+function buildNewsListCacheKey(params) {
+  const deltaKey = params.delta
+    ? `after:${params.delta.afterCreatedAt}:${params.delta.afterId}`
+    : params.cursor || `offset:${params.offset}`;
+
+  return `public:news:list:${params.limit}:${deltaKey}:${params.search}:${params.includeTotal}:legacy:${params.legacyPosts}`;
+}
+
 export async function GET(request) {
   return runApiRoute(request, {
     route: "/api/news",
@@ -132,8 +152,13 @@ export async function GET(request) {
         if (rateLimited) return rateLimited;
 
         const params = parseListParams(req.nextUrl.searchParams);
-        const cacheKey = `public:news:list:${params.limit}:${params.cursor || `offset:${params.offset}`}:${params.search}:${params.includeTotal}:legacy:${params.legacyPosts}`;
 
+        if (params.delta) {
+          const data = await fetchNewsList(params);
+          return jsonOk(data, { cacheControl: CACHE_NEWS_LIST });
+        }
+
+        const cacheKey = buildNewsListCacheKey(params);
         const { data } = await withReadCache(cacheKey, NEWS_API_CACHE_MS, async () => fetchNewsList(params));
 
         return jsonOk(data, { cacheControl: CACHE_NEWS_LIST });

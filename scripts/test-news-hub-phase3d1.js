@@ -65,9 +65,15 @@ function testCompareNewsByRecency() {
   assert.ok(compareNewsByRecency(newer, older) < 0);
   assert.ok(compareNewsByRecency(older, newer) > 0);
 
-  const sameTimeA = { id: "10", created_at: "2026-08-01T12:00:00.000Z" };
-  const sameTimeB = { id: "9", created_at: "2026-08-01T12:00:00.000Z" };
-  assert.ok(compareNewsByRecency(sameTimeA, sameTimeB) < 0);
+  const sameTimeA = {
+    id: "a0000000-0000-4000-8000-000000000001",
+    created_at: "2026-08-01T12:00:00.000Z",
+  };
+  const sameTimeB = {
+    id: "b0000000-0000-4000-8000-000000000002",
+    created_at: "2026-08-01T12:00:00.000Z",
+  };
+  assert.ok(compareNewsByRecency(sameTimeB, sameTimeA) < 0);
 }
 
 function testMergeDedupesAndCaps() {
