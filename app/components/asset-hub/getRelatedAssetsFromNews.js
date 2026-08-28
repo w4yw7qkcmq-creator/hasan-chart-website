@@ -1,4 +1,4 @@
-import { ASSET_CONFIGS } from "./configs";
+import { NEWS_ASSET_MATCHING_INDEX } from "../../../lib/news-asset-matching-index";
 import { detectNewsCategory } from "../../../lib/news-images";
 
 /** @type {Record<string, { id: string, symbol: string, name: string, path: string, kind: "market" }>} */
@@ -101,10 +101,10 @@ function buildNewsSearchText(newsItem = {}) {
 
 /**
  * @param {string} text
- * @param {import("./configs/types").AssetHubConfig} config
+ * @param {import("../../../lib/news-asset-matching-index").NewsAssetMatchingEntry} config
  */
 function scoreAssetMatch(text, config) {
-  const keywords = config?.news?.keywords || [];
+  const keywords = config?.keywords || [];
   let score = 0;
 
   for (const keyword of keywords) {
@@ -144,7 +144,7 @@ export function getRelatedAssetsFromNews(newsItem = {}, options = {}) {
     }
   };
 
-  for (const config of Object.values(ASSET_CONFIGS)) {
+  for (const config of Object.values(NEWS_ASSET_MATCHING_INDEX)) {
     const score = scoreAssetMatch(text, config);
     if (score > 0) {
       addItem(
@@ -165,7 +165,7 @@ export function getRelatedAssetsFromNews(newsItem = {}, options = {}) {
     if (item.kind !== "asset") continue;
 
     for (const companionId of COMPANION_ASSETS[id] || []) {
-      const companion = ASSET_CONFIGS[companionId];
+      const companion = NEWS_ASSET_MATCHING_INDEX[companionId];
       if (!companion) continue;
 
       addItem(
@@ -186,7 +186,7 @@ export function getRelatedAssetsFromNews(newsItem = {}, options = {}) {
     if (!pattern.test(text)) continue;
 
     for (const assetId of assets) {
-      const config = ASSET_CONFIGS[assetId];
+      const config = NEWS_ASSET_MATCHING_INDEX[assetId];
       if (!config) continue;
 
       addItem(
