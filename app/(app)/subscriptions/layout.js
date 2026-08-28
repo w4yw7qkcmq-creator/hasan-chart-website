@@ -1,3 +1,4 @@
+import "../../styles/subscriptions.css";
 import PublicPageJsonLd from "../../components/public-seo/PublicPageJsonLd";
 import { buildPublicPageMetadata } from "../../../lib/seo";
 import { getPublicSeoPage } from "../../../lib/public-seo-content";
