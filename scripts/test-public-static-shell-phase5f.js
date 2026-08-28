@@ -44,12 +44,12 @@ function testBatch1And2RoutesStillUnderPublicStatic() {
   }
 }
 
-function testPriceAlertsRemainsOnFullShell() {
-  assert.ok(fs.existsSync(path.join(rootDir, "app/(app)/price-alerts/page.js")));
-  assert.ok(!fs.existsSync(path.join(rootDir, "app/(public-static)/price-alerts/page.js")));
-  assert.ok(PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES.includes("/price-alerts"));
-  assert.ok(PUBLIC_STATIC_REJECTED_BATCH_3_ROUTES.includes("/price-alerts"));
-  assert.ok(!PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES.includes("/technical-analysis"));
+function testPriceAlertsMigratedToPublicStatic() {
+  assert.ok(fs.existsSync(path.join(rootDir, "app/(public-static)/price-alerts/page.js")));
+  assert.ok(!fs.existsSync(path.join(rootDir, "app/(app)/price-alerts/page.js")));
+  assert.ok(PUBLIC_STATIC_BATCH_3_ROUTES.includes("/price-alerts"));
+  assert.ok(!PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES.includes("/price-alerts"));
+  assert.ok(!PUBLIC_STATIC_REJECTED_BATCH_3_ROUTES.includes("/price-alerts"));
 }
 
 function testPublicStaticShellRemainsAuthFree() {
@@ -86,8 +86,8 @@ function testNavigationModuleListsMigratedRoutes() {
   const nav = read("lib/site-shell-navigation.js");
   assert.match(nav, /PUBLIC_STATIC_BATCH_3_ROUTES/);
   assert.match(nav, /PUBLIC_STATIC_MIGRATED_ROUTES/);
-  assert.equal(PUBLIC_STATIC_BATCH_3_ROUTES.length, 1);
-  assert.equal(PUBLIC_STATIC_MIGRATED_ROUTES.length, 11);
+  assert.equal(PUBLIC_STATIC_BATCH_3_ROUTES.length, 2);
+  assert.equal(PUBLIC_STATIC_MIGRATED_ROUTES.length, 12);
   assert.deepEqual(PUBLIC_STATIC_BATCH_1_ROUTES, ["/about", "/brand", "/company", "/commodities", "/oil"]);
   assert.deepEqual(PUBLIC_STATIC_BATCH_2_ROUTES, [
     "/markets",
@@ -101,7 +101,7 @@ function testNavigationModuleListsMigratedRoutes() {
 const tests = [
   ["technical-analysis lives under public-static", testBatch3RouteUnderPublicStatic],
   ["batch 1 and batch 2 routes remain under public-static", testBatch1And2RoutesStillUnderPublicStatic],
-  ["price-alerts remains on full shell", testPriceAlertsRemainsOnFullShell],
+  ["price-alerts migrated to public-static", testPriceAlertsMigratedToPublicStatic],
   ["PublicStaticShell stays auth/push-free", testPublicStaticShellRemainsAuthFree],
   ["technical-analysis remains static ISR server page", testBatch3RouteRemainsStaticServerPage],
   ["navigation module tracks batch 3 migrated routes", testNavigationModuleListsMigratedRoutes],

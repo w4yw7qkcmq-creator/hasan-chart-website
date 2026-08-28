@@ -91,7 +91,7 @@ function testNavigationModuleListsAllMigratedRoutes() {
   assert.match(nav, /PUBLIC_STATIC_BATCH_2_ROUTES/);
   assert.match(nav, /PUBLIC_STATIC_MIGRATED_ROUTES/);
   assert.match(nav, /PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES/);
-  assert.equal(PUBLIC_STATIC_MIGRATED_ROUTES.length, 11);
+  assert.equal(PUBLIC_STATIC_MIGRATED_ROUTES.length, 12);
 }
 
 const tests = [
