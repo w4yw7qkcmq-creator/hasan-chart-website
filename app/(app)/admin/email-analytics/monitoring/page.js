@@ -12,6 +12,7 @@ import { QueueHealthHero } from "../components/email-ops/QueueHealthHero";
 import { deriveQueueHealth, formatRelativeTimeAr } from "../components/email-ops/utils";
 import { getQueueStatusLabel } from "../components/email-ops/labels";
 import { IconAlert, IconInbox } from "../components/icons-ops";
+import { PriceAlertWorkerStatusCard } from "../components/PriceAlertWorkerStatusCard";
 
 const KPI_CONFIG = [
   { key: "pending", tone: "amber", hint: "في انتظار المعالجة" },
@@ -86,6 +87,8 @@ export default function EmailMonitoringPage() {
           {error}
         </div>
       ) : null}
+
+      <PriceAlertWorkerStatusCard />
 
       {loading ? (
         <EmailOpsKpiSkeleton count={7} />
