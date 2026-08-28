@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppModal } from "../../components/AppModalProvider";
+import { ANALYTICS_EVENTS } from "../../../lib/analytics-events";
+import { trackEvent } from "../../../lib/analytics";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
@@ -170,6 +172,7 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
+    trackEvent(ANALYTICS_EVENTS.REGISTRATION_STARTED, { method: "email_form" });
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -204,6 +207,8 @@ export default function RegisterPage() {
         message:
           "أرسلنا رابط تفعيل إلى بريدك الإلكتروني.\nقم بتفعيل الحساب أولاً ثم سجل الدخول.",
       });
+
+      trackEvent(ANALYTICS_EVENTS.REGISTRATION_COMPLETED, { method: "email_form" });
 
       setUsername("");
       setEmail("");

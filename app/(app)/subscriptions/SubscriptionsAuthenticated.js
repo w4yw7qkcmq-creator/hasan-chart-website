@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AppModal from "../../components/AppModal";
 import Breadcrumbs from "../../components/seo/Breadcrumbs";
 import {
@@ -16,6 +16,8 @@ import {
   getPaymentNetworkLabel,
   validatePaymentNetwork,
 } from "../../../lib/payment-networks.js";
+import { ANALYTICS_EVENTS } from "../../../lib/analytics-events";
+import { trackEvent } from "../../../lib/analytics";
 
 const PAGE_BREADCRUMBS = [
   { label: "الرئيسية", href: "/" },
@@ -59,6 +61,13 @@ export default function SubscriptionsAuthenticated({ user }) {
   const [submitting, setSubmitting] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const subscriptionViewTrackedRef = useRef(false);
+
+  useEffect(() => {
+    if (subscriptionViewTrackedRef.current) return;
+    subscriptionViewTrackedRef.current = true;
+    trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_VIEWED, { audience: "authenticated" });
+  }, []);
 
   useEffect(() => {
     if (!notification) return;
@@ -129,6 +138,10 @@ export default function SubscriptionsAuthenticated({ user }) {
     }
 
     setPaymentProofFile(file);
+    trackEvent(ANALYTICS_EVENTS.PAYMENT_PROOF_STARTED, {
+      plan: selectedPlan?.name || undefined,
+      service: selectedPlan?.category || undefined,
+    });
     event.target.value = "";
   };
 
@@ -138,6 +151,15 @@ export default function SubscriptionsAuthenticated({ user }) {
     setPaymentNetwork("");
     setAddressCopied(false);
     setPaymentProofFile(null);
+    trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_CTA_CLICKED, {
+      plan: plan.name,
+      service: plan.category,
+      placement: "subscriptions_page",
+    });
+    trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_PLAN_SELECTED, {
+      plan: plan.name,
+      service: plan.category,
+    });
   };
 
   const resetSubscriptionModal = () => {
@@ -281,6 +303,10 @@ export default function SubscriptionsAuthenticated({ user }) {
         type: "success",
         title: "طلبك قيد المعالجة ✅",
         message: "تم استلام طلب الاشتراك وإثبات الدفع، وسيقوم الدعم بمراجعته وتفعيل الباقة.",
+      });
+      trackEvent(ANALYTICS_EVENTS.PAYMENT_PROOF_SUBMITTED, {
+        plan: selectedPlan.name,
+        service: selectedPlan.category,
       });
     } catch (error) {
       if (error?.name === "AbortError") return;

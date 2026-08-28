@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { AnalyticsProvider } from "./AnalyticsProvider";
 import { AppModalProvider } from "./AppModalProvider";
 import { AuthProvider } from "./AuthProvider";
 import { NotificationProvider } from "./notifications/NotificationProvider";
@@ -39,13 +40,15 @@ function DeferredNotificationUi() {
 
 export function ClientProviders({ children }) {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <AppModalProvider>
-          <DeferredNotificationUi />
-          {children}
-        </AppModalProvider>
-      </NotificationProvider>
-    </AuthProvider>
+    <AnalyticsProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <AppModalProvider>
+            <DeferredNotificationUi />
+            {children}
+          </AppModalProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </AnalyticsProvider>
   );
 }

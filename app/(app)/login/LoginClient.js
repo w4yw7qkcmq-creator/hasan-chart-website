@@ -8,6 +8,8 @@ import Link from "next/link";
 import { devLog } from "../../../lib/dev-log";
 import { isAdminUser } from "../../../lib/admin-emails";
 import { applyClientSession } from "../../../lib/auth-session-client";
+import { ANALYTICS_EVENTS } from "../../../lib/analytics-events";
+import { trackEvent } from "../../../lib/analytics";
 import { getSafeNextPath } from "../../../lib/safe-next-path";
 import { useAppModal } from "../../components/AppModalProvider";
 import { useAuth } from "../../components/AuthProvider";
@@ -481,6 +483,7 @@ export default function LoginClient() {
       }
 
       acknowledgeSignIn(applied.user);
+      trackEvent(ANALYTICS_EVENTS.LOGIN_COMPLETED, { method: "email_password" });
 
       router.refresh();
       router.replace(destination);

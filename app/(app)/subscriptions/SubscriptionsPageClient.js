@@ -1,7 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useRef } from "react";
 import { RequireAuthGuestLandingGate } from "../../components/public-seo/GuestPublicLandingGate";
+import { ANALYTICS_EVENTS } from "../../../lib/analytics-events";
+import { trackEvent } from "../../../lib/analytics";
 
 const SubscriptionsAuthenticated = dynamic(() => import("./SubscriptionsAuthenticated"), {
   ssr: false,
@@ -26,6 +29,14 @@ function SubscriptionsAuthenticatedPendingShell() {
 }
 
 export default function SubscriptionsPageClient({ landing, initialAuthenticated = false }) {
+  const guestViewTrackedRef = useRef(false);
+
+  useEffect(() => {
+    if (initialAuthenticated || guestViewTrackedRef.current) return;
+    guestViewTrackedRef.current = true;
+    trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_VIEWED, { audience: "guest" });
+  }, [initialAuthenticated]);
+
   return (
     <RequireAuthGuestLandingGate
       landing={landing}
