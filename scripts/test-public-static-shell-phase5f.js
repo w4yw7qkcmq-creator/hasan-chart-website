@@ -6,8 +6,10 @@ import { fileURLToPath } from "node:url";
 import {
   PUBLIC_STATIC_BATCH_1_ROUTES,
   PUBLIC_STATIC_BATCH_2_ROUTES,
+  PUBLIC_STATIC_BATCH_3_ROUTES,
   PUBLIC_STATIC_MIGRATED_ROUTES,
   PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES,
+  PUBLIC_STATIC_REJECTED_BATCH_3_ROUTES,
 } from "../lib/site-shell-navigation.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,8 +22,8 @@ function routeFolder(route) {
   return route.replace(/^\//, "");
 }
 
-function testBatch2RoutesUnderPublicStatic() {
-  for (const route of PUBLIC_STATIC_BATCH_2_ROUTES) {
+function testBatch3RouteUnderPublicStatic() {
+  for (const route of PUBLIC_STATIC_BATCH_3_ROUTES) {
     const folder = routeFolder(route);
     assert.ok(
       fs.existsSync(path.join(rootDir, `app/(public-static)/${folder}/page.js`)),
@@ -34,26 +36,20 @@ function testBatch2RoutesUnderPublicStatic() {
   }
 }
 
-function testBatch1RoutesStillUnderPublicStatic() {
-  for (const route of PUBLIC_STATIC_BATCH_1_ROUTES) {
+function testBatch1And2RoutesStillUnderPublicStatic() {
+  for (const route of [...PUBLIC_STATIC_BATCH_1_ROUTES, ...PUBLIC_STATIC_BATCH_2_ROUTES]) {
     const folder = routeFolder(route);
     assert.ok(fs.existsSync(path.join(rootDir, `app/(public-static)/${folder}/page.js`)));
     assert.ok(!fs.existsSync(path.join(rootDir, `app/(app)/${folder}/page.js`)));
   }
 }
 
-function testRejectedRoutesRemainOnFullShell() {
-  for (const route of PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES) {
-    const folder = routeFolder(route);
-    assert.ok(
-      fs.existsSync(path.join(rootDir, `app/(app)/${folder}/page.js`)),
-      `${route} should remain under (app)`
-    );
-    assert.ok(
-      !fs.existsSync(path.join(rootDir, `app/(public-static)/${folder}/page.js`)),
-      `${route} must not be migrated in batch 2`
-    );
-  }
+function testPriceAlertsRemainsOnFullShell() {
+  assert.ok(fs.existsSync(path.join(rootDir, "app/(app)/price-alerts/page.js")));
+  assert.ok(!fs.existsSync(path.join(rootDir, "app/(public-static)/price-alerts/page.js")));
+  assert.ok(PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES.includes("/price-alerts"));
+  assert.ok(PUBLIC_STATIC_REJECTED_BATCH_3_ROUTES.includes("/price-alerts"));
+  assert.ok(!PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES.includes("/technical-analysis"));
 }
 
 function testPublicStaticShellRemainsAuthFree() {
@@ -73,8 +69,8 @@ function testPublicStaticShellRemainsAuthFree() {
   }
 }
 
-function testBatch2RoutesRemainStaticServerPages() {
-  for (const route of PUBLIC_STATIC_BATCH_2_ROUTES) {
+function testBatch3RouteRemainsStaticServerPage() {
+  for (const route of PUBLIC_STATIC_BATCH_3_ROUTES) {
     const folder = routeFolder(route);
     const page = read(`app/(public-static)/${folder}/page.js`);
     const layout = read(`app/(public-static)/${folder}/layout.js`);
@@ -86,21 +82,29 @@ function testBatch2RoutesRemainStaticServerPages() {
   }
 }
 
-function testNavigationModuleListsAllMigratedRoutes() {
+function testNavigationModuleListsMigratedRoutes() {
   const nav = read("lib/site-shell-navigation.js");
-  assert.match(nav, /PUBLIC_STATIC_BATCH_2_ROUTES/);
+  assert.match(nav, /PUBLIC_STATIC_BATCH_3_ROUTES/);
   assert.match(nav, /PUBLIC_STATIC_MIGRATED_ROUTES/);
-  assert.match(nav, /PUBLIC_STATIC_REJECTED_BATCH_2_ROUTES/);
+  assert.equal(PUBLIC_STATIC_BATCH_3_ROUTES.length, 1);
   assert.equal(PUBLIC_STATIC_MIGRATED_ROUTES.length, 11);
+  assert.deepEqual(PUBLIC_STATIC_BATCH_1_ROUTES, ["/about", "/brand", "/company", "/commodities", "/oil"]);
+  assert.deepEqual(PUBLIC_STATIC_BATCH_2_ROUTES, [
+    "/markets",
+    "/forex",
+    "/crypto",
+    "/stocks",
+    "/economic-news",
+  ]);
 }
 
 const tests = [
-  ["batch 2 routes live under public-static", testBatch2RoutesUnderPublicStatic],
-  ["batch 1 routes remain under public-static", testBatch1RoutesStillUnderPublicStatic],
-  ["rejected batch 2 candidates remain on full shell", testRejectedRoutesRemainOnFullShell],
+  ["technical-analysis lives under public-static", testBatch3RouteUnderPublicStatic],
+  ["batch 1 and batch 2 routes remain under public-static", testBatch1And2RoutesStillUnderPublicStatic],
+  ["price-alerts remains on full shell", testPriceAlertsRemainsOnFullShell],
   ["PublicStaticShell stays auth/push-free", testPublicStaticShellRemainsAuthFree],
-  ["batch 2 routes remain static ISR server pages", testBatch2RoutesRemainStaticServerPages],
-  ["navigation module tracks batch 2 migrated routes", testNavigationModuleListsAllMigratedRoutes],
+  ["technical-analysis remains static ISR server page", testBatch3RouteRemainsStaticServerPage],
+  ["navigation module tracks batch 3 migrated routes", testNavigationModuleListsMigratedRoutes],
 ];
 
 let passed = 0;
@@ -110,4 +114,4 @@ for (const [label, fn] of tests) {
   console.log(`✓ ${label}`);
 }
 
-console.log(`\nPhase 5D public-static shell expansion: ${passed}/${tests.length} passed`);
+console.log(`\nPhase 5F public-static shell expansion: ${passed}/${tests.length} passed`);
