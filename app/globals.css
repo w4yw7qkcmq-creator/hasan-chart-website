@@ -1768,73 +1768,6 @@ html[data-theme="light"] .site-top-header__gradient {
   background: rgba(239, 68, 68, 0.2);
 }
 
-.notificationsPage {
-  border-color: rgba(34, 211, 238, 0.16);
-  background: rgba(7, 20, 47, 0.72);
-  color: rgb(241 245 249);
-}
-
-.notificationsPage__glow {
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.18), transparent 40%),
-    radial-gradient(circle at bottom left, rgba(34, 211, 238, 0.1), transparent 38%);
-}
-
-.notificationsPage__title {
-  color: rgb(248 250 252);
-}
-
-.notificationsPage__subtitle {
-  color: rgba(165, 243, 252, 0.72);
-}
-
-.notificationsPage__panel {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgb(203 213 225);
-}
-
-.notificationsPage__action {
-  border-color: rgba(34, 211, 238, 0.22);
-  background: rgba(34, 211, 238, 0.08);
-  color: rgb(224 242 254);
-}
-
-.notificationsPage__action:hover {
-  background: rgba(34, 211, 238, 0.16);
-}
-
-.notificationsPage__danger {
-  border-color: rgba(248, 113, 113, 0.28);
-  background: rgba(239, 68, 68, 0.12);
-  color: rgb(254 202 202);
-}
-
-.notificationsPage__danger:hover {
-  background: rgba(239, 68, 68, 0.2);
-}
-
-.notificationsPage__alertSuccess {
-  border: 1px solid rgba(52, 211, 153, 0.42);
-  background: linear-gradient(
-    135deg,
-    rgba(16, 185, 129, 0.24) 0%,
-    rgba(34, 211, 238, 0.16) 100%
-  );
-  color: #ecfdf5;
-  box-shadow: 0 10px 28px rgba(16, 185, 129, 0.14);
-}
-
-.notificationsPage__alertError {
-  border: 1px solid rgba(248, 113, 113, 0.42);
-  background: linear-gradient(
-    135deg,
-    rgba(239, 68, 68, 0.24) 0%,
-    rgba(248, 113, 113, 0.14) 100%
-  );
-  color: #fee2e2;
-  box-shadow: 0 10px 28px rgba(239, 68, 68, 0.14);
-}
 
 .notificationHub {
   display: flex;
@@ -1853,9 +1786,6 @@ html[data-theme="light"] .site-top-header__gradient {
   padding: 1.25rem;
 }
 
-.notificationsPage__hub {
-  border-radius: 1.75rem;
-}
 
 .notificationHub__toolbar {
   display: grid;
@@ -2254,12 +2184,6 @@ html[data-theme="light"] .notificationHubItem__message {
   color: #475569;
 }
 
-html[data-theme="light"] .notificationsPage {
-  border-color: rgba(47, 150, 255, 0.24);
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
-  box-shadow: 0 10px 30px rgba(47, 150, 255, 0.12);
-}
 
 html[data-theme="light"] .browserPushBtn {
   border-color: rgba(47, 150, 255, 0.22);
@@ -2389,60 +2313,6 @@ html[data-theme="light"] .notificationListItem__delete {
   color: #b91c1c;
 }
 
-html[data-theme="light"] .notificationsPage {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(47, 150, 255, 0.16);
-  color: #0f172a;
-  box-shadow: 0 25px 90px rgba(47, 150, 255, 0.1);
-}
-
-html[data-theme="light"] .notificationsPage__title {
-  color: #0f172a;
-}
-
-html[data-theme="light"] .notificationsPage__subtitle {
-  color: #64748b;
-}
-
-html[data-theme="light"] .notificationsPage__panel {
-  background: rgba(248, 250, 252, 0.88);
-  border-color: rgba(148, 163, 184, 0.22);
-  color: #475569;
-}
-
-html[data-theme="light"] .notificationsPage__action {
-  border-color: rgba(47, 150, 255, 0.24);
-  background: rgba(224, 242, 254, 0.72);
-  color: #0f172a;
-}
-
-html[data-theme="light"] .notificationsPage__danger {
-  border-color: rgba(239, 68, 68, 0.24);
-  background: rgba(254, 226, 226, 0.72);
-  color: #b91c1c;
-}
-
-html[data-theme="light"] .notificationsPage__alertSuccess {
-  border-color: rgba(5, 150, 105, 0.38);
-  background: linear-gradient(
-    135deg,
-    rgba(209, 250, 229, 0.96) 0%,
-    rgba(224, 242, 254, 0.92) 100%
-  );
-  color: #065f46;
-  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.12);
-}
-
-html[data-theme="light"] .notificationsPage__alertError {
-  border-color: rgba(220, 38, 38, 0.34);
-  background: linear-gradient(
-    135deg,
-    rgba(254, 226, 226, 0.96) 0%,
-    rgba(254, 242, 242, 0.92) 100%
-  );
-  color: #991b1b;
-  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.1);
-}
 
 @keyframes notificationToastEnter {
   from {
