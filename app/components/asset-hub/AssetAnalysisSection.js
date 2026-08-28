@@ -1,5 +1,6 @@
 "use client";
 
+import "../../styles/daily-analysis.css";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
