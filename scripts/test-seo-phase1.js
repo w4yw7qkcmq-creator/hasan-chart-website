@@ -75,7 +75,7 @@ describe("news sitemap canonical paths", () => {
 
 describe("gold URL consolidation", () => {
   it("keeps /gold live and redirects only /xau alias to /xauusd", () => {
-    const goldPage = readFileSync("app/(app)/gold/page.js", "utf8");
+    const goldPage = readFileSync("app/(public-static)/gold/page.js", "utf8");
     const xauPage = readFileSync("app/(app)/xau/page.js", "utf8");
     assert.match(goldPage, /GoldPageContent/);
     assert.doesNotMatch(goldPage, /permanentRedirect\("\/xauusd"\)/);
