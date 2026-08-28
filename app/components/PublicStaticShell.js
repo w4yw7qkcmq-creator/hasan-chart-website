@@ -4,80 +4,12 @@ import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useClientMounted } from "../hooks/useClientMounted";
+import {
+  publicStaticMenuGroups as menuGroups,
+  shouldPrefetchSidebarHref,
+  siteShellSocialLinks as socialLinks,
+} from "../../lib/site-shell-navigation";
 import { useTheme } from "./ThemeProvider";
-
-const menuGroups = [
-  {
-    id: "markets",
-    label: "الأسواق",
-    icon: "📊",
-    defaultOpen: true,
-    items: [
-      { href: "/", icon: "🏠", label: "الرئيسية" },
-      { href: "/#market-windows", icon: "▣", label: "نوافذ السوق" },
-      { href: "/#prices", icon: "📊", label: "الأسعار المباشرة" },
-      { href: "/#chart", icon: "📈", label: "الشارت الحي" },
-      { href: "/news", icon: "📰", label: "الأخبار" },
-      { href: "/assets", icon: "🗂️", label: "الأصول والأسواق" },
-      { href: "/order-book", icon: "📒", label: "دفتر الأوامر والسيولة" },
-      { href: "/daily-analysis", icon: "📝", label: "التحليلات اليومية" },
-      { href: "/academy", icon: "🎓", label: "HasaN CharT Academy" },
-      { href: "/results", icon: "🏆", label: "HasaN CharT Result" },
-    ],
-  },
-  {
-    id: "services",
-    label: "الخدمات",
-    icon: "💼",
-    defaultOpen: true,
-    items: [
-      { href: "/#analysis", icon: "🧠", label: "طلب تحليل عملة" },
-      { href: "/#alerts", icon: "🔔", label: "تنبيه سعر" },
-      { href: "/subscriptions", icon: "💎", label: "الاشتراكات" },
-      { href: "/vip-spot", icon: "⭐", label: "توصيات VIP سبوت", auth: true, plan: "spot" },
-      { href: "/vip-futures", icon: "🔥", label: "توصيات VIP فيوتشر", auth: true, plan: "futures" },
-      { href: "/account-management", icon: "📂", label: "إدارة الحسابات" },
-      { href: "/partner-center", icon: "🤝", label: "برنامج الشركاء" },
-    ],
-  },
-  {
-    id: "account",
-    label: "الحساب",
-    icon: "👤",
-    defaultOpen: true,
-    items: [
-      { href: "/my-dashboard", icon: "👤", label: "لوحة المستخدم", auth: true },
-      { href: "/my-analysis", icon: "📩", label: "طلباتي وردود الإدارة", auth: true },
-      { href: "/notification-settings", icon: "🔔", label: "إعدادات الإشعارات", auth: true },
-    ],
-  },
-];
-
-const HEAVY_PREFETCH_ROUTES = new Set([
-  "/partner-center",
-  "/subscriptions",
-  "/my-dashboard",
-  "/my-analysis",
-  "/vip-spot",
-  "/vip-futures",
-  "/account-management",
-  "/admin",
-  "/daily-analysis",
-  "/news",
-  "/assets",
-]);
-
-function shouldPrefetchSidebarHref(href) {
-  const path = String(href || "").split("#")[0];
-  return !HEAVY_PREFETCH_ROUTES.has(path);
-}
-
-const socialLinks = [
-  { label: "الدعم الفني", badge: "تليجرام", icon: "🛟", href: "https://t.me/HasaNCharTSupport" },
-  { label: "القناة الرسمية", badge: "تليجرام", icon: "📢", href: "https://t.me/HsaNCharT" },
-  { label: "د. حسن", badge: "تليجرام", icon: "👨‍🏫", href: "https://t.me/CEOHasaNCharT" },
-  { label: "منصة إكس", badge: "إكس", icon: "𝕏", href: "https://x.com/HasanChart" },
-];
 
 const MOBILE_HEADER_SCROLL_MQ = "(max-width: 1023px)";
 const MOBILE_HEADER_TOP_THRESHOLD_PX = 12;
