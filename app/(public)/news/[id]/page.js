@@ -236,7 +236,7 @@ export default async function NewsDetailsPage({ params }) {
   const categoryVisual = getCategoryVisual(category);
   const newsTags = detectTags(news);
   const topicServiceLinks = getNewsTopicServiceLinks(news);
-  const relatedAssets = getRelatedAssetsFromNews(news);
+  const relatedAssets = getRelatedAssetsFromNews({ ...news, title });
   const newsTopicType = getNewsTopicType(news, category);
   const affectedMarketLabel = getAffectedMarketLabel(relatedAssets, category);
   const impactLabel = getImpactLevelLabel(news.impact_level);

@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { detectNewsCategory } from "../lib/news-images.js";
+import { truncateWithoutBreakingSurrogates } from "../lib/text-safety.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { getRelatedAssetsFromNews } = await import(
@@ -43,6 +44,42 @@ function getWatchPointsForTest(news = {}) {
 
 function paths(news, options = {}) {
   return getRelatedAssetsFromNews(news, options).map((item) => item.path);
+}
+
+/** Mirrors app/(public)/news/[id]/page.js cleanText + getNewsTitle for matcher alignment. */
+function cleanNewsText(text) {
+  if (!text) return "";
+
+  return String(text)
+    .replace(/https?:\/\/t\.me\/EconomicNewsi/gi, "")
+    .replace(/قناة الأخبار الرسمية\s*:*/gi, "")
+    .replace(/🔊|📢/g, "")
+    .replace(/\b(Reuters|CNBC|Investing\.com|MarketWatch|CoinDesk)\b\s*[-–—:]?\s*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNewsTitleForMatching(news = {}) {
+  const content = cleanNewsText(news?.content || "");
+  const title = cleanNewsText(news?.title || "");
+  const arabicSentences = content
+    .split(/[.!؟\n]/)
+    .map((part) => part.trim())
+    .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
+
+  if (arabicSentences.length > 0) {
+    return truncateWithoutBreakingSurrogates(
+      arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, ""),
+      150
+    );
+  }
+
+  return title || "خبر اقتصادي عاجل";
+}
+
+/** Same input shape as /news/[id] after title alignment. */
+function pathsAligned(news, options = {}) {
+  return paths({ ...news, title: getNewsTitleForMatching(news) }, options);
 }
 
 function assertNoXau(resultPaths, label) {
@@ -343,6 +380,98 @@ const FIXTURES = [
   },
 ];
 
+const GPU_EXACT_PRODUCTION_CONTENT = `أعلنت شركة "بوليش" عن جمعها لمبلغ مئة مليون دولار لتمويل قروض مدعومة بوحدات معالجة الرسوميات، بهدف تعزيز خدماتها في مجال التمويل الرقمي.
+
+📢 قناة الأخبار الرسمية:
+https://t.me/EconomicNewsi`;
+
+const TITLE_ALIGNMENT_FIXTURES = [
+  {
+    name: "GPU exact DB title mismatch",
+    news: {
+      title: "تمويل بقيمة مئة مليون دولار يدعم الدولار الأمريكي.",
+      content: GPU_EXACT_PRODUCTION_CONTENT,
+      slug: "market-news-ce8c1c",
+    },
+    assertRaw: (p) => {
+      assert.ok(p.includes("/dxy") && p.includes("/xauusd"), "raw DB title should false-positive");
+    },
+    assertAligned: (p) => {
+      assertEmpty(p, "GPU exact DB title mismatch aligned");
+      assertExcludes(p, ["/dxy", "/xauusd", "/gold", "/xau", "/forex"], "GPU exact DB title mismatch aligned");
+    },
+  },
+  {
+    name: "Bitcoin visible in content despite generic raw title",
+    news: {
+      title: "عاجل: تحديث اقتصادي",
+      content: "Bitcoin holds above $80,000 as BTC and crypto majors rally today.",
+      category: "crypto",
+    },
+    assertAligned: (p) => {
+      assertIncludes(p, "/btc", "Bitcoin alignment");
+      assertIncludes(p, "/crypto", "Bitcoin alignment");
+    },
+  },
+  {
+    name: "EUR/USD visible in content despite generic raw title",
+    news: {
+      title: "تحديثات السوق",
+      content: "EUR/USD يتراجع مع قوة الدولار في جلسة أوروبية.",
+      category: "economy",
+    },
+    assertAligned: (p) => {
+      assertIncludes(p, "/eurusd", "EUR/USD alignment");
+    },
+  },
+  {
+    name: "XAU/USD visible in content despite generic raw title",
+    news: {
+      title: "ملخص الأسواق",
+      content: "XAU/USD يخترق 3500 و gold prices extend gains.",
+      category: "commodities",
+    },
+    assertAligned: (p) => {
+      assertIncludes(p, "/xauusd", "XAU/USD alignment");
+      assertNoXau(p, "XAU/USD alignment");
+    },
+  },
+  {
+    name: "NASDAQ visible in content despite generic raw title",
+    news: {
+      title: "تقرير يومي",
+      content: "NASDAQ and US stocks declined after tech earnings.",
+      category: "stocks",
+    },
+    assertAligned: (p) => {
+      assertIncludes(p, "/nasdaq", "NASDAQ alignment");
+    },
+  },
+  {
+    name: "False forex phrase only in raw title",
+    news: {
+      title: "تمويل بقيمة مئة مليون دولار يدعم الدولار الأمريكي.",
+      content:
+        "أعلنت الشركة عن تعيين مدير تسويق جديد اليوم في خطوة إدارية داخلية.",
+      category: "economy",
+    },
+    assertRaw: (p) => assert.ok(p.length > 0, "raw title false forex phrase"),
+    assertAligned: (p) => assertEmpty(p, "False forex phrase only in raw title"),
+  },
+  {
+    name: "Explicit XAU/USD in aligned title from content",
+    news: {
+      title: "ملخص",
+      content: "زوج الذهب XAU/USD يختبر مقاومة جديدة.",
+      category: "commodities",
+    },
+    assertAligned: (p) => {
+      assertIncludes(p, "/xauusd", "Explicit XAU/USD aligned title");
+      assertNoXau(p, "Explicit XAU/USD aligned title");
+    },
+  },
+];
+
 // --- Legacy (pre-Phase-12) matcher for replay comparison ---
 
 const LEGACY_MARKET_PAGES = {
@@ -449,6 +578,18 @@ for (const fixture of FIXTURES) {
 
 console.log(`✓ ${passed}/${FIXTURES.length} deterministic fixtures passed`);
 
+let titleAlignmentPassed = 0;
+for (const fixture of TITLE_ALIGNMENT_FIXTURES) {
+  const rawPaths = paths(fixture.news);
+  const alignedPaths = pathsAligned(fixture.news);
+  assertNoXau(rawPaths, `${fixture.name} raw`);
+  assertNoXau(alignedPaths, `${fixture.name} aligned`);
+  fixture.assertRaw?.(rawPaths);
+  fixture.assertAligned?.(alignedPaths);
+  titleAlignmentPassed += 1;
+}
+console.log(`✓ ${titleAlignmentPassed}/${TITLE_ALIGNMENT_FIXTURES.length} title-alignment fixtures passed`);
+
 // --- Cap comparison on fixtures + GPU ---
 
 const CAP_SAMPLES = [
@@ -487,7 +628,27 @@ for (const cap of [2, 3, 4, 8]) {
   console.log(summarizeCap(cap));
 }
 
-// --- GPU production article replay (clean DB-equivalent text) ---
+// --- GPU production article replay (exact DB record + alignment) ---
+
+const GPU_PRODUCTION_DB = {
+  title: "تمويل بقيمة مئة مليون دولار يدعم الدولار الأمريكي.",
+  content: GPU_EXACT_PRODUCTION_CONTENT,
+  slug: "market-news-ce8c1c",
+  category: "economy",
+};
+
+const gpuRawPaths = paths(GPU_PRODUCTION_DB);
+const gpuAlignedPaths = pathsAligned(GPU_PRODUCTION_DB);
+assert.ok(
+  gpuRawPaths.includes("/dxy") && gpuRawPaths.includes("/xauusd"),
+  `GPU raw DB replay should false-positive, got ${gpuRawPaths.join(", ") || "(empty)"}`
+);
+assert.deepEqual(
+  gpuAlignedPaths,
+  [],
+  `GPU aligned replay must NO_LINK, got ${gpuAlignedPaths.join(", ") || "(empty)"}`
+);
+assertNoXau(gpuAlignedPaths, "GPU aligned replay");
 
 const GPU_PRODUCTION_NEWS = {
   title:
@@ -499,14 +660,141 @@ const GPU_PRODUCTION_NEWS = {
 };
 
 const gpuBeforePaths = getRelatedAssetsLegacy(GPU_PRODUCTION_NEWS);
-const gpuAfterPaths = paths(GPU_PRODUCTION_NEWS);
+const gpuAfterPaths = pathsAligned(GPU_PRODUCTION_NEWS);
 assert.deepEqual(
   gpuAfterPaths,
   [],
   `GPU production replay must NO_LINK, got ${gpuAfterPaths.join(", ") || "(empty)"}`
 );
 assertNoXau(gpuAfterPaths, "GPU production replay");
-console.log("✓ GPU production article replay:", { before: gpuBeforePaths, after: gpuAfterPaths });
+console.log("✓ GPU production article replay:", {
+  rawDb: gpuRawPaths,
+  aligned: gpuAlignedPaths,
+  before: gpuBeforePaths,
+  after: gpuAfterPaths,
+});
+
+function fetchSupabaseAnonKey() {
+  const home = execSync('curl -sS --max-time 30 "https://www.hasanchartworld.com/"', {
+    encoding: "utf8",
+  });
+  const scripts = [...home.matchAll(/\/_next\/static\/chunks\/[^"']+\.js/g)].map((m) => m[0]);
+  for (const scriptPath of scripts.slice(0, 20)) {
+    const js = execSync(`curl -sS --max-time 30 "https://www.hasanchartworld.com${scriptPath}"`, {
+      encoding: "utf8",
+    });
+    const match = js.match(/(eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})/);
+    if (match) return match[1];
+  }
+  throw new Error("supabase anon key not found");
+}
+
+function fetchProductionDbArticles(limit = 30) {
+  const sitemap = execSync(
+    'curl -sS --max-time 60 "https://www.hasanchartworld.com/news-sitemap.xml"',
+    { encoding: "utf8" }
+  );
+  const slugs = [...sitemap.matchAll(/<loc>https:\/\/www\.hasanchartworld\.com\/news\/([^<]+)<\/loc>/g)]
+    .slice(0, limit)
+    .map((m) => m[1]);
+  if (slugs.length === 0) return [];
+
+  const anonKey = fetchSupabaseAnonKey();
+  const slugList = slugs.map((slug) => encodeURIComponent(slug)).join(",");
+  const url =
+    `https://lzgsxdsumnteuwtjfqlm.supabase.co/rest/v1/news_posts` +
+    `?slug=in.(${slugList})&select=id,slug,title,content,impact_level,created_at`;
+  const payload = execSync(
+    `curl -sS --max-time 60 -H "apikey: ${anonKey}" -H "Authorization: Bearer ${anonKey}" "${url}"`,
+    { encoding: "utf8" }
+  );
+  const rows = JSON.parse(payload);
+  const bySlug = new Map(rows.map((row) => [row.slug, row]));
+  return slugs.map((slug) => bySlug.get(slug)).filter(Boolean);
+}
+
+function hasGenuineMarketSignal(news = {}) {
+  const text = `${getNewsTitleForMatching(news)} ${cleanNewsText(news.content || "")}`.toLowerCase();
+  return /bitcoin|btc|crypto|ethereum|nasdaq|stock|gold|xau\s*\/?\s*usd|xauusd|eurusd|eur\/usd|forex|oil|brent|نفط|ذهب|ناسداك|بيتكوين|فوركس|dxy/i.test(
+    text
+  );
+}
+
+function compareTitleAlignment(articles) {
+  const summary = {
+    changed: 0,
+    same: 0,
+    improved: 0,
+    becameNoLink: 0,
+    lostUseful: 0,
+    newFalsePositive: 0,
+    changes: [],
+  };
+
+  for (const article of articles) {
+    const rawPaths = paths(article);
+    const alignedPaths = pathsAligned(article);
+    const rawKey = rawPaths.join(",");
+    const alignedKey = alignedPaths.join(",");
+    if (rawKey === alignedKey) {
+      summary.same += 1;
+      continue;
+    }
+
+    summary.changed += 1;
+    if (rawPaths.length > 0 && alignedPaths.length === 0) {
+      summary.becameNoLink += 1;
+      if (hasGenuineMarketSignal(article)) {
+        summary.lostUseful += 1;
+        summary.changes.push({
+          slug: article.slug,
+          type: "lost_useful",
+          raw: rawPaths,
+          aligned: alignedPaths,
+        });
+      } else {
+        summary.improved += 1;
+        summary.changes.push({
+          slug: article.slug,
+          type: "improved",
+          raw: rawPaths,
+          aligned: alignedPaths,
+        });
+      }
+    } else if (rawPaths.length === 0 && alignedPaths.length > 0) {
+      summary.newFalsePositive += 1;
+      summary.changes.push({
+        slug: article.slug,
+        type: "new_false_positive",
+        raw: rawPaths,
+        aligned: alignedPaths,
+      });
+    } else {
+      summary.changes.push({
+        slug: article.slug,
+        type: "changed",
+        raw: rawPaths,
+        aligned: alignedPaths,
+      });
+    }
+  }
+
+  return summary;
+}
+
+function summarizeAlignedReplay(articles, getter) {
+  const stats = { good: 0, questionable: 0, wrong: 0, no_link: 0, totalLinks: 0, maxLinks: 0, xau: 0 };
+  for (const article of articles) {
+    const p = getter(article);
+    stats.totalLinks += p.length;
+    stats.maxLinks = Math.max(stats.maxLinks, p.length);
+    if (p.includes("/xau")) stats.xau += 1;
+    const cls = classifyReplay(p, `${getNewsTitleForMatching(article)} ${article.slug}`);
+    stats[cls] += 1;
+  }
+  stats.avg = (stats.totalLinks / articles.length).toFixed(2);
+  return stats;
+}
 
 // --- Production replay (newest 30 from sitemap) ---
 
@@ -584,15 +872,44 @@ if (productionArticles.length > 0) {
   const current = summarizeReplay((a) =>
     getRelatedAssetsLegacy({ title: a.title, content: a.content, slug: a.slug, category: a.category })
   );
-  const candidate = summarizeReplay((a) =>
-    paths({ title: a.title, content: a.content, slug: a.slug, category: a.category })
-  );
+  const candidate = summarizeReplay((a) => pathsAligned(a));
 
-  console.log("\n30-article production replay:");
+  console.log("\n30-article production replay (display-title HTML sample):");
   console.log("CURRENT (legacy):", current);
-  console.log("CANDIDATE (refined):", candidate);
+  console.log("CANDIDATE (title-aligned):", candidate);
 
   assert.equal(candidate.xau, 0, "Candidate must have zero /xau occurrences");
+}
+
+let productionDbArticles = [];
+try {
+  productionDbArticles = fetchProductionDbArticles(30);
+} catch (error) {
+  console.warn("DB title-alignment replay skipped:", error.message);
+}
+
+if (productionDbArticles.length > 0) {
+  const rawStats = summarizeAlignedReplay(productionDbArticles, paths);
+  const alignedStats = summarizeAlignedReplay(productionDbArticles, pathsAligned);
+  const alignmentDiff = compareTitleAlignment(productionDbArticles);
+
+  console.log("\n30-article DB raw vs title-aligned replay:");
+  console.log("CURRENT (raw DB title):", rawStats);
+  console.log("CANDIDATE (display title):", alignedStats);
+  console.log("Alignment diff:", {
+    articles: productionDbArticles.length,
+    changed: alignmentDiff.changed,
+    same: alignmentDiff.same,
+    improved: alignmentDiff.improved,
+    becameNoLink: alignmentDiff.becameNoLink,
+    lostUseful: alignmentDiff.lostUseful,
+    newFalsePositive: alignmentDiff.newFalsePositive,
+    changes: alignmentDiff.changes,
+  });
+
+  assert.equal(alignedStats.xau, 0, "Aligned DB replay must have zero /xau");
+  assert.equal(alignmentDiff.lostUseful, 0, "Title alignment must not drop genuine market links");
+  assert.equal(alignmentDiff.newFalsePositive, 0, "Title alignment must not introduce new false positives");
 }
 
 // --- Watch-point macro replay (unchanged module) ---
