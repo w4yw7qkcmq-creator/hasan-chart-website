@@ -219,13 +219,81 @@ const FIXTURES = [
   {
     name: "GPU financing",
     news: {
-      title: "أعلنت شركة Polish عن جمعها لمبلغ مئة مليون دولار لتمويل GPU-backed loans",
-      content: "The firm raised 100 million dollars for graphics processing unit financing.",
+      title:
+        "أعلنت شركة بوليش عن جمعها لمبلغ مئة مليون دولار لتمويل قروض مدعومة بوحدات معالجة الرسوميات، بهدف تعزيز خدماتها في مجال التمويل الرقمي",
+      content:
+        "أعلنت شركة بوليش عن جمعها لمبلغ مئة مليون دولار لتمويل قروض مدعومة بوحدات معالجة الرسوميات، بهدف تعزيز خدماتها في مجال التمويل الرقمي.",
       slug: "market-news-ce8c1c",
       category: "economy",
     },
     assertRelated: (p) => {
       assertEmpty(p, "GPU financing");
+    },
+  },
+  {
+    name: "Arabic monetary A",
+    news: {
+      title: "تمويل بقيمة مئة مليون دولار",
+      content: "شركة تمويل تقنية",
+      category: "economy",
+    },
+    assertRelated: (p) =>
+      assertExcludes(p, ["/dxy", "/xauusd", "/gold", "/xau"], "Arabic monetary A"),
+  },
+  {
+    name: "Arabic monetary B",
+    news: {
+      title: "صفقة بقيمة 100 مليون دولار",
+      content: "صفقة تمويل",
+      category: "economy",
+    },
+    assertRelated: (p) =>
+      assertExcludes(p, ["/dxy", "/xauusd", "/gold", "/xau"], "Arabic monetary B"),
+  },
+  {
+    name: "Arabic monetary C",
+    news: {
+      title: "الشركة تجمع ثلاثة مليارات دولار",
+      content: "جولة تمويل",
+      category: "economy",
+    },
+    assertRelated: (p) =>
+      assertExcludes(p, ["/dxy", "/xauusd", "/gold", "/xau"], "Arabic monetary C"),
+  },
+  {
+    name: "Arabic USD market D",
+    news: {
+      title: "الدولار الأمريكي يرتفع أمام اليورo",
+      content: "تحركات العملات",
+      category: "economy",
+    },
+    assert: (p) => {
+      assert.ok(p.length > 0, "Arabic USD market D");
+      assertExcludes(p, ["/xau"], "Arabic USD market D");
+    },
+  },
+  {
+    name: "Arabic USD market E",
+    news: {
+      title: "مؤشر الدولار DXY يرتفع",
+      content: "مؤشر الدولار",
+      category: "economy",
+    },
+    assert: (p) => {
+      assertIncludes(p, "/dxy", "Arabic USD market E");
+      assertNoXau(p, "Arabic USD market E");
+    },
+  },
+  {
+    name: "Arabic USD market F",
+    news: {
+      title: "EUR/USD يتراجع مع قوة الدولار",
+      content: "EUR/USD forex",
+      category: "economy",
+    },
+    assert: (p) => {
+      assertIncludes(p, "/eurusd", "Arabic USD market F");
+      assertNoXau(p, "Arabic USD market F");
     },
   },
   {
@@ -418,6 +486,27 @@ console.log("\nCap comparison (fixtures):");
 for (const cap of [2, 3, 4, 8]) {
   console.log(summarizeCap(cap));
 }
+
+// --- GPU production article replay (clean DB-equivalent text) ---
+
+const GPU_PRODUCTION_NEWS = {
+  title:
+    "أعلنت شركة بوليش عن جمعها لمبلغ مئة مليون دولار لتمويل قروض مدعومة بوحدات معالجة الرسوميات، بهدف تعزيز خدماتها في مجال التمويل الرقمي",
+  content:
+    "أعلنت شركة بوليش عن جمعها لمبلغ مئة مليون دولار لتمويل قروض مدعومة بوحدات معالجة الرسوميات، بهدف تعزيز خدماتها في مجال التمويل الرقمي.",
+  slug: "market-news-ce8c1c",
+  category: "economy",
+};
+
+const gpuBeforePaths = getRelatedAssetsLegacy(GPU_PRODUCTION_NEWS);
+const gpuAfterPaths = paths(GPU_PRODUCTION_NEWS);
+assert.deepEqual(
+  gpuAfterPaths,
+  [],
+  `GPU production replay must NO_LINK, got ${gpuAfterPaths.join(", ") || "(empty)"}`
+);
+assertNoXau(gpuAfterPaths, "GPU production replay");
+console.log("✓ GPU production article replay:", { before: gpuBeforePaths, after: gpuAfterPaths });
 
 // --- Production replay (newest 30 from sitemap) ---
 

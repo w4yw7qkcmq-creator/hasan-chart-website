@@ -113,10 +113,19 @@ const EXPLICIT_TOPIC_PATTERNS = [
 ];
 
 const WEAK_DOLLAR_KEYWORDS = new Set(["dollar", "dollars", "الدولار", "دولار"]);
-const MONETARY_AMOUNT_DOLLAR =
-  /\d[\d,.]*\s*(?:million|billion|mln|bln|m|b)?\s*(?:dollar|dollars|usd|\$|دولار|مليون\s*دولار|مليار\s*دولار)/i;
+const ENGLISH_MONETARY_AMOUNT_DOLLAR =
+  /\d[\d,.]*\s*(?:million|billion|mln|bln|m|b)?\s*(?:dollars?|usd|\$)/i;
+const ARABIC_MONETARY_AMOUNT_DOLLAR =
+  /(?:^|[\s،,.!؟])(?:م(?:ئة|ائة|ئتي)|\d[\d,.]*|[\u0600-\u06FF]{2,12})\s+(?:مليون|مليار|مليارات|ملايين)\s+دولار(?:ات)?(?:$|[\s،,.!؟])|(?:^|[\s،,.!؟])(?:مليون|مليار|مليارات|ملايين)\s+دولار(?:ات)?(?:$|[\s،,.!؟])|(?:بقيمة|تمويل(?:\s+بقيمة)?|صفقة\s+بقيمة|جمع(?:ها)?(?:\s+لمبلغ)?)\s+(?:\d[\d,.]*\s*)?(?:م(?:ئة|ائة|ئتي|[\u0600-\u06FF]{2,12})\s+)?(?:مليون|مليار|مليارات|ملايين)\s+دولار(?:ات)?/i;
 const STRONG_FOREX_SIGNAL =
-  /dxy|dollar index|us dollar index|مؤشر الدولار|forex|فوركس|eurusd|gbpusd|usdjpy|fed|federal reserve|فيدرالي|ecb|boj|central bank|البنك المركزي/i;
+  /dxy|dollar index|us dollar index|مؤشر الدولار|forex|فوركس|eurusd|gbpusd|usdjpy|eur\/usd|fed|federal reserve|فيدرالي|ecb|boj|central bank|البنك المركزي|الدولار الأمريكي|الدولار\s+ين|اليورو\s+مقابل\s+الدولار|usd strengthens/i;
+
+/**
+ * @param {string} text
+ */
+function hasMonetaryAmountDollarContext(text) {
+  return ENGLISH_MONETARY_AMOUNT_DOLLAR.test(text) || ARABIC_MONETARY_AMOUNT_DOLLAR.test(text);
+}
 
 /** Minimum score for a match to be included in output. */
 const MIN_CONFIDENCE_SCORE = 3;
@@ -163,7 +172,7 @@ function shouldSkipKeyword(text, keyword) {
     return false;
   }
 
-  if (!MONETARY_AMOUNT_DOLLAR.test(text)) {
+  if (!hasMonetaryAmountDollarContext(text)) {
     return false;
   }
 
