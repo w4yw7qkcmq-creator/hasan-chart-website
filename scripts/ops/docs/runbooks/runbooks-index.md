@@ -10,6 +10,7 @@
 | [latency-degraded.md](./latency-degraded.md) | AR-006 — Latency SLO |
 | [queue-backlog.md](./queue-backlog.md) | AR-007 — IA queue |
 | [worker-down.md](./worker-down.md) | AR-008 — Worker unavailable |
+| [external-uptime-monitoring.md](./external-uptime-monitoring.md) | Phase 14 — External uptime (VERIFIED ACTIVE) |
 | [release-blocked.md](./release-blocked.md) | AR-010 — Release Gate NO-GO |
 
 ## Usage
