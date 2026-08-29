@@ -229,17 +229,21 @@ function AnalysisEmptyState({ selectedFilter, onResetFilter }) {
   );
 }
 
-export default function DailyAnalysisClient() {
-  const [analyses, setAnalyses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+export default function DailyAnalysisClient({
+  initialAnalyses = [],
+  initialLoadError = "",
+}) {
+  const hasServerData = Array.isArray(initialAnalyses);
+  const [analyses, setAnalyses] = useState(initialAnalyses);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(initialLoadError);
   const [canPublish, setCanPublish] = useState(false);
   const [adminAccessChecked, setAdminAccessChecked] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState("all");
   const loadInFlightRef = useRef(false);
-  const hasLoadedOnceRef = useRef(false);
+  const hasLoadedOnceRef = useRef(hasServerData);
 
-  const loadAnalyses = useCallback(async () => {
+  const loadAnalyses = useCallback(async ({ background = false } = {}) => {
     if (loadInFlightRef.current) {
       return;
     }
@@ -248,6 +252,10 @@ export default function DailyAnalysisClient() {
 
     try {
       setErrorMessage("");
+
+      if (!background && !hasLoadedOnceRef.current) {
+        setLoading(true);
+      }
 
       const response = await fetch("/api/daily-analysis", {
         method: "GET",
@@ -262,7 +270,9 @@ export default function DailyAnalysisClient() {
       setAnalyses(Array.isArray(result.analyses) ? result.analyses : []);
       hasLoadedOnceRef.current = true;
     } catch (error) {
-      setErrorMessage(error?.message || "حدث خطأ أثناء تحميل التحليلات.");
+      if (!background || !hasLoadedOnceRef.current) {
+        setErrorMessage(error?.message || "حدث خطأ أثناء تحميل التحليلات.");
+      }
       if (!hasLoadedOnceRef.current) {
         setAnalyses([]);
       }
@@ -273,8 +283,8 @@ export default function DailyAnalysisClient() {
   }, []);
 
   useEffect(() => {
-    loadAnalyses();
-  }, [loadAnalyses]);
+    loadAnalyses({ background: hasServerData });
+  }, [loadAnalyses, hasServerData]);
 
   useEffect(() => {
     let cancelled = false;

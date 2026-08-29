@@ -5,11 +5,9 @@ import { requireAdminPermission } from "../../../lib/admin-auth";
 import { IAM_PERMISSIONS } from "../../../lib/iam/constants";
 import { enforceRateLimit } from "../../../lib/enforce-rate-limit";
 import { adminMutationLimiter, getClientIp } from "../../../lib/rate-limit";
+import { getPublicDailyAnalyses } from "../../../lib/daily-analysis/get-public-daily-analyses";
 import { getSupabaseAdmin } from "../../../lib/supabase-admin";
-import { invalidateReadCache, withReadCache } from "../../../lib/server-read-cache";
-import { DAILY_ANALYSIS_API_CACHE_MS } from "../../../lib/public-cache-config";
-import { fetchTelegramDailyAnalysisItems } from "../../../lib/public-section-feed/index.js";
-import { mergeFeedItemsByPublishedAt } from "../../../lib/public-section-feed/merge.js";
+import { invalidateReadCache } from "../../../lib/server-read-cache";
 import { DAILY_ANALYSIS_COLUMNS } from "../../../lib/supabase-query-columns";
 import { trimText } from "../../../lib/text-sanitize";
 
@@ -44,45 +42,7 @@ export async function GET(request) {
     route: "/api/daily-analysis",
     handler: async (_req, logContext) => {
       try {
-        const { data } = await withReadCache("public:daily-analysis", DAILY_ANALYSIS_API_CACHE_MS, async () => {
-      const supabase = getSupabaseAdmin();
-
-      const { data: rows, error } = await supabase
-        .from("daily_analysis")
-        .select(DAILY_ANALYSIS_COLUMNS)
-        .eq("published", true)
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) {
-        const missingTable =
-          error.code === "42P01" ||
-          /daily_analysis/i.test(error.message || "") ||
-          /does not exist/i.test(error.message || "");
-
-        if (missingTable) {
-          return {
-            success: true,
-            analyses: [],
-          };
-        }
-
-        throw new Error(error.message || "تعذر تحميل التحليلات.");
-      }
-
-      const manualAnalyses = (rows || []).map(normalizeItem).filter(Boolean);
-      const telegramAnalyses = await fetchTelegramDailyAnalysisItems();
-      const analyses = mergeFeedItemsByPublishedAt([...manualAnalyses, ...telegramAnalyses], {
-        cap: 100,
-      });
-
-      return {
-        success: true,
-        tableReady: true,
-        analyses,
-      };
-    });
-
+        const data = await getPublicDailyAnalyses();
         return jsonOk(data, { cacheControl: CACHE_PUBLIC_CONTENT });
       } catch (error) {
         return jsonError(error, 500, {

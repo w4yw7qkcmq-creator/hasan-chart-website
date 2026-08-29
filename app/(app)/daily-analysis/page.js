@@ -4,8 +4,8 @@ import {
   buildPublicMetadata,
   serializeJsonLd,
 } from "../../../lib/seo";
-import { Suspense } from "react";
-import DailyAnalysisClientOnly from "./DailyAnalysisClientOnly";
+import { getPublicDailyAnalyses } from "../../../lib/daily-analysis/get-public-daily-analyses";
+import DailyAnalysisClient from "./DailyAnalysisClient";
 
 export const revalidate = 300;
 
@@ -34,11 +34,21 @@ const BREADCRUMB_JSON_LD = buildBreadcrumbJsonLd(PAGE_BREADCRUMBS);
 const COLLECTION_JSON_LD = buildDailyAnalysisListPageJsonLd({
   path: "/daily-analysis",
   title: "التحليلات اليومية | HasaN CharT World",
-  description:
-    "مجموعة التحليلات اليومية والأسبوعية لأسواق المال من HasaN CharT World.",
+  description: "مجموعة التحليلات اليومية والأسبوعية لأسواق المال من HasaN CharT World.",
 });
 
-export default function DailyAnalysisPage() {
+export default async function DailyAnalysisPage() {
+  let initialAnalyses = [];
+  let initialLoadError = "";
+
+  try {
+    const result = await getPublicDailyAnalyses();
+    initialAnalyses = Array.isArray(result?.analyses) ? result.analyses : [];
+  } catch (error) {
+    console.error("[daily-analysis] SSR load failed:", error);
+    initialLoadError = error?.message || "تعذر تحميل التحليلات.";
+  }
+
   return (
     <>
       <script
@@ -49,19 +59,7 @@ export default function DailyAnalysisPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(COLLECTION_JSON_LD) }}
       />
-      <Suspense
-        fallback={
-          <main className="daily-analysis-page min-h-screen px-4 py-10" aria-busy="true" aria-live="polite">
-            <div className="mx-auto max-w-7xl">
-              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-10 text-center text-slate-300">
-                جاري تحميل التحليلات اليومية...
-              </div>
-            </div>
-          </main>
-        }
-      >
-        <DailyAnalysisClientOnly />
-      </Suspense>
+      <DailyAnalysisClient initialAnalyses={initialAnalyses} initialLoadError={initialLoadError} />
     </>
   );
 }
