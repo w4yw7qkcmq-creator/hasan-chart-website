@@ -101,7 +101,7 @@ const withTimeout = (promise, ms, message = "REQUEST_TIMEOUT") => {
   });
 };
 
-export default function HomePageClient({ heroCopy }) {
+export default function HomePageClient({ heroCopy, marketHubLinks }) {
   const { showAppModal } = useAppModal();
   const { authResolved, user } = useAuth();
   const [activeNotice, setActiveNotice] = useState("");
@@ -436,6 +436,8 @@ export default function HomePageClient({ heroCopy }) {
             </div>
           </div>
         </section>
+
+        {marketHubLinks}
 
         <HomeMarketWindowsSection
           marketWindows={MARKET_WINDOWS}
