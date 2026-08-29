@@ -47,6 +47,10 @@ import {
   getCanonicalNewsPath,
   shouldRedirectToCanonicalNewsPath,
 } from "../../../../lib/news-urls";
+import {
+  safeEncodeURIComponent,
+  truncateWithoutBreakingSurrogates,
+} from "../../../../lib/text-safety";
 
 export const revalidate = 120;
 
@@ -83,7 +87,10 @@ function getNewsTitle(news) {
     .filter((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
 
   if (arabicSentences.length > 0) {
-    return arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, "").slice(0, 150);
+    return truncateWithoutBreakingSurrogates(
+      arabicSentences[0].replace(/^عاجل\s*[:：-]?\s*/i, ""),
+      150
+    );
   }
 
   return title || "خبر اقتصادي عاجل";
@@ -285,7 +292,7 @@ export default async function NewsDetailsPage({ params }) {
         <div className="flex flex-wrap items-center gap-3">
           <CopyArticleButtonClientOnly url={articleUrl} />
           <a
-            href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(articleUrl)}&text=${encodeURIComponent(title)}`}
+            href={`https://twitter.com/intent/tweet?url=${safeEncodeURIComponent(articleUrl)}&text=${safeEncodeURIComponent(title)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center rounded-2xl border border-violet-500/40 bg-violet-600 px-4 py-3 text-sm font-black !text-white dark:!text-white no-underline shadow-xl shadow-violet-600/20 transition hover:scale-105 hover:bg-violet-700 dark:border-violet-300/40 dark:bg-violet-400"
