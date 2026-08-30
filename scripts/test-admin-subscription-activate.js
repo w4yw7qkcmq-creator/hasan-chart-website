@@ -89,7 +89,32 @@ function createMockSupabase(initialRow, options = {}) {
         return {
           select() {
             return {
-              eq(_column, value) {
+              eq(column, value) {
+                if (column === "user_email") {
+                  const listChain = {
+                    in(_statusColumn, allowedStatuses) {
+                      listChain._allowedStatuses = allowedStatuses;
+                      return listChain;
+                    },
+                    order() {
+                      return listChain;
+                    },
+                    limit() {
+                      return Promise.resolve({
+                        data:
+                          row &&
+                          String(row.user_email || "").toLowerCase() ===
+                            String(value || "").toLowerCase() &&
+                          listChain._allowedStatuses?.includes(row.status)
+                            ? [{ ...row }]
+                            : [],
+                        error: null,
+                      });
+                    },
+                  };
+                  return listChain;
+                }
+
                 return {
                   async maybeSingle() {
                     if (!row || String(value) !== String(row.id)) {
@@ -536,7 +561,7 @@ async function testActivateProfileUpdateFailurePartialSuccess() {
   assert.equal(dispatchCalled, true);
   assert.ok(result.warnings.some((item) => /تحديث صلاحية المستخدم/.test(item)));
   assert.ok(
-    supabase.auditRows.some((entry) => entry.action === "activate-subscription-profile-update-failed")
+    supabase.auditRows.some((entry) => entry.action === "activate-subscription-profile-reconcile-failed")
   );
 }
 
