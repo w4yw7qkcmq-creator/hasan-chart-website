@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const path = require("path");
+const { withSentryConfig } = require("@sentry/nextjs");
 const { getSecurityHeaders } = require("./lib/security-headers");
 
 const CACHE_PUBLIC_SEO_ARTIFACT =
@@ -153,4 +154,30 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+
+module.exports = withSentryConfig(nextConfig, {
+  org: sentryOrg,
+  project: sentryProject,
+  authToken: sentryAuthToken,
+  silent: !process.env.CI,
+  hideSourceMaps: true,
+  widenClientFileUpload: true,
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+  sourcemaps: {
+    disable: !sentryAuthToken || !sentryOrg || !sentryProject,
+  },
+  release: {
+    name:
+      process.env.SENTRY_RELEASE ||
+      process.env.RAILWAY_GIT_COMMIT_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.GIT_COMMIT,
+  },
+});

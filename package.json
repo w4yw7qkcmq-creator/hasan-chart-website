@@ -81,6 +81,7 @@
     "test:telegram-content-phase2a1": "node --test scripts/test-telegram-content-phase2a1.js && node scripts/test-telegram-content-startup-smoke.js"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.72.0",
     "@supabase/supabase-js": "^2.105.3",
     "@tanstack/react-virtual": "^3.14.5",
     "@upstash/ratelimit": "^2.0.8",

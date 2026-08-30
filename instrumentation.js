@@ -1,5 +1,9 @@
+import * as Sentry from "@sentry/nextjs";
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./sentry.server.config.js");
+
     const { announceWebsitePriceAlertEmailGuard } = await import(
       "./lib/price-alert-email-guard.js"
     );
@@ -29,4 +33,10 @@ export async function register() {
     const { warmupSymbolRegistry } = await import("./lib/market-data/symbol-registry.js");
     warmupSymbolRegistry("instrumentation-register");
   }
+
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("./sentry.edge.config.js");
+  }
 }
+
+export const onRequestError = Sentry.captureRequestError;
