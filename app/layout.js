@@ -47,7 +47,9 @@ export const metadata = {
   }),
   applicationName: SITE_ORGANIZATION_NAME,
   appleWebApp: {
+    capable: true,
     title: SITE_ORGANIZATION_NAME,
+    statusBarStyle: "black-translucent",
   },
   icons: {
     icon: [

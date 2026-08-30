@@ -832,6 +832,10 @@ html[data-theme="light"] .bootstrapScreen__tagline {
   cursor: not-allowed;
 }
 
+.browserPushBell--needs-home-screen {
+  border-color: rgba(34, 211, 238, 0.28);
+}
+
 .browserPushBell__icon {
   font-size: 1.125rem;
   line-height: 1;
@@ -865,6 +869,11 @@ html[data-theme="light"] .bootstrapScreen__tagline {
 
 .browserPushBell__badge--blocked {
   background: #ef4444;
+  color: #fff;
+}
+
+.browserPushBell__badge--info {
+  background: #0ea5e9;
   color: #fff;
 }
 

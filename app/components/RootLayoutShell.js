@@ -18,6 +18,11 @@ import {
   pushEnrollmentCompactUi,
 } from "../../lib/push-enrollment-state.js";
 import {
+  detectPushPlatformContext,
+  detectWebPushCapabilities,
+  IOS_HOME_SCREEN_GUIDANCE_MESSAGE,
+} from "../../lib/push-platform.js";
+import {
   shouldPrefetchSidebarHref,
   siteShellMenuGroups as menuGroups,
   siteShellSocialLinks as socialLinks,
@@ -33,7 +38,7 @@ function BrowserPushHeaderButton({ ui, onClick }) {
       onClick={onClick}
       className={`browserPushBell shrink-0 ${ui.active ? "browserPushBell--active" : ""} ${
         ui.variant === "unsupported" ? "browserPushBell--unsupported" : ""
-      }`}
+      } ${ui.variant === "needs_home_screen" ? "browserPushBell--needs-home-screen" : ""}`}
     >
       <span className="browserPushBell__icon" aria-hidden="true">
         🔔
@@ -786,7 +791,21 @@ function RootLayoutShell({ children }) {
       return;
     }
 
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+    const platform = detectPushPlatformContext();
+
+    if (platform.isIOSBrowserTab) {
+      showAppModal({
+        type: "info",
+        title: "تفعيل الإشعارات على iPhone",
+        message: IOS_HOME_SCREEN_GUIDANCE_MESSAGE,
+        buttonText: "حسنًا",
+      });
+      return;
+    }
+
+    const capabilities = detectWebPushCapabilities();
+
+    if (!capabilities.webPushSupported) {
       setPushEnrollment(PUSH_ENROLLMENT.UNSUPPORTED);
       showAppModal({
         type: "warning",
@@ -815,6 +834,25 @@ function RootLayoutShell({ children }) {
         message: "إشعارات المتصفح محظورة من إعدادات المتصفح. فعّلها يدوياً من إعدادات المتصفح ثم أعد المحاولة.",
       });
       return;
+    }
+
+    let permission = Notification.permission;
+
+    if (permission === "default") {
+      permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+
+      if (permission !== "granted") {
+        setPushEnrollment(
+          permission === "denied" ? PUSH_ENROLLMENT.DENIED : PUSH_ENROLLMENT.PROMPT
+        );
+        showAppModal({
+          type: "warning",
+          title: "تم رفض الإشعارات",
+          message: "تم رفض إشعارات المتصفح. يمكنك تفعيلها لاحقاً من إعدادات المتصفح.",
+        });
+        return;
+      }
     }
 
     try {
@@ -869,21 +907,6 @@ function RootLayoutShell({ children }) {
       if (browserState.needsReenable) {
         setWebPushEnabled(false);
         setPushEnrollment(PUSH_ENROLLMENT.NEEDS_REENABLE);
-      }
-
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-
-      if (permission !== "granted") {
-        setPushEnrollment(
-          permission === "denied" ? PUSH_ENROLLMENT.DENIED : PUSH_ENROLLMENT.PROMPT
-        );
-        showAppModal({
-          type: "warning",
-          title: "تم رفض الإشعارات",
-          message: "تم رفض إشعارات المتصفح. يمكنك تفعيلها لاحقاً من إعدادات المتصفح.",
-        });
-        return;
       }
 
       const saveResult = await savePushSubscription();

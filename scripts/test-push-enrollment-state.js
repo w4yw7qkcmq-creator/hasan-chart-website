@@ -82,6 +82,51 @@ test("compact ui: unsupported is disabled", () => {
   assert.equal(ui.badge, null);
 });
 
+test("enrollment: iOS browser tab => needs home screen even without Notification", () => {
+  assert.equal(
+    resolvePushEnrollmentFromBrowserState({
+      needsHomeScreen: true,
+      serviceWorkerSupported: true,
+      pushManagerSupported: false,
+      notificationSupported: false,
+    }),
+    PUSH_ENROLLMENT.NEEDS_HOME_SCREEN
+  );
+});
+
+test("enrollment: missing PushManager => unsupported when not iOS browser tab", () => {
+  assert.equal(
+    resolvePushEnrollmentFromBrowserState({
+      needsHomeScreen: false,
+      serviceWorkerSupported: true,
+      pushManagerSupported: false,
+      notificationSupported: true,
+    }),
+    PUSH_ENROLLMENT.UNSUPPORTED
+  );
+});
+
+test("enrollment: desktop supported => prompt unchanged", () => {
+  assert.equal(
+    resolvePushEnrollmentFromBrowserState({
+      needsHomeScreen: false,
+      serviceWorkerSupported: true,
+      pushManagerSupported: true,
+      notificationSupported: true,
+      permission: "default",
+      hasSubscription: false,
+    }),
+    PUSH_ENROLLMENT.PROMPT
+  );
+});
+
+test("compact ui: needs home screen is clickable", () => {
+  const ui = pushEnrollmentCompactUi(PUSH_ENROLLMENT.NEEDS_HOME_SCREEN);
+  assert.equal(ui.disabled, false);
+  assert.equal(ui.variant, "needs_home_screen");
+  assert.notEqual(ui.variant, "unsupported");
+});
+
 test("compact ui: checking shows spinner state", () => {
   const ui = pushEnrollmentCompactUi(PUSH_ENROLLMENT.ENROLLED, { checking: true });
   assert.equal(ui.variant, "checking");

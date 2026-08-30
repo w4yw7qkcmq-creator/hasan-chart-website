@@ -799,15 +799,6 @@ export default function AdminPage() {
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "granted") {
         setBrowserNotificationsEnabled(true);
-      } else if (Notification.permission !== "denied") {
-        Notification.requestPermission()
-          .then((permission) => {
-            if (cancelled) return;
-            if (permission === "granted") {
-              setBrowserNotificationsEnabled(true);
-            }
-          })
-          .catch(() => {});
       }
     }
 
