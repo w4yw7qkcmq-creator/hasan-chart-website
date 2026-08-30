@@ -21,6 +21,23 @@ function pastIso(days = 1) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
+function buildReconcilePayloadFromRows(rows) {
+  const activeRows = rows.filter((row) => {
+    if (row?.admin_disabled) return false;
+    if (row?.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return false;
+    return true;
+  });
+  const planText = activeRows
+    .map((row) => [row.plan_name, row.category].filter(Boolean).join(" "))
+    .filter(Boolean)
+    .join(" | ");
+  return {
+    activeRows,
+    expectedStatus: activeRows.length ? "نشط" : "غير نشط",
+    expectedPlan: planText || "بدون اشتراك",
+  };
+}
+
 function createLifecycleSupabase(initialRows = [], options = {}) {
   const rows = initialRows.map((row) => ({ ...row }));
   const profileUpdates = [];
@@ -168,6 +185,59 @@ function createLifecycleSupabase(initialRows = [], options = {}) {
       }
 
       throw new Error(`Unexpected table ${table}`);
+    },
+    async rpc(fn, params) {
+      if (fn !== "reconcile_profile_subscription_from_requests") {
+        throw new Error(`Unexpected rpc ${fn}`);
+      }
+
+      const email = String(params.p_user_email || "").toLowerCase();
+      const matchingRows = rows.filter(
+        (row) =>
+          String(row.user_email || "").toLowerCase() === email &&
+          ["مفعل", "نشط", "active"].includes(row.status)
+      );
+      const { expectedStatus, expectedPlan } = buildReconcilePayloadFromRows(matchingRows);
+
+      profileUpdates.push({
+        email,
+        values: {
+          subscription_status: expectedStatus,
+          subscription_plan: expectedPlan,
+        },
+      });
+
+      if (profileUpdateFails) {
+        return {
+          data: {
+            success: true,
+            profile_matched: false,
+            expected_status: expectedStatus,
+            expected_plan: expectedPlan,
+            actual_status: profileState.subscription_status,
+            actual_plan: profileState.subscription_plan,
+          },
+          error: null,
+        };
+      }
+
+      profileState = {
+        ...profileState,
+        subscription_status: expectedStatus,
+        subscription_plan: expectedPlan,
+      };
+
+      return {
+        data: {
+          success: true,
+          profile_matched: true,
+          expected_status: expectedStatus,
+          expected_plan: expectedPlan,
+          actual_status: expectedStatus,
+          actual_plan: expectedPlan,
+        },
+        error: null,
+      };
     },
   };
 

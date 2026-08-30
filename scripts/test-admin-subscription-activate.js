@@ -84,6 +84,38 @@ function createMockSupabase(initialRow, options = {}) {
     getRow() {
       return row;
     },
+    async rpc(fn, params) {
+      if (fn !== "reconcile_profile_subscription_from_requests") {
+        throw new Error(`Unexpected rpc ${fn}`);
+      }
+
+      profileUpdates.push({ email: params.p_user_email, rpc: true });
+      if (profileUpdateFails) {
+        return {
+          data: {
+            success: true,
+            profile_matched: false,
+            expected_status: "نشط",
+            expected_plan: "VIP Spot",
+            actual_status: "غير نشط",
+            actual_plan: "بدون اشتراك",
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: {
+          success: true,
+          profile_matched: true,
+          expected_status: "نشط",
+          expected_plan: "VIP Spot",
+          actual_status: "نشط",
+          actual_plan: "VIP Spot",
+        },
+        error: null,
+      };
+    },
     from(table) {
       if (table === "subscription_requests") {
         return {

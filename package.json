@@ -75,7 +75,7 @@
     "test:forex-subscriptions": "node --test scripts/test-forex-subscriptions.js",
     "test:financial-center-cursor": "node scripts/test-financial-center-cursor.js",
     "test:subscription-plan-security": "node --test scripts/test-subscription-plan-security.js",
-    "test:subscription-profile-reconcile": "node scripts/test-subscription-profile-reconcile-lifecycle.js && node scripts/test-admin-subscription-activate.js",
+    "test:subscription-profile-reconcile": "node scripts/test-subscription-profile-reconcile-lifecycle.js && node scripts/test-admin-subscription-activate.js && node --test scripts/test-profile-subscription-reconcile-rpc-static.js && node scripts/test-profile-subscription-reconcile-rpc-security.js",
     "test:partner:migration-history": "node --test scripts/test-partner-migration-history-guard.js && node scripts/partner-center/verify-production-migration-history.mjs",
     "test:partner:r9-staging": "node scripts/partner-center/r9-staging-validation.mjs",
     "test:telegram-content-phase2a": "node --test scripts/test-telegram-content-phase2a.js && node scripts/test-telegram-content-rls-static.js",

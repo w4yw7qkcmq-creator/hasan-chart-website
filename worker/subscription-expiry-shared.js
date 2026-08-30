@@ -62,68 +62,34 @@ function createEmptySummary() {
   };
 }
 
-function buildProfileSubscriptionPlanText(activeRows = []) {
-  return activeRows
-    .map((row) => [row.plan_name, row.category].filter(Boolean).join(" "))
-    .filter(Boolean)
-    .join(" | ");
-}
-
-async function fetchActiveSubscriptionRowsForUser(supabase, userEmail) {
+async function reconcileProfileSubscriptionFromRequests(supabase, userEmail) {
   const email = String(userEmail || "").trim().toLowerCase();
-  if (!email) {
-    return { email: "", rows: [], activeRows: [], error: null, missingColumns: false };
-  }
+  if (!email) return;
 
-  const { data: rows, error } = await supabase
-    .from("subscription_requests")
-    .select("id,plan_name,category,status,expires_at,admin_disabled")
-    .eq("user_email", email)
-    .in("status", ["مفعل", "نشط", "active"])
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    if (/column .* does not exist/i.test(error.message || "")) {
-      return { email, rows: [], activeRows: [], error: null, missingColumns: true };
-    }
-    return { email, rows: [], activeRows: [], error, missingColumns: false };
-  }
-
-  const activeRows = (rows || []).filter((row) => {
-    if (row?.admin_disabled) return false;
-    if (row?.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return false;
-    return true;
+  const { data, error } = await supabase.rpc("reconcile_profile_subscription_from_requests", {
+    p_user_email: email,
   });
 
-  return {
-    email,
-    rows: rows || [],
-    activeRows,
-    error: null,
-    missingColumns: false,
-  };
-}
+  if (error) {
+    throw error;
+  }
 
-async function reconcileProfileSubscriptionFromRequests(supabase, userEmail) {
-  const { email, activeRows, error, missingColumns } = await fetchActiveSubscriptionRowsForUser(
-    supabase,
-    userEmail
-  );
-  if (!email || missingColumns) return;
-  if (error) throw error;
+  const payload = data || {};
+  if (!payload.success) {
+    throw new Error(payload.reason || "profile-subscription-reconcile-failed");
+  }
 
-  const planText = buildProfileSubscriptionPlanText(activeRows);
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({
-      subscription_plan: planText || "بدون اشتراك",
-      subscription_status: activeRows.length ? "نشط" : "غير نشط",
-    })
-    .eq("email", email);
-
-  if (profileError) {
-    throw profileError;
+  if (!payload.profile_matched) {
+    console.error("subscription-maintenance:profile-reconcile-mismatch", {
+      email,
+      profiles_updated: payload.profiles_updated,
+      active_request_count: payload.active_request_count,
+      expected_status: payload.expected_status,
+      expected_plan: payload.expected_plan,
+      actual_status: payload.actual_status,
+      actual_plan: payload.actual_plan,
+    });
+    throw new Error("profile subscription reconcile did not persist expected state");
   }
 }
 
