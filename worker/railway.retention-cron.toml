@@ -1,0 +1,12 @@
+# Database retention cron — Railway service: "Database Retention Cron"
+# Root Directory = worker | Config File = railway.retention-cron.toml
+# Required env: NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY
+# Schedule: once daily at 04:00 UTC (after profiles reconciliation)
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "node database-retention-cron.js"
+cronSchedule = "0 4 * * *"
+restartPolicyType = "NEVER"

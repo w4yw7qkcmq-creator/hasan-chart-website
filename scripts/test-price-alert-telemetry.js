@@ -31,7 +31,23 @@ function createMockSupabase({ fail = false } = {}) {
   const ok = await telemetry.persistCycleTelemetry(createMockSupabase(), row);
   assert.equal(ok.ok, true);
 
-  const fail = await telemetry.persistCycleTelemetry(createMockSupabase({ fail: true }), row);
+  const throttled = await telemetry.persistCycleTelemetry(createMockSupabase(), row);
+  assert.equal(throttled.ok, true);
+  assert.equal(throttled.skipped, true);
+  assert.equal(throttled.reason, "healthy_throttled");
+
+  const errorRow = telemetry.buildCycleTelemetryRow({
+    runId: "par-error",
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    durationMs: 10,
+    status: "failed",
+    stats: {},
+    lock: { acquired: true },
+  });
+  assert.equal(telemetry.shouldPersistCycleTelemetry(errorRow), true);
+
+  const fail = await telemetry.persistCycleTelemetry(createMockSupabase({ fail: true }), errorRow);
   assert.equal(fail.ok, false);
 
   console.log("price alert telemetry PASS");

@@ -1,6 +1,27 @@
 const { randomBytes } = require("node:crypto");
 const { getInstanceId } = require("./price-alert-distributed-lock");
 
+const HEALTHY_TELEMETRY_PERSIST_INTERVAL_MS = 5 * 60_000;
+let lastHealthyTelemetryPersistAt = 0;
+
+function shouldPersistCycleTelemetry(row = {}) {
+  const status = String(row.status || "").trim();
+  if (status === "failed" || status === "overlap") return true;
+  if (Number(row.alerts_triggered) > 0) return true;
+  if (Number(row.alerts_claimed) > 0) return true;
+  if (Number(row.stale_prices) > 0) return true;
+  if (Number(row.push_failed) > 0) return true;
+  if (Number(row.email_failed) > 0) return true;
+  if (row.error_code_safe) return true;
+
+  const now = Date.now();
+  if (now - lastHealthyTelemetryPersistAt >= HEALTHY_TELEMETRY_PERSIST_INTERVAL_MS) {
+    lastHealthyTelemetryPersistAt = now;
+    return true;
+  }
+  return false;
+}
+
 function createRunId() {
   return `par-${Date.now()}-${randomBytes(4).toString("hex")}`;
 }
@@ -56,6 +77,10 @@ async function persistCycleTelemetry(getSupabaseClient, row) {
     return { ok: false, reason: "supabase_unavailable" };
   }
 
+  if (!shouldPersistCycleTelemetry(row)) {
+    return { ok: true, skipped: true, reason: "healthy_throttled" };
+  }
+
   try {
     const { error } = await client.from("price_alert_worker_runs").insert(row);
     if (error) {
@@ -92,4 +117,6 @@ module.exports = {
   buildCycleTelemetryRow,
   persistCycleTelemetry,
   cleanupOldRuns,
+  shouldPersistCycleTelemetry,
+  HEALTHY_TELEMETRY_PERSIST_INTERVAL_MS,
 };

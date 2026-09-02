@@ -4,10 +4,10 @@ const { getMetricsAggregator } = require("./metrics-aggregator");
 const { getCycleFunnel } = require("../../news-ingestion/cycle-funnel");
 
 const HEARTBEAT_WINDOW_KEY = "worker_heartbeat";
+const HEARTBEAT_BUCKET_MS = 5 * 60_000;
 
 function currentHeartbeatBucketStart() {
-  const minuteMs = 60_000;
-  return new Date(Math.floor(Date.now() / minuteMs) * minuteMs).toISOString();
+  return new Date(Math.floor(Date.now() / HEARTBEAT_BUCKET_MS) * HEARTBEAT_BUCKET_MS).toISOString();
 }
 
 async function flushWorkerTelemetrySnapshot(supabase) {

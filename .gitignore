@@ -1,3 +1,5 @@
+.retention-backups/
+
 node_modules
 .next
 .env
