@@ -76,6 +76,28 @@ export async function POST(request) {
       expectedAction: "register",
     });
     if (!captcha.ok) {
+      const turnstileLog = {};
+      if (Array.isArray(captcha.codes) && captcha.codes.length > 0) {
+        turnstileLog.codes = captcha.codes;
+      }
+      if (captcha.reason) {
+        turnstileLog.reason = captcha.reason;
+      }
+      if (captcha.replay) {
+        turnstileLog.replay = true;
+      }
+      if (captcha.timeout) {
+        turnstileLog.timeout = true;
+      }
+      if (captcha.hostname) {
+        turnstileLog.hostname = captcha.hostname;
+      }
+      if (captcha.action && captcha.expectedAction) {
+        turnstileLog.action = captcha.action;
+        turnstileLog.expectedAction = captcha.expectedAction;
+      }
+      console.warn("[Turnstile] Registration verification failed", turnstileLog);
+
       return NextResponse.json(
         { success: false, error: captcha.error || TURNSTILE_REGISTRATION_ERROR_AR },
         { status: captcha.status || 403 }

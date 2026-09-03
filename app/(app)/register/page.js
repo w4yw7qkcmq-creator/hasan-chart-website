@@ -88,6 +88,7 @@ export default function RegisterPage() {
 
       turnstileWidgetId.current = window.turnstile.render("#turnstile-register", {
         sitekey: TURNSTILE_SITE_KEY,
+        action: "register",
         theme: "dark",
         language: "ar",
         appearance: "always",
@@ -98,8 +99,22 @@ export default function RegisterPage() {
         "expired-callback": () => {
           setTurnstileToken("");
         },
+        "timeout-callback": () => {
+          setTurnstileToken("");
+          if (window.turnstile && turnstileWidgetId.current !== null) {
+            window.turnstile.reset(turnstileWidgetId.current);
+          }
+        },
         "error-callback": () => {
           setTurnstileToken("");
+          if (window.turnstile && turnstileWidgetId.current !== null) {
+            window.turnstile.reset(turnstileWidgetId.current);
+          }
+          showAppModal({
+            type: "warning",
+            title: "تحقق أمني",
+            message: "تعذر تحميل التحقق الأمني. حاول مرة أخرى أو افتح الموقع بمتصفح آخر.",
+          });
         },
       });
 
