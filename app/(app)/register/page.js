@@ -5,8 +5,45 @@ import { useRouter } from "next/navigation";
 import { useAppModal } from "../../components/AppModalProvider";
 import { ANALYTICS_EVENTS } from "../../../lib/analytics-events";
 import { trackEvent } from "../../../lib/analytics";
+import {
+  detectBrowserFamily,
+  normalizeTurnstileClientErrorCode,
+  TURNSTILE_CLIENT_ERROR_EVENT,
+  TURNSTILE_REGISTER_ACTION,
+} from "../../../lib/security/turnstile-client-telemetry.js";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+function createClientReportId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  }
+
+  return String(Date.now());
+}
+
+function reportTurnstileClientError(errorCode, clientReportId) {
+  const code = normalizeTurnstileClientErrorCode(errorCode);
+  if (!code) return;
+
+  const payload = {
+    event: TURNSTILE_CLIENT_ERROR_EVENT,
+    code,
+    action: TURNSTILE_REGISTER_ACTION,
+    browserFamily: detectBrowserFamily(typeof navigator !== "undefined" ? navigator.userAgent : ""),
+  };
+
+  if (clientReportId) {
+    payload.clientReportId = clientReportId;
+  }
+
+  fetch("/api/telemetry/turnstile-client-error", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {});
+}
 
 const verifyTurnstileToken = async (token) => {
   if (!TURNSTILE_SITE_KEY) return { ok: true };
@@ -75,6 +112,7 @@ export default function RegisterPage() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReady, setTurnstileReady] = useState(false);
   const turnstileWidgetId = useRef(null);
+  const turnstileClientReportId = useRef(null);
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY) return;
@@ -105,8 +143,12 @@ export default function RegisterPage() {
             window.turnstile.reset(turnstileWidgetId.current);
           }
         },
-        "error-callback": () => {
+        "error-callback": (errorCode) => {
           setTurnstileToken("");
+          if (!turnstileClientReportId.current) {
+            turnstileClientReportId.current = createClientReportId();
+          }
+          reportTurnstileClientError(errorCode, turnstileClientReportId.current);
           if (window.turnstile && turnstileWidgetId.current !== null) {
             window.turnstile.reset(turnstileWidgetId.current);
           }
