@@ -3,7 +3,7 @@
  */
 
 const { blockProductionTestRecipientSend } = require("./email-outbox-guard.cjs");
-const { syncCampaignRecipientFromOutbox } = require("./email-campaign/delivery-sync.cjs");
+const { syncCampaignRecipientFromOutbox } = require("./email-campaign-delivery-sync.cjs");
 
 const EMAIL_OUTBOX_TABLE = "email_outbox";
 const EMAIL_MESSAGES_TABLE = "email_messages";

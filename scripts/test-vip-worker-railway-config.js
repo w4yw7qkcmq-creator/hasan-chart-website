@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -29,11 +30,25 @@ assert.match(emailNixpacks, /email-outbox-processor\.js/);
 
 const rootCore = read("lib/email-outbox-core.cjs");
 const workerCore = read("worker/lib/email-outbox-core.cjs");
+const ROOT_CAMPAIGN_SYNC = 'require("./email-campaign/delivery-sync.cjs")';
+const WORKER_CAMPAIGN_SYNC = 'require("./email-campaign-delivery-sync.cjs")';
+
+assert.match(rootCore, new RegExp(ROOT_CAMPAIGN_SYNC.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+assert.match(workerCore, new RegExp(WORKER_CAMPAIGN_SYNC.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+const normalizedRootCore = rootCore.replace(ROOT_CAMPAIGN_SYNC, WORKER_CAMPAIGN_SYNC);
 assert.equal(
-  rootCore,
+  normalizedRootCore,
   workerCore,
-  "worker/lib/email-outbox-core.cjs must stay in sync with lib/email-outbox-core.cjs"
+  "worker/lib/email-outbox-core.cjs must match lib/email-outbox-core.cjs except campaign sync require path"
 );
+
+const emailQueueBuildValidation = execSync(
+  'node -e "require(\'./email-outbox-processor.js\'); console.log(\'email queue worker deps ok\')"',
+  { cwd: join(ROOT, "worker"), encoding: "utf8" }
+);
+assert.match(emailQueueBuildValidation, /email queue worker deps ok/);
+
 assert.match(read("lib/email-outbox-guard.cjs"), /email-recipient-guard\.cjs/);
 assert.match(read("worker/lib/email-outbox-guard.cjs"), /email-recipient-guard\.cjs/);
 
