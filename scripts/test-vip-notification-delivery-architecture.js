@@ -253,7 +253,9 @@ test("worker sync: outbox sent updates VIP delivery", async () => {
   );
 
   assert.equal(sync.synced, true);
-  assert.equal(updated.status, "provider_accepted");
+  assert.equal(updated.status, "delivered");
+  assert.ok(updated.delivered_at);
+  assert.equal(updated.provider_message_id, "resend-xyz");
 });
 
 test("email-queue-worker sync after mock Resend", async () => {

@@ -3,7 +3,7 @@
  */
 
 const { blockProductionTestRecipientSend } = require("./email-outbox-guard.cjs");
-const { syncCampaignRecipientFromOutbox } = require("./email-campaign-delivery-sync.cjs");
+const { syncCampaignRecipientFromOutbox } = require("./email-campaign/delivery-sync.cjs");
 
 const EMAIL_OUTBOX_TABLE = "email_outbox";
 const EMAIL_MESSAGES_TABLE = "email_messages";
@@ -519,11 +519,14 @@ async function syncVipStatusDeliveryFromOutbox(
 
   if (outcome === "provider_accepted" || outcome === "sent") {
     Object.assign(patch, {
-      status: "provider_accepted",
+      status: "delivered",
+      delivered_at: row.sent_at || new Date().toISOString(),
       provider_message_id: providerMessageId || row.resend_id || null,
       error_code: null,
       error_message_safe: null,
       failed_at: null,
+      processing_started_at: null,
+      processing_worker_id: null,
     });
   } else if (outcome === "skipped") {
     Object.assign(patch, {
@@ -568,13 +571,18 @@ async function finalizeProviderAccepted(supabase, row, sendResult, deps = {}) {
   const upsertFn = deps.upsertEmailMessageFromOutbox || upsertEmailMessageFromOutbox;
   await upsertFn(supabase, row, resendId);
 
+  const sentAt = new Date().toISOString();
   await markEmailSent(supabase, { outboxId: row.id, resendId });
 
   const syncFn = deps.syncVipStatusDeliveryFromOutbox || syncVipStatusDeliveryFromOutbox;
-  await syncFn(supabase, row, {
-    outcome: "provider_accepted",
-    providerMessageId: resendId,
-  });
+  await syncFn(
+    supabase,
+    { ...row, sent_at: sentAt, resend_id: resendId },
+    {
+      outcome: "sent",
+      providerMessageId: resendId,
+    }
+  );
 
   const campaignSyncFn = deps.syncCampaignRecipientFromOutbox || syncCampaignRecipientFromOutbox;
   await campaignSyncFn(supabase, row, {
