@@ -67,7 +67,7 @@ function formatTelegramNewsMessage({ template, headline, country, previous, fore
       forecast ? `المتوقع: ${forecast}` : null,
       actual ? `الحالي: ${actual}` : null,
       "",
-      cleaned.impact ? "📊 التأثير المحتمل:" : null,
+      cleaned.impact ? "📊 القراءة:" : null,
       cleaned.impact || null,
     ].filter((line) => line !== null);
     return stripTimestampFooter(trimToLimit(collapseBlankLines(body.join("\n")), 750));

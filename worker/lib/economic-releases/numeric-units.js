@@ -9,10 +9,15 @@ function hasThousandsSuffix(value) {
   return /k$/i.test(String(value || "").trim());
 }
 
+const INVENTORY_EVENT_PATTERN = /EIA_.*INVENTOR|CRUDE_OIL_INVENTOR|GASOLINE_INVENTOR|DISTILLATE|CUSHING/i;
+
 function inferEventNumericScale(eventType, values = []) {
   const key = String(eventType || "");
   if (THOUSANDS_EVENT_PATTERN.test(key)) {
     return "thousands";
+  }
+  if (INVENTORY_EVENT_PATTERN.test(key)) {
+    return "millions";
   }
   if (PERCENT_OR_RATE_PATTERN.test(key)) {
     return "percent_or_index";
@@ -50,6 +55,7 @@ function shouldInferThousandsMultiplier(raw, scale, peerValues = []) {
 
 module.exports = {
   THOUSANDS_EVENT_PATTERN,
+  INVENTORY_EVENT_PATTERN,
   inferEventNumericScale,
   hasThousandsSuffix,
   shouldInferThousandsMultiplier,

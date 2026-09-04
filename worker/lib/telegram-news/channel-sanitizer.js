@@ -43,7 +43,7 @@ function assertNoChannelArtifacts(message) {
   if (/exness|one\.exness/i.test(text)) {
     issues.push("promo_link_leak");
   }
-  if (/اشترak|subscribe|VIP\s*promo/i.test(text)) {
+  if (/اشترك|subscribe|VIP\s*promo/i.test(text)) {
     issues.push("subscription_leak");
   }
 

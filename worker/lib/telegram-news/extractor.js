@@ -7,6 +7,9 @@ const { resolveCountryCode } = require("../economic-releases/country-resolver");
 const { normalizeTextForMatching, normalizeArabicIndicDigits } = require("../economic-releases/text-normalization");
 const { extractNumbers } = require("./fingerprint");
 const { normalizeTitleText, isGenericTitle } = require("./editorial-title");
+const { extractSourceReading, paraphrasePublishedReading } = require("./source-reading");
+const { isPromotionalDetailLine } = require("./sanitize-source-for-parsing");
+const { sanitizeSourceForParsing } = require("./sanitize-source-for-parsing");
 
 const FIELD_PATTERNS = {
   previous: [
@@ -180,7 +183,7 @@ function isLikelyStructuredReleaseTitle(cleaned, fullText = "") {
     return true;
   }
 
-  return /مؤشر|pmi|purchasing managers|مديري المشتريات|jobless|claims|cpi|nfp|gdp|ppi|pce|fed|fomc|ism|retail sales|consumer confidence|michigan|industrial production|housing|trade balance|adp|jolts|average hourly|empire state|durable goods|factory orders|capacity utilization|minutes|محضr/i.test(
+  return /مؤشر|pmi|purchasing managers|مديري المشتريات|مخزون|jobless|claims|cpi|nfp|gdp|ppi|pce|fed|fomc|ism|retail sales|consumer confidence|michigan|industrial production|housing|trade balance|adp|jolts|average hourly|empire state|durable goods|factory orders|capacity utilization|minutes|محضr/i.test(
     value
   );
 }
@@ -368,8 +371,35 @@ function extractEntities(text) {
   return [...entities];
 }
 
+function resolveEventIdentity(canonicalEventKey, sourceEventName, canonical = {}) {
+  const def = CANONICAL_EVENT_DEFINITIONS[canonicalEventKey] || canonical || {};
+  let institution = null;
+  let sector = null;
+
+  if (/ISM/.test(String(canonicalEventKey || ""))) {
+    institution = "ISM";
+    if (/MANUFACTURING/.test(canonicalEventKey) && !/NON_MANUFACTURING/.test(canonicalEventKey)) {
+      sector = "MANUFACTURING";
+    } else if (/NON_MANUFACTURING|SERVICES/.test(canonicalEventKey)) {
+      sector = "NON_MANUFACTURING";
+    }
+  } else if (/EIA/.test(String(canonicalEventKey || ""))) {
+    institution = "EIA";
+    sector = "ENERGY";
+  }
+
+  return {
+    sourceEventName: sourceEventName || null,
+    canonicalEventId: canonicalEventKey || null,
+    canonicalDisplayName: def.arabicName || sourceEventName || null,
+    institution,
+    sector,
+  };
+}
+
 function buildFactualSummary(facts, detailLines) {
-  const parts = [facts.title, facts.previous, facts.forecast, facts.actual, ...detailLines.slice(0, 3)]
+  const safeLines = (detailLines || []).filter((line) => !isPromotionalDetailLine(line));
+  const parts = [facts.title, facts.previous, facts.forecast, facts.actual, ...safeLines.slice(0, 3)]
     .filter(Boolean)
     .map((part) => String(part).trim());
   return parts.join(" | ").slice(0, 500);
@@ -387,19 +417,30 @@ function isStructuredEconomicRelease(text, canonical) {
 }
 
 function extractFactsFromTelegramPost(post) {
-  const text = normalizeArabicIndicDigits(post.rawText || "");
+  const sourceRawText = normalizeArabicIndicDigits(post.sourceRawText || post.rawText || "");
+  const sanitized =
+    post.sanitizedText ||
+    sanitizeSourceForParsing(sourceRawText, { eventType: post.canonicalEventKey || null }).sanitizedText;
+  const text = normalizeArabicIndicDigits(sanitized);
+  const sourceEventName = extractEventTitle(sourceRawText) || extractEventTitle(text);
   let previous = extractField(text, "previous");
   let forecast = extractField(text, "forecast");
   let actual = extractField(text, "actual");
   const revisedPrevious = extractField(text, "revisedPrevious");
   const countryCode = extractCountryCode(text);
   const country = extractCountry(text) || COUNTRY_DISPLAY[countryCode] || null;
-  const title = extractEventTitle(text);
+  const title = sourceEventName || extractEventTitle(text);
   const period = extractPeriod(text);
   const combined = `${title || ""} ${text}`;
   const canonical = resolveCanonicalForTelegram(combined, { countryCode });
   const resolvedEventKey =
     canonical.eventKey || resolveEventTypeFromAliases(combined, { countryCode });
+  const identity = resolveEventIdentity(resolvedEventKey || canonical.eventKey, title, canonical);
+  const sourceReading =
+    post.sourceReading ||
+    extractSourceReading(sourceRawText, { eventType: resolvedEventKey || canonical.eventKey }) ||
+    null;
+  const publishedReading = sourceReading ? paraphrasePublishedReading(sourceReading) : null;
   const rateDecision = isRateDecisionCanonical(canonical, resolvedEventKey);
   if (rateDecision && !actual) {
     actual = extractRateDecisionAction(text);
@@ -418,6 +459,7 @@ function extractFactsFromTelegramPost(post) {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
+    .filter((line) => !isPromotionalDetailLine(line))
     .filter(
       (line) =>
         !/^(?:السابق|المتوقع|التقدير|الحالي|النتيجة|actual|forecast|previous)\s*[:：]/i.test(line) &&
@@ -432,8 +474,15 @@ function extractFactsFromTelegramPost(post) {
     sourceMessageId: post.sourceMessageId,
     sourceUrl: post.sourceUrl,
     sourcePublishedAt: post.sourcePublishedAt,
+    sourceRawText,
+    sanitizedText: text,
     countryCode: countryCode || canonical.country || null,
     canonicalEventKey: resolvedEventKey || canonical.eventKey,
+    sourceEventName: identity.sourceEventName,
+    canonicalEventId: identity.canonicalEventId,
+    canonicalDisplayName: identity.canonicalDisplayName,
+    institution: identity.institution,
+    sector: identity.sector,
     title,
     country,
     eventType:
@@ -455,6 +504,9 @@ function extractFactsFromTelegramPost(post) {
     scheduledAt: post.sourcePublishedAt,
     factualSummary: buildFactualSummary({ title, previous, forecast, actual }, detailLines),
     exclusiveAnalysisDetected: detectExclusiveAnalysis(text),
+    sourceReadingRaw: sourceReading?.raw || null,
+    sourceReading,
+    publishedReading,
     canonical,
     isEconomic,
     isStructuredTriple,
@@ -470,6 +522,7 @@ module.exports = {
   extractCountryCode,
   isStructuredEconomicRelease,
   resolveCanonicalForTelegram,
+  resolveEventIdentity,
   detectExclusiveAnalysis,
   COUNTRY_DISPLAY,
 };

@@ -114,7 +114,7 @@ function isStructuredTripleReleaseTitle(title) {
     return false;
   }
 
-  return /jobless claims|initial claims|continuing claims|unemployment rate|\bcpi\b|core cpi|\bppi\b|\bpce\b|\bnfp\b|nonfarm payrolls|consumer confidence|michigan sentiment|retail sales|\bism\b|\bpmi\b|philadelphia fed|philly fed|empire state|\bgdp\b|fomc|rate decision|interest rate decision|average hourly earnings|\bjolts\b|\badp\b|durable goods|factory orders|industrial production|capacity utilization|housing starts|building permits|home sales|trade balance|current account|مديري المشتريات/i.test(
+  return /jobless claims|initial claims|continuing claims|unemployment rate|\bcpi\b|core cpi|\bppi\b|\bpce\b|\bnfp\b|nonfarm payrolls|consumer confidence|michigan sentiment|retail sales|\bism\b|\bpmi\b|philadelphia fed|philly fed|empire state|\bgdp\b|fomc|rate decision|interest rate decision|average hourly earnings|\bjolts\b|\badp\b|durable goods|factory orders|industrial production|capacity utilization|housing starts|building permits|home sales|trade balance|current account|crude oil inventories|gasoline inventories|distillate inventories|cushing|eia|مخزون|مديري المشتريات/i.test(
     value
   );
 }

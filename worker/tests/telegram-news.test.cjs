@@ -469,7 +469,9 @@ async function testIsmEconomicTemplate() {
   const msg = processed[0].formattedMessage;
   assert.ok(msg.includes("49.5"));
   assert.ok(msg.includes("50.9"));
-  assert.ok(msg.includes("📊 التأثير المحتمل"));
+  assert.ok(!msg.includes("📊 التأثير المحتمل"));
+  assert.ok(!msg.includes("📊 القراءة:"));
+  assert.ok(!/تأثير محدود|تعذر تحديد/i.test(msg));
 }
 
 async function testLoganGeneralTemplate() {

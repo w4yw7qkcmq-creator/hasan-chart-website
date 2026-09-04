@@ -23,7 +23,8 @@ const PROMO_SIGNALS = [
   /توصيات\s*مدفوعة/i,
   /\bvip\b/i,
   /تواصل\s*معنا/i,
-  /انضم\s*الآن/i,
+  /انضم\s*(?:لل)?(?:قناة|القناة)/i,
+  /لمتابعة[^\n]{0,120}(?:انضم|إنضم|اشترك)/i,
   /اشترك\s*الآن/i,
   /العرض\s*لفترة\s*محدودة/i,
   /حصاد\s*أسبوع/i,
@@ -37,7 +38,7 @@ const PROMO_SIGNALS = [
 ];
 
 const PROMO_LINE_PATTERN =
-  /^(?:اشترك|انضم|إنضم|join(?:\s+our\s+channel)?|subscribe|تابعنا|follow\s*us|تواصل\s*معنا|افتح\s*حساب|open\s*account|promo\s*code|referral|broker|exness|\bxm\b|⬤\s*قناة|📚|please\s*open\s*telegram|https?:\/\/t\.me\/\S+|@forex\w+|one\.exness)/i;
+  /^(?:اشترك|انضم|إنضم|join(?:\s+our\s+channel)?|subscribe|تابعنا|follow\s*us|تواصل\s*معنا|افتح\s*حساب|open\s*account|promo\s*code|referral|broker|exness|\bxm\b|⬤\s*قناة|📚|please\s*open\s*telegram|https?:\/\/(?:www\.)?telegram\.me\/\S+|https?:\/\/t\.me\/\S+|@forex\w+|one\.exness|لمتابعة)/i;
 
 const NEWS_SIGNAL_PATTERN =
   /صدر\s*الآن|السابق|الحالي|المتوقع|عاجل|breaking|gold|bitcoin|fed|fomc|powell|iran|trump|oil|نفط|ذهب|دولار|cpi|nfp|gdp|pmi|ism|ترامب|إيران|تصريح|بيان|🇺🇸|🟥|🚨|percent|%/i;

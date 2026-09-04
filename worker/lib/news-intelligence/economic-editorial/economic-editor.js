@@ -1,36 +1,43 @@
 const { logPhase2Event, PHASE2_EVENTS } = require("./observability-v2");
-const { interpretSingleEvent, interpretEventFamily } = require("./deterministic-interpretation");
 const {
   buildSingleStructuredOutput,
   buildFamilyStructuredOutput,
   formatSingleEditorial,
   formatFamilyEditorial,
 } = require("./arabic-formatter");
-const { maybeEnhanceWithAi } = require("./ai-editor");
 const { validateQualityGateV2, BLOCK_REASONS } = require("./quality-gate-v2");
 const { validateNumericTokenIntegrity } = require("./numeric-integrity");
 const { resolveVisualPriority } = require("./interpretation-registry");
 const { getEventFamily } = require("../event-registry");
 const { buildScheduledBucket } = require("../../telegram-news/fingerprint");
+const { interpretEventFamily } = require("./deterministic-interpretation");
+const { maybeEnhanceWithAi } = require("./ai-editor");
 
-const EDITORIAL_VERSION = "phase2-v1";
+const EDITORIAL_VERSION = "phase2-v3";
 
 function buildStructuredInputFromPublication(publication = {}) {
+  const facts = publication.facts || {};
   return {
     eventType: publication.eventType,
     eventFamily: publication.eventFamily || getEventFamily(publication.eventType),
-    country: publication.country || "US",
-    actual: publication.facts?.actual ?? publication.actual,
-    forecast: publication.facts?.forecast ?? publication.forecast,
-    previous: publication.facts?.previous ?? publication.previous,
-    unit: publication.facts?.unit ?? publication.unit,
+    country: publication.country || facts.countryCode || "US",
+    actual: facts.actual ?? publication.actual,
+    forecast: facts.forecast ?? publication.forecast,
+    previous: facts.previous ?? publication.previous,
+    unit: facts.unit ?? publication.unit,
     releaseTime: publication.releaseDate || publication.releaseTime,
     importance: publication.importance,
+    canonicalDisplayName: facts.canonicalDisplayName || publication.canonicalDisplayName || null,
+    sourceReading: facts.sourceReading || publication.sourceReading || null,
+    sourceReadingRaw: facts.sourceReadingRaw || publication.sourceReadingRaw || null,
+    publishedReading: facts.publishedReading || publication.publishedReading || null,
+    canonicalEventId: facts.canonicalEventId || publication.eventType || null,
+    telegramStructuredEconomic: publication.sourceType === "telegram_economic",
     canonicalFacts: {
-      actual: publication.facts?.actual ?? publication.actual,
-      forecast: publication.facts?.forecast ?? publication.forecast,
-      previous: publication.facts?.previous ?? publication.previous,
-      unit: publication.facts?.unit ?? publication.unit,
+      actual: facts.actual ?? publication.actual,
+      forecast: facts.forecast ?? publication.forecast,
+      previous: facts.previous ?? publication.previous,
+      unit: facts.unit ?? publication.unit,
     },
   };
 }
@@ -42,38 +49,28 @@ async function composeSingleEditorial(structuredEvent, options = {}) {
     mode: "single",
   });
 
-  const deterministic = interpretSingleEvent(structuredEvent);
-  logPhase2Event(PHASE2_EVENTS.ECONOMIC_INTERPRETATION_DETERMINISTIC, {
+  const structured = buildSingleStructuredOutput(structuredEvent);
+  const aiMeta = {
+    aiUsed: false,
+    aiReason: structured.interpretation ? "source_reading_preserved" : "source_reading_absent",
+  };
+
+  logPhase2Event(PHASE2_EVENTS.ECONOMIC_AI_EDITOR_SKIPPED, {
     eventType: structuredEvent.eventType,
-    usdBias: deterministic.usdBias,
+    reason: aiMeta.aiReason,
   });
-
-  let structured = buildSingleStructuredOutput(structuredEvent, deterministic);
-  let aiMeta = { aiUsed: false, aiReason: "deterministic_sufficient" };
-
-  const aiResult = await maybeEnhanceWithAi(structured, deterministic, structuredEvent, options);
-  if (aiResult.aiUsed) {
-    structured = { ...structured, ...aiResult.enhancements };
-    aiMeta = aiResult;
-    logPhase2Event(PHASE2_EVENTS.ECONOMIC_AI_EDITOR_USED, { eventType: structuredEvent.eventType });
-  } else {
-    logPhase2Event(PHASE2_EVENTS.ECONOMIC_AI_EDITOR_SKIPPED, {
-      eventType: structuredEvent.eventType,
-      reason: aiResult.aiReason,
-    });
-  }
 
   const body = formatSingleEditorial(structured);
   const quality = validateQualityGateV2({
     structured,
     body,
     structuredEvent,
-    deterministic,
     rawSourceText: options.rawSourceText || null,
+    telegramStructuredEconomic: structuredEvent.telegramStructuredEconomic === true,
   });
   if (!quality.ok) {
     logPhase2Event(PHASE2_EVENTS.QUALITY_GATE_BLOCKED, { reason: quality.reason, eventType: structuredEvent.eventType });
-    return { ok: false, blocked: true, reason: quality.reason, stage: "quality_gate", quality };
+    return { ok: false, blocked: true, reason: quality.reason, stage: "quality_gate", quality, detail: quality.detail };
   }
 
   const numeric = validateNumericTokenIntegrity(body, structuredEvent.canonicalFacts || structuredEvent, {
@@ -90,7 +87,7 @@ async function composeSingleEditorial(structuredEvent, options = {}) {
   logPhase2Event(PHASE2_EVENTS.ECONOMIC_EDITOR_COMPLETED, {
     eventType: structuredEvent.eventType,
     mode: "single",
-    aiUsed: aiMeta.aiUsed,
+    aiUsed: false,
     latencyMs,
   });
 
@@ -98,16 +95,19 @@ async function composeSingleEditorial(structuredEvent, options = {}) {
     ok: true,
     structured,
     body,
-    deterministic,
+    deterministic: null,
     aiMeta,
     image: null,
-    imageMeta: { source: "deferred_to_gateway", visualPriority: structured.visualPriority || resolveVisualPriority(structuredEvent.eventType) },
+    imageMeta: {
+      source: "deferred_to_gateway",
+      visualPriority: structured.visualPriority || resolveVisualPriority(structuredEvent.eventType),
+    },
     visualPriority: structured.visualPriority || resolveVisualPriority(structuredEvent.eventType),
     editorialVersion: EDITORIAL_VERSION,
     latency: {
       totalMs: latencyMs,
-      deterministicMs: aiResult.deterministicMs || latencyMs,
-      aiMs: aiResult.aiMs || 0,
+      deterministicMs: latencyMs,
+      aiMs: 0,
       imageMs: 0,
     },
   };
@@ -152,7 +152,6 @@ async function composeFamilyEditorial(family, children, options = {}) {
     structured,
     body,
     structuredEvent: { eventFamily: family, children, canonicalFacts },
-    deterministic: familyInterpretation,
     rawSourceText: options.rawSourceText || null,
     isFamily: true,
   });

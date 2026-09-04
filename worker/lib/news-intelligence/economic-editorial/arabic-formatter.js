@@ -70,7 +70,6 @@ function formatSingleEditorial(editorial = {}) {
     buildHeadlineLine(editorial),
     editorial.factsBlock,
     editorial.interpretation ? `📊 القراءة:\n${editorial.interpretation}` : null,
-    editorial.marketImpact ? `التأثير:\n${editorial.marketImpact}` : null,
     OFFICIAL_CHANNEL_FOOTER,
   ]);
 }
@@ -100,16 +99,19 @@ function buildCountryLine(country = "US") {
   return country;
 }
 
-function buildSingleStructuredOutput(event, interpretation) {
+function buildSingleStructuredOutput(event) {
+  const headline = event.canonicalDisplayName || getEventArabicName(event.eventType);
+  const publishedReading = event.publishedReading || event.sourceReading?.normalizedText || null;
   return {
-    headline: getEventArabicName(event.eventType),
+    headline,
     countryLine: buildCountryLine(event.country),
     factsBlock: buildFactsBlock(event),
-    interpretation: interpretation.interpretationLine,
-    marketImpact: interpretation.impactLine,
+    interpretation: publishedReading,
+    marketImpact: null,
+    sourceReadingRaw: event.sourceReadingRaw || event.sourceReading?.raw || null,
     importance: getInterpretationMetadata(event.eventType).importance,
     visualPriority: getInterpretationMetadata(event.eventType).visualPriority || "OPTIONAL",
-    editorialVersion: "phase2-v2",
+    editorialVersion: "phase2-v3",
     children: null,
   };
 }

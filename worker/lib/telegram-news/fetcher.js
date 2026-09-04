@@ -1,4 +1,5 @@
 const { stripPromotionalFooter, isPromotionOnly } = require("./promo-filter");
+const { sanitizeSourceForParsing } = require("./sanitize-source-for-parsing");
 
 function decodeTelegramHtml(value) {
   return String(value || "")
@@ -19,31 +20,7 @@ function decodeTelegramHtml(value) {
 }
 
 function cleanTelegramSourceText(value) {
-  const withoutFooter = stripPromotionalFooter(
-    String(value || "")
-      .replace(/https?:\/\/t\.me\/\S+/gi, "")
-      .replace(/Telegram\.me\/?\S*/gi, "")
-      .replace(/@ForexBreakingNews/gi, "")
-      .replace(/@ForexNewspaper/gi, "")
-      .replace(/ForexBreakingNews/gi, "")
-      .replace(/ForexNewspaper/gi, "")
-      .replace(/JOIN OUR CHANNEL/gi, "")
-      .replace(/SUBSCRIBE/gi, "")
-      .replace(/Follow us/gi, "")
-      .replace(/Breaking News/gi, "")
-      .replace(/&quot;/gi, '"')
-      .replace(/&#39;/gi, "'")
-      .replace(/&amp;/gi, "&")
-      .replace(/#[^\s#]+/g, "")
-  );
-
-  return withoutFooter
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+/g, " ").trim())
-    .filter(Boolean)
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return sanitizeSourceForParsing(value).sanitizedText;
 }
 
 function isPromotionalTelegramMessage(text) {
@@ -60,11 +37,12 @@ function parseTelegramChannelHtml(html, channel, stats = null) {
     const dataPost = match[1];
     const rawHtml = match[2];
     const publishedAt = match[3];
-    const rawDecoded = decodeTelegramHtml(rawHtml);
-    const hadPromoFooter = rawDecoded !== stripPromotionalFooter(rawDecoded);
-    const text = cleanTelegramSourceText(rawDecoded);
+    const sourceRawText = decodeTelegramHtml(rawHtml);
+    const hadPromoFooter = sourceRawText !== stripPromotionalFooter(sourceRawText);
+    const sanitized = sanitizeSourceForParsing(sourceRawText);
+    const text = sanitized.sanitizedText;
 
-    if (stats && hadPromoFooter && text) {
+    if (stats && (hadPromoFooter || sanitized.promoFooterRemoved) && text) {
       stats.promoFootersRemoved += 1;
     }
 
@@ -86,9 +64,12 @@ function parseTelegramChannelHtml(html, channel, stats = null) {
       sourceMessageId: messageId,
       sourceUrl: `https://t.me/${channelName}/${messageId}`,
       sourcePublishedAt: publishedAt,
+      sourceRawText: sanitized.sourceRawText,
+      sanitizedText: text,
       rawText: text,
+      sourceReading: sanitized.sourceReading,
       priority: channel.priority || 99,
-      promoFooterRemoved: hadPromoFooter,
+      promoFooterRemoved: hadPromoFooter || sanitized.promoFooterRemoved,
     });
   }
 

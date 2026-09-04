@@ -62,6 +62,30 @@ const US_ALIASES = {
   US_PENDING_HOME_SALES: alias(/pending home sales/i),
   US_TRADE_BALANCE: alias(/trade balance/i),
   US_CURRENT_ACCOUNT: alias(/current account/i),
+  US_EIA_CRUDE_OIL_INVENTORIES: alias(
+    /(?:us\s+)?crude\s+oil\s+inventor(?:y|ies)/i,
+    /eia\s+crude\s+oil\s+inventor(?:y|ies)/i,
+    /مخزون(?:ات)?\s*النفط\s*الخام(?:\s*الأمريكي)?/i,
+    /مخزون\s*النفط\s*الخام(?:\s*الأمريكي)?/i
+  ),
+  US_EIA_GASOLINE_INVENTORIES: alias(/gasoline\s+inventor(?:y|ies)/i, /gasoline\s+stocks/i, /مخزون\s*البنزين(?:\s*الأمريكي)?/i),
+  US_EIA_DISTILLATE_INVENTORIES: alias(
+    /distillate\s+inventor(?:y|ies)/i,
+    /distillate\s+stocks/i,
+    /مخزون\s*نواتج\s*التقطير(?:\s*الأمريكية)?/i
+  ),
+  US_EIA_CUSHING_CRUDE_INVENTORIES: alias(
+    /cushing\s+crude\s+oil\s+inventor(?:y|ies)/i,
+    /cushing\s+inventor(?:y|ies)/i,
+    /مخزون\s*كوشينغ(?:\s*النفط\s*الخام)?/i
+  ),
+  US_ISM_NON_MANUFACTURING_PMI: alias(
+    /ism\s*non[\s-]?manufacturing|non[\s-]?manufacturing\s*ism/i,
+    /مديري\s*المشتريات(?:\s*في|\s*ل)?(?:ل)?(?:قطاع)?\s*غير\s*الصناعي/i,
+    /(?:غير\s*الصناعي).*مديري\s*المشتريات/i,
+    /معهد\s*إدارة\s*التوريدات.*(?:غير\s*الصناعي|مديري\s*المشتريات)/i,
+    /مديري\s*المشتريات.*معهد\s*إدارة\s*التوريدات/i
+  ),
   US_SP_GLOBAL_FLASH_MANUFACTURING_PMI: alias(
     /s&p global.*manufacturing|sp global.*manufacturing|standard\s*(?:&|and)\s*poor(?:'?s)?.*manufacturing|flash manufacturing pmi/i,
     /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?).*?(?:التصنيع|manufacturing|الصناع)/i,

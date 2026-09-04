@@ -240,11 +240,67 @@ const US_GROWTH = Object.fromEntries([
   }),
 ]);
 
+const US_EIA_INVENTORIES = Object.fromEntries([
+  releaseDef("US", "EIA_CUSHING_CRUDE_INVENTORIES", {
+    priority: 6,
+    patterns: p(
+      /cushing\s+crude\s+oil\s+inventor(?:y|ies)/i,
+      /cushing\s+inventor(?:y|ies)/i,
+      /eia\s+cushing/i,
+      /مخزون\s*كوشينغ(?:\s*النفط\s*الخام)?/i
+    ),
+    arabicName: "مخزون النفط الخام في كوشينغ",
+  }),
+  releaseDef("US", "EIA_CRUDE_OIL_INVENTORIES", {
+    priority: 7,
+    patterns: p(
+      /(?:us\s+)?crude\s+oil\s+inventor(?:y|ies)/i,
+      /eia\s+crude\s+oil\s+inventor(?:y|ies)/i,
+      /crude\s+oil\s+inventor(?:y|ies)\s*(?:\(?(?:m|mb|barrels?)\)?)?/i,
+      /مخزون(?:ات)?\s*النفط\s*الخام(?:\s*الأمريكي)?/i,
+      /مخزون\s*النفط\s*الخام(?:\s*الأمريكي)?/i
+    ),
+    arabicName: "مخزون النفط الخام الأمريكي",
+  }),
+  releaseDef("US", "EIA_GASOLINE_INVENTORIES", {
+    priority: 8,
+    patterns: p(
+      /gasoline\s+inventor(?:y|ies)/i,
+      /gasoline\s+stocks/i,
+      /eia\s+gasoline/i,
+      /مخزون\s*البنزين(?:\s*الأمريكي)?/i
+    ),
+    arabicName: "مخزون البنزين الأمريكي",
+  }),
+  releaseDef("US", "EIA_DISTILLATE_INVENTORIES", {
+    priority: 8,
+    patterns: p(
+      /distillate\s+inventor(?:y|ies)/i,
+      /distillate\s+stocks/i,
+      /eia\s+distillate/i,
+      /مخزون\s*نواتج\s*التقطير(?:\s*الأمريكية)?/i
+    ),
+    arabicName: "مخزون نواتج التقطير الأمريكية",
+  }),
+]);
+
 const US_PMI = Object.fromEntries([
   releaseDef("US", "ISM_MANUFACTURING", {
     priority: 3,
     patterns: [/\bism\b.*manufacturing|ism manufacturing pmi/i],
     arabicName: "مؤشر ISM للتصنيع",
+  }),
+  releaseDef("US", "ISM_NON_MANUFACTURING_PMI", {
+    priority: 2,
+    patterns: p(
+      /\bism\b.*non[\s-]?manufacturing|non[\s-]?manufacturing.*\bism\b|ism non[\s-]?manufacturing pmi/i,
+      /ism services pmi/i,
+      /مديري\s*المشتريات(?:\s*في|\s*ل)?(?:ل)?(?:قطاع)?\s*غير\s*الصناعي/i,
+      /(?:غير\s*الصناعي).*مديري\s*المشتريات/i,
+      /معهد\s*إدارة\s*التوريدات.*(?:غير\s*الصناعي|مديري\s*المشتريات)/i,
+      /مديري\s*المشتريات.*معهد\s*إدارة\s*التوريدات/i
+    ),
+    arabicName: "مؤشر مديري المشتريات للقطاع غير الصناعي (ISM)",
   }),
   releaseDef("US", "ISM_SERVICES", {
     priority: 3,
@@ -304,7 +360,7 @@ const US_PMI = Object.fromEntries([
   }),
   releaseDef("US", "PMI", {
     priority: 99,
-    patterns: [/\bpmi\b|purchasing managers|مديري المشتريات/i],
+    patterns: [/\bpmi\b|purchasing managers/i, /مديري\s*المشتريات/i],
     arabicName: "مؤشر مديري المشتريات الأمريكي",
   }),
 ]);
@@ -564,6 +620,7 @@ const CANONICAL_EVENT_DEFINITIONS = {
   ...US_INFLATION,
   ...US_LABOR,
   ...US_GROWTH,
+  ...US_EIA_INVENTORIES,
   ...US_PMI,
   ...US_FED,
   ...UK,

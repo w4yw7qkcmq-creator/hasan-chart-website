@@ -24,17 +24,23 @@ function resetPhase2IntegrationForTests() {
 }
 
 function buildStructuredEventFromFacts(facts = {}, overrides = {}) {
-  const eventType = overrides.eventType || facts.eventType || facts.canonical?.eventKey;
+  const eventType = overrides.eventType || facts.eventType || facts.canonicalEventId || facts.canonical?.eventKey;
   return {
     eventType,
     eventFamily: overrides.eventFamily || getEventFamily(eventType),
-    country: overrides.country || facts.country || facts.canonical?.country || "US",
+    country: overrides.country || facts.countryCode || facts.country || facts.canonical?.country || "US",
     actual: facts.actual,
     forecast: facts.forecast,
     previous: facts.previous,
     unit: facts.unit || null,
     releaseTime: overrides.releaseTime || facts.releaseTime || facts.scheduledAt || facts.sourcePublishedAt,
     importance: overrides.importance || facts.importance || "HIGH",
+    canonicalDisplayName: facts.canonicalDisplayName || facts.canonical?.arabicName || null,
+    sourceReading: facts.sourceReading || null,
+    sourceReadingRaw: facts.sourceReadingRaw || facts.sourceReading?.raw || null,
+    publishedReading: facts.publishedReading || facts.sourceReading?.normalizedText || null,
+    canonicalEventId: facts.canonicalEventId || facts.canonicalEventKey || eventType || null,
+    telegramStructuredEconomic: overrides.telegramStructuredEconomic !== false,
     canonicalFacts: {
       actual: facts.actual,
       forecast: facts.forecast,

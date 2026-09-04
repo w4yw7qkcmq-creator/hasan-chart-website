@@ -64,16 +64,20 @@ async function resolveFormattedDraftWithRetry({ structuredFacts, facts, post, op
 
     let impactText = draft.impact || "";
     if (templateType === "economic") {
-      if (options.disableAi !== true) {
+      if (facts.publishedReading || facts.sourceReading?.normalizedText) {
+        impactText = facts.publishedReading || facts.sourceReading.normalizedText;
+      } else if (options.disableAi !== true && !facts.isStructuredTriple) {
         const impactResolved = await resolveImpactWithAi(facts, options);
         impactText = impactResolved.impactParagraph || impactText;
       }
-      impactText = impactText || getEconomicReleaseImpactText(facts.title, facts.actual, facts.forecast);
+      if (!impactText && !facts.isStructuredTriple) {
+        impactText = getEconomicReleaseImpactText(facts.title, facts.actual, facts.forecast);
+      }
     } else if (!impactText && options.disableAi !== true) {
       const impactResolved = await resolveImpactWithAi(facts, options);
       impactText = impactResolved.impactParagraph || impactText;
     }
-    if (!impactText) {
+    if (!impactText && templateType !== "economic") {
       impactText = "قد تنعكس هذه التطورات على الدولار والذهب ومؤشرات الأسهم.";
     }
 

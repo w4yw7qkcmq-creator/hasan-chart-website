@@ -3,6 +3,7 @@ const { createCorrelationId } = require("../news-intelligence/autonomy/structure
 const { getEventFamily } = require("../news-intelligence/event-registry");
 const { DECISION_OUTCOMES, REASON_CODES, normalizeReasonCode } = require("../news-intelligence/autonomy/reason-taxonomy");
 const { resolveCountryCode } = require("../economic-releases/country-resolver");
+const { buildPipelineTraceMetadata } = require("./pipeline-trace");
 
 const terminalDecisionKeys = new Set();
 
@@ -23,6 +24,12 @@ function mapPipelineReasonToCode(reason) {
     TELEGRAM_POST_CLASSIFICATION_UNCLEAR: REASON_CODES.PARSER_INCOMPLETE,
     TELEGRAM_NEWS_LOW_VALUE: REASON_CODES.LOW_VALUE_SKIPPED,
     PRE_EVENT_ALERT_MISSING_EVENT_NAME: REASON_CODES.PARSER_INCOMPLETE,
+    UNSUPPORTED_EVENT: REASON_CODES.CANONICAL_EVENT_UNRESOLVED,
+    PROMOTIONAL_ARTIFACT_BLOCKED: REASON_CODES.SOURCE_POLICY_BLOCKED,
+    INVENTED_READING_PRESENT: REASON_CODES.QUALITY_GATE_BLOCKED,
+    READING_WITHOUT_SOURCE: REASON_CODES.QUALITY_GATE_BLOCKED,
+    HEADLINE_IDENTITY_MISMATCH: REASON_CODES.QUALITY_GATE_BLOCKED,
+    MISSING_ACTUAL: REASON_CODES.PARSER_INCOMPLETE,
     MULTI_STORY_UNCLEAR: REASON_CODES.MULTI_STORY_UNCLEAR,
     source_conflict: REASON_CODES.FACT_INTEGRITY_FAILED,
     FINAL_MESSAGE_FACT_MISMATCH: REASON_CODES.FACT_INTEGRITY_FAILED,
@@ -92,12 +99,13 @@ function recordTelegramTerminalDecision(input = {}, options = {}) {
     importance: input.importance || "HIGH",
     qualityStatus: decision === DECISION_OUTCOMES.PUBLISHED ? "published" : "blocked",
     imageStatus: input.imageStatus || null,
-    metadata: {
+      metadata: {
       stage: input.stage || "telegram_pipeline",
       subReason: input.subReason || input.reason || null,
       country: input.country || resolveCountryCode(`${input.facts?.title || ""}\n${input.post?.rawText || ""}`),
       titlePreview: String(input.facts?.title || input.title || "").slice(0, 120),
       classification: input.classification?.classification || null,
+      pipelineTrace: buildPipelineTraceMetadata(input.pipelineTrace || input.post?.pipelineTrace || null),
       ...(input.metadata || {}),
     },
     latency: input.latency || null,

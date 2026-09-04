@@ -65,13 +65,14 @@ function buildRuleBasedEditorialDraft(structuredFacts, facts = {}) {
   if (structuredFacts.isStructuredTriple) {
     const titleResult = resolveEditorialTitle(facts, structuredFacts.eventType, structuredFacts.titleFact);
     const headline =
-      titleResult.title ||
+      facts.canonicalDisplayName ||
       buildEconomicEditorialTitle(facts, structuredFacts.eventType) ||
+      titleResult.title ||
       "إصدار اقتصادي أمريكي";
     const impact =
-      structuredFacts.actual && structuredFacts.forecast
-        ? `القراءة الفعلية ${structuredFacts.actual} مقابل توقع ${structuredFacts.forecast} قد تؤثر على توقعات الفائدة وحركة الدولار والذهب خلال الجلسة.`
-        : "قد تؤثر هذه القراءة على توقعات الفائدة وحركة الدولار والذهب خلال الجلسة.";
+      facts.publishedReading || facts.sourceReading?.normalizedText
+        ? facts.publishedReading || facts.sourceReading.normalizedText
+        : "";
     return {
       ok: true,
       template: "economic",
