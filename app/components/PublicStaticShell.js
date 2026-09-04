@@ -4,6 +4,7 @@ import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useClientMounted } from "../hooks/useClientMounted";
+import { resolveProtectedHref } from "../../lib/auth-guard";
 import {
   publicStaticMenuGroups as menuGroups,
   shouldPrefetchSidebarHref,
@@ -15,16 +16,13 @@ const MOBILE_HEADER_SCROLL_MQ = "(max-width: 1023px)";
 const MOBILE_HEADER_TOP_THRESHOLD_PX = 12;
 const MOBILE_HEADER_DIRECTION_DELTA_PX = 10;
 
-function resolveSidebarHref(item, authResolved, currentUser) {
-  if (!item.loginGate) {
-    return item.href;
-  }
-
-  if (authResolved && currentUser) {
-    return item.href;
-  }
-
-  return `/login?next=${encodeURIComponent(item.href)}`;
+function resolveSidebarHref(item, authResolved, authStatus, currentUser) {
+  return resolveProtectedHref(item.href, {
+    authResolved,
+    status: authStatus,
+    user: currentUser,
+    loginGate: Boolean(item.loginGate),
+  });
 }
 
 function resolveMenuItemState(item, authResolved, currentUser) {
@@ -48,9 +46,9 @@ const sidebarMenuItemClass =
 
 const sidebarMenuItemDesktopClass = `${sidebarMenuItemClass} sidebar-nav-item--interactive`;
 
-function SidebarMenuItem({ item, state, authResolved, currentUser, onNavigate, variant = "desktop" }) {
+function SidebarMenuItem({ item, state, authResolved, authStatus, currentUser, onNavigate, variant = "desktop" }) {
   const itemClass = variant === "desktop" ? sidebarMenuItemDesktopClass : sidebarMenuItemClass;
-  const href = resolveSidebarHref(item, authResolved, currentUser);
+  const href = resolveSidebarHref(item, authResolved, authStatus, currentUser);
 
   if (state === "hidden") {
     return null;
@@ -121,6 +119,7 @@ function SidebarMenuGroup({ group, isOpen, onToggle, children, variant = "deskto
 
 function renderSidebarGroups({
   authResolved,
+  authStatus,
   currentUser,
   collapsedGroups,
   onToggleGroup,
@@ -140,6 +139,7 @@ function renderSidebarGroups({
             item={item}
             state={state}
             authResolved={authResolved}
+            authStatus={authStatus}
             currentUser={currentUser}
             onNavigate={onNavigate}
             variant={variant}
@@ -459,6 +459,7 @@ export default function PublicStaticShell({ children }) {
 
   const sidebarNavProps = {
     authResolved: true,
+    authStatus: "unauthenticated",
     currentUser: null,
     collapsedGroups,
     onToggleGroup: toggleMenuGroup,

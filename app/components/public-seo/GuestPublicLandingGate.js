@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  resolveProtectedAuthPhase,
+  shouldHoldProtectedNavigation,
+  shouldRedirectProtectedToLogin,
+} from "../../../lib/auth-guard";
 import { useAuth } from "../AuthProvider";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 
@@ -8,17 +13,18 @@ import { useRequireAuth } from "../../hooks/useRequireAuth";
  * When initialAuthenticated (server-validated session), skip guest landing on first paint.
  */
 export function AuthGuestLandingGate({ landing, children, initialAuthenticated = false }) {
-  const { authResolved, user } = useAuth();
+  const { authResolved, status, user } = useAuth();
+  const phase = resolveProtectedAuthPhase({ authResolved, status, user });
 
   if (initialAuthenticated) {
-    if (authResolved && !user?.email) {
+    if (shouldRedirectProtectedToLogin(phase)) {
       return landing;
     }
 
     return children;
   }
 
-  if (!authResolved || !user?.email) {
+  if (phase !== "authenticated") {
     return landing;
   }
 
@@ -35,15 +41,14 @@ export function RequireAuthGuestLandingGate({
   initialAuthenticated = false,
   authenticatedPendingFallback = null,
 }) {
-  const { authResolved, user, sessionPending, isAuthenticated, shouldShowLogin } =
-    useRequireAuth();
+  const { user, phase, sessionPending, shouldShowLogin } = useRequireAuth();
 
   if (initialAuthenticated) {
-    if (shouldShowLogin || (authResolved && !isAuthenticated)) {
+    if (shouldShowLogin) {
       return landing;
     }
 
-    if (sessionPending || !user?.email) {
+    if (sessionPending || shouldHoldProtectedNavigation(phase) || !user?.email) {
       return authenticatedPendingFallback ?? children;
     }
 
@@ -54,7 +59,7 @@ export function RequireAuthGuestLandingGate({
     return children;
   }
 
-  if (sessionPending || shouldShowLogin || !isAuthenticated) {
+  if (sessionPending || shouldShowLogin || phase !== "authenticated") {
     return landing;
   }
 

@@ -1,23 +1,23 @@
 "use client";
 
+import {
+  resolveProtectedAuthPhase,
+  shouldRedirectProtectedToLogin,
+} from "../../lib/auth-guard";
 import { useAuth } from "../components/AuthProvider";
 
 export function useRequireAuth() {
   const { authResolved, profileReady, status, user } = useAuth();
-
-  const sessionPending = !authResolved || status === "loading";
-  const isAuthenticated =
-    authResolved && status === "authenticated" && Boolean(user?.email);
-  const shouldShowLogin =
-    authResolved && status === "unauthenticated" && !user?.email;
+  const phase = resolveProtectedAuthPhase({ authResolved, status, user });
 
   return {
     authResolved,
     profileReady,
     status,
     user,
-    sessionPending,
-    isAuthenticated,
-    shouldShowLogin,
+    phase,
+    sessionPending: phase === "loading",
+    isAuthenticated: phase === "authenticated",
+    shouldShowLogin: shouldRedirectProtectedToLogin(phase),
   };
 }

@@ -3,6 +3,11 @@
 import dynamic from "next/dynamic";
 import { memo, useEffect, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
+import {
+  resolveProtectedAuthPhase,
+  shouldHoldProtectedNavigation,
+  shouldRedirectProtectedToLogin,
+} from "../../lib/auth-guard";
 import { createPriceAlert } from "../../lib/price-alert-create-client";
 import { useAppModal } from "../components/AppModalProvider";
 import { useAuth } from "../components/AuthProvider";
@@ -103,7 +108,8 @@ const withTimeout = (promise, ms, message = "REQUEST_TIMEOUT") => {
 
 export default function HomePageClient({ heroCopy, marketHubLinks }) {
   const { showAppModal } = useAppModal();
-  const { authResolved, user } = useAuth();
+  const { authResolved, status, user } = useAuth();
+  const authPhase = resolveProtectedAuthPhase({ authResolved, status, user });
   const [activeNotice, setActiveNotice] = useState("");
 
   const [analysisCoin, setAnalysisCoin] = useState("");
@@ -188,9 +194,16 @@ export default function HomePageClient({ heroCopy, marketHubLinks }) {
   };
 
   const requireLogin = () => {
-    const user = JSON.parse(localStorage.getItem("currentUser") || "null");
+    if (shouldHoldProtectedNavigation(authPhase)) {
+      showAppModal({
+        type: "info",
+        title: "جاري التحقق",
+        message: "جاري التحقق من جلسة الدخول، حاول مرة أخرى بعد لحظات.",
+      });
+      return null;
+    }
 
-    if (!user) {
+    if (shouldRedirectProtectedToLogin(authPhase) || !user?.email) {
       showAppModal({
         type: "warning",
         title: "يجب تسجيل الدخول",
@@ -206,8 +219,26 @@ export default function HomePageClient({ heroCopy, marketHubLinks }) {
   const submitAnalysis = async () => {
     if (analysisSubmitting) return;
 
-    const user = requireLogin();
-    if (!user) return;
+    if (shouldHoldProtectedNavigation(authPhase)) {
+      showAppModal({
+        type: "info",
+        title: "جاري التحقق",
+        message: "جاري التحقق من جلسة الدخول، حاول مرة أخرى بعد لحظات.",
+      });
+      return;
+    }
+
+    if (shouldRedirectProtectedToLogin(authPhase) || !user?.email) {
+      showAppModal({
+        type: "warning",
+        title: "يجب تسجيل الدخول",
+        message: "يجب الدخول للحساب أولاً",
+      });
+      window.location.href = "/login";
+      return;
+    }
+
+    const activeUser = user;
 
     const cleanCoin = analysisCoin.trim().toUpperCase();
     const cleanFrame = analysisFrame.trim();
@@ -241,8 +272,8 @@ export default function HomePageClient({ heroCopy, marketHubLinks }) {
         },
         signal: controller.signal,
         body: JSON.stringify({
-          user_email: user.email,
-          username: user.username || user.email,
+          user_email: activeUser.email,
+          username: activeUser.username || activeUser.email,
           coin: cleanCoin,
           frame: cleanFrame,
         }),
@@ -340,7 +371,7 @@ export default function HomePageClient({ heroCopy, marketHubLinks }) {
   const submitAlert = async () => {
     if (alertSubmitting) return;
 
-    if (!authResolved) {
+    if (shouldHoldProtectedNavigation(authPhase)) {
       showAppModal({
         type: "info",
         title: "جاري التحقق",
@@ -349,7 +380,7 @@ export default function HomePageClient({ heroCopy, marketHubLinks }) {
       return;
     }
 
-    if (!user?.email) {
+    if (shouldRedirectProtectedToLogin(authPhase) || !user?.email) {
       showAppModal({
         type: "error",
         title: "يجب تسجيل الدخول",

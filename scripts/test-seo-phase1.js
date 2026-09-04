@@ -310,7 +310,7 @@ describe("SEO Phase 2C — authenticated flash mitigation", () => {
   it("AuthGuestLandingGate skips landing when initialAuthenticated", () => {
     const gate = readFileSync("app/components/public-seo/GuestPublicLandingGate.js", "utf8");
     assert.match(gate, /initialAuthenticated/);
-    assert.match(gate, /authResolved && !user\?\.email/);
+    assert.match(gate, /shouldRedirectProtectedToLogin\(phase\)/);
   });
 
   it("RequireAuthGuestLandingGate uses authenticatedPendingFallback not marketing landing", () => {

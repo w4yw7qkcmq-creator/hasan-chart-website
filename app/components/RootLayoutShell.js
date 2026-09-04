@@ -6,6 +6,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { scheduleAfterPaint } from "../../lib/schedule-after-paint";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
+import { resolveProtectedHref } from "../../lib/auth-guard";
 import { resolveSupabaseAuthUser } from "../../lib/auth-session-client";
 import { useAppModal } from "./AppModalProvider";
 import { useAuth } from "./AuthProvider";
@@ -132,16 +133,13 @@ function AuthLoginLink({ className, onClick, compact = false }) {
   );
 }
 
-function resolveSidebarHref(item, authResolved, currentUser) {
-  if (!item.loginGate) {
-    return item.href;
-  }
-
-  if (authResolved && currentUser) {
-    return item.href;
-  }
-
-  return `/login?next=${encodeURIComponent(item.href)}`;
+function resolveSidebarHref(item, authResolved, authStatus, currentUser) {
+  return resolveProtectedHref(item.href, {
+    authResolved,
+    status: authStatus,
+    user: currentUser,
+    loginGate: Boolean(item.loginGate),
+  });
 }
 
 function resolveMenuItemState(item, authResolved, currentUser) {
@@ -180,13 +178,14 @@ function SidebarMenuItem({
   item,
   state,
   authResolved,
+  authStatus,
   currentUser,
   unreadAnalysisCount = 0,
   onNavigate,
   variant = "desktop",
 }) {
   const itemClass = variant === "desktop" ? sidebarMenuItemDesktopClass : sidebarMenuItemClass;
-  const href = resolveSidebarHref(item, authResolved, currentUser);
+  const href = resolveSidebarHref(item, authResolved, authStatus, currentUser);
 
   if (state === "hidden") {
     return null;
@@ -262,6 +261,7 @@ function SidebarMenuGroup({ group, isOpen, onToggle, children, variant = "deskto
 
 function renderSidebarGroups({
   authResolved,
+  authStatus,
   currentUser,
   unreadAnalysisCount,
   isAdmin,
@@ -291,6 +291,7 @@ function renderSidebarGroups({
             item={item}
             state={state}
             authResolved={authResolved}
+            authStatus={authStatus}
             currentUser={currentUser}
             unreadAnalysisCount={unreadAnalysisCount}
             onNavigate={onNavigate}
@@ -408,6 +409,7 @@ function RootLayoutShell({ children }) {
   const mounted = useClientMounted();
   const shellUser = mounted ? currentUser : null;
   const shellAuthResolved = mounted ? authResolved : false;
+  const shellAuthStatus = mounted ? authStatus : "loading";
   const authLoading = !mounted || !authResolved;
   const shellNotificationPermission = mounted ? notificationPermission : "default";
   const shellWebPushEnabled = mounted ? webPushEnabled : false;
@@ -1278,6 +1280,7 @@ function RootLayoutShell({ children }) {
                 <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll">
                   {renderSidebarGroups({
                     authResolved: shellAuthResolved,
+                    authStatus: shellAuthStatus,
                     currentUser: shellUser,
                     unreadAnalysisCount: shellUnreadAnalysisCount,
                     isAdmin: shellIsAdmin,
@@ -1347,6 +1350,7 @@ function RootLayoutShell({ children }) {
             <nav className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 pl-1 customScroll">
               {renderSidebarGroups({
                 authResolved: shellAuthResolved,
+                authStatus: shellAuthStatus,
                 currentUser: shellUser,
                 unreadAnalysisCount: shellUnreadAnalysisCount,
                 isAdmin: shellIsAdmin,
