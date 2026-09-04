@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
+import { createLiveChartSearchFetch, searchLiveChartSymbol } from "../../lib/live-chart-symbol";
 import {
   resolveProtectedAuthPhase,
   shouldHoldProtectedNavigation,
@@ -124,6 +125,8 @@ export default function HomePageClient({ heroCopy, marketHubLinks }) {
   const [chartSearch, setChartSearch] = useState("BTCUSDT");
   const [chartInterval, setChartInterval] = useState("15");
   const [chartSearchError, setChartSearchError] = useState("");
+  const chartSearchRequestRef = useRef(0);
+  const chartSearchAbortRef = useRef(null);
 
   const getCooldownMessage = (createdAt) => {
     if (!createdAt) return { blocked: false, text: "" };
@@ -323,49 +326,33 @@ export default function HomePageClient({ heroCopy, marketHubLinks }) {
   };
 
   const applyChartSearch = async () => {
-    const { warmupBybitNetwork } = await import("../../lib/bybit-network");
-    warmupBybitNetwork();
+    chartSearchAbortRef.current?.abort();
+    const controller = new AbortController();
+    chartSearchAbortRef.current = controller;
 
-    let symbol = String(chartSearch || "")
-      .toUpperCase()
-      .trim()
-      .replace(/[^A-Z0-9]/g, "");
+    const requestId = ++chartSearchRequestRef.current;
+    setChartSearchError("");
 
-    if (!symbol) {
-      setChartSearchError("اكتب رمز العملة أولاً مثل BTC أو BTCUSDT");
+    const result = await searchLiveChartSymbol(chartSearch, {
+      fetchFn: createLiveChartSearchFetch(controller.signal, 8000),
+      signal: controller.signal,
+    });
+
+    if (requestId !== chartSearchRequestRef.current) {
       return;
     }
 
-    if (!symbol.endsWith("USDT")) {
-      symbol = `${symbol}USDT`;
+    if (result.aborted) {
+      return;
     }
 
-    setChartSearchError("");
-
-    try {
-      const response = await fetch(
-        `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(symbol)}`,
-        {
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
-
-      const data = await response.json().catch(() => null);
-      const foundPrice = Number(data?.result?.list?.[0]?.lastPrice);
-
-      if (!response.ok || data?.retCode !== 0 || !Number.isFinite(foundPrice)) {
-        setChartSearchError("لم يتم العثور على هذه العملة في سوق USDT");
-        return;
-      }
-
-      setChartSymbol(symbol);
-      setChartSearch(symbol);
-    } catch (err) {
-      console.error("Chart symbol search error:", err);
-      setChartSearchError("حدث خطأ أثناء البحث عن العملة");
+    if (!result.ok) {
+      setChartSearchError(result.error);
+      return;
     }
+
+    setChartSymbol(result.symbol);
+    setChartSearch(result.symbol);
   };
 
   const submitAlert = async () => {
