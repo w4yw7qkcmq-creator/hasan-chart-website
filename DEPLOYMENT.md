@@ -175,6 +175,45 @@ No legacy paths: Supabase Edge Functions and website cron are disabled.
 
 ---
 
+## 3b. Railway — VIP Status Delivery Worker
+
+Dedicated persistent worker for VIP recommendation status notifications (site, push, email outbox enqueue).
+
+### Create service
+
+1. Same Railway project → **New Service** from same repo
+2. Service name: `vip-status-delivery-worker` (or equivalent)
+3. **Root directory:** `worker`
+4. **Config file:** `worker/railway.vip-status-delivery.toml`
+5. **Start command:** `npm run vip-status-delivery-worker` (persistent; `VIP_STATUS_DELIVERY_WORKER_ONESHOT=false`)
+
+### Required variables (VIP Status Delivery Worker)
+
+| Variable | Required | Notes |
+|----------|:--------:|-------|
+| `VIP_STATUS_DELIVERY_WORKER_ENABLED` | ✅ | Must be `true`, `1`, `yes`, or `on`. **Unset = disabled.** |
+| `VIP_STATUS_DELIVERY_WORKER_ONESHOT` | ○ | Leave unset/false for production persistent mode |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Same project as Web |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role |
+| `RESEND_API_KEY` | ✅ | Email outbox enqueue path |
+| `EMAIL_FROM` | ⭐ | Verified sender |
+| `EMAIL_REPLY_TO` | ⭐ | Support reply address |
+| `ADMIN_EMAIL` | ⭐ | Admin health alerts (site notifications) |
+
+Persistent worker logs:
+
+- `VIP_STATUS_DELIVERY_PERSISTENT_LOOP_STARTED`
+- `VIP_STATUS_DELIVERY_PERSISTENT_CYCLE_FINISHED` (every cycle, including idle)
+- `VIP_STATUS_DELIVERY_HEALTH`
+
+If `VIP_STATUS_DELIVERY_WORKER_ENABLED` is not truthy on this dedicated service, the worker exits with code **1** (`VIP_STATUS_DELIVERY_WORKER_DISABLED_FATAL`) so `restartPolicyType = ON_FAILURE` surfaces misconfiguration.
+
+Optional cron (Web service): `POST /api/cron/vip-worker-health` with `CRON_SECRET` every 5 minutes to alert when persisted heartbeat is stale (>10 min) while worker is stopped.
+
+Restart policy remains `ON_FAILURE` (not `ALWAYS`).
+
+---
+
 ## 4. Railway — Worker Service (News) *(optional)*
 
 1. New Service → same repo

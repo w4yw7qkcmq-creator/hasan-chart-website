@@ -83,13 +83,34 @@ async function loadFlagModule() {
   return import("../lib/vip-status-delivery-worker-flag.js");
 }
 
+function handleDisabledWorkerStartup({ oneShot, enabled }) {
+  const { resolveDisabledWorkerStartup } = require("../lib/vip-status-delivery-startup.js");
+  const decision = resolveDisabledWorkerStartup({ oneShot, enabled });
+
+  if (decision.action === "continue") {
+    return decision;
+  }
+
+  console.log(
+    JSON.stringify({
+      level: decision.level || "info",
+      event: decision.event,
+      service: SERVICE_NAME,
+      timestamp: new Date().toISOString(),
+      message: decision.message || null,
+    })
+  );
+
+  process.exit(decision.exitCode);
+  return decision;
+}
+
 async function runOneShotCron() {
   const { isVipStatusDeliveryWorkerEnabled } = await loadFlagModule();
   const { runVipStatusDeliveryCron } = await loadQueueModule();
 
   if (!isVipStatusDeliveryWorkerEnabled()) {
-    console.log(JSON.stringify({ event: "VIP_STATUS_DELIVERY_WORKER_SKIPPED" }));
-    process.exit(0);
+    handleDisabledWorkerStartup({ oneShot: true, enabled: false });
     return;
   }
 
@@ -107,8 +128,7 @@ async function runPersistentWorker() {
   const { runVipStatusDeliveryBatch } = await loadQueueModule();
 
   if (!isVipStatusDeliveryWorkerEnabled()) {
-    console.log(JSON.stringify({ event: "VIP_STATUS_DELIVERY_WORKER_SKIPPED" }));
-    process.exit(0);
+    handleDisabledWorkerStartup({ oneShot: false, enabled: false });
     return;
   }
 
