@@ -16,6 +16,7 @@ import {
   VIP_HEARTBEAT_STALE_SECONDS,
 } from "../lib/vip-status-delivery-heartbeat.js";
 import { getPersistentWorkerConfig, runPersistentVipStatusDeliveryLoop } from "../worker/vip-status-delivery-persistent-loop.js";
+import { getVipStatusDeliveryQueueMetrics } from "../lib/vip-status-delivery-queue.js";
 
 test("flag truthy values enable worker", () => {
   const prev = process.env.VIP_STATUS_DELIVERY_WORKER_ENABLED;
@@ -214,6 +215,60 @@ test("persistent loop stops on shutdown without spinning", async () => {
   });
 
   assert.equal(cycles, 1);
+});
+
+test("queue metrics: health fields only, no terminal status count queries", async () => {
+  const statusFilters = [];
+  let queryCount = 0;
+
+  const supabase = {
+    from(table) {
+      assert.equal(table, "vip_signal_status_deliveries");
+      const builder = {
+        select() {
+          queryCount += 1;
+          return builder;
+        },
+        eq(_col, value) {
+          statusFilters.push(value);
+          return builder;
+        },
+        not() {
+          return builder;
+        },
+        lte() {
+          return builder;
+        },
+        order() {
+          return builder;
+        },
+        limit() {
+          return builder;
+        },
+        maybeSingle: async () => ({
+          data: { created_at: new Date(Date.now() - 45_000).toISOString() },
+          error: null,
+        }),
+        then(resolve) {
+          return Promise.resolve({ count: 0, error: null }).then(resolve);
+        },
+      };
+      return builder;
+    },
+  };
+
+  const metrics = await getVipStatusDeliveryQueueMetrics(supabase);
+
+  assert.equal(queryCount, 4);
+  assert.deepEqual(statusFilters.sort(), ["pending", "pending", "processing", "processing"]);
+  assert.equal(metrics.pending, 0);
+  assert.equal(metrics.processing, 0);
+  assert.ok(metrics.oldestPendingAgeMs >= 44_000);
+  assert.equal(metrics.staleProcessingCount, 0);
+  assert.equal(metrics.delivered, undefined);
+  assert.equal(metrics.failed, undefined);
+  assert.equal(metrics.unavailable, undefined);
+  assert.equal(metrics.skipped, undefined);
 });
 
 test("missing supabase env fails boot path via validateRuntimeEnv contract", () => {
