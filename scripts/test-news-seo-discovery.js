@@ -5,8 +5,10 @@ import {
   buildNewsSitemapUrlEntry,
   buildSitemapIndexXml,
   buildUrlsetXml,
+  filterArchiveMonthPosts,
   getArchiveSitemapChildUrl,
   getNewsArchiveMonthKey,
+  getUtcMonthBounds,
   isLegacyUuidCanonicalSegment,
   isNewsPostSitemapEligible,
   LATEST_NEWS_SITEMAP_LIMIT,
@@ -94,6 +96,23 @@ describe("archive sitemap partitioning", () => {
     const paths = Array.from(partitions.values()).flat().map((entry) => entry.path);
     assert.equal(new Set(paths).size, paths.length);
   });
+
+  it("builds UTC month bounds for archive month queries", () => {
+    assert.deepEqual(getUtcMonthBounds("2026-06"), {
+      start: "2026-06-01T00:00:00.000Z",
+      endExclusive: "2026-07-01T00:00:00.000Z",
+    });
+    assert.equal(getUtcMonthBounds("2026-13"), null);
+  });
+
+  it("filters archive month posts with latest exclusion", () => {
+    const junePosts = posts.filter((post) => getNewsArchiveMonthKey(post.created_at) === "2026-06");
+    const entries = filterArchiveMonthPosts(junePosts, new Set(["1", "2"]));
+    assert.deepEqual(
+      entries.map((entry) => entry.path),
+      ["/news/old-a", "/news/old-b", "/news/legacy-text-3098babd"]
+    );
+  });
 });
 
 describe("sitemap XML builders", () => {
@@ -145,8 +164,8 @@ describe("route wiring", () => {
 
     assert.match(latest, /LATEST_NEWS_SITEMAP_LIMIT/);
     assert.match(latest, /isNewsPostSitemapEligible/);
-    assert.match(archiveIndex, /buildArchiveSitemapPartitions/);
-    assert.match(archiveChild, /parseArchiveMonthFile/);
+    assert.match(archiveIndex, /getArchiveSitemapIndexPartitions/);
+    assert.match(archiveChild, /getArchiveMonthSitemapEntries/);
     assert.match(archivePage, /NewsArchivePagination/);
     assert.match(archivePage, /getCachedNewsArchivePage/);
     assert.match(robots, /news-archive-sitemap\.xml/);

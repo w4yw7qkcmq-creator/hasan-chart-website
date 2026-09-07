@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { buildArchiveSitemapPartitions, getNewsSupabaseClient } from "../../../../lib/news-archive-data";
+import { getArchiveMonthSitemapEntries, getNewsSupabaseClient } from "../../../../lib/news-archive-data";
 import {
   buildNewsSitemapUrlEntry,
   buildUrlsetXml,
@@ -24,8 +24,7 @@ export async function GET(_request, { params }) {
     });
   }
 
-  const partitions = await buildArchiveSitemapPartitions();
-  const items = partitions.get(monthKey) || [];
+  const items = await getArchiveMonthSitemapEntries(monthKey);
 
   const urlEntries = items.map((item) =>
     buildNewsSitemapUrlEntry({

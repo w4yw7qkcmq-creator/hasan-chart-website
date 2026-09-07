@@ -1,4 +1,4 @@
-import { buildArchiveSitemapPartitions, getNewsSupabaseClient } from "../../../lib/news-archive-data";
+import { getArchiveSitemapIndexPartitions, getNewsSupabaseClient } from "../../../lib/news-archive-data";
 import {
   buildSitemapIndexEntry,
   buildSitemapIndexXml,
@@ -17,7 +17,7 @@ export async function GET() {
     });
   }
 
-  const partitions = await buildArchiveSitemapPartitions();
+  const partitions = await getArchiveSitemapIndexPartitions();
   const monthKeys = Array.from(partitions.keys()).sort();
 
   const entries = monthKeys.map((monthKey) => {
