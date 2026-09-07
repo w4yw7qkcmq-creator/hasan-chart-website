@@ -1,5 +1,6 @@
 import Breadcrumbs from "../../components/seo/Breadcrumbs";
 import { NewsHubLinks } from "../../components/news/NewsHubLinks";
+import NewsArchiveNavLink from "../../components/news/NewsArchiveNavLink";
 import { NEWS_BREADCRUMBS } from "../../components/news/newsListFormatting";
 import NewsHeroRefresh from "./NewsHeroRefresh";
 
@@ -22,6 +23,8 @@ export default function NewsPageShell() {
       </header>
 
       <NewsHubLinks />
+
+      <NewsArchiveNavLink />
     </>
   );
 }

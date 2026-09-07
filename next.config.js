@@ -102,11 +102,38 @@ const nextConfig = {
         ],
       },
       {
+        source: "/news-archive-sitemap.xml",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: CACHE_PUBLIC_SEO_ARTIFACT,
+          },
+        ],
+      },
+      {
+        source: "/news-sitemaps/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: CACHE_PUBLIC_SEO_ARTIFACT,
+          },
+        ],
+      },
+      {
         source: "/content-sitemap.xml",
         headers: [
           {
             key: "Cache-Control",
             value: CACHE_PUBLIC_SEO_ARTIFACT,
+          },
+        ],
+      },
+      {
+        source: "/news/archive/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: CACHE_PUBLIC_NEWS_PAGE,
           },
         ],
       },

@@ -1,21 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 import { getCanonicalNewsPath } from "../../../lib/news-urls";
 import { buildAbsoluteUrl, SITE_ORGANIZATION_NAME } from "../../../lib/seo";
+import {
+  escapeSitemapXml,
+  isNewsPostSitemapEligible,
+  LATEST_NEWS_SITEMAP_LIMIT,
+  toSitemapIsoDate,
+} from "../../../lib/news-sitemap-shared";
 
 export const dynamic = "force-dynamic";
 
 const GOOGLE_NEWS_WINDOW_MS = 48 * 60 * 60 * 1000;
 
-function escapeXml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
 function getNewsPath(item) {
+  if (!isNewsPostSitemapEligible(item)) {
+    return null;
+  }
+
   const path = getCanonicalNewsPath(item);
   return path === "/news" ? null : path;
 }
@@ -33,17 +34,6 @@ function cleanNewsSitemapTitle(item) {
     .find((part) => /[\u0600-\u06FF]/.test(part) && part.length > 18);
 
   return content ? content.replace(/^عاجل\s*[:：-]?\s*/i, "").slice(0, 150) : "خبر اقتصادي عاجل";
-}
-
-function toSitemapIsoDate(value) {
-  if (!value) return null;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toISOString();
 }
 
 function isRecentForGoogleNews(createdAt) {
@@ -71,7 +61,7 @@ export async function GET() {
     .from("news_posts")
     .select("id, slug, title, content, created_at")
     .order("created_at", { ascending: false })
-    .limit(1000);
+    .limit(LATEST_NEWS_SITEMAP_LIMIT);
 
   const newsUrls = (news || [])
     .map((item) => {
@@ -92,18 +82,18 @@ export async function GET() {
         ? `
     <news:news>
       <news:publication>
-        <news:name>${escapeXml(SITE_ORGANIZATION_NAME)}</news:name>
+        <news:name>${escapeSitemapXml(SITE_ORGANIZATION_NAME)}</news:name>
         <news:language>ar</news:language>
       </news:publication>
-      <news:publication_date>${escapeXml(publicationDate)}</news:publication_date>
-      <news:title>${escapeXml(headline)}</news:title>
+      <news:publication_date>${escapeSitemapXml(publicationDate)}</news:publication_date>
+      <news:title>${escapeSitemapXml(headline)}</news:title>
     </news:news>`
         : "";
 
       return `
   <url>
-    <loc>${escapeXml(buildAbsoluteUrl(path))}</loc>
-    <lastmod>${escapeXml(lastModified)}</lastmod>
+    <loc>${escapeSitemapXml(buildAbsoluteUrl(path))}</loc>
+    <lastmod>${escapeSitemapXml(lastModified)}</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>${googleNewsBlock}
   </url>`;
