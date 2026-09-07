@@ -3768,7 +3768,8 @@ async function fetchForexNews(options = {}) {
         status: "overlap",
         lock: { acquired: false, contended: true },
         buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA,
-      })
+      }),
+      { stats: { cycleDurationMs: 0 } }
     );
     return { skipped: true, reason: "overlap", stats };
   }
@@ -3787,17 +3788,22 @@ async function fetchForexNews(options = {}) {
         distributed: distributedLock.distributed,
       })
     );
+    const distributedOverlapStats = {
+      cycleDurationMs: Date.now() - cycleStartedAt,
+      lastErrorSafe: distributedLock.reason,
+    };
     await persistCycleTelemetry(
       getSupabaseClient,
       buildCycleTelemetryRow({
         runId,
         startedAt: cycleStartedIso,
         completedAt: new Date().toISOString(),
-        stats: { cycleDurationMs: Date.now() - cycleStartedAt, lastErrorSafe: distributedLock.reason },
+        stats: distributedOverlapStats,
         status: "overlap",
         lock: { acquired: false, contended: true },
         buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA,
-      })
+      }),
+      { stats: distributedOverlapStats }
     );
     return {
       skipped: true,
@@ -4530,7 +4536,8 @@ async function fetchForexNews(options = {}) {
           contended: false,
         },
         buildCommit: process.env.RAILWAY_GIT_COMMIT_SHA,
-      })
+      }),
+      { stats }
     );
     if (distributedOwner) {
       await releaseDistributedCycleLock(getSupabaseClient, distributedOwner, distributedLockName);

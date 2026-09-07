@@ -102,7 +102,7 @@ This closes the previously accepted observability gap where a complete Railway o
 - DB: `news_worker_cycle_runs`, `news_system_metric_snapshots` (`worker_heartbeat`)
 - Admin (auth): `GET /api/admin/news/system-status`
 
-**Stale guidance:** Investigate if no successful cycle row within ~2× poll interval + buffer (poll interval from worker env; typically minutes-scale).
+**Stale guidance:** Prefer `news_system_metric_snapshots` (`worker_heartbeat`, 5-minute buckets) or admin `GET /api/admin/news/system-status`. Manual SQL on `news_worker_cycle_runs` may show up to **5 minutes** between healthy samples (telemetry throttle); investigate if no successful row within ~**2× poll interval + buffer** for failures/overlap rows, or heartbeat snapshot stale.
 
 **Severity:** HIGH when stale/down per admin read-model.
 

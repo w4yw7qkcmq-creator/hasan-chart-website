@@ -2,8 +2,10 @@ const crypto = require("crypto");
 const { getInstanceId } = require("./news-worker-distributed-lock");
 
 const RETENTION_DAYS = 90;
+const HEALTHY_TELEMETRY_PERSIST_INTERVAL_MS = 5 * 60_000;
 let lastPersistedRun = null;
 let telemetryPersistFailures = 0;
+let lastHealthyTelemetryPersistAt = 0;
 
 function createRunId() {
   return `nwr-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
@@ -43,12 +45,40 @@ function buildCycleTelemetryRow({ runId, startedAt, completedAt, stats = {}, sta
   };
 }
 
-async function persistCycleTelemetry(getSupabaseClient, payload) {
+function shouldPersistCycleTelemetry(row = {}, stats = {}) {
+  const status = String(row.status || "").trim();
+  if (status === "failed" || status === "overlap" || status === "skipped") return true;
+  if (row.error_code_safe) return true;
+  if (row.lock_contended) return true;
+  if (Number(row.site_published_count) > 0) return true;
+  if (Number(row.telegram_published_count) > 0) return true;
+  if (Number(row.ai_calls) > 0) return true;
+  if (Number(row.image_failures) > 0) return true;
+  if (Number(stats.aiFailed) > 0) return true;
+  if (Number(stats.dbFailed) > 0) return true;
+  if (Number(stats.telegramFailed) > 0) return true;
+  if (Number(stats.economicEventsPublished) > 0) return true;
+  if (Number(stats.economicEventsDroppedIncomplete) > 0) return true;
+
+  const now = Date.now();
+  if (now - lastHealthyTelemetryPersistAt >= HEALTHY_TELEMETRY_PERSIST_INTERVAL_MS) {
+    lastHealthyTelemetryPersistAt = now;
+    return true;
+  }
+  return false;
+}
+
+async function persistCycleTelemetry(getSupabaseClient, payload, options = {}) {
+  const stats = options.stats || {};
   const client = getSupabaseClient?.();
   if (!client) {
     telemetryPersistFailures += 1;
     console.warn("NEWS_WORKER_TELEMETRY_SKIP", JSON.stringify({ reason: "supabase_unavailable" }));
     return { persisted: false, reason: "supabase_unavailable" };
+  }
+
+  if (!shouldPersistCycleTelemetry(payload, stats)) {
+    return { persisted: false, skipped: true, reason: "healthy_throttled" };
   }
 
   try {
@@ -106,14 +136,22 @@ function getTelemetrySnapshot() {
 function resetTelemetryForTests() {
   lastPersistedRun = null;
   telemetryPersistFailures = 0;
+  lastHealthyTelemetryPersistAt = 0;
+}
+
+function setHealthyTelemetryPersistClockForTests(timestampMs) {
+  lastHealthyTelemetryPersistAt = timestampMs;
 }
 
 module.exports = {
   createRunId,
   buildCycleTelemetryRow,
+  shouldPersistCycleTelemetry,
   persistCycleTelemetry,
   maybeCleanupOldTelemetry,
   getTelemetrySnapshot,
   resetTelemetryForTests,
+  setHealthyTelemetryPersistClockForTests,
   RETENTION_DAYS,
+  HEALTHY_TELEMETRY_PERSIST_INTERVAL_MS,
 };
