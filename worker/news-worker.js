@@ -146,6 +146,11 @@ const {
 const { recordDecision } = require("./lib/news-intelligence/autonomy/decision-record");
 const { createCorrelationId } = require("./lib/news-intelligence/autonomy/structured-log");
 const { markEligibleRssItemProcessed } = require("./lib/general-rss/pipeline");
+const {
+  buildPrevalidatedRssGatewayPublication,
+  publishPrevalidatedRssViaGateway,
+  retryPrevalidatedRssGatewayPublication,
+} = require("./lib/general-rss/gateway-adapter");
 const { getSourceHealthEngine } = require("./lib/news-intelligence/autonomy/source-health");
 const { FAILURE_ATTRIBUTION } = require("./lib/news-intelligence/autonomy/failure-attribution");
 
@@ -4405,45 +4410,124 @@ async function fetchForexNews(options = {}) {
         console.log("NEWS_DRY_RUN eligible publish-ready item:", latestNews.title);
       } else {
         recordPublicationAttempt();
-        if (finalImage) {
-          const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
 
-          if (photoPath) {
-            await sendTelegramPhoto(publicationMessage, photoPath, {
-              visualType: sourceImageResult?.visualType,
-              imageTitle,
-              contextText: publicationMessage,
-              imageUrl: finalImage,
-            });
-            stats.telegramPublished += 1;
-          } else {
-            console.log("⏭️ Image rejected or unavailable. Sending text only.");
-            await sendTelegramMessage(publicationMessage);
-            stats.telegramPublished += 1;
+        const rssPublication = buildPrevalidatedRssGatewayPublication({
+          latestNews,
+          approvedRssPresentation,
+          publicationMessage,
+          finalImage,
+          sourceImageResult,
+          imageTitle,
+          combinedTopicCluster,
+          combinedNewsIdentity,
+          normalizedDedupeTitle: normalizeNewsTitle(
+            approvedRssPresentation?.siteTitle || combinedNewsIdentity
+          ).slice(0, 500),
+        });
+
+        const gateway = getNewsPublisherGateway();
+        const rssGatewayDeps = {
+          dryRun: false,
+          supabase: getSupabaseClient(),
+          deliverRssTelegramLeg: async ({ message }) => {
+            if (finalImage) {
+              const photoPath = await createNewsCard(imageTitle, finalImage, latestNews.impactLevel || "HIGH");
+              if (photoPath) {
+                await sendTelegramPhoto(message, photoPath, {
+                  visualType: sourceImageResult?.visualType,
+                  imageTitle,
+                  contextText: message,
+                  imageUrl: finalImage,
+                });
+                return { sent: true, mode: "photo" };
+              }
+              console.log("⏭️ Image rejected or unavailable. Sending text only.");
+              await sendTelegramMessage(message);
+              return { sent: true, mode: "text_fallback_no_card" };
+            }
+            await sendTelegramMessage(message);
+            return { sent: true, mode: "text" };
+          },
+          saveNewsPostToSupabase,
+        };
+
+        let gatewayResult = await publishPrevalidatedRssViaGateway(gateway, rssPublication, rssGatewayDeps);
+
+        if (gatewayResult.blocked) {
+          if (gatewayResult.reason === "DUPLICATE_BLOCKED") {
+            stats.rejectedDuplicate += 1;
+            recordRejection(stats, "duplicate_gateway_reservation", latestNews.title);
           }
-        } else {
-          await sendTelegramMessage(publicationMessage);
+          recordRssCandidateDecision(latestNews, gatewayResult.reason || "GATEWAY_BLOCKED", {
+            aiUsed: true,
+            metadata: { stage: gatewayResult.stage || "gateway" },
+          });
+          markEligibleRssItemProcessed(latestNews, "gateway_blocked", { dryRun });
+          continue eligibleLoop;
+        }
+
+        if (gatewayResult.partial && gatewayResult.publicationRecord) {
+          gatewayResult = await retryPrevalidatedRssGatewayPublication(
+            gateway,
+            gatewayResult.publicationRecord,
+            { retryLeg: "site_only", skipTelegram: true },
+            rssGatewayDeps
+          );
+        } else if (
+          gatewayResult.failed &&
+          gatewayResult.publicationRecord &&
+          gatewayResult.telegramSent !== true &&
+          gatewayResult.siteInserted !== true
+        ) {
+          gatewayResult = await retryPrevalidatedRssGatewayPublication(
+            gateway,
+            gatewayResult.publicationRecord,
+            { retryLeg: "full" },
+            rssGatewayDeps
+          );
+        } else if (
+          gatewayResult.failed &&
+          gatewayResult.publicationRecord &&
+          gatewayResult.telegramSent !== true &&
+          gatewayResult.siteInserted === true
+        ) {
+          gatewayResult = await retryPrevalidatedRssGatewayPublication(
+            gateway,
+            gatewayResult.publicationRecord,
+            { retryLeg: "telegram_only", skipSite: true },
+            rssGatewayDeps
+          );
+        }
+
+        const telegramSent = gatewayResult.telegramSent === true;
+        const siteInserted = gatewayResult.siteInserted === true;
+
+        if (telegramSent) {
           stats.telegramPublished += 1;
         }
-
-        const saveResult = await saveNewsPostToSupabase({
-          title: approvedRssPresentation?.siteTitle || latestNews.title || imageTitle,
-          content: approvedRssPresentation?.siteContent || publicationMessage,
-          image_url: finalImage || null,
-          impact_level: latestNews.impactLevel || "MEDIUM",
-          source_link: latestLink,
-          rssImageResolutionAttempted: !latestNews.isTelegramSource,
-        });
-        if (saveResult?.error) {
-          stats.dbFailed += 1;
-        } else {
+        if (siteInserted) {
           stats.dbInserted += 1;
+        } else if (telegramSent || gatewayResult.failed) {
+          stats.dbFailed += 1;
         }
+
+        if (!telegramSent && !siteInserted) {
+          stats.telegramFailed += 1;
+          stats.lastErrorSafe = gatewayResult.reason || "rss_gateway_publish_failed";
+          recordRssCandidateDecision(latestNews, "GATEWAY_PUBLISH_FAILED", {
+            aiUsed: true,
+            metadata: { reason: gatewayResult.reason || null },
+          });
+          markEligibleRssItemProcessed(latestNews, "gateway_failed", { dryRun });
+          continue eligibleLoop;
+        }
+
+        const saveResult = siteInserted ? { ok: true } : { error: "site_not_inserted" };
 
         const rssPostAudit = auditRssPostPublish({
           sourceLink: latestLink,
-          telegramSent: stats.telegramPublished > 0,
-          siteInserted: !saveResult?.error,
+          telegramSent,
+          siteInserted,
           expectedTitle: approvedRssPresentation?.siteTitle || latestNews.title,
           savedTitle: approvedRssPresentation?.siteTitle || latestNews.title,
           expectedImageUrl: finalImage,

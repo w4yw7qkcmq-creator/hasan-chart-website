@@ -31,6 +31,7 @@ const {
   recordTelegramEconomicPublicationSuccess,
   recordTelegramEconomicPublicationFailure,
 } = require("../news-ingestion/cycle-funnel");
+const { isPrevalidatedRssGeneralPublication } = require("../general-rss/gateway-adapter");
 
 const BLOCK_REASONS = {
   ...EDITORIAL_BLOCK_REASONS,
@@ -104,6 +105,9 @@ function buildStoredPublicationMetadata(publication, editorial, canonical) {
     title: publication.title,
     body: editorial.body,
     bodySource: publication.bodySource || "formatted",
+    siteContent: publication.metadata?.siteContent || editorial.body,
+    telegramMessage: publication.metadata?.telegramMessage || editorial.body,
+    deferPostPublishSideEffects: publication.deferPostPublishSideEffects === true,
     sourceLink: publication.sourceLink || null,
     importance: publication.importance || "HIGH",
     facts: publication.facts || {},
@@ -167,7 +171,14 @@ function createNewsPublisherGateway(options = {}) {
       publicationRecord.telegramLegStatus !== LEG_STATUS.SUCCESS
     ) {
       try {
-        if (photoPath && deps.sendTelegramPhoto) {
+        if (isPrevalidatedRssGeneralPublication(publication) && typeof deps.deliverRssTelegramLeg === "function") {
+          const rssTelegramResult = await deps.deliverRssTelegramLeg({
+            message: publication.metadata?.telegramMessage || editorial.body,
+            publication,
+            publicationRecord,
+          });
+          telegramSent = rssTelegramResult?.sent === true;
+        } else if (photoPath && deps.sendTelegramPhoto) {
           await deps.sendTelegramPhoto(editorial.body, photoPath);
           telegramSent = true;
         } else if (imageGate.requiresImage) {
@@ -201,10 +212,13 @@ function createNewsPublisherGateway(options = {}) {
       if (deps.saveNewsPostToSupabase) {
         const saveResult = await deps.saveNewsPostToSupabase({
           title: publication.title,
-          content: editorial.body,
-          image_url: siteImageUrl || null,
+          content: isPrevalidatedRssGeneralPublication(publication)
+            ? publication.metadata?.siteContent || editorial.body
+            : editorial.body,
+          image_url: siteImageUrl || publication.imageUrl || null,
           impact_level: publication.importance || "HIGH",
           source_link: publication.sourceLink || canonical.eventKey,
+          rssImageResolutionAttempted: publication.metadata?.rssImageResolutionAttempted === true,
         });
         siteInserted = !saveResult?.error;
         await store.updateDeliveryLeg(
@@ -215,26 +229,28 @@ function createNewsPublisherGateway(options = {}) {
       }
     }
 
-    if (deps.savePublishedNewsToSupabase && publication.sourceLink) {
-      await deps.savePublishedNewsToSupabase({
-        link: publication.sourceLink,
-        title: `${publication.title} ${editorial.body}`.slice(0, 500),
-        normalized_title: publication.title.slice(0, 500),
-        topic_cluster: canonical.eventKey || publication.eventKey || null,
-        published_at: new Date().toISOString(),
-      });
-    }
+    if (!publication.deferPostPublishSideEffects) {
+      if (deps.savePublishedNewsToSupabase && publication.sourceLink) {
+        await deps.savePublishedNewsToSupabase({
+          link: publication.sourceLink,
+          title: `${publication.title} ${editorial.body}`.slice(0, 500),
+          normalized_title: publication.title.slice(0, 500),
+          topic_cluster: canonical.eventKey || publication.eventKey || null,
+          published_at: new Date().toISOString(),
+        });
+      }
 
-    if (deps.savePublishedNewsLink && publication.sourceLink) {
-      deps.savePublishedNewsLink(publication.sourceLink, `${publication.title} ${editorial.body}`);
-    }
+      if (deps.savePublishedNewsLink && publication.sourceLink) {
+        deps.savePublishedNewsLink(publication.sourceLink, `${publication.title} ${editorial.body}`);
+      }
 
-    if (deps.dispatchMarketNewsNotifications) {
-      await deps.dispatchMarketNewsNotifications({
-        title: publication.title,
-        sourceLink: publication.sourceLink,
-        impactLevel: publication.importance || "HIGH",
-      });
+      if (deps.dispatchMarketNewsNotifications) {
+        await deps.dispatchMarketNewsNotifications({
+          title: publication.title,
+          sourceLink: publication.sourceLink,
+          impactLevel: publication.importance || "HIGH",
+        });
+      }
     }
 
     return { telegramSent, siteInserted };
@@ -305,7 +321,7 @@ function createNewsPublisherGateway(options = {}) {
       return { blocked: true, reason: sourcePolicy.reason, stage: "source_policy", detail: sourcePolicy.detail };
     }
 
-    if (publication.rawSourceText) {
+    if (publication.rawSourceText && !isPrevalidatedRssGeneralPublication(publication)) {
       const copyCheck = evaluateCopySimilarity(editorial.body, publication.rawSourceText, publication.copyGuard);
       if (!copyCheck.ok) {
         logNewsEvent(NEWS_EVENTS.COPY_SIMILARITY_BLOCKED, {
@@ -382,7 +398,11 @@ function createNewsPublisherGateway(options = {}) {
     let publicationForSemantics = publicationWithCorrelation;
     let editorialForDelivery = editorial;
 
-    if (publicationType === PUBLICATION_TYPES.GENERAL_NEWS && !numericEconomic) {
+    if (
+      publicationType === PUBLICATION_TYPES.GENERAL_NEWS &&
+      !numericEconomic &&
+      !isPrevalidatedRssGeneralPublication(publicationWithCorrelation)
+    ) {
       const semanticResult = validateAndRepairPublicationSemantics(
         publicationWithCorrelation,
         editorial,
@@ -507,6 +527,77 @@ function createNewsPublisherGateway(options = {}) {
       });
     }
 
+    if (isPrevalidatedRssGeneralPublication(publicationForSemantics) && publicationForSemantics.eventKey) {
+      const existingRss = await store.getPublicationIdentity({
+        eventKey: publicationForSemantics.eventKey,
+        publicationType,
+      });
+      if (existingRss) {
+        const duplicateBlocked = {
+          blocked: true,
+          reason: BLOCK_REASONS.DUPLICATE_BLOCKED,
+          stage: "idempotency",
+          eventKey: publicationForSemantics.eventKey,
+          publicationRecord: existingRss,
+        };
+        phase3?.observeEvaluationBlocked(publicationWithCorrelation, duplicateBlocked, {
+          ...deps,
+          correlationId,
+          latency: { totalMs: Date.now() - ingestStartedAt },
+        });
+        return duplicateBlocked;
+      }
+
+      const identity = await store.acquirePublicationIdentity({
+        eventKey: publicationForSemantics.eventKey,
+        publicationType,
+        sourceType: publicationForSemantics.sourceType,
+        sourceId: publicationForSemantics.sourceId,
+        metadata: buildStoredPublicationMetadata(publicationForSemantics, editorialForDelivery, canonical),
+      });
+
+      if (!identity.acquired) {
+        if (identity.reason === BLOCK_REASONS.IDEMPOTENCY_STORE_UNAVAILABLE) {
+          const blocked = {
+            blocked: true,
+            reason: identity.reason,
+            stage: "idempotency",
+            eventKey: publicationForSemantics.eventKey,
+            detail: identity.detail,
+          };
+          phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+            ...deps,
+            correlationId,
+            latency: { totalMs: Date.now() - ingestStartedAt },
+          });
+          return blocked;
+        }
+
+        const duplicateBlocked = {
+          blocked: true,
+          reason: identity.reason || BLOCK_REASONS.DUPLICATE_BLOCKED,
+          stage: "idempotency",
+          eventKey: publicationForSemantics.eventKey,
+          publicationRecord: identity.record || null,
+        };
+        phase3?.observeEvaluationBlocked(publicationWithCorrelation, duplicateBlocked, {
+          ...deps,
+          correlationId,
+          latency: { totalMs: Date.now() - ingestStartedAt },
+        });
+        return duplicateBlocked;
+      }
+
+      publicationRecord = identity.record;
+      logNewsEvent(NEWS_EVENTS.LOCK_ACQUIRED, {
+        eventKey: publicationForSemantics.eventKey,
+        publicationType,
+        destination,
+        dbBacked: identity.dbBacked === true,
+        memoryOnly: identity.memoryOnly === true,
+      });
+    }
+
     logNewsEvent(NEWS_EVENTS.PUBLICATION_ALLOWED, {
       eventKey: canonical.eventKey,
       eventType: canonical.eventType,
@@ -545,6 +636,24 @@ function createNewsPublisherGateway(options = {}) {
           reason: BLOCK_REASONS.IDEMPOTENCY_STORE_UNAVAILABLE,
           stage: "idempotency",
           eventKey: canonical.eventKey,
+        };
+        phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+          ...deps,
+          correlationId,
+          latency: { totalMs: Date.now() - ingestStartedAt },
+        });
+        return blocked;
+      }
+
+      if (
+        !publicationRecord &&
+        isPrevalidatedRssGeneralPublication(publicationForSemantics)
+      ) {
+        const blocked = {
+          blocked: true,
+          reason: BLOCK_REASONS.IDEMPOTENCY_STORE_UNAVAILABLE,
+          stage: "idempotency",
+          eventKey: publicationForSemantics.eventKey,
         };
         phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
           ...deps,
@@ -772,7 +881,7 @@ function createNewsPublisherGateway(options = {}) {
       sourceType: publicationRecord.sourceType,
       sourceId: publicationRecord.sourceId,
       title: stored.title,
-      body: stored.body,
+      body: stored.telegramMessage || stored.body,
       bodySource: stored.bodySource || "formatted",
       destination: options.destination || DESTINATIONS.BOTH,
       sourceLink: stored.sourceLink,
@@ -782,6 +891,7 @@ function createNewsPublisherGateway(options = {}) {
       imageUrl: stored.imageUrl || null,
       imageResult: stored.imageResult || null,
       imagePolicy: stored.imagePolicy || null,
+      deferPostPublishSideEffects: stored.deferPostPublishSideEffects === true,
       metadata: stored,
     };
 
@@ -796,31 +906,36 @@ function createNewsPublisherGateway(options = {}) {
     });
 
     const retryLeg = options.retryLeg || "full";
+    const skipTelegram = options.skipTelegram === true || retryLeg === "site_only";
+    const skipSite = options.skipSite === true || retryLeg === "telegram_only";
     const workingRecord = {
       ...publicationRecord,
-      telegramLegStatus:
-        retryLeg === "site_only" || options.skipTelegram === true
-          ? publicationRecord.telegramLegStatus
-          : publicationRecord.telegramLegStatus,
-      siteLegStatus:
-        retryLeg === "telegram_only" || options.skipSite === true
-          ? publicationRecord.siteLegStatus
-          : publicationRecord.siteLegStatus,
     };
-
-    if (retryLeg === "telegram_only") {
-      workingRecord.siteLegStatus = LEG_STATUS.SUCCESS;
-    }
-    if (retryLeg === "site_only") {
-      workingRecord.telegramLegStatus = LEG_STATUS.SUCCESS;
-    }
 
     if (deps.dryRun) {
       return { dryRun: true, retried: true, publicationRecord: workingRecord, retryLeg };
     }
 
     try {
-      const delivery = await deliverPublicationLegs(publication, editorial, canonical, workingRecord, deps);
+      const delivery = await deliverPublicationLegs(
+        publication,
+        editorial,
+        canonical,
+        workingRecord,
+        { ...deps, skipTelegram, skipSite }
+      );
+      await store.updateDeliveryLeg(
+        workingRecord,
+        "telegram",
+        delivery.telegramSent ? LEG_STATUS.SUCCESS : LEG_STATUS.FAILED
+      );
+      await store.updateDeliveryLeg(
+        workingRecord,
+        "site",
+        delivery.siteInserted ? LEG_STATUS.SUCCESS : LEG_STATUS.FAILED
+      );
+      workingRecord.telegramLegStatus = delivery.telegramSent ? LEG_STATUS.SUCCESS : LEG_STATUS.FAILED;
+      workingRecord.siteLegStatus = delivery.siteInserted ? LEG_STATUS.SUCCESS : LEG_STATUS.FAILED;
       return {
         retried: true,
         published: delivery.telegramSent && delivery.siteInserted,
