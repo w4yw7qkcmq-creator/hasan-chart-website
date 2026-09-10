@@ -1,0 +1,20 @@
+{
+  "name": "production-incident-ecb-inline-20260910",
+  "sourceText": "اخبار الفوركس العاجلة 📊 📚 pinned « صدر الآن : أوروبا - 🔵 قرار الفائدة الصادر عن البنك المركزي الأوروبي ▪️ السابق : %2.40 ▪️ التقدير : %2.65 ▫️ الحالي : %2.65 • النتيجة : تم رفع الفائدة على اليورو الأوروبي (إيجابي لليورو) لمتابعة أَخبار الأَسهم والذهب والعملات إِنضم للقناة… »",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "42424",
+    "sourcePublishedAt": "2026-09-10T12:15:16.000Z"
+  },
+  "expected": {
+    "canonicalEventKey": "EZ_ECB_RATE_DECISION",
+    "countryCode": "EZ",
+    "previous": "2.40%",
+    "forecast": "2.65%",
+    "actual": "2.65%",
+    "sourceReadingContains": ["تم رفع الفائدة", "إيجابي لليورو"],
+    "headlineContains": ["قرار الفائدة", "البنك المركزي الأوروبي"],
+    "countryLine": "منطقة اليورو 🇪🇺",
+    "mustNotContainInFacts": ["النتيجة", "لمتابعة", "انضم", "ForexBreakingNews"]
+  }
+}

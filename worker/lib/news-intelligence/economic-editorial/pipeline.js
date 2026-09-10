@@ -29,6 +29,7 @@ function buildStructuredEventFromFacts(facts = {}, overrides = {}) {
     eventType,
     eventFamily: overrides.eventFamily || getEventFamily(eventType),
     country: overrides.country || facts.countryCode || facts.country || facts.canonical?.country || "US",
+    countryCode: overrides.countryCode || facts.countryCode || facts.canonical?.country || null,
     actual: facts.actual,
     forecast: facts.forecast,
     previous: facts.previous,

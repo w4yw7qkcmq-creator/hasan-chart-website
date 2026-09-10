@@ -4,12 +4,20 @@ const {
 } = require("../economic-releases/canonical-events");
 const { resolveEventTypeFromAliases } = require("../news-intelligence/event-registry");
 const { resolveCountryCode } = require("../economic-releases/country-resolver");
-const { normalizeTextForMatching, normalizeArabicIndicDigits } = require("../economic-releases/text-normalization");
+const {
+  normalizeTextForMatching,
+  normalizeArabicIndicDigits,
+  extractStrictEconomicNumericToken,
+  validateStructuredNumericFacts,
+} = require("../economic-releases/text-normalization");
 const { extractNumbers } = require("./fingerprint");
 const { normalizeTitleText, isGenericTitle } = require("./editorial-title");
 const { extractSourceReading, paraphrasePublishedReading } = require("./source-reading");
-const { isPromotionalDetailLine } = require("./sanitize-source-for-parsing");
-const { sanitizeSourceForParsing } = require("./sanitize-source-for-parsing");
+const {
+  isPromotionalDetailLine,
+  sanitizeSourceForParsing,
+  tokenizeInlineEconomicLabels,
+} = require("./sanitize-source-for-parsing");
 
 const FIELD_PATTERNS = {
   previous: [
@@ -58,7 +66,36 @@ function sanitizeFieldValue(value) {
   let cleaned = String(value).trim();
   cleaned = cleaned.split(/🔴|🔵|▪️|▫️|✍️|👇|🇬🇧|🇺🇸|🇪🇺|🇨🇭|🇷🇺|➡️/)[0].trim();
   cleaned = cleaned.split(/\s+(?:المتوقع|التقدير|الحالي|forecast|actual|previous|السابق)\s*[:：]/i)[0].trim();
-  return cleaned || null;
+  cleaned = cleaned.split(/\s*(?:•|👈)\s*النتيجة\s*[:：]/i)[0].trim();
+  return extractStrictEconomicFieldValue(cleaned);
+}
+
+function extractStrictEconomicFieldValue(rawSegment) {
+  if (!rawSegment) {
+    return null;
+  }
+  return extractStrictEconomicNumericToken(rawSegment);
+}
+
+function extractQualitativeFieldValue(rawSegment) {
+  if (!rawSegment) {
+    return null;
+  }
+  let cleaned = String(rawSegment).trim();
+  cleaned = cleaned.split(/🔴|🔵|▪️|▫️|✍️|👇|🇬🇧|🇺🇸|🇪🇺|🇨🇭|🇷🇺|➡️/)[0].trim();
+  cleaned = cleaned.split(/\s+(?:المتوقع|التقدير|الحالي|forecast|actual|previous|السابق)\s*[:：]/i)[0].trim();
+  cleaned = cleaned.split(/\s*(?:•|👈)\s*النتيجة\s*[:：]/i)[0].trim();
+  if (!cleaned || /\d/.test(cleaned)) {
+    return null;
+  }
+  if (/لمتابعة|انضم|إِنضم|telegram|tele\.me|t\.me\//i.test(cleaned)) {
+    return null;
+  }
+  return cleaned.length <= 80 ? cleaned : null;
+}
+
+function prepareTextForFieldExtraction(text) {
+  return tokenizeInlineEconomicLabels(normalizeArabicIndicDigits(text));
 }
 
 function extractRateDecisionAction(text) {
@@ -85,13 +122,41 @@ function isRateDecisionCanonical(canonical, resolvedEventKey) {
   return def?.eventType === "rate_decision" || canonical?.eventType === "rate_decision";
 }
 function extractField(text, fieldName) {
-  const normalizedText = normalizeArabicIndicDigits(text);
+  const normalizedText = prepareTextForFieldExtraction(text);
   for (const pattern of FIELD_PATTERNS[fieldName] || []) {
     const match = String(normalizedText || "").match(pattern);
     if (match?.[1]) {
-      return sanitizeFieldValue(match[1].trim());
+      const raw = match[1].trim();
+      const strict = extractStrictEconomicFieldValue(raw);
+      if (strict) {
+        return strict;
+      }
+      return extractQualitativeFieldValue(raw);
     }
   }
+  return null;
+}
+
+function extractCanonicalEventPhraseFromInline(text) {
+  const value = String(text || "");
+  const inlinePatterns = [
+    /(?:🔵|🔴|▪️|🟥)?\s*(قرار\s+(?:ال)?فائدة[^▪️▫️•🔴🔵]{4,100})/iu,
+    /(?:🔵|🔴|▪️|🟥)?\s*(قرار\s+(?:ال)?فائدة\s+(?:الصادر\s+عن\s+)?(?:البنك\s+المركزي\s+الأوروبي|ECB)[^▪️▫️•]{0,40})/iu,
+    /(?:🔵|🔴|▪️|🟥)?\s*((?:مؤشر|تقرير|مخزون|مبيعات|بيانات|معدل|الناتج)[^▪️▫️•🔴🔵]{4,100})/iu,
+  ];
+
+  for (const pattern of inlinePatterns) {
+    const match = value.match(pattern);
+    if (match?.[1]) {
+      const phrase = stripLeadingDecorations(match[1])
+        .replace(/\s*(?:▪️|▫️|🔴|🔵).*$/, "")
+        .trim();
+      if (phrase.length >= 8 && !isGenericTitle(phrase) && !/^(?:اخبار|أخبار)\s*(?:ال)?فوركس|pinned/i.test(phrase)) {
+        return phrase.slice(0, 120);
+      }
+    }
+  }
+
   return null;
 }
 
@@ -209,7 +274,13 @@ function scoreEventTitleCandidate(cleaned, fullText) {
 }
 
 function extractEventTitle(text) {
-  const lines = String(text || "")
+  const inlineCanonical = extractCanonicalEventPhraseFromInline(text);
+  if (inlineCanonical) {
+    return inlineCanonical;
+  }
+
+  const tokenized = prepareTextForFieldExtraction(text);
+  const lines = String(tokenized || "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
@@ -418,10 +489,14 @@ function isStructuredEconomicRelease(text, canonical) {
 
 function extractFactsFromTelegramPost(post) {
   const sourceRawText = normalizeArabicIndicDigits(post.sourceRawText || post.rawText || "");
-  const sanitized =
-    post.sanitizedText ||
-    sanitizeSourceForParsing(sourceRawText, { eventType: post.canonicalEventKey || null }).sanitizedText;
-  const text = normalizeArabicIndicDigits(sanitized);
+  const sanitizedBundle =
+    post.sanitizedText != null
+      ? {
+          sanitizedText: post.sanitizedText,
+          sourceReading: post.sourceReading || null,
+        }
+      : sanitizeSourceForParsing(sourceRawText, { eventType: post.canonicalEventKey || null });
+  const text = normalizeArabicIndicDigits(sanitizedBundle.sanitizedText);
   const sourceEventName = extractEventTitle(sourceRawText) || extractEventTitle(text);
   let previous = extractField(text, "previous");
   let forecast = extractField(text, "forecast");
@@ -438,6 +513,7 @@ function extractFactsFromTelegramPost(post) {
   const identity = resolveEventIdentity(resolvedEventKey || canonical.eventKey, title, canonical);
   const sourceReading =
     post.sourceReading ||
+    sanitizedBundle.sourceReading ||
     extractSourceReading(sourceRawText, { eventType: resolvedEventKey || canonical.eventKey }) ||
     null;
   const publishedReading = sourceReading ? paraphrasePublishedReading(sourceReading) : null;
@@ -468,6 +544,22 @@ function extractFactsFromTelegramPost(post) {
 
   const numbers = [...new Set([previous, forecast, actual, revisedPrevious, ...extractNumbers(text)].filter(Boolean))];
   const importance = HIGH_IMPACT_KEYS.has(resolvedEventKey || canonical.eventKey) ? "high" : "normal";
+
+  const numericFieldValidation = validateStructuredNumericFacts(
+    {
+      previous,
+      forecast,
+      actual,
+      isStructuredTriple,
+      sourceMessageId: post.sourceMessageId,
+      canonicalEventId: identity.canonicalEventId,
+      canonicalEventKey: resolvedEventKey || canonical.eventKey,
+    },
+    {
+      sourceMessageId: post.sourceMessageId,
+      canonicalEventId: identity.canonicalEventId,
+    }
+  );
 
   return {
     sourceChannel: post.sourceChannel,
@@ -512,12 +604,16 @@ function extractFactsFromTelegramPost(post) {
     isStructuredTriple,
     isPlainFedNews,
     detailLines,
+    numericFieldValidation,
   };
 }
 
 module.exports = {
   extractFactsFromTelegramPost,
   extractField,
+  extractStrictEconomicFieldValue,
+  extractCanonicalEventPhraseFromInline,
+  prepareTextForFieldExtraction,
   extractCountry,
   extractCountryCode,
   isStructuredEconomicRelease,

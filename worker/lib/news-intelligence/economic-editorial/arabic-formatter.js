@@ -92,9 +92,29 @@ function formatFamilyEditorial(editorial = {}) {
   ]);
 }
 
+const PUBLIC_COUNTRY_LINES = {
+  US: "الولايات المتحدة 🇺🇸",
+  EZ: "منطقة اليورو 🇪🇺",
+  UK: "المملكة المتحدة 🇬🇧",
+  CA: "كندا 🇨🇦",
+  AU: "أستراليا 🇦🇺",
+  JP: "اليابان 🇯🇵",
+  CN: "الصين 🇨🇳",
+  CH: "سويسرا 🇨🇭",
+  RU: "روسيا 🇷🇺",
+  DE: "ألمانيا 🇩🇪",
+  FR: "فرنسا 🇫🇷",
+};
+
 function buildCountryLine(country = "US") {
-  if (country === "US") {
-    return "الولايات المتحدة 🇺🇸";
+  if (PUBLIC_COUNTRY_LINES[country]) {
+    return PUBLIC_COUNTRY_LINES[country];
+  }
+  if (country === "الولايات المتحدة" || /united states|usa/i.test(String(country || ""))) {
+    return PUBLIC_COUNTRY_LINES.US;
+  }
+  if (country === "منطقة اليورو" || /eurozone|euro area|منطقة اليورو/i.test(String(country || ""))) {
+    return PUBLIC_COUNTRY_LINES.EZ;
   }
   return country;
 }
@@ -104,7 +124,7 @@ function buildSingleStructuredOutput(event) {
   const publishedReading = event.publishedReading || event.sourceReading?.normalizedText || null;
   return {
     headline,
-    countryLine: buildCountryLine(event.country),
+    countryLine: buildCountryLine(event.countryCode || event.country),
     factsBlock: buildFactsBlock(event),
     interpretation: publishedReading,
     marketImpact: null,

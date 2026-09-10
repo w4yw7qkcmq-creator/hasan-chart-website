@@ -1,3 +1,17 @@
+function normalizeArabicForPromoMatching(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/[ى]/g, "ي")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+const INLINE_PROMO_STOP_PATTERN =
+  /(?:لمتابعة|انضم|إنضم|اشترك|telegram\.me|t\.me\/|@forexbreakingnews|@forexnewspaper|forexbreakingnews|forexnewspaper)/iu;
+
 const PROMO_SIGNALS = [
   /\bexness\b/i,
   /\bxm\b/i,
@@ -59,7 +73,33 @@ function isPromoLine(line) {
   if (!value) {
     return false;
   }
-  return PROMO_LINE_PATTERN.test(value) || PROMO_SIGNALS.some((p) => p.test(value));
+  const normalized = normalizeArabicForPromoMatching(value);
+  return (
+    PROMO_LINE_PATTERN.test(value) ||
+    PROMO_SIGNALS.some((p) => p.test(value) || p.test(normalized)) ||
+    /لمتابعة.{0,120}(?:انضم|إنضم|اشترك)/i.test(normalized)
+  );
+}
+
+function stripInlinePromoSegment(text) {
+  let value = String(text || "");
+  const normalized = normalizeArabicForPromoMatching(value);
+  const stopIndex = normalized.search(
+    /(?:لمتابعة|انضم(?:\s|$)|إنضم(?:\s|$)|اشترك|telegram\.me|t\.me\/|@forexbreakingnews|@forexnewspaper|forexbreakingnews|forexnewspaper)/
+  );
+  if (stopIndex >= 0) {
+    value = value.slice(0, stopIndex);
+  }
+  value = value
+    .replace(/https?:\/\/(?:www\.)?telegram\.me\/[^\s]*/giu, "")
+    .replace(/https?:\/\/t\.me\/(?!EconomicNewsi\b)[^\s]*/giu, "")
+    .replace(/@[Ff]orex[Bb]reaking[Nn]ews\b/gu, "")
+    .replace(/@[Ff]orex[Nn]ewspaper\b/gu, "")
+    .replace(/forexbreakingnews/iu, "")
+    .replace(/forexnewspaper/iu, "")
+    .replace(/[«»]/g, "")
+    .trim();
+  return value;
 }
 
 function stripPromotionalFooter(text) {
@@ -144,7 +184,10 @@ function isPromotionOnly(text) {
 
 module.exports = {
   PROMO_SIGNALS,
+  normalizeArabicForPromoMatching,
+  INLINE_PROMO_STOP_PATTERN,
   isPromoLine,
+  stripInlinePromoSegment,
   stripPromotionalFooter,
   stripPromotionalContent,
   detectPromotionSignals,

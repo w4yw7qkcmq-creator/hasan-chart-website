@@ -455,7 +455,7 @@ const EZ = Object.fromEntries([
       /ecb rate decision|ecb interest rate|european central bank rate|interest rate decision|european central bank|البنك المركزي الأوروبي|المركزي الأوروبي|قرار الفائدة الأوروبي/i,
       /قرار الفائدة|قرار فائدة|\brate decision\b|\brate cut\b|\brate hike\b/i
     ),
-    arabicName: "قرار فائدة ECB",
+    arabicName: "قرار الفائدة للبنك المركزي الأوروبي",
   }),
   centralBankRate("EZ", "ECB_DEPOSIT_RATE", {
     priority: 2,

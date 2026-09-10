@@ -183,7 +183,7 @@ async function testProductionGatewayDuplicateBlocked() {
   assert.strictEqual(photoCalls, 1);
 
   const second = await gateway.publish(
-    buildProductionPublication(MSG_B_TIME, "telegram:ForexBreakingNews/42101", "203K - تعليق"),
+    buildProductionPublication(MSG_B_TIME, "telegram:ForexBreakingNews/42101", "203K"),
     deps
   );
   assert.strictEqual(second.blocked, true);

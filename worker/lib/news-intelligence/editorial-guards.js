@@ -1,3 +1,10 @@
+const {
+  extractLeadingEconomicNumericToken,
+  normalizeEconomicFieldValue,
+  stripBidiMarks,
+  assertStrictNumericEconomicField,
+} = require("../economic-releases/text-normalization");
+
 const BLOCK_REASONS = {
   EDITORIAL_OUTPUT_INVALID: "EDITORIAL_OUTPUT_INVALID",
   RAW_TEXT_FALLBACK_FORBIDDEN: "RAW_TEXT_FALLBACK_FORBIDDEN",
@@ -65,10 +72,8 @@ function detectRawFallbackPattern(body, formatted, raw) {
 }
 
 function extractNumericTokens(value) {
-  return String(value || "")
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .match(/-?\d+(?:\.\d+)?(?:K|M|B|%)?/g) || [];
+  const token = extractLeadingEconomicNumericToken(stripBidiMarks(value));
+  return token ? [token] : [];
 }
 
 function validateFactIntegrity(publicationFacts = {}, canonicalFacts = {}) {
@@ -82,14 +87,20 @@ function validateFactIntegrity(publicationFacts = {}, canonicalFacts = {}) {
       continue;
     }
 
-    const pubTokens = extractNumericTokens(pubValue);
-    const canonTokens = extractNumericTokens(canonValue);
-    if (!pubTokens.length || !canonTokens.length) {
+    const pubStrict = assertStrictNumericEconomicField(pubValue, field);
+    const canonStrict = assertStrictNumericEconomicField(canonValue, field);
+    if (!pubStrict.ok || !canonStrict.ok) {
+      mismatches.push({
+        field,
+        expected: canonStrict.normalized || null,
+        actual: pubStrict.normalized || null,
+        reason: "CONTAMINATED_ECONOMIC_FIELD",
+      });
       continue;
     }
 
-    const pubPrimary = pubTokens[0];
-    const canonPrimary = canonTokens[0];
+    const pubPrimary = pubStrict.normalized;
+    const canonPrimary = canonStrict.normalized;
     if (pubPrimary !== canonPrimary) {
       mismatches.push({ field, expected: canonPrimary, actual: pubPrimary });
     }

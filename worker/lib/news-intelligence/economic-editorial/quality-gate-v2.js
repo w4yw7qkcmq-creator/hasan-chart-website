@@ -2,6 +2,11 @@ const { evaluateCopySimilarity } = require("../copy-similarity-guard");
 const { validateFactIntegrity } = require("../editorial-guards");
 const { validateNumericTokenIntegrity } = require("./numeric-integrity");
 const { readingDirectionMatchesPublished } = require("../../telegram-news/source-reading");
+const { normalizeArabicForPromoMatching } = require("../../telegram-news/promo-filter");
+const {
+  assertStrictNumericEconomicField,
+  stripBidiMarks,
+} = require("../../economic-releases/text-normalization");
 const { getEventArabicName } = require("./interpretation-registry");
 
 const BLOCK_REASONS = {
@@ -27,6 +32,7 @@ const BLOCK_REASONS = {
   BODY_TOO_SHORT: "BODY_TOO_SHORT",
   IMAGE_REQUIRED_MISSING: "IMAGE_REQUIRED_MISSING",
   INTERPRETATION_DIRECTION_MISMATCH: "INTERPRETATION_DIRECTION_MISMATCH",
+  CONTAMINATED_ECONOMIC_FIELD: "CONTAMINATED_ECONOMIC_FIELD",
 };
 
 const COMPETITOR_PATTERNS = [
@@ -92,6 +98,11 @@ function validateQualityGateV2(input = {}) {
   }
 
   if (telegramStructuredEconomic && !isFamily) {
+    const bodyFactCheck = validateStructuredBodyFacts(gateBody, structuredEvent);
+    if (!bodyFactCheck.ok) {
+      return fail(BLOCK_REASONS.CONTAMINATED_ECONOMIC_FIELD, bodyFactCheck);
+    }
+
     if (!structuredEvent.actual && !structuredEvent.canonicalFacts?.actual) {
       return fail(BLOCK_REASONS.MISSING_ACTUAL);
     }
@@ -117,10 +128,14 @@ function validateQualityGateV2(input = {}) {
     return fail(BLOCK_REASONS.BODY_TOO_LONG);
   }
 
+  const promoNormalizedBody = normalizeArabicForPromoMatching(gateBody);
   for (const pattern of COMPETITOR_PATTERNS) {
-    if (pattern.test(gateBody)) {
+    if (pattern.test(gateBody) || pattern.test(promoNormalizedBody)) {
       return fail(BLOCK_REASONS.PROMOTIONAL_ARTIFACT_BLOCKED);
     }
+  }
+  if (/لمتابعة.{0,160}(?:انضم|إنضم|إِنضم|اشترك)/iu.test(promoNormalizedBody)) {
+    return fail(BLOCK_REASONS.PROMOTIONAL_ARTIFACT_BLOCKED);
   }
 
   for (const pattern of PLACEHOLDER_PATTERNS) {
@@ -204,7 +219,32 @@ function validateQualityGateV2(input = {}) {
 
 function extractFieldFromBody(body, label) {
   const match = String(body || "").match(new RegExp(`${label}\\s*[:：]\\s*([^\\n]+)`, "i"));
-  return match ? match[1].replace(/\u2066|\u2069/g, "").trim() : null;
+  return match ? stripBidiMarks(match[1]).trim() : null;
+}
+
+function validateStructuredBodyFacts(body, structuredEvent = {}) {
+  const labels = [
+    ["previous", "السابق"],
+    ["forecast", "المتوقع"],
+    ["actual", "الحالي"],
+  ];
+  for (const [field, label] of labels) {
+    const fromBody = extractFieldFromBody(body, label);
+    const canonical = structuredEvent.canonicalFacts?.[field] ?? structuredEvent[field];
+    const value = fromBody || canonical;
+    if (!value) {
+      continue;
+    }
+    const check = assertStrictNumericEconomicField(value, field, {
+      reason: BLOCK_REASONS.CONTAMINATED_ECONOMIC_FIELD,
+      sourceMessageId: structuredEvent.sourceMessageId || null,
+      canonicalEventId: structuredEvent.canonicalEventId || structuredEvent.eventType || null,
+    });
+    if (!check.ok) {
+      return check;
+    }
+  }
+  return { ok: true };
 }
 
 function fail(reason, detail = null) {
@@ -219,4 +259,6 @@ function fail(reason, detail = null) {
 module.exports = {
   BLOCK_REASONS,
   validateQualityGateV2,
+  validateStructuredBodyFacts,
+  extractFieldFromBody,
 };

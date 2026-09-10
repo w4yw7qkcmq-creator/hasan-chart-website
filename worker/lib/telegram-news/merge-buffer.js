@@ -86,6 +86,28 @@ function createTelegramMergeBuffer(options = {}) {
       };
     }
 
+    if (merged.facts?.numericFieldValidation && merged.facts.numericFieldValidation.ok === false) {
+      return {
+        ...merged,
+        skipPublish: true,
+        reason: merged.facts.numericFieldValidation.reason || "CONTAMINATED_ECONOMIC_FIELD",
+        validation: {
+          complete: false,
+          reason: merged.facts.numericFieldValidation.reason || "CONTAMINATED_ECONOMIC_FIELD",
+          field: merged.facts.numericFieldValidation.field || null,
+        },
+        aiResult: "none",
+        structuredDataValidation: {
+          stage: "STRUCTURED_DATA_VALID",
+          reason: merged.facts.numericFieldValidation.reason || "CONTAMINATED_ECONOMIC_FIELD",
+          field: merged.facts.numericFieldValidation.field || null,
+          canonicalEventId: merged.facts.canonicalEventId || merged.facts.canonicalEventKey || null,
+          sourceChannel: merged.post?.sourceChannel || null,
+          sourceMessageId: merged.post?.sourceMessageId || null,
+        },
+      };
+    }
+
     const classification = merged.post._pipeline?.classification || {};
     const formatted = await formatTelegramPost(merged.post, merged.facts, { ...formatOptions, classification });
     const finalFactCheck =

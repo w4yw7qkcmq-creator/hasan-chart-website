@@ -1,6 +1,13 @@
+const { normalizeArabicForPromoMatching, stripInlinePromoSegment } = require("./promo-filter");
+
 const READING_LINE_PATTERNS = [
   /^[\s👈➡️⬅️✍️]*النتيجة\s*[:：]\s*(.+)$/iu,
-  /^[\s👈➡️⬅️]*النتيجة\s+(.+)$/iu,
+  /^[\s👈➡️⬅️✍️]*النتيجة\s+(.+)$/iu,
+];
+
+const INLINE_READING_PATTERNS = [
+  /(?:•|👈)\s*النتيجة\s*[:：]\s*(.+)$/iu,
+  /النتيجة\s*[:：]\s*(.+)$/iu,
 ];
 
 const INVENTORY_READING_PATTERNS = [
@@ -81,8 +88,27 @@ function buildNormalizedText(raw, direction, asset) {
   if (direction === "NEUTRAL" && asset === "USD") {
     return "النتيجة محايدة للدولار الأمريكي.";
   }
+  if (direction === "POSITIVE" && asset === "EUR") {
+    return cleaned.endsWith(".") ? cleaned : `${cleaned}.`;
+  }
+  if (direction === "NEGATIVE" && asset === "EUR") {
+    return cleaned.endsWith(".") ? cleaned : `${cleaned}.`;
+  }
 
   return cleaned.endsWith(".") ? cleaned : `${cleaned}.`;
+}
+
+function trimReadingAtPromoBoundary(fragment) {
+  let value = stripInlinePromoSegment(String(fragment || ""));
+  value = value.split(/📚|👇|»/)[0];
+  const normalized = normalizeArabicForPromoMatching(value);
+  const stop = normalized.search(
+    /(?:لمتابعة|\u0627\u0646\u0636\u0645|\u0627\u0634\u062a\u0631\u0643|telegram\.me|t\.me\/|forexbreakingnews|forexnewspaper)/
+  );
+  if (stop >= 0) {
+    value = value.slice(0, stop);
+  }
+  return cleanReadingFragment(value);
 }
 
 function extractSourceReadingRaw(text) {
@@ -108,6 +134,30 @@ function extractSourceReadingRaw(text) {
     const match = joined.match(pattern);
     if (match?.[0]) {
       return cleanReadingFragment(match[0]);
+    }
+  }
+
+  for (const line of lines) {
+    for (const pattern of INLINE_READING_PATTERNS) {
+      const match = line.match(pattern);
+      if (match?.[1]) {
+        const trimmed = trimReadingAtPromoBoundary(match[1]);
+        if (trimmed) {
+          return trimmed;
+        }
+      }
+    }
+  }
+
+  for (const line of lines) {
+    const inlineMatch = line.match(
+      /(?:^|[\d.%KMBkmb\s•👈➡️-]+)\s*(?:•|👈)\s*النتيجة\s*[:：]\s*(.+)$/iu
+    );
+    if (inlineMatch?.[1]) {
+      const trimmed = trimReadingAtPromoBoundary(inlineMatch[1]);
+      if (trimmed) {
+        return trimmed;
+      }
     }
   }
 

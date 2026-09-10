@@ -2,6 +2,11 @@ const {
   inferEventNumericScale,
   shouldInferThousandsMultiplier,
 } = require("./numeric-units");
+const {
+  assertStrictNumericEconomicField,
+  validateStructuredNumericFacts,
+  extractStrictEconomicNumericToken,
+} = require("./text-normalization");
 
 const FORBIDDEN_PLACEHOLDER_PATTERN =
   /(?:^|\s)(?:غير\s*متوفر(?:\s*الآن)?|n\/a|not\s+available|undefined|null)(?:\s|$)/i;
@@ -89,7 +94,7 @@ function compareEconomicValues(actual, forecast, options = {}) {
   };
 }
 
-function normalizeEconomicFieldValue(value) {
+function normalizeEconomicFieldValue(value, options = {}) {
   if (isMissingEconomicValue(value)) {
     return {
       display: null,
@@ -100,13 +105,36 @@ function normalizeEconomicFieldValue(value) {
   }
 
   const raw = String(value).trim();
-  const numeric = parseEconomicNumber(raw);
+  if (options.strict === true) {
+    const strict = assertStrictNumericEconomicField(raw, options.fieldName || "value", options);
+    if (!strict.ok) {
+      return {
+        display: null,
+        numeric: null,
+        isMissing: true,
+        raw,
+        invalid: true,
+        reason: strict.reason,
+        field: strict.field,
+      };
+    }
+    const display = strict.display;
+    return {
+      display,
+      numeric: parseEconomicNumber(display),
+      isMissing: false,
+      raw: display,
+    };
+  }
+
+  const strictToken = extractStrictEconomicNumericToken(raw) || raw;
+  const numeric = parseEconomicNumber(strictToken);
 
   return {
-    display: raw,
+    display: strictToken,
     numeric,
     isMissing: false,
-    raw,
+    raw: strictToken,
   };
 }
 
@@ -223,5 +251,7 @@ module.exports = {
   formatDisplayValue,
   mergeProviderEvents,
   containsForbiddenPlaceholder,
+  assertStrictNumericEconomicField,
+  validateStructuredNumericFacts,
   FORBIDDEN_PLACEHOLDER_PATTERN,
 };

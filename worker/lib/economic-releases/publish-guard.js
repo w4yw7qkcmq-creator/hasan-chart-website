@@ -1,6 +1,25 @@
-const { containsForbiddenPlaceholder } = require("./normalize");
+const { containsForbiddenPlaceholder, validateStructuredNumericFacts } = require("./normalize");
 
-function canPublishStructuredRelease(validation, message) {
+function canPublishStructuredRelease(validation, message, facts = {}) {
+  if (facts?.numericFieldValidation && facts.numericFieldValidation.ok === false) {
+    return {
+      allowed: false,
+      reason: facts.numericFieldValidation.reason || "CONTAMINATED_ECONOMIC_FIELD",
+      missingFields: [],
+      field: facts.numericFieldValidation.field || null,
+    };
+  }
+
+  const numericValidation = validateStructuredNumericFacts(facts);
+  if (!numericValidation.ok) {
+    return {
+      allowed: false,
+      reason: numericValidation.reason || "CONTAMINATED_ECONOMIC_FIELD",
+      missingFields: [],
+      field: numericValidation.field || null,
+    };
+  }
+
   if (!validation?.complete) {
     return {
       allowed: false,

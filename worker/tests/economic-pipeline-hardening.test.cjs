@@ -189,6 +189,33 @@ function runPromoHardeningTest() {
   assert(!facts.sanitizedText.includes("انضم للقناة"), "sanitized excludes join CTA");
 }
 
+async function runEcbInlineIncidentTest() {
+  const fixturePath = path.join(
+    root,
+    "fixtures/news-intelligence/golden/production-incident-ecb-inline-20260910.json"
+  );
+  const fixture = JSON.parse(require("fs").readFileSync(fixturePath, "utf8"));
+  const sanitized = sanitizeSourceForParsing(fixture.sourceText);
+  const facts = extractFactsFromTelegramPost({
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: "42424",
+    sourceRawText: sanitized.sourceRawText,
+    sanitizedText: sanitized.sanitizedText,
+    rawText: sanitized.sanitizedText,
+    sourceReading: sanitized.sourceReading,
+  });
+  assert(facts.actual === "2.65%", `ECB actual=${facts.actual}`);
+  assert(facts.previous === "2.40%", `ECB previous=${facts.previous}`);
+  assert(facts.sourceReading?.raw?.includes("تم رفع الفائدة"), "ECB reading");
+  assert(facts.numericFieldValidation?.ok === true, "ECB numeric validation");
+  const result = await composeSingleEditorial(buildStructuredEventFromFacts(facts, { telegramStructuredEconomic: true }), {
+    rawSourceText: fixture.sourceText,
+  });
+  assert(result.ok === true, "ECB phase2");
+  assert(result.body.includes(fixture.expected.countryLine), "ECB country");
+  assert(!result.body.includes(" — EZ"), "ECB no EZ leak");
+}
+
 async function main() {
   runCrudeOilTest();
   await runCrudePhase2Test();
@@ -197,6 +224,7 @@ async function main() {
   await runIsmPhase2Test();
   await runNoReadingTest();
   runPromoHardeningTest();
+  await runEcbInlineIncidentTest();
   console.log("economic-pipeline-hardening.test.cjs: all tests passed");
 }
 

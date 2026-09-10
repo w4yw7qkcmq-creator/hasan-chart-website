@@ -1,27 +1,48 @@
 const { extractNumbers } = require("./fingerprint");
+const {
+  extractLeadingEconomicNumericToken,
+  normalizeEconomicFieldValue,
+  stripBidiMarks,
+  assertStrictNumericEconomicField,
+} = require("../economic-releases/text-normalization");
 
 function collectProtectedNumbers(facts = {}) {
   const numbers = new Set();
   for (const value of [facts.previous, facts.forecast, facts.actual, facts.revisedPrevious]) {
     if (value != null && String(value).trim() !== "") {
-      numbers.add(String(value).trim());
+      const token = extractLeadingEconomicNumericToken(value);
+      if (token) {
+        numbers.add(token);
+      }
     }
   }
   for (const value of facts.numbers || facts.rawNumbers || []) {
     if (value != null && String(value).trim() !== "") {
-      numbers.add(String(value).trim());
+      const token = extractLeadingEconomicNumericToken(value);
+      if (token) {
+        numbers.add(token);
+      }
     }
   }
-  extractNumbers(facts.factualSummary || "").forEach((n) => numbers.add(n));
+  extractNumbers(facts.factualSummary || "").forEach((n) => numbers.add(normalizeEconomicFieldValue(n)));
   return [...numbers];
 }
 
 function messageContainsProtectedNumber(message, number) {
-  const normalized = String(number).trim();
+  const normalized = normalizeEconomicFieldValue(number);
   if (!normalized) {
     return true;
   }
-  return String(message || "").includes(normalized);
+  const bodyTokens = collectProtectedNumbers({ numbers: extractNumbers(message) });
+  return bodyTokens.some((token) => token === normalized || token.includes(normalized) || normalized.includes(token));
+}
+
+function extractFieldNumericFromMessage(message, label) {
+  const match = String(message || "").match(new RegExp(`${label}\\s*[:：]\\s*([^\\n]+)`, "i"));
+  if (!match?.[1]) {
+    return null;
+  }
+  return extractLeadingEconomicNumericToken(stripBidiMarks(match[1]));
 }
 
 function validateFinalMessageAgainstFacts(message, facts = {}) {
@@ -29,30 +50,46 @@ function validateFinalMessageAgainstFacts(message, facts = {}) {
     return { ok: true, reason: null };
   }
 
-  const protectedNumbers = collectProtectedNumbers(facts);
-  const missingNumbers = protectedNumbers.filter((num) => !messageContainsProtectedNumber(message, num));
-
-  const fieldChecks = [
-    ["previous", facts.previous],
-    ["forecast", facts.forecast],
-    ["actual", facts.actual],
-  ];
-
-  for (const [fieldName, expected] of fieldChecks) {
+  for (const field of ["previous", "forecast", "actual"]) {
+    const expected = facts[field];
     if (!expected) {
       continue;
     }
-    const label =
-      fieldName === "previous" ? "السابق" : fieldName === "forecast" ? "المتوقع" : "الحالي";
-    if (!String(message || "").includes(String(expected).trim())) {
+    const strict = assertStrictNumericEconomicField(expected, field);
+    if (!strict.ok) {
+      return {
+        ok: false,
+        reason: "CONTAMINATED_ECONOMIC_FIELD",
+        field,
+        detail: `${field} fact is not numeric-only`,
+      };
+    }
+  }
+
+  const fieldChecks = [
+    ["previous", facts.previous, "السابق"],
+    ["forecast", facts.forecast, "المتوقع"],
+    ["actual", facts.actual, "الحالي"],
+  ];
+
+  for (const [fieldName, expected, label] of fieldChecks) {
+    if (!expected) {
+      continue;
+    }
+    const expectedNorm = extractLeadingEconomicNumericToken(expected);
+    const bodyNorm = extractFieldNumericFromMessage(message, label);
+    if (bodyNorm && expectedNorm && bodyNorm !== expectedNorm) {
       return {
         ok: false,
         reason: "FINAL_MESSAGE_FACT_MISMATCH",
         field: fieldName,
-        detail: `${label} missing or changed`,
+        detail: `${label} numeric token mismatch`,
       };
     }
   }
+
+  const protectedNumbers = collectProtectedNumbers(facts);
+  const missingNumbers = protectedNumbers.filter((num) => !messageContainsProtectedNumber(message, num));
 
   if (missingNumbers.length) {
     return {
@@ -61,10 +98,6 @@ function validateFinalMessageAgainstFacts(message, facts = {}) {
       field: "numbers",
       detail: `Missing numbers: ${missingNumbers.join(", ")}`,
     };
-  }
-
-  if (facts.title && !String(message || "").includes(String(facts.title).slice(0, 12))) {
-    // title may be reformulated — only block if all numbers present but title completely unrelated
   }
 
   return { ok: true, reason: null };
@@ -79,4 +112,5 @@ module.exports = {
   collectProtectedNumbers,
   validateFinalMessageAgainstFacts,
   validateAiOutputAgainstFacts,
+  extractFieldNumericFromMessage,
 };
