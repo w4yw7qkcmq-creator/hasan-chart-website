@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const root = path.join(__dirname, "..", "lib");
@@ -230,23 +232,32 @@ async function testRequiredImageUsesTelegramPhoto() {
 }
 
 async function testFastLaneImageUnavailablePublishesTextOnly() {
+  const emptyPoolDir = path.join(os.tmpdir(), `fast-lane-empty-remediation-${Date.now()}`);
+  fs.mkdirSync(emptyPoolDir, { recursive: true });
+  process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR = emptyPoolDir;
+
   const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
   const gateway = createNewsPublisherGateway({ store, runtimeMode: "test" });
   let textCalls = 0;
 
-  const result = await gateway.publish(
-    buildProductionPublication("2026-08-06T12:30:01.000Z", "telegram:ForexBreakingNews/required-blocked"),
-    makePhotoDeps({
-      resolvePublicationImageResult,
-      sendTelegramMessage: async () => {
-        textCalls += 1;
-        return { ok: true };
-      },
-    })
-  );
+  try {
+    const result = await gateway.publish(
+      buildProductionPublication("2026-08-06T12:30:01.000Z", "telegram:ForexBreakingNews/required-blocked"),
+      makePhotoDeps({
+        resolvePublicationImageResult,
+        sendTelegramMessage: async () => {
+          textCalls += 1;
+          return { ok: true };
+        },
+      })
+    );
 
-  assert.ok(result.telegramSent || result.published || result.partial);
-  assert.strictEqual(textCalls, 1);
+    assert.ok(result.telegramSent || result.published || result.partial);
+    assert.strictEqual(textCalls, 1);
+  } finally {
+    delete process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR;
+    fs.rmSync(emptyPoolDir, { recursive: true, force: true });
+  }
 }
 
 function testNumericEconomicSourcePolicyMatrix() {

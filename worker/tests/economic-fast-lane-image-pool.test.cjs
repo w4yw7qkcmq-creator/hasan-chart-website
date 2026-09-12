@@ -194,6 +194,10 @@ async function testUnknownEventGenericFallback() {
 }
 
 async function testMissingImagePublishesTextAnyway() {
+  const emptyPoolDir = path.join(os.tmpdir(), `fast-lane-empty-gateway-${Date.now()}`);
+  fs.mkdirSync(emptyPoolDir, { recursive: true });
+  process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR = emptyPoolDir;
+
   const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
   const gateway = createNewsPublisherGateway({ store, runtimeMode: "test" });
   let textCalls = 0;
@@ -201,6 +205,7 @@ async function testMissingImagePublishesTextAnyway() {
   const releaseDate = "2026-09-11T18:00:01.000Z";
   const messageId = `missing-image-${Date.now()}`;
 
+  try {
   const result = await gateway.publish(
     {
       eventType: "US_INITIAL_JOBLESS_CLAIMS",
@@ -247,6 +252,10 @@ async function testMissingImagePublishesTextAnyway() {
   assert.ok(result.telegramSent || result.partial || result.published, "must publish without blocking");
   assert.strictEqual(textCalls, 1);
   assert.strictEqual(photoCalls, 0);
+  } finally {
+    delete process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR;
+    fs.rmSync(emptyPoolDir, { recursive: true, force: true });
+  }
 }
 
 async function testRssPathUnchanged() {
@@ -430,11 +439,16 @@ async function testSelectorThrowPublishesText() {
 }
 
 async function testSiteLegAcceptsNullImageUrl() {
+  const emptyPoolDir = path.join(os.tmpdir(), `fast-lane-empty-site-${Date.now()}`);
+  fs.mkdirSync(emptyPoolDir, { recursive: true });
+  process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR = emptyPoolDir;
+
   const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
   const gateway = createNewsPublisherGateway({ store, runtimeMode: "test" });
   let savedSitePayload = null;
   const messageId = `site-null-image-${Date.now()}`;
 
+  try {
   const result = await gateway.publish(
     {
       eventType: "US_CPI_MOM",
@@ -474,6 +488,10 @@ async function testSiteLegAcceptsNullImageUrl() {
   });
   assert.strictEqual(audit.ok, true);
   assert.deepStrictEqual(audit.warnings, []);
+  } finally {
+    delete process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR;
+    fs.rmSync(emptyPoolDir, { recursive: true, force: true });
+  }
 }
 
 async function testGatewayIdempotencySingleAttempt() {

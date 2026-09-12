@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const root = path.join(__dirname, "..", "lib");
@@ -193,6 +195,10 @@ async function testDuplicateBlockedBeforeAiInGateway() {
 }
 
 async function testFastLaneImageFailurePublishesTextOnly() {
+  const emptyPoolDir = path.join(os.tmpdir(), `fast-lane-empty-policy-${Date.now()}`);
+  fs.mkdirSync(emptyPoolDir, { recursive: true });
+  process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR = emptyPoolDir;
+
   const gateway = createNewsPublisherGateway({ runtimeMode: "test", forceMemory: true });
   const publication = {
     eventType: "US_INITIAL_JOBLESS_CLAIMS",
@@ -219,26 +225,31 @@ async function testFastLaneImageFailurePublishesTextOnly() {
     },
   };
 
-  resetOpenAiImageCallCountForTests();
-  let textCalls = 0;
-  const result = await gateway.publish(publication, {
-    resolvePublicationImageResult,
-    registry: createNewsImageProviderRegistryBroken(),
-    cacheDir: TEST_CACHE_DIR,
-    outputDir: TEST_OUTPUT_DIR,
-    sendTelegramPhoto: async () => ({ ok: true }),
-    sendTelegramMessage: async () => {
-      textCalls += 1;
-      return { ok: true };
-    },
-    saveNewsPostToSupabase: async () => ({}),
-    savePublishedNewsToSupabase: async () => ({}),
-    savePublishedNewsLink: () => {},
-  });
+  try {
+    resetOpenAiImageCallCountForTests();
+    let textCalls = 0;
+    const result = await gateway.publish(publication, {
+      resolvePublicationImageResult,
+      registry: createNewsImageProviderRegistryBroken(),
+      cacheDir: TEST_CACHE_DIR,
+      outputDir: TEST_OUTPUT_DIR,
+      sendTelegramPhoto: async () => ({ ok: true }),
+      sendTelegramMessage: async () => {
+        textCalls += 1;
+        return { ok: true };
+      },
+      saveNewsPostToSupabase: async () => ({}),
+      savePublishedNewsToSupabase: async () => ({}),
+      savePublishedNewsLink: () => {},
+    });
 
-  assert.ok(result.telegramSent || result.published || result.partial);
-  assert.strictEqual(textCalls, 1);
-  assert.strictEqual(getOpenAiImageCallCountForTests(), 0);
+    assert.ok(result.telegramSent || result.published || result.partial);
+    assert.strictEqual(textCalls, 1);
+    assert.strictEqual(getOpenAiImageCallCountForTests(), 0);
+  } finally {
+    delete process.env.ECONOMIC_FAST_LANE_IMAGE_POOL_DIR;
+    fs.rmSync(emptyPoolDir, { recursive: true, force: true });
+  }
 }
 
 async function testPostPublishAuditorAcceptsTextOnlyWarning() {
