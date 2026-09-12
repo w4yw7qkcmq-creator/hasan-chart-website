@@ -32,6 +32,10 @@ const {
   recordTelegramEconomicPublicationFailure,
 } = require("../news-ingestion/cycle-funnel");
 const { isPrevalidatedRssGeneralPublication } = require("../general-rss/gateway-adapter");
+const {
+  isTelegramEconomicFastLaneEligible,
+  resolveTelegramEconomicFastLaneImagePolicy,
+} = require("../news-images/economic-image-pool");
 
 const BLOCK_REASONS = {
   ...EDITORIAL_BLOCK_REASONS,
@@ -53,6 +57,16 @@ function buildPublicationEventFingerprint(canonical, publication = {}) {
 }
 
 function resolveRequiredImageGate(publication, canonical) {
+  const fastLaneImagePolicy = resolveTelegramEconomicFastLaneImagePolicy(publication);
+  if (fastLaneImagePolicy?.imageBlocking === false) {
+    return {
+      requiresImage: false,
+      visualPriority: VISUAL_PRIORITY.OPTIONAL,
+      imageRequirement: { level: VISUAL_PRIORITY.OPTIONAL, reason: "fast_lane_prebuilt_optional" },
+      fastLaneImagePolicy,
+    };
+  }
+
   const explicitPriority = publication.visualPriority || publication.metadata?.visualPriority || null;
   if (explicitPriority === VISUAL_PRIORITY.OPTIONAL || explicitPriority === "OPTIONAL") {
     return {
@@ -703,6 +717,7 @@ function createNewsPublisherGateway(options = {}) {
         publicationType === PUBLICATION_TYPES.RELEASE &&
         !cachedImage &&
         !imageGate.requiresImage &&
+        !isTelegramEconomicFastLaneEligible(publicationForDelivery) &&
         (publication.importance === "HIGH" || isFastLaneActive());
 
       const trackEconomicRelease =
@@ -751,33 +766,50 @@ function createNewsPublisherGateway(options = {}) {
         );
 
         if (imageGate.requiresImage && !hasDeliverablePublicationImage(publicationForDelivery)) {
-          const blocked = {
-            blocked: true,
-            reason: BLOCK_REASONS.IMAGE_REQUIRED_UNAVAILABLE,
-            stage: "image",
-            eventKey: canonical.eventKey,
-            publicationRecord,
-          };
-          await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.FAILED);
-          await store.updateDeliveryLeg(publicationRecord, "site", LEG_STATUS.FAILED);
-          if (trackEconomicRelease) {
-            recordTelegramEconomicPublicationFailure();
+          if (isTelegramEconomicFastLaneEligible(publicationForDelivery)) {
+            logNewsEvent(NEWS_EVENTS.PUBLICATION_ALLOWED, {
+              eventKey: canonical.eventKey,
+              fastLaneImageFailOpen: true,
+              imageSelectionStatus:
+                publicationForDelivery.metadata?.imageTelemetry?.imageSelectionStatus || "MISSING",
+            });
+            delivery = await deliverPublicationLegs(
+              publicationForDelivery,
+              editorialForDelivery,
+              canonical,
+              publicationRecord,
+              deps
+            );
+          } else {
+            const blocked = {
+              blocked: true,
+              reason: BLOCK_REASONS.IMAGE_REQUIRED_UNAVAILABLE,
+              stage: "image",
+              eventKey: canonical.eventKey,
+              publicationRecord,
+            };
+            await store.updateDeliveryLeg(publicationRecord, "telegram", LEG_STATUS.FAILED);
+            await store.updateDeliveryLeg(publicationRecord, "site", LEG_STATUS.FAILED);
+            if (trackEconomicRelease) {
+              recordTelegramEconomicPublicationFailure();
+            }
+            phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
+              ...deps,
+              correlationId,
+              latency: { totalMs: Date.now() - ingestStartedAt },
+            });
+            return blocked;
           }
-          phase3?.observeEvaluationBlocked(publicationWithCorrelation, blocked, {
-            ...deps,
-            correlationId,
-            latency: { totalMs: Date.now() - ingestStartedAt },
-          });
-          return blocked;
-        }
+        } else {
 
-        delivery = await deliverPublicationLegs(
-          publicationForDelivery,
-          editorialForDelivery,
-          canonical,
-          publicationRecord,
-          deps
-        );
+          delivery = await deliverPublicationLegs(
+            publicationForDelivery,
+            editorialForDelivery,
+            canonical,
+            publicationRecord,
+            deps
+          );
+        }
       }
       await store.updateDeliveryLeg(
         publicationRecord,
@@ -804,6 +836,8 @@ function createNewsPublisherGateway(options = {}) {
         recordTelegramEconomicPublicationFailure();
       }
 
+      const imageTelemetry = publicationForDelivery.metadata?.imageTelemetry || {};
+      const gatewayAt = new Date().toISOString();
       recordEconomicLatencySample({
         eventKey: canonical.eventKey,
         eventType: publication.eventType || canonical.eventType,
@@ -812,15 +846,21 @@ function createNewsPublisherGateway(options = {}) {
         sourcePublishedAt: publication.releaseDate || publication.receivedAt,
         sourceObservedAt: publication.metadata?.sourceObservedAt || publication.receivedAt,
         workerFetchedAt: publication.metadata?.workerFetchedAt || publication.receivedAt,
-        publicationReadyAt: publication.metadata?.publicationReadyAt || new Date().toISOString(),
-        imageReadyAt: publicationForDelivery.metadata?.imageTelemetry?.totalImageWorkflowMs
-          ? new Date().toISOString()
-          : null,
+        parsedAt: publication.metadata?.parsedAt || null,
+        qualityGatePassedAt: publication.metadata?.qualityGatePassedAt || null,
+        publicationReadyAt: publication.metadata?.publicationReadyAt || gatewayAt,
+        imageSelectedAt: imageTelemetry.imageSelectionMs != null ? gatewayAt : null,
+        imageReadyAt: imageTelemetry.totalImageWorkflowMs ? gatewayAt : null,
+        publisherGatewayAt: gatewayAt,
         telegramSentAt: new Date().toISOString(),
         siteSavedAt: delivery.siteInserted ? new Date().toISOString() : null,
-        fastLane: isFastLaneActive(),
+        fastLane: isFastLaneActive() || isTelegramEconomicFastLaneEligible(publicationForDelivery),
         textFirst: useTextFirst === true,
         imageCacheHit: Boolean(cachedImage),
+        imageMode: imageTelemetry.imageMode || null,
+        imageSelectionStatus: imageTelemetry.imageSelectionStatus || null,
+        prebuiltCategory: imageTelemetry.prebuiltCategory || null,
+        imageSelectionMs: imageTelemetry.imageSelectionMs ?? null,
       });
 
       const successResult = {

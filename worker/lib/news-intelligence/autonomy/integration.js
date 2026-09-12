@@ -8,6 +8,7 @@ const { computeConfidence, evaluateConfidencePolicy } = require("./confidence-en
 const { observeAnomaly, observeSilentFailure } = require("./anomaly-detector");
 const { openOrUpdateIncident, INCIDENT_TYPES, SEVERITY } = require("./incident-engine");
 const { auditPublishedRecord } = require("./post-publish-auditor");
+const { resolveTelegramEconomicFastLaneImagePolicy } = require("../../news-images/economic-image-pool");
 const { reconcileDelivery } = require("./delivery-reconciliation");
 const { updateHeartbeat, getHeartbeat } = require("./heartbeat");
 const { getCircuitBreakerRegistry } = require("./circuit-breaker");
@@ -201,7 +202,9 @@ function observePublicationResult(publication = {}, result = {}, options = {}) {
       publication,
       publicationRecord: result.publicationRecord,
       canonicalFacts: publication.facts,
-      requiredImage: publication.imagePolicy === "REQUIRED" || publication.metadata?.imagePolicy === "REQUIRED",
+      requiredImage:
+        !resolveTelegramEconomicFastLaneImagePolicy(publication) &&
+        (publication.imagePolicy === "REQUIRED" || publication.metadata?.imagePolicy === "REQUIRED"),
     });
     if (!audit.ok && options.gateway && isPhase3AutonomyEnabled(options)) {
       reconcileDelivery(result.publicationRecord, options.gateway, { correlationId }).catch(() => {});

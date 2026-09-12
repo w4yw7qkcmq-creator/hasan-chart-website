@@ -11,6 +11,12 @@ const { uploadNewsImageBuffer, buildStablePublicationKey } = require("./image-st
 const { createEmptyImageTelemetry, summarizeImageStatus, recordImageTelemetry } = require("./image-telemetry");
 const { resolveOpenAIImageSettings } = require("./openai-image-settings");
 const { classifyImageError, isTransientImageError } = require("./image-error-classifier");
+const {
+  isTelegramEconomicFastLaneEligible,
+  selectEconomicFastLaneImage,
+  SELECTION_STATUS,
+  IMAGE_MODES,
+} = require("./economic-image-pool");
 
 const settings = resolveOpenAIImageSettings();
 const IMAGE_WORKFLOW_BUDGET_MS = settings.workflowBudgetMs;
@@ -290,6 +296,74 @@ async function resolvePublicationImageResult(publication = {}, deps = {}) {
         cacheHit: true,
       };
     }
+  }
+
+  if (isTelegramEconomicFastLaneEligible(publication)) {
+    const selectionStartedAt = Date.now();
+    const selection = selectEconomicFastLaneImage({
+      canonicalEventId: eventKey,
+      countryCode: country,
+      sourceMessageId:
+        publication.metadata?.rawMessageId || publication.metadata?.sourceMessageId || null,
+      publishedAt: publication.releaseDate || publication.metadata?.sourcePublishedAt || null,
+    });
+    const policy = resolveNewsImagePolicy(publication);
+    const telemetry = createEmptyImageTelemetry();
+    telemetry.imagePolicyMode = policy.mode;
+    telemetry.imageMode = selection.imageMode || IMAGE_MODES.PREBUILT_FAST_LANE;
+    telemetry.imageSelectionStatus = selection.status;
+    telemetry.imageSelectionMs = selection.selectionMs ?? Date.now() - selectionStartedAt;
+    telemetry.prebuiltCategory = selection.category || null;
+    telemetry.prebuiltAssetPath = selection.assetPath || null;
+    telemetry.prebuiltPoolIndex = selection.poolIndex ?? null;
+    telemetry.aiImageAttempted = false;
+    telemetry.publishedWithoutImage = selection.status !== SELECTION_STATUS.PREBUILT_SELECTED;
+
+    if (selection.status === SELECTION_STATUS.PREBUILT_SELECTED && selection.filePath) {
+      telemetry.publishedWithPrebuiltImage = true;
+      const imageResult = {
+        generationAttempted: false,
+        delivery: "photo",
+        source: "prebuilt_pool",
+        filePath: selection.filePath,
+        imageUrl: selection.assetPath || null,
+        provider: "prebuilt",
+        imageMode: IMAGE_MODES.PREBUILT_FAST_LANE,
+      };
+      recordImageTelemetry(telemetry);
+      return {
+        ok: true,
+        policy: { ...policy, allowAi: false, prebuiltFastLane: true },
+        imageResult,
+        telemetry,
+        imageStatus: "prebuilt_selected",
+        fastLane: true,
+      };
+    }
+
+    telemetry.warning =
+      selection.status === SELECTION_STATUS.PREBUILT_FAILED_OPEN
+        ? "PREBUILT_IMAGE_FAILED_OPEN"
+        : "PREBUILT_IMAGE_MISSING";
+    const imageResult = {
+      generationAttempted: false,
+      delivery: "text",
+      source: "prebuilt_pool_missing",
+      filePath: null,
+      imageUrl: null,
+      provider: null,
+      imageMode: IMAGE_MODES.PREBUILT_FAST_LANE,
+    };
+    recordImageTelemetry(telemetry);
+    return {
+      ok: true,
+      policy: { ...policy, allowAi: false, prebuiltFastLane: true },
+      imageResult,
+      telemetry,
+      imageStatus: selection.status,
+      fastLane: true,
+      failOpen: true,
+    };
   }
 
   const policy = resolveNewsImagePolicy(publication);

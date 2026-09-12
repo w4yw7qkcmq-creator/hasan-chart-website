@@ -229,7 +229,7 @@ async function testRequiredImageUsesTelegramPhoto() {
   assert.strictEqual(textCalls, 0);
 }
 
-async function testRequiredImageUnavailableBlocksPublication() {
+async function testFastLaneImageUnavailablePublishesTextOnly() {
   const store = createPublicationStore({ runtimeMode: "test", forceMemory: true });
   const gateway = createNewsPublisherGateway({ store, runtimeMode: "test" });
   let textCalls = 0;
@@ -237,19 +237,7 @@ async function testRequiredImageUnavailableBlocksPublication() {
   const result = await gateway.publish(
     buildProductionPublication("2026-08-06T12:30:01.000Z", "telegram:ForexBreakingNews/required-blocked"),
     makePhotoDeps({
-      resolvePublicationImageResult: async () => ({
-        ok: true,
-        policy: { mode: "AI_PRIMARY" },
-        imageResult: {
-          generationAttempted: true,
-          delivery: "text",
-          filePath: null,
-          imageUrl: null,
-          source: "none",
-        },
-        telemetry: { publishedWithoutImage: true },
-        imageStatus: "missing",
-      }),
+      resolvePublicationImageResult,
       sendTelegramMessage: async () => {
         textCalls += 1;
         return { ok: true };
@@ -257,9 +245,8 @@ async function testRequiredImageUnavailableBlocksPublication() {
     })
   );
 
-  assert.strictEqual(result.blocked, true);
-  assert.strictEqual(result.reason, "IMAGE_REQUIRED_UNAVAILABLE");
-  assert.strictEqual(textCalls, 0);
+  assert.ok(result.telegramSent || result.published || result.partial);
+  assert.strictEqual(textCalls, 1);
 }
 
 function testNumericEconomicSourcePolicyMatrix() {
@@ -423,7 +410,7 @@ async function run() {
   await testForexNewspaperOnlyDoesNotFallbackPublish();
   await testProductionGatewayDuplicateBlocked();
   await testRequiredImageUsesTelegramPhoto();
-  await testRequiredImageUnavailableBlocksPublication();
+  await testFastLaneImageUnavailablePublishesTextOnly();
   testStallDetectorDoesNotFireWithoutEconomicAttempts();
   testStallDetectorDoesNotFireForQualityBlockedOnly();
   testStallDetectorFiresForRepeatedEconomicPublishFailures();

@@ -53,22 +53,41 @@ function deriveTimings(input = {}, now = Date.now()) {
   const readyMs = toMs(publicationReadyAt);
   const telegramMs = toMs(telegramSentAt);
 
+  const parsedMs = toMs(input.parsedAt);
+  const qualityGateMs = toMs(input.qualityGatePassedAt);
+  const imageSelectedMs = toMs(input.imageSelectedAt);
+  const gatewayMs = toMs(input.publisherGatewayAt);
+
   return {
     sourcePublishedAt,
     sourceObservedAt,
     workerFetchedAt,
     parsedAt: input.parsedAt || null,
     canonicalResolvedAt: input.canonicalResolvedAt || null,
+    qualityGatePassedAt: input.qualityGatePassedAt || null,
     publicationReadyAt,
+    imageSelectedAt: input.imageSelectedAt || null,
     imageReadyAt: input.imageReadyAt || null,
+    publisherGatewayAt: input.publisherGatewayAt || null,
     telegramSentAt,
     siteSavedAt: input.siteSavedAt || null,
     sourceToObservedMs: sourceMs != null && observedMs != null ? observedMs - sourceMs : null,
     observedToFetchedMs: observedMs != null && fetchedMs != null ? fetchedMs - observedMs : null,
+    observedToParsedMs: observedMs != null && parsedMs != null ? parsedMs - observedMs : null,
     fetchedToReadyMs: fetchedMs != null && readyMs != null ? readyMs - fetchedMs : null,
+    imageSelectionMs:
+      typeof input.imageSelectionMs === "number"
+        ? input.imageSelectionMs
+        : imageSelectedMs != null && qualityGateMs != null
+          ? imageSelectedMs - qualityGateMs
+          : null,
     readyToTelegramMs: readyMs != null && telegramMs != null ? telegramMs - readyMs : null,
+    gatewayToTelegramMs: gatewayMs != null && telegramMs != null ? telegramMs - gatewayMs : null,
     sourceToTelegramMs: sourceMs != null && telegramMs != null ? telegramMs - sourceMs : null,
     observedToTelegramMs: observedMs != null && telegramMs != null ? telegramMs - observedMs : null,
+    imageMode: input.imageMode || null,
+    imageSelectionStatus: input.imageSelectionStatus || null,
+    prebuiltCategory: input.prebuiltCategory || null,
   };
 }
 
@@ -81,6 +100,10 @@ function recordEconomicLatencySample(input = {}) {
     fastLane: input.fastLane === true,
     textFirst: input.textFirst === true,
     imageCacheHit: input.imageCacheHit === true,
+    imageMode: input.imageMode || null,
+    imageSelectionStatus: input.imageSelectionStatus || null,
+    prebuiltCategory: input.prebuiltCategory || null,
+    imageSelectionMs: input.imageSelectionMs ?? null,
     ...deriveTimings(input),
   };
 

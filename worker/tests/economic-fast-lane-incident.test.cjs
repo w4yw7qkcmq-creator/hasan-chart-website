@@ -171,13 +171,23 @@ function testSpGlobalAliases() {
 
 async function testImageCacheAndTextFirstPolicy() {
   resetEventImageCacheForTests();
+  const fs = require("fs");
+  const poolDir = path.join(__dirname, "..", ".cache", "fast-lane-incident-pool");
+  const jobsDir = path.join(poolDir, "jobs");
+  fs.mkdirSync(jobsDir, { recursive: true });
+  fs.writeFileSync(path.join(jobsDir, "01.jpg"), Buffer.from("incident-test-image"));
+
   assert(getCachedEventImage("US_ADP_EMPLOYMENT", "US") === null, "cache miss initially");
-  const cached = await prewarmEventImage("US_ADP_EMPLOYMENT", {
-    country: "US",
-    title: "ADP Employment",
-    importance: "HIGH",
-  });
-  assert(cached && cached.filePath, "prewarm stores cache entry");
+  const cached = await prewarmEventImage(
+    "US_ADP_EMPLOYMENT",
+    {
+      country: "US",
+      title: "ADP Employment",
+      importance: "HIGH",
+    },
+    { poolBaseDir: poolDir }
+  );
+  assert(cached && cached.filePath, "prewarm stores cache entry when prebuilt asset exists");
   assert(getCachedEventImage("US_ADP_EMPLOYMENT", "US") !== null, "cache hit after prewarm");
 }
 

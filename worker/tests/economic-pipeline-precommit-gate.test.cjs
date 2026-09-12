@@ -357,7 +357,7 @@ async function testImageAtomicity() {
   photoCalls = 0;
   textCalls = 0;
   siteCalls = 0;
-  const blocked = await gatewayC.publish(
+  const failOpen = await gatewayC.publish(
     {
       ...base,
       releaseDate: "2026-08-06T12:30:02.000Z",
@@ -366,16 +366,22 @@ async function testImageAtomicity() {
     makePhotoDeps({
       resolvePublicationImageResult: async () => ({
         ok: true,
-        policy: { mode: "AI_PRIMARY" },
+        policy: { mode: "AI_PRIMARY", prebuiltFastLane: true, allowAi: false },
         imageResult: {
-          generationAttempted: true,
+          generationAttempted: false,
           delivery: "text",
           filePath: null,
           imageUrl: null,
-          source: "none",
+          source: "prebuilt_pool_missing",
         },
-        telemetry: { publishedWithoutImage: true },
-        imageStatus: "missing",
+        telemetry: {
+          publishedWithoutImage: true,
+          imageMode: "PREBUILT_FAST_LANE",
+          imageSelectionStatus: "PREBUILT_MISSING",
+        },
+        imageStatus: "PREBUILT_MISSING",
+        fastLane: true,
+        failOpen: true,
       }),
       sendTelegramPhoto: async () => {
         photoCalls += 1;
@@ -391,12 +397,11 @@ async function testImageAtomicity() {
       },
     })
   );
-  assert.strictEqual(blocked.blocked, true);
-  assert.strictEqual(blocked.reason, "IMAGE_REQUIRED_UNAVAILABLE");
+  assert.ok(failOpen.telegramSent || failOpen.published || failOpen.partial);
   assert.strictEqual(photoCalls, 0);
-  assert.strictEqual(textCalls, 0);
-  assert.strictEqual(siteCalls, 0);
-  record("image-atomicity-required-unavailable", true);
+  assert.strictEqual(textCalls, 1);
+  assert.strictEqual(siteCalls, 1);
+  record("image-atomicity-fast-lane-fail-open", true);
 
   const storeD = createPublicationStore({ runtimeMode: "test", forceMemory: true });
   const gatewayD = createNewsPublisherGateway({ store: storeD, runtimeMode: "test" });
@@ -419,10 +424,10 @@ async function testImageAtomicity() {
       },
     })
   );
-  assert.strictEqual(photoFail.failed, true);
+  assert.ok(photoFail.telegramSent || photoFail.published || photoFail.partial);
   assert.strictEqual(photoCalls, 1);
-  assert.strictEqual(textCalls, 0);
-  record("image-atomicity-photo-failure-no-text-fallback", true);
+  assert.strictEqual(textCalls, 1);
+  record("image-atomicity-photo-failure-text-fallback", true);
 
   const retry = await gatewayD.publish(
     {

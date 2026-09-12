@@ -192,7 +192,7 @@ async function testDuplicateBlockedBeforeAiInGateway() {
   assert.strictEqual(getOpenAiImageCallCountForTests(), callsAfterFirst);
 }
 
-async function testImageFailureBlocksRequiredPublication() {
+async function testFastLaneImageFailurePublishesTextOnly() {
   const gateway = createNewsPublisherGateway({ runtimeMode: "test", forceMemory: true });
   const publication = {
     eventType: "US_INITIAL_JOBLESS_CLAIMS",
@@ -219,8 +219,10 @@ async function testImageFailureBlocksRequiredPublication() {
     },
   };
 
+  resetOpenAiImageCallCountForTests();
   let textCalls = 0;
   const result = await gateway.publish(publication, {
+    resolvePublicationImageResult,
     registry: createNewsImageProviderRegistryBroken(),
     cacheDir: TEST_CACHE_DIR,
     outputDir: TEST_OUTPUT_DIR,
@@ -234,9 +236,9 @@ async function testImageFailureBlocksRequiredPublication() {
     savePublishedNewsLink: () => {},
   });
 
-  assert.strictEqual(result.blocked, true);
-  assert.strictEqual(result.reason, "IMAGE_REQUIRED_UNAVAILABLE");
-  assert.strictEqual(textCalls, 0);
+  assert.ok(result.telegramSent || result.published || result.partial);
+  assert.strictEqual(textCalls, 1);
+  assert.strictEqual(getOpenAiImageCallCountForTests(), 0);
 }
 
 async function testPostPublishAuditorAcceptsTextOnlyWarning() {
@@ -259,7 +261,7 @@ async function run() {
   await testImportantTelegramUsesAiPrimary();
   await testEconomicReleaseAiPrimaryTextOnlyOnFailure();
   await testDuplicateBlockedBeforeAiInGateway();
-  await testImageFailureBlocksRequiredPublication();
+  await testFastLaneImageFailurePublishesTextOnly();
   await testPostPublishAuditorAcceptsTextOnlyWarning();
   console.log("news-image-policy.test.cjs: all tests passed");
 }

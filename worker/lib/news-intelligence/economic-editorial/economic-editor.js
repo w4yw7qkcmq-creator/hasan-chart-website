@@ -12,6 +12,7 @@ const { getEventFamily } = require("../event-registry");
 const { buildScheduledBucket } = require("../../telegram-news/fingerprint");
 const { interpretEventFamily } = require("./deterministic-interpretation");
 const { maybeEnhanceWithAi } = require("./ai-editor");
+const { resolveTelegramEconomicFastLaneImagePolicy } = require("../../news-images/economic-image-pool");
 
 const EDITORIAL_VERSION = "phase2-v3";
 
@@ -61,12 +62,25 @@ async function composeSingleEditorial(structuredEvent, options = {}) {
   });
 
   const body = formatSingleEditorial(structured);
+  const publicationContext = options.publication || {
+    sourceType: structuredEvent.telegramStructuredEconomic ? "telegram_economic" : null,
+    sourceId: structuredEvent.sourceId || options.sourceId || null,
+    publicationType: options.publicationType || "RELEASE",
+    eventType: structuredEvent.eventType,
+    eventKey: structuredEvent.eventType,
+  };
+  const fastLaneImagePolicy = resolveTelegramEconomicFastLaneImagePolicy(publicationContext);
+
   const quality = validateQualityGateV2({
     structured,
     body,
     structuredEvent,
     rawSourceText: options.rawSourceText || null,
     telegramStructuredEconomic: structuredEvent.telegramStructuredEconomic === true,
+    publication: publicationContext,
+    fastLaneImagePolicy,
+    imageRequired: fastLaneImagePolicy ? false : options.imageRequired,
+    imageResolved: fastLaneImagePolicy ? false : options.imageResolved,
   });
   if (!quality.ok) {
     logPhase2Event(PHASE2_EVENTS.QUALITY_GATE_BLOCKED, { reason: quality.reason, eventType: structuredEvent.eventType });

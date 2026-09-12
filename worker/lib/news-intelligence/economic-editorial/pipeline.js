@@ -71,6 +71,9 @@ async function runEconomicEditorialPipeline(input = {}, options = {}) {
     createBrandedFallback: options.createBrandedFallback,
     sourceImageUrl: options.sourceImageUrl,
     allowSourceImage: options.allowSourceImage,
+    publication: options.publication || null,
+    sourceId: options.sourceId || null,
+    publicationType: options.publicationType || null,
   };
 
   let editorialResult;
@@ -115,6 +118,16 @@ async function buildPhase2PublicationRequest(basePublication = {}, options = {})
   const pipeline = await runEconomicEditorialPipeline(structuredEvent, {
     ...options,
     rawSourceText: basePublication.rawSourceText || null,
+    publication: {
+      sourceType: basePublication.sourceType,
+      sourceId: basePublication.sourceId,
+      publicationType: basePublication.publicationType,
+      eventType: structuredEvent.eventType,
+      eventKey: structuredEvent.eventType,
+      country: structuredEvent.country,
+    },
+    sourceId: basePublication.sourceId,
+    publicationType: basePublication.publicationType,
   });
 
   if (!pipeline.ok) {

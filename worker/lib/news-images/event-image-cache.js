@@ -1,8 +1,3 @@
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const { generateDeterministicBrandedFallbackImage } = require("./premium-image-generator");
-const { FALLBACK_BRAND } = require("./image-policy");
 const {
   CACHE_TTL_MS,
   getCachedEventImage,
@@ -13,9 +8,10 @@ const {
   resetEventImageCacheForTests,
   buildCacheKey,
 } = require("../news-intelligence/event-image-cache-store");
-
-const CACHE_DIR =
-  process.env.ECONOMIC_EVENT_IMAGE_CACHE_DIR || path.join(os.tmpdir(), "hasan-chart-economic-event-images");
+const {
+  selectEconomicFastLaneImage,
+  SELECTION_STATUS,
+} = require("./economic-image-pool");
 
 async function prewarmEventImage(eventKey, context = {}, options = {}) {
   purgeExpiredEntries();
@@ -25,42 +21,28 @@ async function prewarmEventImage(eventKey, context = {}, options = {}) {
     return existing;
   }
 
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-  }
+  const selection = selectEconomicFastLaneImage({
+    canonicalEventId: eventKey,
+    countryCode: country,
+    sourceMessageId: `prewarm:${eventKey}`,
+    publishedAt: context.releaseTime || context.scheduledAt || null,
+    poolBaseDir: options.poolBaseDir,
+  });
 
-  const cacheKey = buildCacheKey(eventKey, country);
-  const result = await generateDeterministicBrandedFallbackImage(
-    {
-      eventKey,
-      eventName: context.eventName || context.title || eventKey,
-      title: context.title || context.eventName || eventKey,
-      country,
-      brandName: FALLBACK_BRAND,
-      importance: context.importance || "HIGH",
-      actual: undefined,
-      forecast: undefined,
-      previous: undefined,
-    },
-    {
-      ...options,
-      disableInternalProviderFallback: true,
-      provider: "fallback",
-      outputPath: path.join(CACHE_DIR, `${cacheKey.replace(/[^a-zA-Z0-9:_-]/g, "_")}.png`),
-    }
-  );
-
-  if (!result?.filePath || !fs.existsSync(result.filePath)) {
+  if (selection.status !== SELECTION_STATUS.PREBUILT_SELECTED || !selection.filePath) {
     return null;
   }
 
   setCachedEventImage(
     eventKey,
     {
-      filePath: result.filePath,
-      imageUrl: null,
+      filePath: selection.filePath,
+      imageUrl: selection.assetPath || null,
       createdAt: Date.now(),
       eventKey,
+      source: "prebuilt_pool",
+      imageMode: selection.imageMode,
+      category: selection.category,
     },
     country
   );
