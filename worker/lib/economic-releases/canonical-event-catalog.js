@@ -345,8 +345,11 @@ const US_PMI = Object.fromEntries([
   }),
   releaseDef("US", "EMPIRE_STATE_MANUFACTURING", {
     priority: 5,
-    patterns: [/empire state manufacturing|empire state index|ny empire state|empire state/i],
-    arabicName: "مؤشر Empire State للتصنيع",
+    patterns: [
+      /empire state manufacturing|empire state index|ny empire state|new york empire state|empire manufacturing|empire state/i,
+      /مؤشر\s*إمباير\s*ستيت|إمباير\s*ستيت|امباير\s*ستيت|مؤشر\s*امباير\s*ستيت|مؤشر\s*نيو\s*يورk\s*الصناعي|مؤشر\s*نيويورk\s*الصناعي/i,
+    ],
+    arabicName: "مؤشر إمباير ستيت للصناعة — الولايات المتحدة 🇺🇸",
   }),
   releaseDef("US", "MANUFACTURING_PMI", {
     priority: 40,

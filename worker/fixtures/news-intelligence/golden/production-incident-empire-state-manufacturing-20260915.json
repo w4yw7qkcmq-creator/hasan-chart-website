@@ -1,0 +1,23 @@
+{
+  "name": "production-incident-empire-state-manufacturing-20260915",
+  "sourceText": "🇺🇸 United States\nEmpire State Manufacturing Index\nمؤشر إمباير ستيت للصناعة\n\nPrevious: 20.60\nEstimate: 14.80\nCurrent: 7.60\n\nالنتيجة: سلبي للدولار الأمريكي وإيجابي للذهب\n\n📚 Please open Telegram via the link below\nTelegram.me/ForexBreakingNews\nJoin ForexBreakingNews channel",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "incident-empire-state-20260915",
+    "sourcePublishedAt": "2026-09-15T13:30:00.000Z",
+    "sourceUrl": "https://t.me/s/ForexBreakingNews/incident-empire-state-20260915"
+  },
+  "expected": {
+    "canonicalEventKey": "US_EMPIRE_STATE_MANUFACTURING",
+    "countryCode": "US",
+    "previous": "20.60",
+    "forecast": "14.80",
+    "actual": "7.60",
+    "isStructuredTriple": true,
+    "sourceReadingContains": "دولار",
+    "promoContamination": false,
+    "publicationAllowed": true,
+    "imageSelectionStatus": "PREBUILT_SELECTED",
+    "imageCategory": "generic-us-economic"
+  }
+}

@@ -26,12 +26,12 @@ const FIELD_PATTERNS = {
     /🔴\s*السابق\s*[:：]?\s*([^\n]+)/i,
   ],
   forecast: [
-    /(?:المتوقع|التقدير|forecast|consensus|expected|expected rate|الفائدة المتوقعة|التوقعات)\s*[:：]?\s*([^\n]+)/i,
+    /(?:المتوقع|التقدير|forecast|consensus|expected|expected rate|estimate|الفائدة المتوقعة|التوقعات)\s*[:：]?\s*([^\n]+)/i,
     /▪️\s*(?:المتوقع|التقدير)\s*[:：]?\s*([^\n]+)/i,
     /🔴\s*(?:المتوقع|التقدير)\s*[:：]?\s*([^\n]+)/i,
   ],
   actual: [
-    /(?:الحالي|actual|current rate|new rate|key rate|rate decision|الفائدة الجديدة|القرار الحالي)\s*[:：]?\s*([^\n]+)/i,
+    /(?:الحالي|actual|current rate|\bcurrent\b|new rate|key rate|rate decision|الفائدة الجديدة|القرار الحالي)\s*[:：]?\s*([^\n]+)/i,
     /▫️\s*الحالي\s*[:：]?\s*([^\n]+)/i,
     /🔵\s*الحالي\s*[:：]?\s*([^\n]+)/i,
   ],

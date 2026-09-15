@@ -115,7 +115,10 @@ const US_ALIASES = {
     /composite pmi/i
   ),
   US_PHILADELPHIA_FED_MANUFACTURING: alias(/philadelphia fed|philly fed|مؤشر فيلادelfia|فيلادelfia/i),
-  US_EMPIRE_STATE_MANUFACTURING: alias(/empire state manufacturing|empire state index/i),
+  US_EMPIRE_STATE_MANUFACTURING: alias(
+    /empire state manufacturing|empire state index|ny empire state|new york empire state|empire manufacturing/i,
+    /مؤشر\s*إمباير\s*ستيت|إمباير\s*ستيت|امباير\s*ستيت|مؤشر\s*امباير\s*ستيت|مؤشر\s*نيو\s*يورk\s*الصناعي|مؤشر\s*نيويورk\s*الصناعي/i
+  ),
   US_FED_RATE_DECISION: alias(/\bfomc\b|fed rate decision|interest rate decision|rate decision/i),
   US_FOMC_MINUTES: alias(/fomc minutes|fed minutes/i),
   US_POWELL_SPEECH: alias(/powell.*speech|press conference/i),
