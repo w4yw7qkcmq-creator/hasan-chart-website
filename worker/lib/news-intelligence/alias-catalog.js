@@ -66,8 +66,10 @@ const US_ALIASES = {
     /(?:us\s+)?crude\s+oil\s+inventor(?:y|ies)/i,
     /eia\s+crude\s+oil\s+inventor(?:y|ies)/i,
     /مخزون(?:ات)?\s*النفط\s*الخام(?:\s*الأمريكي)?/i,
-    /مخزون\s*النفط\s*الخام(?:\s*الأمريكي)?/i
+    /مخزون\s*النفط\s*الخام(?:\s*الأمريكي)?/i,
+    /مخزون\s*النفط\s*الأ?مريكي\s*الخام/i
   ),
+  US_BUSINESS_INVENTORIES: alias(/business inventories|مخزون\s*الشركات|مخزون\s*شركات/i),
   US_EIA_GASOLINE_INVENTORIES: alias(/gasoline\s+inventor(?:y|ies)/i, /gasoline\s+stocks/i, /مخزون\s*البنزين(?:\s*الأمريكي)?/i),
   US_EIA_DISTILLATE_INVENTORIES: alias(
     /distillate\s+inventor(?:y|ies)/i,

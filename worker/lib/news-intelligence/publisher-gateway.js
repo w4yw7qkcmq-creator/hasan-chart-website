@@ -1,6 +1,7 @@
 const { NEWS_EVENTS, logNewsEvent } = require("./observability");
 const { PUBLICATION_TYPES, DESTINATIONS, SOURCE_TYPES } = require("./publication-types");
 const { buildCanonicalEventFromCandidate, isNumericEconomicRelease } = require("./event-normalizer");
+const { STRUCTURED_ECONOMIC_FALLBACK } = require("./structured-economic-fallback");
 const { validateEditorialOutput, validateFactIntegrity, BLOCK_REASONS: EDITORIAL_BLOCK_REASONS } = require("./editorial-guards");
 const { validateNumericEconomicSourcePolicy, BLOCK_REASONS: SOURCE_BLOCK_REASONS } = require("./source-policy");
 const {
@@ -301,7 +302,9 @@ function createNewsPublisherGateway(options = {}) {
       sourceChannel: publication.sourceId,
       rawMessageId: publication.metadata?.rawMessageId,
       rawText: publication.rawSourceText,
-      title: publication.title,
+      title: publication.canonicalDisplayName || publication.title,
+      fallbackTitle: publication.canonicalDisplayName || publication.title,
+      fallbackEligible: publication.eventType === STRUCTURED_ECONOMIC_FALLBACK,
     });
 
     if (canonical.eventKey) {

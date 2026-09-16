@@ -9,6 +9,7 @@ const {
 } = require("../../economic-releases/text-normalization");
 const { getEventArabicName } = require("./interpretation-registry");
 const { resolveTelegramEconomicFastLaneImagePolicy } = require("../../news-images/economic-image-pool");
+const { isStructuredEconomicFallbackEventType } = require("../structured-economic-fallback");
 
 const BLOCK_REASONS = {
   QUALITY_GATE_BLOCKED: "QUALITY_GATE_BLOCKED",
@@ -107,9 +108,14 @@ function validateQualityGateV2(input = {}) {
     if (!structuredEvent.actual && !structuredEvent.canonicalFacts?.actual) {
       return fail(BLOCK_REASONS.MISSING_ACTUAL);
     }
-    const expectedHeadline = structuredEvent.canonicalDisplayName || getEventArabicName(structuredEvent.eventType);
+    const expectedHeadline = isStructuredEconomicFallbackEventType(structuredEvent.eventType)
+      ? structuredEvent.canonicalDisplayName || structuredEvent.publicTitle || null
+      : structuredEvent.canonicalDisplayName || getEventArabicName(structuredEvent.eventType);
     if (expectedHeadline && structured.headline !== expectedHeadline) {
       return fail(BLOCK_REASONS.HEADLINE_IDENTITY_MISMATCH);
+    }
+    if (isStructuredEconomicFallbackEventType(structuredEvent.eventType) && !expectedHeadline) {
+      return fail(BLOCK_REASONS.MISSING_HEADLINE);
     }
   }
 

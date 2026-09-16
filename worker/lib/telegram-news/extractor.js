@@ -19,6 +19,10 @@ const {
   sanitizeSourceForParsing,
   tokenizeInlineEconomicLabels,
 } = require("./sanitize-source-for-parsing");
+const {
+  STRUCTURED_ECONOMIC_FALLBACK,
+  hasValidStrictEconomicTriple,
+} = require("../news-intelligence/structured-economic-fallback");
 
 const FIELD_PATTERNS = {
   previous: [
@@ -503,11 +507,14 @@ function extractFactsFromTelegramPost(post) {
   let forecast = extractField(text, "forecast");
   let actual = extractField(text, "actual");
   const revisedPrevious = extractField(text, "revisedPrevious");
-  const countryCode = extractCountryCode(text);
+  let countryCode = extractCountryCode(text);
   const country = extractCountry(text) || COUNTRY_DISPLAY[countryCode] || null;
   const title = sourceEventName || extractEventTitle(text);
   const period = extractPeriod(text);
   const combined = `${title || ""} ${text}`;
+  if (!countryCode) {
+    countryCode = extractCountryCode(`${title || ""}\n${sourceRawText}`) || null;
+  }
   const canonical = resolveCanonicalForTelegram(combined, { countryCode });
   const resolvedEventKey =
     canonical.eventKey || resolveEventTypeFromAliases(combined, { countryCode });
@@ -577,6 +584,22 @@ function extractFactsFromTelegramPost(post) {
     };
   }
 
+  const strictTripleFacts = {
+    previous,
+    forecast,
+    actual,
+    isStructuredTriple,
+    numericFieldValidation,
+  };
+  const useStructuredFallback =
+    !resolvedEventKey &&
+    !canonical.eventKey &&
+    hasValidStrictEconomicTriple(strictTripleFacts);
+  const resolvedEventType =
+    resolvedEventKey ||
+    (canonical.eventKey && !String(canonical.eventKey).endsWith("_CPI_GENERIC") ? canonical.eventKey : null) ||
+    (useStructuredFallback ? STRUCTURED_ECONOMIC_FALLBACK : isStructuredTriple ? "structured_release" : "general");
+
   return {
     sourceChannel: post.sourceChannel,
     sourceMessageId: post.sourceMessageId,
@@ -584,7 +607,7 @@ function extractFactsFromTelegramPost(post) {
     sourcePublishedAt: post.sourcePublishedAt,
     sourceRawText,
     sanitizedText: text,
-    countryCode: countryCode || canonical.country || null,
+    countryCode: countryCode || canonical.country || extractCountryCode(title || "") || null,
     canonicalEventKey: resolvedEventKey || canonical.eventKey,
     sourceEventName: identity.sourceEventName,
     canonicalEventId: identity.canonicalEventId,
@@ -593,12 +616,8 @@ function extractFactsFromTelegramPost(post) {
     sector: identity.sector,
     title,
     country,
-    eventType:
-      resolvedEventKey ||
-      (canonical.eventKey && !String(canonical.eventKey).endsWith("_CPI_GENERIC")
-        ? canonical.eventKey
-        : null) ||
-      (isStructuredTriple ? "structured_release" : "general"),
+    eventType: resolvedEventType,
+    canonicalStatus: useStructuredFallback ? "UNMAPPED" : "MAPPED",
     period,
     previous,
     revisedPrevious,

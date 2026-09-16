@@ -2,6 +2,10 @@ const { PUBLICATION_TYPES, DESTINATIONS, SOURCE_TYPES } = require("./publication
 const { resolveCandidateImportance } = require("../news-images/image-policy");
 const { resolveEventTypeFromAliases } = require("./event-registry");
 const { CANONICAL_EVENT_DEFINITIONS } = require("../economic-releases/canonical-events");
+const {
+  STRUCTURED_ECONOMIC_FALLBACK,
+  hasValidStrictEconomicTriple,
+} = require("./structured-economic-fallback");
 
 function resolvePublicationEventType(candidate = {}) {
   const facts = candidate.facts || {};
@@ -9,12 +13,17 @@ function resolvePublicationEventType(candidate = {}) {
     return facts.canonicalEventKey;
   }
   const combined = `${facts.title || ""}\n${candidate.post?.rawText || ""}`;
-  const aliasEventType = resolveEventTypeFromAliases(combined);
+  const aliasEventType = resolveEventTypeFromAliases(combined, {
+    countryCode: facts.countryCode || facts.canonical?.country || null,
+  });
   if (aliasEventType) {
     return aliasEventType;
   }
   if (facts.canonical?.eventKey && facts.canonical.eventKey !== "US_CPI_GENERIC") {
     return facts.canonical.eventKey;
+  }
+  if (candidate.newsType === "economic" && hasValidStrictEconomicTriple(facts)) {
+    return STRUCTURED_ECONOMIC_FALLBACK;
   }
   return null;
 }
@@ -30,11 +39,19 @@ function buildTelegramPublicationRequest(candidate, validation, ctx = {}) {
       : resolveCandidateImportance({ importance: "MEDIUM", metadata: { candidate, newsValue: candidate.newsValue } });
 
   const eventType = resolvePublicationEventType(candidate);
+  const fallbackTitle =
+    candidate.facts?.canonicalDisplayName ||
+    candidate.facts?.sourceEventName ||
+    validation.resolvedTitle ||
+    null;
 
   return {
     eventType,
     eventKey: null,
-    country: candidate.facts?.canonical?.country || "US",
+    country: candidate.facts?.countryCode || candidate.facts?.canonical?.country || "US",
+    canonicalDisplayName:
+      eventType === STRUCTURED_ECONOMIC_FALLBACK ? fallbackTitle : candidate.facts?.canonicalDisplayName || null,
+    canonicalStatus: eventType === STRUCTURED_ECONOMIC_FALLBACK ? "UNMAPPED" : null,
     releaseDate: candidate.post?.sourcePublishedAt || candidate.facts?.scheduledAt || null,
     publicationType:
       candidate.newsType === "economic" ? PUBLICATION_TYPES.RELEASE : PUBLICATION_TYPES.GENERAL_NEWS,

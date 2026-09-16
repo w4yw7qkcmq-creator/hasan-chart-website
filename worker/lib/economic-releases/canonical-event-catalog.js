@@ -193,6 +193,14 @@ const US_GROWTH = Object.fromEntries([
     patterns: [/factory orders|طلبيات المصانع/i],
     arabicName: "طلبيات المصانع الأمريكية",
   }),
+  releaseDef("US", "BUSINESS_INVENTORIES", {
+    priority: 17,
+    patterns: [
+      /business inventories|مخزون\s*الشركات|مخزون\s*شركات/i,
+      /inventories?\s*\(?business\)?/i,
+    ],
+    arabicName: "مخزون الشركات",
+  }),
   releaseDef("US", "INDUSTRIAL_PRODUCTION", {
     priority: 16,
     patterns: [/industrial production|الإنتاج الصناعي/i],
@@ -258,7 +266,8 @@ const US_EIA_INVENTORIES = Object.fromEntries([
       /eia\s+crude\s+oil\s+inventor(?:y|ies)/i,
       /crude\s+oil\s+inventor(?:y|ies)\s*(?:\(?(?:m|mb|barrels?)\)?)?/i,
       /مخزون(?:ات)?\s*النفط\s*الخام(?:\s*الأمريكي)?/i,
-      /مخزون\s*النفط\s*الخام(?:\s*الأمريكي)?/i
+      /مخزون\s*النفط\s*الخام(?:\s*الأمريكي)?/i,
+      /مخزون\s*النفط\s*الأ?مريكي\s*الخام/i
     ),
     arabicName: "مخزون النفط الخام الأمريكي",
   }),

@@ -7,6 +7,10 @@ const { resolveEventTypeFromAliases, getEventFamily, normalizeAliasText, isFamil
 const { resolveCountryCode } = require("../economic-releases/country-resolver");
 const { buildScheduledBucket } = require("../telegram-news/fingerprint");
 const { extractLeadingEconomicNumericToken } = require("../economic-releases/text-normalization");
+const {
+  STRUCTURED_ECONOMIC_FALLBACK,
+  isStructuredEconomicFallbackEventType,
+} = require("./structured-economic-fallback");
 
 function normalizeReleaseInstant(value) {
   if (!value) {
@@ -30,10 +34,23 @@ function normalizePeriod(value) {
     .toUpperCase();
 }
 
-function buildStableReleaseEventKey({ country, eventType, releaseDate, period }) {
+function slugifyFallbackPublicTitle(title) {
+  const normalized = normalizeAliasText(title)
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 72);
+  return normalized || "economic_release";
+}
+
+function buildStableReleaseEventKey({ country, eventType, releaseDate, period, fallbackTitle, rawMessageId }) {
   const bucket = buildScheduledBucket(releaseDate);
   if (!eventType || !bucket || bucket === "unknown") {
     return null;
+  }
+  if (isStructuredEconomicFallbackEventType(eventType)) {
+    const slug = slugifyFallbackPublicTitle(fallbackTitle);
+    const messagePart = rawMessageId ? `:msg:${rawMessageId}` : "";
+    return `${country}:FALLBACK:${slug}:${bucket}${messagePart}`;
   }
   const periodPart = period ? `:${normalizePeriod(period)}` : "";
   return `${country}:${eventType}:${bucket}${periodPart}`;
@@ -52,6 +69,9 @@ function buildCanonicalEventFromCandidate(candidate = {}) {
     const resolved = resolveCanonicalEventKey(combined, { countryCode: country });
     eventType = resolved.eventKey || null;
   }
+  if (!eventType && candidate.fallbackEligible === true) {
+    eventType = STRUCTURED_ECONOMIC_FALLBACK;
+  }
 
   const releaseDate = normalizeReleaseInstant(
     candidate.releaseDate || candidate.scheduledAt || candidate.sourcePublishedAt || candidate.receivedAt
@@ -67,7 +87,14 @@ function buildCanonicalEventFromCandidate(candidate = {}) {
     period,
   };
 
-  const eventKey = buildStableReleaseEventKey({ country, eventType, releaseDate, period });
+  const eventKey = buildStableReleaseEventKey({
+    country,
+    eventType,
+    releaseDate,
+    period,
+    fallbackTitle: candidate.title || candidate.fallbackTitle || title,
+    rawMessageId: candidate.rawMessageId || candidate.sourceMessageId || null,
+  });
   const legacyIdempotencyKey =
     eventType && releaseDate
       ? buildIdempotencyKey({ country, eventKey: eventType, scheduledAt: releaseDate })
@@ -95,6 +122,9 @@ function buildCanonicalEventFromCandidate(candidate = {}) {
 function isNumericEconomicRelease(eventType) {
   if (!eventType) {
     return false;
+  }
+  if (isStructuredEconomicFallbackEventType(eventType)) {
+    return true;
   }
   if (isFamilyPublicationEventType(eventType)) {
     return true;

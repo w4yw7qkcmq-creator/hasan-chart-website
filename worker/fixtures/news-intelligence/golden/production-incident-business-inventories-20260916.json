@@ -1,0 +1,18 @@
+{
+  "name": "production-incident-business-inventories-20260916",
+  "sourceText": "🇺🇸 United States\nBusiness Inventories\nمخزون الشركات\n\n▪️ السابق : %0.0\n▪️ التقدير : %0.6\n▫️ الحالي : %0.8\n\nالنتيجة: سلبي للدولار الأمريكي\n\n📚 Please open Telegram via the link below\nTelegram.me/ForexBreakingNews",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "42568",
+    "sourcePublishedAt": "2026-09-16T14:00:19.000Z",
+    "sourceUrl": "https://t.me/ForexBreakingNews/42568"
+  },
+  "expected": {
+    "canonicalEventKey": "US_BUSINESS_INVENTORIES",
+    "countryCode": "US",
+    "previous": "0.0%",
+    "forecast": "0.6%",
+    "actual": "0.8%",
+    "imageCategory": "generic-us-economic"
+  }
+}

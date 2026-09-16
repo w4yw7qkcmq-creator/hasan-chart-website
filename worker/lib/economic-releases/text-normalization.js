@@ -2,8 +2,12 @@ function normalizeArabicIndicDigits(value) {
   return String(value || "").replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
 }
 
+function stripArabicDiacritics(value) {
+  return String(value || "").replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "");
+}
+
 function normalizeTextForMatching(value) {
-  return normalizeArabicIndicDigits(value)
+  return stripArabicDiacritics(normalizeArabicIndicDigits(value))
     .toLowerCase()
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, " ")
     .replace(/[^\p{L}\p{N}%./+\-]/gu, " ")
@@ -77,6 +81,11 @@ function normalizeSignedEconomicRawToken(value) {
   const suffixMinusWithUnit = compact.match(/^(\d+(?:[.,]\d+)?[KMBkmb])-$/i);
   if (suffixMinusWithUnit) {
     return `-${suffixMinusWithUnit[1].replace(/,/g, ".")}`;
+  }
+
+  const suffixMinusDecimalWithUnit = compact.match(/^(\d+[.,]\d+[KMBkmb])-$/i);
+  if (suffixMinusDecimalWithUnit) {
+    return `-${suffixMinusDecimalWithUnit[1].replace(/,/g, ".")}`;
   }
 
   const prefixPercent = compact.match(/^%(\d+(?:[.,]\d+)?)$/i);
@@ -240,6 +249,7 @@ function validateSourceNumericSignIntegrity(sourceText, facts = {}, fieldPattern
 
 module.exports = {
   normalizeArabicIndicDigits,
+  stripArabicDiacritics,
   normalizeTextForMatching,
   normalizeFingerprintText,
   normalizeEconomicFieldValue,

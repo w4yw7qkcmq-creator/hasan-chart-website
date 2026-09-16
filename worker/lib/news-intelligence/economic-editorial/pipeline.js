@@ -23,8 +23,15 @@ function resetPhase2IntegrationForTests() {
   defaultCoordinator = null;
 }
 
+const { STRUCTURED_ECONOMIC_FALLBACK } = require("../structured-economic-fallback");
+
 function buildStructuredEventFromFacts(facts = {}, overrides = {}) {
-  const eventType = overrides.eventType || facts.eventType || facts.canonicalEventId || facts.canonical?.eventKey;
+  const eventType =
+    overrides.eventType ||
+    facts.canonicalEventKey ||
+    facts.canonicalEventId ||
+    facts.eventType ||
+    facts.canonical?.eventKey;
   return {
     eventType,
     eventFamily: overrides.eventFamily || getEventFamily(eventType),
@@ -36,7 +43,9 @@ function buildStructuredEventFromFacts(facts = {}, overrides = {}) {
     unit: facts.unit || null,
     releaseTime: overrides.releaseTime || facts.releaseTime || facts.scheduledAt || facts.sourcePublishedAt,
     importance: overrides.importance || facts.importance || "HIGH",
-    canonicalDisplayName: facts.canonicalDisplayName || facts.canonical?.arabicName || null,
+    canonicalDisplayName: facts.canonicalDisplayName || facts.canonical?.arabicName || facts.sourceEventName || null,
+    publicTitle: facts.canonicalDisplayName || facts.sourceEventName || null,
+    canonicalStatus: facts.canonicalStatus || (eventType === STRUCTURED_ECONOMIC_FALLBACK ? "UNMAPPED" : "MAPPED"),
     sourceReading: facts.sourceReading || null,
     sourceReadingRaw: facts.sourceReadingRaw || facts.sourceReading?.raw || null,
     publishedReading: facts.publishedReading || facts.sourceReading?.normalizedText || null,

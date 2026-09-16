@@ -1,0 +1,18 @@
+{
+  "name": "production-incident-crude-inventories-20260916",
+  "sourceText": "مخزون النفط الأَمريكي الخام\n\n▪️ السابق : -0.391M\n▪️ التقدير : 1.600M\n▫️ الحالي : -0.640M\n\nالنتيجة: سلبي لأسعار النفط\n\n📚 Please open Telegram via the link below\nTelegram.me/ForexBreakingNews",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "42571",
+    "sourcePublishedAt": "2026-09-16T14:30:19.000Z",
+    "sourceUrl": "https://t.me/ForexBreakingNews/42571"
+  },
+  "expected": {
+    "canonicalEventKey": "US_EIA_CRUDE_OIL_INVENTORIES",
+    "countryCode": "US",
+    "previous": "-0.391M",
+    "forecast": "1.600M",
+    "actual": "-0.640M",
+    "imageCategory": "eia"
+  }
+}

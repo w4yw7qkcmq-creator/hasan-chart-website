@@ -28,7 +28,9 @@ function buildStructuredInputFromPublication(publication = {}) {
     unit: facts.unit ?? publication.unit,
     releaseTime: publication.releaseDate || publication.releaseTime,
     importance: publication.importance,
-    canonicalDisplayName: facts.canonicalDisplayName || publication.canonicalDisplayName || null,
+    canonicalDisplayName:
+      facts.canonicalDisplayName || publication.canonicalDisplayName || publication.title || null,
+    publicTitle: publication.canonicalDisplayName || publication.title || facts.canonicalDisplayName || null,
     sourceReading: facts.sourceReading || publication.sourceReading || null,
     sourceReadingRaw: facts.sourceReadingRaw || publication.sourceReadingRaw || null,
     publishedReading: facts.publishedReading || publication.publishedReading || null,
