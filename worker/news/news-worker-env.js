@@ -185,6 +185,10 @@ function getPollIntervalMs() {
   return parseBoundedInt("NEWS_POLL_INTERVAL_MS", { defaultValue: 60_000, min: 15_000, max: 300_000 }).value;
 }
 
+function getTelegramEconomicFastPollIntervalMs() {
+  return parseBoundedInt("TELEGRAM_ECONOMIC_FAST_POLL_MS", { defaultValue: 15_000, min: 5_000, max: 60_000 }).value;
+}
+
 function classifyNewsWorkerVariable(key) {
   const required = new Set([
     "SUPABASE_URL",
@@ -201,6 +205,7 @@ function classifyNewsWorkerVariable(key) {
     "NEWS_DRY_RUN",
     "DISABLE_GENERAL_RSS",
     "NEWS_POLL_INTERVAL_MS",
+    "TELEGRAM_ECONOMIC_FAST_POLL_MS",
     "NEWS_MAX_POSTS_PER_HOUR",
     "NEWS_PREMIUM_IMAGES_ENABLED",
     "NEWS_IMAGE_PROVIDER",
@@ -243,6 +248,7 @@ module.exports = {
   isNewsWorkerEnabled,
   isNewsDryRun,
   getPollIntervalMs,
+  getTelegramEconomicFastPollIntervalMs,
   resolveSupabaseUrlFromEnv,
   isProductionLike,
   classifyNewsWorkerVariable,

@@ -1,0 +1,25 @@
+{
+  "name": "production-incident-retail-sales-20260916",
+  "sourceText": "🇺🇸 United States\nUS Retail Sales\nمبيعات التجزئة الأمريكية\n\n▪️ السابق : %0.6-\n▪️ التقدير : %0.8\n▫️ الحالي : %1.2\n\nالنتيجة: إيجابي للدولار الأمريكي\n\n📚 Please open Telegram via the link below\nTelegram.me/ForexBreakingNews\nJoin ForexBreakingNews channel",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "42563",
+    "sourcePublishedAt": "2026-09-16T12:30:19.000Z",
+    "sourceUrl": "https://t.me/ForexBreakingNews/42563"
+  },
+  "expected": {
+    "canonicalEventKey": "US_RETAIL_SALES",
+    "countryCode": "US",
+    "previous": "-0.6%",
+    "forecast": "0.8%",
+    "actual": "1.2%",
+    "isStructuredTriple": true,
+    "arabicPreviousLine": "السابق: -0.6%",
+    "arabicForecastLine": "المتوقع: 0.8%",
+    "arabicActualLine": "الحالي: 1.2%",
+    "promoContamination": false,
+    "publicationAllowed": true,
+    "imageSelectionStatus": "PREBUILT_SELECTED",
+    "imageCategory": "retail-sales"
+  }
+}

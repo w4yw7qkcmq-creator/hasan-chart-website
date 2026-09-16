@@ -9,6 +9,7 @@ const {
   normalizeArabicIndicDigits,
   extractStrictEconomicNumericToken,
   validateStructuredNumericFacts,
+  validateSourceNumericSignIntegrity,
 } = require("../economic-releases/text-normalization");
 const { extractNumbers } = require("./fingerprint");
 const { normalizeTitleText, isGenericTitle } = require("./editorial-title");
@@ -545,7 +546,7 @@ function extractFactsFromTelegramPost(post) {
   const numbers = [...new Set([previous, forecast, actual, revisedPrevious, ...extractNumbers(text)].filter(Boolean))];
   const importance = HIGH_IMPACT_KEYS.has(resolvedEventKey || canonical.eventKey) ? "high" : "normal";
 
-  const numericFieldValidation = validateStructuredNumericFacts(
+  let numericFieldValidation = validateStructuredNumericFacts(
     {
       previous,
       forecast,
@@ -560,6 +561,21 @@ function extractFactsFromTelegramPost(post) {
       canonicalEventId: identity.canonicalEventId,
     }
   );
+  const signIntegrity = validateSourceNumericSignIntegrity(
+    text,
+    { previous, forecast, actual, isStructuredTriple },
+    FIELD_PATTERNS
+  );
+  if (!signIntegrity.ok) {
+    numericFieldValidation = {
+      ok: false,
+      reason: signIntegrity.reason || "NUMERIC_SIGN_INTEGRITY_FAILED",
+      field: signIntegrity.field || signIntegrity.failures?.[0]?.field || null,
+      failures: [...(numericFieldValidation.failures || []), ...(signIntegrity.failures || [])],
+      sourceMessageId: post.sourceMessageId,
+      canonicalEventId: identity.canonicalEventId,
+    };
+  }
 
   return {
     sourceChannel: post.sourceChannel,

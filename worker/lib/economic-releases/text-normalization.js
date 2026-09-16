@@ -34,7 +34,7 @@ function stripBidiMarks(value) {
  * Supports: 2.65%, %2.65, 54.2, 162K, 23K-, -4.450M, 0.095M, 4.1%, -0.2%, 1.2B
  */
 const STRICT_ECONOMIC_NUMERIC_PATTERN =
-  /^[-−]?(?:\d+(?:[.,]\d+)?(?:[KMBkmb])?(?:%|-)?|%\d+(?:[.,]\d+)?)$/;
+  /^[+−-]?(?:\d+(?:[.,]\d+)?(?:[KMBkmb])?(?:%|-)?|%\d+(?:[.,]\d+)?)$/;
 
 function formatStrictEconomicDisplay(token) {
   if (!token) {
@@ -48,16 +48,55 @@ function formatStrictEconomicDisplay(token) {
   return value;
 }
 
+/**
+ * ForexBreakingNews often encodes negative percentages as suffix minus, e.g. %0.6- or 0.6-%
+ */
+function normalizeSignedEconomicRawToken(value) {
+  let raw = stripBidiMarks(normalizeArabicIndicDigits(String(value || ""))).trim();
+  if (!raw) {
+    return raw;
+  }
+
+  const compact = raw.replace(/\s+/g, "");
+
+  const prefixPercentSuffixMinus = compact.match(/^%(\d+(?:[.,]\d+)?)-$/i);
+  if (prefixPercentSuffixMinus) {
+    return `-${prefixPercentSuffixMinus[1].replace(/,/g, ".")}%`;
+  }
+
+  const suffixMinusBeforePercent = compact.match(/^(\d+(?:[.,]\d+)?)-%$/i);
+  if (suffixMinusBeforePercent) {
+    return `-${suffixMinusBeforePercent[1].replace(/,/g, ".")}%`;
+  }
+
+  const suffixMinusDecimalOnly = compact.match(/^(\d+[.,]\d+)-$/i);
+  if (suffixMinusDecimalOnly) {
+    return `-${suffixMinusDecimalOnly[1].replace(/,/g, ".")}%`;
+  }
+
+  const suffixMinusWithUnit = compact.match(/^(\d+(?:[.,]\d+)?[KMBkmb])-$/i);
+  if (suffixMinusWithUnit) {
+    return `-${suffixMinusWithUnit[1].replace(/,/g, ".")}`;
+  }
+
+  const prefixPercent = compact.match(/^%(\d+(?:[.,]\d+)?)$/i);
+  if (prefixPercent) {
+    return `${prefixPercent[1].replace(/,/g, ".")}%`;
+  }
+
+  return raw.replace(/,/g, ".").replace(/−/g, "-");
+}
+
 function extractStrictEconomicNumericToken(value) {
-  const raw = stripBidiMarks(normalizeArabicIndicDigits(String(value || ""))).trim();
+  const raw = normalizeSignedEconomicRawToken(String(value || ""));
   if (!raw) {
     return null;
   }
 
   const candidates = [
-    raw.match(/^([-−]?\d+(?:[.,]\d+)?(?:[KMBkmb])?(?:%|-)?)/i)?.[1],
-    raw.match(/^([-−]?\d+(?:[.,]\d+)?%)/)?.[1],
-    raw.match(/^(%\d+(?:[.,]\d+)?)/)?.[1],
+    raw.match(/^([+−-]?\d+(?:[.,]\d+)?(?:[KMBkmb])?(?:%|-)?)/i)?.[1],
+    raw.match(/^([+−-]?\d+(?:[.,]\d+)?%)/)?.[1],
+    raw.match(/^([+−-]?%\d+(?:[.,]\d+)?)/)?.[1],
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -149,16 +188,68 @@ function validateStructuredNumericFacts(facts = {}, options = {}) {
   return { ok: true, reason: null, failures: [] };
 }
 
+function validateSourceNumericSignIntegrity(sourceText, facts = {}, fieldPatterns = {}) {
+  if (!facts.isStructuredTriple || !sourceText) {
+    return { ok: true, reason: null, failures: [] };
+  }
+
+  const failures = [];
+  for (const field of ["previous", "forecast", "actual"]) {
+    const parsed = facts[field];
+    if (!parsed) {
+      continue;
+    }
+    const patterns = fieldPatterns[field] || [];
+    let rawSegment = null;
+    for (const pattern of patterns) {
+      const match = String(sourceText || "").match(pattern);
+      if (match?.[1]) {
+        rawSegment = match[1].trim();
+        break;
+      }
+    }
+    if (!rawSegment) {
+      continue;
+    }
+    const fromSource = extractStrictEconomicNumericToken(rawSegment);
+    if (!fromSource) {
+      continue;
+    }
+    if (normalizeEconomicFieldValue(fromSource) !== normalizeEconomicFieldValue(parsed)) {
+      failures.push({
+        field,
+        reason: "NUMERIC_SIGN_INTEGRITY_FAILED",
+        sourceSegment: rawSegment.slice(0, 40),
+        expected: fromSource,
+        actual: parsed,
+      });
+    }
+  }
+
+  if (failures.length) {
+    return {
+      ok: false,
+      reason: failures[0].reason,
+      field: failures[0].field,
+      failures,
+    };
+  }
+
+  return { ok: true, reason: null, failures: [] };
+}
+
 module.exports = {
   normalizeArabicIndicDigits,
   normalizeTextForMatching,
   normalizeFingerprintText,
   normalizeEconomicFieldValue,
   stripBidiMarks,
+  normalizeSignedEconomicRawToken,
   extractLeadingEconomicNumericToken,
   extractStrictEconomicNumericToken,
   formatStrictEconomicDisplay,
   assertStrictNumericEconomicField,
   validateStructuredNumericFacts,
+  validateSourceNumericSignIntegrity,
   STRICT_ECONOMIC_NUMERIC_PATTERN,
 };

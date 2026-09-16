@@ -11,6 +11,7 @@ const {
   assertNewsWorkerEnvironmentOrThrow,
   isNewsWorkerEnabled,
   getPollIntervalMs,
+  getTelegramEconomicFastPollIntervalMs,
 } = require("./news/news-worker-env");
 const {
   recordCycleStart,
@@ -3686,6 +3687,7 @@ async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
 }
 
 let telegramBurstTimer = null;
+let telegramEconomicFastPollTimer = null;
 let newsPollTimer = null;
 
 async function refreshEconomicFastLane(registry) {
@@ -3732,6 +3734,24 @@ function syncTelegramBurstPolling() {
 function getEffectivePollIntervalMs() {
   const { getTelegramBurstPollIntervalMs } = require("./lib/telegram-news/economic-fast-lane");
   return getTelegramBurstPollIntervalMs() || getPollIntervalMs();
+}
+
+function startTelegramEconomicFastPoll() {
+  const fastMs = getTelegramEconomicFastPollIntervalMs();
+  if (!fastMs || fastMs <= 0) {
+    return;
+  }
+  if (telegramEconomicFastPollTimer) {
+    clearInterval(telegramEconomicFastPollTimer);
+  }
+  telegramEconomicFastPollTimer = setInterval(() => {
+    if (isFetchingNews) {
+      return;
+    }
+    fetchForexNews({ skipScheduledAlerts: true, telegramOnly: true }).catch((error) => {
+      console.warn("TELEGRAM_ECONOMIC_FAST_POLL_FAILED", error.message);
+    });
+  }, fastMs);
 }
 
 function scheduleNextNewsCycle() {
@@ -3964,6 +3984,20 @@ async function fetchForexNews(options = {}) {
     } catch (error) {
       stats.lastErrorSafe = error.message;
       console.error("⚠️ Telegram discovery error:", error.message);
+    }
+
+    if (options.telegramOnly === true) {
+      stats.telegramOnly = true;
+      stats.fetched = allItems.length;
+      stats.cycleDurationMs = Date.now() - cycleStartedAt;
+      lastCycleStats = stats;
+      lastCycleCompletedAt = new Date().toISOString();
+      if (!stats.lastErrorSafe) {
+        lastSuccessfulFetchAt = lastCycleCompletedAt;
+        consecutiveFailures = 0;
+      }
+      console.log("TELEGRAM_ECONOMIC_FAST_POLL_COMPLETE", JSON.stringify(stats));
+      return stats;
     }
 
     let rssFetchResult = { items: [], feedReports: [], fetched: 0 };
@@ -4883,5 +4917,6 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
     })
   );
   console.log("🚀 News Worker Started...");
+  startTelegramEconomicFastPoll();
   scheduleNextNewsCycle();
 }
