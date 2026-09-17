@@ -10,6 +10,7 @@ const { isFamilyPublicationEventType } = require("../news-intelligence/event-reg
 const IMAGE_MODES = {
   PREBUILT: "PREBUILT",
   PREBUILT_FAST_LANE: "PREBUILT_FAST_LANE",
+  GENERAL_PREBUILT: "GENERAL_PREBUILT",
 };
 
 const SELECTION_STATUS = {

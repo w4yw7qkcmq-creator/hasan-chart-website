@@ -276,8 +276,10 @@ async function testRssPathUnchanged() {
     body: "Gold jumps",
   });
   assert.strictEqual(getOpenAiImageCallCountForTests(), 0);
-  assert.strictEqual(resolution.imageResult.delivery, "text");
+  assert.strictEqual(resolution.imageResult.delivery, "photo");
+  assert.strictEqual(resolution.telemetry?.imageMode, IMAGE_MODES.GENERAL_PREBUILT);
   assert.notStrictEqual(resolution.telemetry?.imageMode, IMAGE_MODES.PREBUILT_FAST_LANE);
+  assert.strictEqual(resolution.generalPrebuilt, true);
 }
 
 async function testNonFastLanePathDoesNotUsePrebuiltPool() {

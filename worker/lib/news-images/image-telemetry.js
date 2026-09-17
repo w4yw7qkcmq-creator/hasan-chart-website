@@ -33,10 +33,27 @@ function createEmptyImageTelemetry() {
     workflowBudgetMs: 0,
     fallbackReason: null,
     warning: null,
+    imageMode: null,
+    imageSelectionStatus: null,
+    imageSelectionMs: 0,
+    prebuiltCategory: null,
+    prebuiltAssetPath: null,
+    publishedWithPrebuiltImage: false,
+    publishedWithCachedImage: false,
+    generalPrebuiltEligible: false,
+    generalPrebuiltCategory: null,
+    generalPrebuiltAsset: null,
+    generalPrebuiltStatus: null,
+    generalPrebuiltSelectionMs: 0,
+    generalPrebuiltRoutingReason: null,
   };
 }
 
 function summarizeImageStatus(telemetry = {}) {
+  if (telemetry.publishedWithPrebuiltImage && telemetry.imageMode === "GENERAL_PREBUILT") {
+    return "general_prebuilt_selected";
+  }
+  if (telemetry.publishedWithPrebuiltImage) return "prebuilt_selected";
   if (telemetry.publishedWithAiImage) return "ai_image";
   if (telemetry.publishedWithFallbackImage) return "fallback_image";
   if (telemetry.sourceImageFound) return "source_image";

@@ -150,19 +150,19 @@ function testPremiumEventSelection() {
   assert.strictEqual(isPremiumImageEvent("US_POWELL_SPEECH"), true);
   assert.strictEqual(isPremiumImageEvent("US_FED_STATEMENT"), true);
   assert.strictEqual(isPremiumImageEvent("US_FED_RATE_DECISION"), true);
-  assert.strictEqual(isPremiumImageEvent("US_ADP"), true);
+  assert.strictEqual(isPremiumImageEvent("US_ADP_EMPLOYMENT"), true);
   assert.strictEqual(isPremiumImageEvent("RANDOM_EVENT"), false);
 }
 
 function testNonPremiumEventsRejected() {
-  assert.strictEqual(isPremiumImageEvent("US_SP_GLOBAL_PMI"), false);
+  assert.strictEqual(isPremiumImageEvent("RANDOM_NON_PREMIUM_EVENT"), false);
   assert.strictEqual(isPremiumImageEvent(null), false);
 }
 
 function testDisplayNames() {
-  assert.strictEqual(getPremiumEventDisplayName("US_CPI_MOM"), "US CPI");
-  assert.strictEqual(getPremiumEventDisplayName("US_NFP"), "Non Farm Payrolls");
-  assert.strictEqual(getPremiumEventDisplayName("US_FED_RATE_DECISION"), "Federal Reserve Interest Rate Decision");
+  assert.strictEqual(getPremiumEventDisplayName("US_CPI_MOM"), "مؤشر التضخم الأمريكي (شهري)");
+  assert.strictEqual(getPremiumEventDisplayName("US_NFP"), "تقرير الوظائف الأمريكية NFP");
+  assert.strictEqual(getPremiumEventDisplayName("US_FED_RATE_DECISION"), "قرار الفائدة الأمريكية");
 }
 
 function testBuildContextFromRelease() {
@@ -171,7 +171,7 @@ function testBuildContextFromRelease() {
     structuredRelease: { country: "US", scheduledAt: "2026-08-01T12:30:00.000Z" },
   });
   assert.strictEqual(context.eventKey, "US_NFP");
-  assert.strictEqual(context.eventName, "Non Farm Payrolls");
+  assert.strictEqual(context.eventName, "تقرير الوظائف الأمريكية NFP");
   assert.strictEqual(context.country, "US");
   assert.strictEqual(context.brandName, "Economic Newsi");
 }
@@ -179,7 +179,7 @@ function testBuildContextFromRelease() {
 function testBuildContextFromTelegramCandidate() {
   const context = buildPremiumImageContextFromCandidate(makeCpiCandidate());
   assert.strictEqual(context.eventKey, "US_CPI_MOM");
-  assert.strictEqual(context.eventName, "US CPI");
+  assert.strictEqual(context.eventName, "مؤشر التضخم الأمريكي (شهري)");
   assert.strictEqual(context.brandName, "Economic Newsi");
   assert.strictEqual(buildPremiumImageContextFromCandidate(makeGoldCandidate()), null);
 }
@@ -737,7 +737,7 @@ function testVisualCategoriesByEventType() {
   assert.strictEqual(resolveVisualCategory("US_CPI_MOM"), "inflation");
   assert.strictEqual(resolveVisualCategory("US_NFP"), "labor");
   assert.strictEqual(resolveVisualCategory("US_FED_RATE_DECISION"), "fed");
-  assert.strictEqual(resolveVisualCategory("US_CORE_PCE_MOM"), "growth");
+  assert.strictEqual(resolveVisualCategory("US_CORE_PCE_MOM"), "inflation");
   assert.strictEqual(resolveVisualCategory("US_ISM_MANUFACTURING"), "pmi");
 }
 

@@ -74,7 +74,8 @@ async function testRssPolicyNeverUsesAi() {
     { cacheDir: TEST_CACHE_DIR, outputDir: TEST_OUTPUT_DIR }
   );
   assert.strictEqual(getOpenAiImageCallCountForTests(), 0);
-  assert.strictEqual(resolution.imageResult.delivery, "text");
+  assert.strictEqual(resolution.imageResult.delivery, "photo");
+  assert.strictEqual(resolution.telemetry?.generalPrebuiltStatus, "GENERAL_PREBUILT_SELECTED");
 }
 
 async function testImportantTelegramUsesAiPrimary() {

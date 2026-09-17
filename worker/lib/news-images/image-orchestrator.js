@@ -17,6 +17,11 @@ const {
   SELECTION_STATUS,
   IMAGE_MODES,
 } = require("./economic-image-pool");
+const {
+  isGeneralPrebuiltEligible,
+  selectGeneralPrebuiltImage,
+  GENERAL_PREBUILT_STATUS,
+} = require("./general-prebuilt-image-pool");
 
 const settings = resolveOpenAIImageSettings();
 const IMAGE_WORKFLOW_BUDGET_MS = settings.workflowBudgetMs;
@@ -364,6 +369,44 @@ async function resolvePublicationImageResult(publication = {}, deps = {}) {
       fastLane: true,
       failOpen: true,
     };
+  }
+
+  if (isGeneralPrebuiltEligible(publication)) {
+    const selection = selectGeneralPrebuiltImage({ publication });
+    if (selection.status === GENERAL_PREBUILT_STATUS.GENERAL_PREBUILT_SELECTED && selection.filePath) {
+      const policy = resolveNewsImagePolicy(publication);
+      const telemetry = createEmptyImageTelemetry();
+      telemetry.imagePolicyMode = policy.mode;
+      telemetry.imageMode = selection.imageMode || IMAGE_MODES.GENERAL_PREBUILT;
+      telemetry.generalPrebuiltEligible = true;
+      telemetry.generalPrebuiltCategory = selection.category || null;
+      telemetry.generalPrebuiltAsset = selection.assetPath || selection.assetName || null;
+      telemetry.generalPrebuiltStatus = selection.status;
+      telemetry.generalPrebuiltSelectionMs = selection.selectionMs || 0;
+      telemetry.generalPrebuiltRoutingReason = selection.routingReason || null;
+      telemetry.aiImageAttempted = false;
+      telemetry.openAiImageCalls = openAiImageCallCount;
+      telemetry.publishedWithPrebuiltImage = true;
+      telemetry.publishedWithoutImage = false;
+      const imageResult = {
+        generationAttempted: false,
+        delivery: "photo",
+        source: "general_prebuilt_pool",
+        filePath: selection.filePath,
+        imageUrl: selection.assetPath || null,
+        provider: "prebuilt",
+        imageMode: IMAGE_MODES.GENERAL_PREBUILT,
+      };
+      recordImageTelemetry(telemetry);
+      return {
+        ok: true,
+        policy: { ...policy, allowAi: false, generalPrebuilt: true },
+        imageResult,
+        telemetry,
+        imageStatus: "general_prebuilt_selected",
+        generalPrebuilt: true,
+      };
+    }
   }
 
   const policy = resolveNewsImagePolicy(publication);
