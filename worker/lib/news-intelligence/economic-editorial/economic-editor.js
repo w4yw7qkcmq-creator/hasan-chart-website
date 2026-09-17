@@ -13,11 +13,15 @@ const { buildScheduledBucket } = require("../../telegram-news/fingerprint");
 const { interpretEventFamily } = require("./deterministic-interpretation");
 const { maybeEnhanceWithAi } = require("./ai-editor");
 const { resolveTelegramEconomicFastLaneImagePolicy } = require("../../news-images/economic-image-pool");
+const { resolvePublicCanonicalDisplayName } = require("../../economic-releases/central-bank-rate-display");
 
 const EDITORIAL_VERSION = "phase2-v3";
 
 function buildStructuredInputFromPublication(publication = {}) {
   const facts = publication.facts || {};
+  const rawDisplayName =
+    facts.canonicalDisplayName || publication.canonicalDisplayName || publication.title || null;
+  const canonicalDisplayName = resolvePublicCanonicalDisplayName(publication.eventType, rawDisplayName);
   return {
     eventType: publication.eventType,
     eventFamily: publication.eventFamily || getEventFamily(publication.eventType),
@@ -28,9 +32,8 @@ function buildStructuredInputFromPublication(publication = {}) {
     unit: facts.unit ?? publication.unit,
     releaseTime: publication.releaseDate || publication.releaseTime,
     importance: publication.importance,
-    canonicalDisplayName:
-      facts.canonicalDisplayName || publication.canonicalDisplayName || publication.title || null,
-    publicTitle: publication.canonicalDisplayName || publication.title || facts.canonicalDisplayName || null,
+    canonicalDisplayName,
+    publicTitle: canonicalDisplayName,
     sourceReading: facts.sourceReading || publication.sourceReading || null,
     sourceReadingRaw: facts.sourceReadingRaw || publication.sourceReadingRaw || null,
     publishedReading: facts.publishedReading || publication.publishedReading || null,

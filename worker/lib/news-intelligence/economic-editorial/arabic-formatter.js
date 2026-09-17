@@ -1,4 +1,9 @@
 const { formatDisplayValue, normalizeEconomicFieldValue } = require("../../economic-releases/normalize");
+const {
+  resolveCentralBankPublicCountryLine,
+  resolvePublicCanonicalDisplayName,
+  resolveCentralBankRatePublicDisplay,
+} = require("../../economic-releases/central-bank-rate-display");
 const { getInterpretationMetadata, getEventArabicName, getFamilyMetadata } = require("./interpretation-registry");
 
 const OFFICIAL_CHANNEL_FOOTER =
@@ -120,11 +125,17 @@ function buildCountryLine(country = "US") {
 }
 
 function buildSingleStructuredOutput(event) {
-  const headline = event.canonicalDisplayName || getEventArabicName(event.eventType);
+  const fallbackHeadline = event.canonicalDisplayName || getEventArabicName(event.eventType);
+  const headline = resolvePublicCanonicalDisplayName(event.eventType, fallbackHeadline);
+  const cbDisplay = resolveCentralBankRatePublicDisplay(event.eventType);
   const publishedReading = event.publishedReading || event.sourceReading?.normalizedText || null;
   return {
     headline,
-    countryLine: buildCountryLine(event.countryCode || event.country),
+    countryLine: resolveCentralBankPublicCountryLine(
+      event.eventType,
+      buildCountryLine(event.countryCode || event.country)
+    ),
+    publicIssuerAr: cbDisplay?.publicIssuerAr || null,
     factsBlock: buildFactsBlock(event),
     interpretation: publishedReading,
     marketImpact: null,

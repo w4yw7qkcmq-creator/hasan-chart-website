@@ -450,7 +450,7 @@ const UK = Object.fromEntries([
   releaseDef("UK", "BOE_RATE_DECISION", {
     patterns: [/boe rate|bank of england rate|interest rate decision|قرار الفائدة|boe/i],
     eventType: "rate_decision",
-    arabicName: "قرار فائدة بنك إngland",
+    arabicName: "قرار الفائدة البريطانية",
   }),
   ...Object.entries(countryPmi("UK", "بريطانيا")),
 ]);
@@ -467,7 +467,7 @@ const EZ = Object.fromEntries([
       /ecb rate decision|ecb interest rate|european central bank rate|interest rate decision|european central bank|البنك المركزي الأوروبي|المركزي الأوروبي|قرار الفائدة الأوروبي/i,
       /قرار الفائدة|قرار فائدة|\brate decision\b|\brate cut\b|\brate hike\b/i
     ),
-    arabicName: "قرار الفائدة للبنك المركزي الأوروبي",
+    arabicName: "قرار الفائدة الأوروبية",
   }),
   centralBankRate("EZ", "ECB_DEPOSIT_RATE", {
     priority: 2,
@@ -511,7 +511,7 @@ const CH = Object.fromEntries([
       /snb rate|swiss national bank rate|swiss central bank|interest rate decision|key rate decision/i,
       /قرار الفائدة السويسري|البنك الوطني السويسري|المركزي السويسري|swiss national bank|snb decision/i
     ),
-    arabicName: "قرار فائدة SNB",
+    arabicName: "قرار الفائدة السويسرية",
   }),
   releaseDef("CH", "SNB_MONETARY_POLICY_ASSESSMENT", {
     priority: 4,
@@ -561,7 +561,7 @@ const CA = Object.fromEntries([
   releaseDef("CA", "BOC_RATE_DECISION", {
     patterns: [/boc rate|bank of canada rate|interest rate decision|قرار الفائدة/i],
     eventType: "rate_decision",
-    arabicName: "قرار فائدة بنك كندا",
+    arabicName: "قرار الفائدة الكندية",
   }),
   releaseDef("CA", "RETAIL_SALES", { patterns: [/retail sales|مبيعات التجزئة/i], arabicName: "مبيعات التجزئة الكندية" }),
 ]);
@@ -574,7 +574,7 @@ const AU = Object.fromEntries([
   releaseDef("AU", "RBA_RATE_DECISION", {
     patterns: [/rba rate|reserve bank of australia rate|interest rate decision|قرار الفائدة/i],
     eventType: "rate_decision",
-    arabicName: "قرار فائدة RBA",
+    arabicName: "قرار الفائدة الأسترالية",
   }),
   releaseDef("AU", "RETAIL_SALES", { patterns: [/retail sales|مبيعات التجزئة/i], arabicName: "مبيعات التجزئة الأسترالية" }),
   ...Object.entries(countryPmi("AU", "أستراليا")),
@@ -586,7 +586,7 @@ const JP = Object.fromEntries([
   releaseDef("JP", "BOJ_RATE_DECISION", {
     patterns: [/boj rate|bank of japan rate|interest rate decision|قرار الفائدة/i],
     eventType: "rate_decision",
-    arabicName: "قرار فائدة BOJ",
+    arabicName: "قرار الفائدة اليابانية",
   }),
   ...Object.entries(countryPmi("JP", "اليابان")),
 ]);

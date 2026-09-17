@@ -23,6 +23,7 @@ const {
   STRUCTURED_ECONOMIC_FALLBACK,
   hasValidStrictEconomicTriple,
 } = require("../news-intelligence/structured-economic-fallback");
+const { resolvePublicCanonicalDisplayName } = require("../economic-releases/central-bank-rate-display");
 
 const FIELD_PATTERNS = {
   previous: [
@@ -464,10 +465,11 @@ function resolveEventIdentity(canonicalEventKey, sourceEventName, canonical = {}
     sector = "ENERGY";
   }
 
+  const rawDisplayName = def.arabicName || sourceEventName || null;
   return {
     sourceEventName: sourceEventName || null,
     canonicalEventId: canonicalEventKey || null,
-    canonicalDisplayName: def.arabicName || sourceEventName || null,
+    canonicalDisplayName: resolvePublicCanonicalDisplayName(canonicalEventKey, rawDisplayName),
     institution,
     sector,
   };
