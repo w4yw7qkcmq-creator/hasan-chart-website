@@ -2,6 +2,7 @@ const { evaluateGeneralNewsMarketRelevance } = require("./market-relevance");
 const { evaluateRssDuplicate } = require("./dedup");
 const { evaluateItemFreshness, getItemPublishedAt, getFeedDelayMinutes } = require("./age-policy");
 const { isRssItemNew, markRssItemSeen } = require("./observation-state");
+const { isRssItemBlockedByPublishFloor } = require("../news-ingestion/checkpoint-store");
 const { resolveFeedName } = require("./feed-fetch");
 
 function createEmptyRssDiagnostics() {
@@ -108,6 +109,17 @@ function processGeneralRssItems(items = [], context = {}) {
     const sourceId = resolveSourceId(item);
     const freshness = evaluateItemFreshness(item, nowMs);
     const relevance = evaluateGeneralNewsMarketRelevance(item);
+
+    if (!skipCheckpointCheck && !dryRun && isRssItemBlockedByPublishFloor(item)) {
+      diagnostics.staleSkipped += 1;
+      recordRejectedItem(diagnostics, item, "RSS_STALE_SKIPPED", "deploy_publish_floor", {
+        ageMinutes: freshness.ageMinutes,
+        feedDelayMinutes: freshness.feedDelayMinutes,
+        category: relevance.category,
+      });
+      finalizeRssItemObservation(sourceId, item, "deploy_floor_skipped", { dryRun, skipCheckpointAdvance });
+      continue;
+    }
 
     if (!skipCheckpointCheck && !dryRun && !isRssItemNew(sourceId, item)) {
       diagnostics.oldSeenSkipped += 1;

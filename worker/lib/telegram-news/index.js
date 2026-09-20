@@ -225,13 +225,17 @@ async function discoverTelegramNews(options = {}) {
         item.post?.sourceChannel === post.sourceChannel &&
         String(item.post?.sourceMessageId) === String(post.sourceMessageId)
     );
-    const terminal = matchingProcessed.every(
-      (item) =>
+    const terminal = matchingProcessed.every((item) => {
+      if (item.newsType === "economic" && !item.skipPublish && item.formattedMessage) {
+        return false;
+      }
+      return (
         item.skipPublish ||
         item.observabilityOnly ||
         item.finalFactCheck?.ok !== false ||
         Boolean(item.newsType)
-    );
+      );
+    });
     if (terminal && matchingProcessed.length > 0) {
       markTelegramMessageSeen(post.sourceChannel, post, { outcome: "processed" });
     }

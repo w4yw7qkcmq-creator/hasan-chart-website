@@ -13,6 +13,7 @@ const {
   markTelegramMessageSeen,
   bootstrapTelegramChannel,
   getRssState,
+  setRssIngestionPublishFloorMs,
 } = require(path.join(root, "lib/news-ingestion/checkpoint-store"));
 const { processGeneralRssItems, resetRssObservationStateForTests } = require(path.join(root, "lib/general-rss"));
 
@@ -96,6 +97,30 @@ function runTelegramCursorTest() {
   assert(newer.new === true, "41638 should be new when cursor is 41636");
 }
 
+function runRssUpdatedPublicationTest() {
+  resetCheckpointStoreForTests();
+  const now = Date.now();
+  const baseLink = "https://example.com/philly-story";
+  const oldVersion = item("Story", baseLink, new Date(now - 6 * 60 * 60_000).toISOString());
+  markRssItemSeen("CNBC", oldVersion, { outcome: "published" });
+
+  const state = getRssState("CNBC");
+  state.highestObservedAtMs = Date.parse(oldVersion.isoDate);
+
+  const updatedSameLink = item("Story updated", baseLink, new Date(now - 30 * 60_000).toISOString());
+  assert(isRssItemNew("CNBC", updatedSameLink) === true, "same link with newer pubDate than watermark is NEW");
+}
+
+function runRssDeployFloorTest() {
+  resetCheckpointStoreForTests();
+  const now = Date.now();
+  setRssIngestionPublishFloorMs(now - 60 * 60_000);
+  const historical = item("Old but unseen", "https://example.com/unseen-old", new Date(now - 24 * 60 * 60_000).toISOString());
+  assert(isRssItemNew("CNBC", historical) === false, "pre-floor historical item must not become NEW");
+  const fresh = item("Fresh", "https://example.com/fresh-new", new Date(now - 5 * 60_000).toISOString());
+  assert(isRssItemNew("CNBC", fresh) === true, "post-floor unseen item remains NEW");
+}
+
 function runBootstrapPolicyTest() {
   resetCheckpointStoreForTests();
   const now = Date.now();
@@ -119,6 +144,8 @@ function runBootstrapPolicyTest() {
 function run() {
   runRestartReplayTest();
   runTelegramCursorTest();
+  runRssUpdatedPublicationTest();
+  runRssDeployFloorTest();
   runBootstrapPolicyTest();
   console.log("news-ingestion-checkpoints.test.cjs PASS");
 }

@@ -116,7 +116,10 @@ const US_ALIASES = {
     /مؤشر مديري المشتريات المركب/i,
     /composite pmi/i
   ),
-  US_PHILADELPHIA_FED_MANUFACTURING: alias(/philadelphia fed|philly fed|مؤشر فيلادelfia|فيلادelfia/i),
+  US_PHILADELPHIA_FED_MANUFACTURING: alias(
+    /philadelphia fed(?:eral)?(?:\s+manufacturing)?(?:\s+index)?|philly fed(?:\s+manufacturing)?(?:\s+index)?|philadelphia manufacturing index/i,
+    /مؤشر\s*ف?[ي]?لادلفيا|ف?[ي]?لادلفيا/i
+  ),
   US_EMPIRE_STATE_MANUFACTURING: alias(
     /empire state manufacturing|empire state index|ny empire state|new york empire state|empire manufacturing/i,
     /مؤشر\s*إمباير\s*ستيت|إمباير\s*ستيت|امباير\s*ستيت|مؤشر\s*امباير\s*ستيت|مؤشر\s*نيو\s*يورk\s*الصناعي|مؤشر\s*نيويورk\s*الصناعي/i

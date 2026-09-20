@@ -1,0 +1,17 @@
+{
+  "name": "production-incident-philly-fladelfia-20260917",
+  "sourceText": "صدر الآن :\n💠 أمريكا -\n🔵 مؤشر فلادلفيا للصناعات التحويلية\n▪️ السابق : 47.4\n▪️ التقدير : 31.3\n▫️ الحالي : 37.8\n👈 النتيجة : إيجابي للدولار الأمريكي",
+  "post": {
+    "sourceChannel": "ForexBreakingNews",
+    "sourceMessageId": "incident-philly-fladelfia-20260917",
+    "sourcePublishedAt": "2026-09-17T12:30:39.000Z",
+    "sourceUrl": "https://t.me/ForexBreakingNews/incident-philly-fladelfia-20260917"
+  },
+  "expected": {
+    "canonicalEventKey": "US_PHILADELPHIA_FED_MANUFACTURING",
+    "actual": "37.8",
+    "forecast": "31.3",
+    "previous": "47.4",
+    "isStructuredTriple": true
+  }
+}

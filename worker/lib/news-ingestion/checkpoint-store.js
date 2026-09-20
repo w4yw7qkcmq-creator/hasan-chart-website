@@ -15,6 +15,9 @@ const CURSOR_TYPES = Object.freeze({
 const MAX_RECENT_SEEN = 500;
 const DEFAULT_BOOTSTRAP_MAX_AGE_HOURS = 24;
 
+/** Items published before this ms are never treated as RSS-new (deploy safety). */
+let rssIngestionPublishFloorMs = null;
+
 /** @type {Map<string, object>} */
 const memory = new Map();
 let hydrated = false;
@@ -121,14 +124,48 @@ function markDirty(sourceType, sourceId) {
   dirtyKeys.add(sourceKey(sourceType, sourceId));
 }
 
+function setRssIngestionPublishFloorMs(ms) {
+  rssIngestionPublishFloorMs = Number.isFinite(ms) ? ms : null;
+}
+
+function getRssIngestionPublishFloorMs() {
+  return rssIngestionPublishFloorMs;
+}
+
+function isRssItemBlockedByPublishFloor(item) {
+  if (rssIngestionPublishFloorMs == null) {
+    return false;
+  }
+  const publishedAtMs = getRssItemPublishedAtMs(item);
+  if (publishedAtMs == null) {
+    return true;
+  }
+  return publishedAtMs < rssIngestionPublishFloorMs;
+}
+
 function isRssItemSeen(sourceId, item) {
   const identity = buildRssItemIdentity(item);
   if (!identity) return false;
   const state = getRssState(sourceId);
-  return (state.recentSeenKeys || []).includes(identity);
+  const inRecentSeen = (state.recentSeenKeys || []).includes(identity);
+  if (!inRecentSeen) {
+    return false;
+  }
+  const publishedAtMs = getRssItemPublishedAtMs(item);
+  if (
+    publishedAtMs != null &&
+    state.highestObservedAtMs != null &&
+    publishedAtMs > state.highestObservedAtMs
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function isRssItemNew(sourceId, item) {
+  if (isRssItemBlockedByPublishFloor(item)) {
+    return false;
+  }
   return !isRssItemSeen(sourceId, item);
 }
 
@@ -334,6 +371,7 @@ function resetCheckpointStoreForTests() {
   memory.clear();
   dirtyKeys.clear();
   hydrated = false;
+  rssIngestionPublishFloorMs = null;
 }
 
 function isHydrated() {
@@ -386,4 +424,7 @@ module.exports = {
   getRssState,
   getTelegramState,
   normalizeLink,
+  setRssIngestionPublishFloorMs,
+  getRssIngestionPublishFloorMs,
+  isRssItemBlockedByPublishFloor,
 };

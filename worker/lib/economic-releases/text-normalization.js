@@ -6,8 +6,14 @@ function stripArabicDiacritics(value) {
   return String(value || "").replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "");
 }
 
+function normalizeKnownEconomicTitleMisspellings(value) {
+  return String(value || "")
+    .replace(/مؤشر\s*فلادلفيا/g, "مؤشر فيلادلفيا")
+    .replace(/(?:^|\s)فلادلفيا/g, (match) => match.replace("فلادلفيا", "فيلادلفيا"));
+}
+
 function normalizeTextForMatching(value) {
-  return stripArabicDiacritics(normalizeArabicIndicDigits(value))
+  return stripArabicDiacritics(normalizeArabicIndicDigits(normalizeKnownEconomicTitleMisspellings(value)))
     .toLowerCase()
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, " ")
     .replace(/[^\p{L}\p{N}%./+\-]/gu, " ")
@@ -250,6 +256,7 @@ function validateSourceNumericSignIntegrity(sourceText, facts = {}, fieldPattern
 module.exports = {
   normalizeArabicIndicDigits,
   stripArabicDiacritics,
+  normalizeKnownEconomicTitleMisspellings,
   normalizeTextForMatching,
   normalizeFingerprintText,
   normalizeEconomicFieldValue,

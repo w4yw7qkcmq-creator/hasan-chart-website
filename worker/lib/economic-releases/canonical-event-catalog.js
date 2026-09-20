@@ -349,7 +349,11 @@ const US_PMI = Object.fromEntries([
   }),
   releaseDef("US", "PHILADELPHIA_FED_MANUFACTURING", {
     priority: 5,
-    patterns: [/philadelphia fed|philly fed|مؤشر فيلادلفيا|فيلادلفيا/i],
+    patterns: [
+      /philadelphia fed(?:eral)?(?:\s+bank)?(?:\s+manufacturing)?(?:\s+index)?|philly fed(?:\s+manufacturing)?(?:\s+index)?|philadelphia manufacturing index/i,
+      /مؤشر\s*ف?[ي]?لادلفيا(?:\s*(?:ل)?(?:ل)?(?:ل)?(?:ال)?(?:صناعات|الصناع|الفيدرالي))?/i,
+      /ف?[ي]?لادلفيا(?:\s*(?:ل)?(?:ل)?(?:صناعات|الصناعات))?/i,
+    ],
     arabicName: "مؤشر فيلادلفيا للصناعات التحويلية",
   }),
   releaseDef("US", "EMPIRE_STATE_MANUFACTURING", {

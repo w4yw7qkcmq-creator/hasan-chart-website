@@ -131,6 +131,7 @@ const {
   flushDirtyToDb: flushIngestionCheckpoints,
   bootstrapAllRssSources,
   normalizeLink,
+  setRssIngestionPublishFloorMs,
 } = require("./lib/news-ingestion/checkpoint-store");
 const {
   resetCycleFunnel,
@@ -4890,6 +4891,7 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
   }
 
   logWorkerEnvStatus();
+  setRssIngestionPublishFloorMs(Date.now());
   loadSourceHealthStates(getSupabaseClient()).then((result) => {
     if (result?.loaded) {
       console.log("NEWS_PHASE3_SOURCE_HEALTH_HYDRATED", JSON.stringify({ loaded: result.loaded }));
