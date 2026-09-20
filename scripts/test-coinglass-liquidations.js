@@ -206,7 +206,6 @@ test("LiquidationsPanel includes loading/error/unavailable copy", () => {
     "utf8",
   );
   assert.match(ui, /بيانات التصفيات غير متاحة مؤقتًا/);
-  assert.match(ui, /المصدر: البيانات العامة المتاحة من CoinGlass/);
   assert.match(ui, /animate-pulse/);
   assert.match(ui, /text-rose-600/);
   assert.match(ui, /text-emerald-600/);

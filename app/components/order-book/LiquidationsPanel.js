@@ -205,11 +205,8 @@ export default function LiquidationsPanel({ data, initialLoading, isRefreshing, 
         <ExchangeTable rows={exchanges} />
       </Panel>
 
-      <Panel title="التصفيات في الوقت الفعلي" description="آخر أوامر التصفية الظاهرة على CoinGlass.">
+      <Panel title="التصفيات في الوقت الفعلي">
         <RealtimeTable rows={realtime} />
-        <p className={`mt-3 text-xs ${ob.textMuted}`}>
-          المصدر: البيانات العامة المتاحة من CoinGlass.
-        </p>
       </Panel>
     </section>
   );
