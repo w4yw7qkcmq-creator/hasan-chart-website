@@ -103,6 +103,7 @@ const {
   getChartPolicyTelemetrySnapshotFromAuthority,
 } = require("./lib/general-rss/chart-visual-policy");
 const { auditRssPostPublish } = require("./lib/general-rss/rss-post-publish-audit");
+const { applyTrumpOfficeholderGuardToMessage } = require("./lib/general-rss/trump-officeholder-role-guard");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
 const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
@@ -3542,7 +3543,7 @@ async function analyzeNewsWithAI(title, link, options = {}) {
           {
             role: "system",
             content:
-              "أنت محرر أخبار مالية عاجلة لقناة تيليجرام احترافية مختصة بالفوركس والأسواق العالمية. اكتب الخبر باللغة العربية فقط. ممنوع كتابة أي كلمات إنجليزية نهائياً حتى لو كان عنوان المصدر بالإنجليزية، باستثناء الرموز الاقتصادية الضرورية مثل CPI أو PPI أو NFP أو FOMC. ترجم أسماء الأخبار والأسواق والشركات إلى العربية أو احذفها إذا كانت غير مهمة. لا تخلط العربية والإنجليزية في نفس السطر. اكتب بأسلوب أخبار عاجلة ومختصرة. التنسيق الإجباري: السطر الأول عنوان عربي عاجل مع إيموجي مناسب. بعده سطر فارغ. بعده ملخص الخبر بالعربية بجملة أو جملتين فقط. لا تكتب كلمة التأثير إلا إذا كان الخبر نتيجة اقتصادية رسمية مثل CPI أو PPI أو NFP أو Jobless Claims أو FOMC أو قرار فائدة أو بيانات بطالة أو GDP أو PMI. أما أخبار الذهب أو النفط أو الكريبتو أو الأسهم أو إيران أو إسرائيل أو الحروب أو العقوبات أو التصعيدات الجيوسياسية فلا تكتب فيها كلمة التأثير نهائياً. إذا كان الخبر نتيجة اقتصادية رسمية وكان التأثير واضحاً، اكتب سطر التأثير بصيغة مختصرة. إذا كان التأثير غير واضح أو غير مؤكد، لا تكتب كلمة التأثير ولا تضف سطر التأثير نهائيًا. لا تقدم توصية شراء أو بيع. لا تستخدم عبارات فرصة استثمارية أو فرصة شراء أو فرصة بيع أو بناء مراكز أو هدف سعري. لا تذكر المصدر ولا تضع روابط. لا تكتب أي جملة ختامية.",
+              "أنت محرر أخبار مالية عاجلة لقناة تيليجرام احترافية مختصة بالفوركس والأسواق العالمية. اكتب الخبر باللغة العربية فقط. ممنوع كتابة أي كلمات إنجليزية نهائياً حتى لو كان عنوان المصدر بالإنجليزية، باستثناء الرموز الاقتصادية الضرورية مثل CPI أو PPI أو NFP أو FOMC. ترجم أسماء الأخبار والأسواق والشركات إلى العربية أو احذفها إذا كانت غير مهمة. لا تخلط العربية والإنجليزية في نفس السطر. اكتب بأسلوب أخبار عاجلة ومختصرة. التنسيق الإجباري: السطر الأول عنوان عربي عاجل مع إيموجي مناسب. بعده سطر فارغ. بعده ملخص الخبر بالعربية بجملة أو جملتين فقط. لا تكتب كلمة التأثير إلا إذا كان الخبر نتيجة اقتصادية رسمية مثل CPI أو PPI أو NFP أو Jobless Claims أو FOMC أو قرار فائدة أو بيانات بطالة أو GDP أو PMI. أما أخبار الذهب أو النفط أو الكريبتو أو الأسهم أو إيران أو إسرائيل أو الحروب أو العقوبات أو التصعيدات الجيوسياسية فلا تكتب فيها كلمة التأثير نهائياً. إذا كان الخبر نتيجة اقتصادية رسمية وكان التأثير واضحاً، اكتب سطر التأثير بصيغة مختصرة. إذا كان التأثير غير واضح أو غير مؤكد، لا تكتب كلمة التأثير ولا تضف سطر التأثير نهائيًا. لا تقدم توصية شراء أو بيع. لا تستخدم عبارات فرصة استثمارية أو فرصة شراء أو فرصة بيع أو بناء مراكز أو هدف سعري. لا تذكر المصدر ولا تضع روابط. لا تكتب أي جملة ختامية. Donald Trump is the current U.S. President for current-context news. Do not describe him as former president unless the source is explicitly discussing a historical period in which that description is contextually required.",
           },
           {
             role: "user",
@@ -3575,10 +3576,15 @@ async function analyzeNewsWithAI(title, link, options = {}) {
       throw new Error(sanitizedDraft.reason || "AI response contains English or empty Arabic text");
     }
 
-    const cleanedAiText = sanitizedDraft.cleanedText;
+    let cleanedAiText = sanitizedDraft.cleanedText;
 
     if (!cleanedAiText || /[A-Za-z]{4,}/.test(cleanedAiText)) {
       throw new Error("AI response contains English or empty Arabic text");
+    }
+
+    const trumpRoleGuard = applyTrumpOfficeholderGuardToMessage(cleanedAiText, title);
+    if (trumpRoleGuard.changed) {
+      cleanedAiText = trumpRoleGuard.text;
     }
 
     const firstLine = cleanedAiText
@@ -4256,7 +4262,7 @@ async function fetchForexNews(options = {}) {
         continue eligibleLoop;
       }
 
-      const message = aiResult.message;
+      let message = aiResult.message;
       let publicationMessage = message;
       let approvedRssPresentation = null;
 
@@ -4321,6 +4327,23 @@ async function fetchForexNews(options = {}) {
 
           approvedRssPresentation = finalPublication.presentation;
           publicationMessage = approvedRssPresentation.telegramMessage;
+        }
+
+        const rssRawSourceForGuard = buildRawSourceText(latestNews);
+        const prePublishTrumpGuard = applyTrumpOfficeholderGuardToMessage(
+          publicationMessage,
+          rssRawSourceForGuard
+        );
+        if (prePublishTrumpGuard.changed) {
+          publicationMessage = prePublishTrumpGuard.text;
+          message = prePublishTrumpGuard.text;
+          const rebuiltPresentation = buildRssPublicationPresentation({
+            sourceTitle: latestNews.title,
+            editorialMessage: publicationMessage,
+            imageTitle: aiResult.imageTitle || approvedRssPresentation?.imageTitle || latestNews.title,
+          });
+          approvedRssPresentation = rebuiltPresentation;
+          publicationMessage = rebuiltPresentation.telegramMessage;
         }
 
         if (!dryRun && isEditorV2ShadowMode() && !aiResult?.editorV2Live) {
