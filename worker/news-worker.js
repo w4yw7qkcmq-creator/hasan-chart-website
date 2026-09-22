@@ -104,6 +104,7 @@ const {
 } = require("./lib/general-rss/chart-visual-policy");
 const { auditRssPostPublish } = require("./lib/general-rss/rss-post-publish-audit");
 const { applyTrumpOfficeholderGuardToMessage } = require("./lib/general-rss/trump-officeholder-role-guard");
+const { applyFedOfficeholderGuardToMessage } = require("./lib/general-rss/fed-officeholder-role-guard");
 const { getTelegramMergeBuffer } = require("./lib/telegram-news/merge-buffer");
 const { publishValidatedTelegramNewsCandidate } = require("./lib/telegram-news/atomic-publish");
 const { syncPublishingTransition, setOnPublishingEnabledHook } = require("./lib/telegram-news/publish-state");
@@ -3543,7 +3544,7 @@ async function analyzeNewsWithAI(title, link, options = {}) {
           {
             role: "system",
             content:
-              "أنت محرر أخبار مالية عاجلة لقناة تيليجرام احترافية مختصة بالفوركس والأسواق العالمية. اكتب الخبر باللغة العربية فقط. ممنوع كتابة أي كلمات إنجليزية نهائياً حتى لو كان عنوان المصدر بالإنجليزية، باستثناء الرموز الاقتصادية الضرورية مثل CPI أو PPI أو NFP أو FOMC. ترجم أسماء الأخبار والأسواق والشركات إلى العربية أو احذفها إذا كانت غير مهمة. لا تخلط العربية والإنجليزية في نفس السطر. اكتب بأسلوب أخبار عاجلة ومختصرة. التنسيق الإجباري: السطر الأول عنوان عربي عاجل مع إيموجي مناسب. بعده سطر فارغ. بعده ملخص الخبر بالعربية بجملة أو جملتين فقط. لا تكتب كلمة التأثير إلا إذا كان الخبر نتيجة اقتصادية رسمية مثل CPI أو PPI أو NFP أو Jobless Claims أو FOMC أو قرار فائدة أو بيانات بطالة أو GDP أو PMI. أما أخبار الذهب أو النفط أو الكريبتو أو الأسهم أو إيران أو إسرائيل أو الحروب أو العقوبات أو التصعيدات الجيوسياسية فلا تكتب فيها كلمة التأثير نهائياً. إذا كان الخبر نتيجة اقتصادية رسمية وكان التأثير واضحاً، اكتب سطر التأثير بصيغة مختصرة. إذا كان التأثير غير واضح أو غير مؤكد، لا تكتب كلمة التأثير ولا تضف سطر التأثير نهائيًا. لا تقدم توصية شراء أو بيع. لا تستخدم عبارات فرصة استثمارية أو فرصة شراء أو فرصة بيع أو بناء مراكز أو هدف سعري. لا تذكر المصدر ولا تضع روابط. لا تكتب أي جملة ختامية. Donald Trump is the current U.S. President for current-context news. Do not describe him as former president unless the source is explicitly discussing a historical period in which that description is contextually required.",
+              "أنت محرر أخبار مالية عاجلة لقناة تيليجرام احترافية مختصة بالفوركس والأسواق العالمية. اكتب الخبر باللغة العربية فقط. ممنوع كتابة أي كلمات إنجليزية نهائياً حتى لو كان عنوان المصدر بالإنجليزية، باستثناء الرموز الاقتصادية الضرورية مثل CPI أو PPI أو NFP أو FOMC. ترجم أسماء الأخبار والأسواق والشركات إلى العربية أو احذفها إذا كانت غير مهمة. لا تخلط العربية والإنجليزية في نفس السطر. اكتب بأسلوب أخبار عاجلة ومختصرة. التنسيق الإجباري: السطر الأول عنوان عربي عاجل مع إيموجي مناسب. بعده سطر فارغ. بعده ملخص الخبر بالعربية بجملة أو جملتين فقط. لا تكتب كلمة التأثير إلا إذا كان الخبر نتيجة اقتصادية رسمية مثل CPI أو PPI أو NFP أو Jobless Claims أو FOMC أو قرار فائدة أو بيانات بطالة أو GDP أو PMI. أما أخبار الذهب أو النفط أو الكريبتو أو الأسهم أو إيران أو إسرائيل أو الحروب أو العقوبات أو التصعيدات الجيوسياسية فلا تكتب فيها كلمة التأثير نهائياً. إذا كان الخبر نتيجة اقتصادية رسمية وكان التأثير واضحاً، اكتب سطر التأثير بصيغة مختصرة. إذا كان التأثير غير واضح أو غير مؤكد، لا تكتب كلمة التأثير ولا تضف سطر التأثير نهائيًا. لا تقدم توصية شراء أو بيع. لا تستخدم عبارات فرصة استثمارية أو فرصة شراء أو فرصة بيع أو بناء مراكز أو هدف سعري. لا تذكر المصدر ولا تضع روابط. لا تكتب أي جملة ختامية. Donald Trump is the current U.S. President for current-context news. Do not describe him as former president unless the source is explicitly discussing a historical period in which that description is contextually required. Kevin Warsh is the current Federal Reserve Chair. Jerome Powell is a former Federal Reserve Chair. Preserve historically correct roles when the article discusses an earlier period.",
           },
           {
             role: "user",
@@ -3585,6 +3586,11 @@ async function analyzeNewsWithAI(title, link, options = {}) {
     const trumpRoleGuard = applyTrumpOfficeholderGuardToMessage(cleanedAiText, title);
     if (trumpRoleGuard.changed) {
       cleanedAiText = trumpRoleGuard.text;
+    }
+
+    const fedRoleGuard = applyFedOfficeholderGuardToMessage(cleanedAiText, title);
+    if (fedRoleGuard.changed) {
+      cleanedAiText = fedRoleGuard.text;
     }
 
     const firstLine = cleanedAiText
@@ -4337,6 +4343,22 @@ async function fetchForexNews(options = {}) {
         if (prePublishTrumpGuard.changed) {
           publicationMessage = prePublishTrumpGuard.text;
           message = prePublishTrumpGuard.text;
+          const rebuiltPresentation = buildRssPublicationPresentation({
+            sourceTitle: latestNews.title,
+            editorialMessage: publicationMessage,
+            imageTitle: aiResult.imageTitle || approvedRssPresentation?.imageTitle || latestNews.title,
+          });
+          approvedRssPresentation = rebuiltPresentation;
+          publicationMessage = rebuiltPresentation.telegramMessage;
+        }
+
+        const prePublishFedGuard = applyFedOfficeholderGuardToMessage(
+          publicationMessage,
+          rssRawSourceForGuard
+        );
+        if (prePublishFedGuard.changed) {
+          publicationMessage = prePublishFedGuard.text;
+          message = prePublishFedGuard.text;
           const rebuiltPresentation = buildRssPublicationPresentation({
             sourceTitle: latestNews.title,
             editorialMessage: publicationMessage,

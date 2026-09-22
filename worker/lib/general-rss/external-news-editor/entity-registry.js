@@ -1,17 +1,33 @@
 const FED_CHAIR_ID = "KEVIN_WARSH";
+const JEROME_POWELL_ID = "JEROME_POWELL";
 
 const OFFICIALS = Object.freeze([
   {
     id: "KEVIN_WARSH",
     canonicalName: "Kevin Warsh",
     names: ["Kevin Warsh", "Warsh"],
-    arabicNames: ["كيفن وارش", "وارش", "Kevin Warsh"],
+    arabicNames: ["كيفن وارش", "كيفن وورش", "وارش", "وورش", "Kevin Warsh"],
     institution: "FEDERAL_RESERVE",
     role: "Federal Reserve Chair",
     arabicRole: "رئيس الاحتياطي الفيدرالي",
     regionalBank: null,
     chairStatus: true,
-    lastVerifiedAsOf: "2026-01-01",
+    termStart: "2026-05-22",
+    lastVerifiedAsOf: "2026-09-01",
+  },
+  {
+    id: "JEROME_POWELL",
+    canonicalName: "Jerome Powell",
+    names: ["Jerome Powell", "Jerome H. Powell", "Jay Powell", "Powell"],
+    arabicNames: ["جيروم باول", "باول", "Jerome Powell", "Jay Powell"],
+    institution: "FEDERAL_RESERVE",
+    role: "Former Federal Reserve Chair",
+    arabicRole: "الرئيس السابق للاحتياطي الفيدرالي",
+    regionalBank: null,
+    chairStatus: false,
+    formerChairStatus: true,
+    termEnd: "2026-05-22",
+    lastVerifiedAsOf: "2026-09-01",
   },
   {
     id: "NEEL_KASHKARI",
@@ -205,16 +221,22 @@ function isFedChairTitlePhrase(text = "") {
   const normalized = normalizeLookup(text);
   return (
     /رئيس الاحتياطي الفيدرالي/.test(text) ||
-    /fed chair|federal reserve chair|chair of the federal reserve/.test(normalized)
+    /fed chair|federal reserve chair|fomc chair|chair of the federal reserve/.test(normalized)
   );
+}
+
+function getOfficialById(id = "") {
+  return OFFICIALS.find((official) => official.id === id) || null;
 }
 
 module.exports = {
   FED_CHAIR_ID,
+  JEROME_POWELL_ID,
   OFFICIALS,
   normalizeLookup,
   matchOfficialInText,
   getFedChairOfficial,
   resolveOfficialRolePhrase,
   isFedChairTitlePhrase,
+  getOfficialById,
 };

@@ -5,6 +5,7 @@ const { buildStructuredFactsV2 } = require("./structured-facts");
 const { generateEditorV2Editorial } = require("./editorial-ai");
 const { validateEditorV2FactGuard } = require("./fact-guard");
 const { applyTrumpOfficeholderGuardToEditorial } = require("../trump-officeholder-role-guard");
+const { applyFedOfficeholderGuardToEditorial } = require("../fed-officeholder-role-guard");
 const {
   classifyEvidenceSufficiency,
   isEvidenceSufficientForEditorial,
@@ -109,6 +110,16 @@ async function runEditorV2Review(input = {}, options = {}) {
       headline: officeholderGuard.headline,
       body: officeholderGuard.body,
       trumpOfficeholderGuardApplied: true,
+    };
+  }
+
+  const fedOfficeholderGuard = applyFedOfficeholderGuardToEditorial(editorial, rssSourceCombined);
+  if (fedOfficeholderGuard.changed) {
+    editorial = {
+      ...editorial,
+      headline: fedOfficeholderGuard.headline,
+      body: fedOfficeholderGuard.body,
+      fedOfficeholderGuardApplied: true,
     };
   }
 
