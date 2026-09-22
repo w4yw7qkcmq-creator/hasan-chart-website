@@ -31,6 +31,11 @@ const {
   resolveImageDisplayTitle,
   counts: editorialCounts,
 } = require(path.join(root, "lib/news-images/editorial-intelligence"));
+const { PEOPLE } = require(path.join(root, "lib/news-images/editorial-intelligence/config/people"));
+const { findByNames, resolvePerson } = require(path.join(
+  root,
+  "lib/news-images/editorial-intelligence/entity-resolver"
+));
 const {
   inspectGeneratedBackground,
   inspectRawBackgroundForTypography,
@@ -876,6 +881,25 @@ function testEditorialPowellSpeechPrimaryPerson() {
   assert.strictEqual(bundle.validation.ok, true);
 }
 
+function testEditorialFedPeopleMetadataRoles() {
+  assert.strictEqual(PEOPLE.JEROME_POWELL.role, "Former Federal Reserve Chair");
+  assert.match(PEOPLE.JEROME_POWELL.visualDescription, /Former Federal Reserve Chair/u);
+  assert.strictEqual(PEOPLE.KEVIN_WARSH.role, "Federal Reserve Chair");
+  assert.match(PEOPLE.KEVIN_WARSH.visualDescription, /Kevin Warsh, Federal Reserve Chair/u);
+
+  const warsh = findByNames(PEOPLE, "Fed Chair Warsh said rates may stay higher");
+  assert.strictEqual(warsh?.id, "KEVIN_WARSH");
+
+  const resolvedWarsh = resolvePerson({
+    person: "Kevin Warsh",
+    eventDefinition: { personPolicy: "person_primary" },
+  });
+  assert.strictEqual(resolvedWarsh?.id, "KEVIN_WARSH");
+
+  assert.strictEqual(PEOPLE.CHRISTINE_LAGARDE.role, "ECB President");
+  assert.strictEqual(PEOPLE.ANDREW_BAILEY.role, "Bank of England Governor");
+}
+
 function testEditorialFomcInstitutionPrimary() {
   const bundle = buildEditorialPromptBundle({
     eventKey: "US_FED_RATE_DECISION",
@@ -1234,7 +1258,7 @@ function testEditorialPromptDedupe() {
 
 function testEditorialRegistryCounts() {
   assert.ok(editorialCounts.events >= 30);
-  assert.strictEqual(editorialCounts.people, 9);
+  assert.strictEqual(editorialCounts.people, 10);
   assert.strictEqual(editorialCounts.institutions, 9);
   assert.strictEqual(editorialCounts.countries, 4);
   assert.strictEqual(editorialCounts.markets, 9);
@@ -1600,6 +1624,7 @@ async function run() {
     testOpenAISettingsDefaults,
     testProviderTargets,
     testEditorialPowellSpeechPrimaryPerson,
+    testEditorialFedPeopleMetadataRoles,
     testEditorialFomcInstitutionPrimary,
     testEditorialLagardeAndBoj,
     testEditorialCpiExcludesResultNumbers,
