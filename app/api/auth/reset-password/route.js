@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { resolvePasswordRecoveryRedirectUrl } from "../../../../lib/auth-password-recovery";
 import {
   getClientIp,
   resetPasswordIpLimiter,
@@ -31,9 +32,8 @@ export async function POST(request) {
       return NextResponse.json({ error: RATE_LIMIT_ERROR }, { status: 429 });
     }
 
-    const { email, redirectTo } = await request.json();
-
-    const normalizedEmail = String(email || "")
+    const body = await request.json().catch(() => ({}));
+    const normalizedEmail = String(body?.email || "")
       .trim()
       .toLowerCase();
 
@@ -45,9 +45,7 @@ export async function POST(request) {
     }
 
     const supabase = createAuthClient();
-    const redirectUrl =
-      String(redirectTo || "").trim() ||
-      `${request.headers.get("origin") || ""}/login`;
+    const redirectUrl = resolvePasswordRecoveryRedirectUrl();
 
     const { error } = await supabase.auth.resetPasswordForEmail(
       normalizedEmail,

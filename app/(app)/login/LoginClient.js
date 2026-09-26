@@ -537,7 +537,6 @@ export default function LoginClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: cleanEmail,
-          redirectTo: `${window.location.origin}/login`,
         }),
       });
 

@@ -424,7 +424,8 @@ function RootLayoutShell({ children }) {
   const mobileThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { mobile: true });
   const sidebarThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource);
   const headerThemeLabel = resolveThemeToggleLabel(shellThemeLabelSource, { compact: true });
-  const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isAuthPage =
+    pathname === "/login" || pathname === "/register" || pathname === "/reset-password";
   const toggleMenuGroup = useCallback((groupId) => {
     setCollapsedGroups((current) => ({
       ...current,
