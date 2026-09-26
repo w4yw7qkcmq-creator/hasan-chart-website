@@ -126,7 +126,7 @@ const {
 } = require("./lib/news-intelligence/autonomy/integration");
 const { getPhase3RuntimeConfig } = require("./lib/news-intelligence/autonomy/feature-flags");
 const { getNewsSystemStatus } = require("./lib/news-intelligence/autonomy/diagnostic-service");
-const { loadSourceHealthStates, flushSourceHealthStates } = require("./lib/news-intelligence/autonomy/source-health-persistence");
+const { loadSourceHealthStates } = require("./lib/news-intelligence/autonomy/source-health-persistence");
 const { buildIdempotencyKey } = require("./lib/economic-releases/canonical-events");
 const {
   hydrateFromDb: hydrateIngestionCheckpoints,
@@ -3893,8 +3893,14 @@ async function fetchForexNews(options = {}) {
     const allItems = [];
 
     const localPublishedItems = readPublishedNewsRecords();
-    const supabasePublishedItems = await loadPublishedNewsFromSupabase();
-    const supabaseNewsPostItems = await loadNewsPostsFromSupabase();
+    let supabasePublishedItems = [];
+    let supabaseNewsPostItems = [];
+    // Fast Telegram polls must not reload historical rows. Publish-time dedupe
+    // still loads them inside buildTelegramPublishDedupContext when an item is ready.
+    if (options.telegramOnly !== true) {
+      supabasePublishedItems = await loadPublishedNewsFromSupabase();
+      supabaseNewsPostItems = await loadNewsPostsFromSupabase();
+    }
     const publishedItems = [
       ...supabasePublishedItems,
       ...supabaseNewsPostItems,
@@ -4678,7 +4684,6 @@ async function fetchForexNews(options = {}) {
     flushObservability(getSupabaseClient()).catch(() => {});
     reconcileOperationalState(getSupabaseClient(), { staleAgeMs: 30 * 60_000 }).catch(() => {});
     flushIngestionCheckpoints(getSupabaseClient()).catch(() => {});
-    flushSourceHealthStates(getSupabaseClient()).catch(() => {});
     await refreshCachedChartAuthorityPolicy().catch(() => {});
     const completedAt = new Date().toISOString();
     const cycleStatus =
