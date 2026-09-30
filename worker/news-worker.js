@@ -38,6 +38,7 @@ const {
   getTelemetrySnapshot,
 } = require("./lib/news-worker-cycle-telemetry");
 const { auditSitePublishParity, auditHistoricalMissingSitePosts } = require("./lib/news-site-recovery");
+const { createDedupeHistoryCache } = require("./lib/news-dedupe-history-cache");
 
 const WebSocket = require("ws");
 global.WebSocket = WebSocket;
@@ -2318,67 +2319,103 @@ async function createNewsCard(title, imageUrl, impactLevel = "HIGH", premiumImag
   }
 }
 
-async function loadPublishedNewsFromSupabase() {
+const DEDUPE_HISTORY_REFRESH_MS = 15 * 60 * 1000;
+let dedupeHistoryCache = null;
+
+function mapPublishedNewsHistoryRow(item) {
+  return {
+    link: item.link,
+    title: item.title || "",
+    normalizedTitle: item.normalized_title || item.normalizedTitle || "",
+    topicCluster: item.topic_cluster || item.topicCluster || null,
+    publishedAt: item.published_at || item.publishedAt || item.created_at || null,
+  };
+}
+
+function mapNewsPostHistoryRow(item) {
+  const title = item.title || "";
+  const content = item.content || "";
+  const text = `${title} ${content}`;
+  return {
+    link: item.source_link || item.link || "",
+    title: title || content || "",
+    normalizedTitle: normalizeNewsTitle(text),
+    topicCluster: getNewsTopicCluster(text),
+    duplicateKey: getStrongDuplicateKey(text),
+    publishedAt: item.created_at || item.publishedAt || null,
+  };
+}
+
+function getDedupeHistoryCache() {
+  if (!dedupeHistoryCache) {
+    dedupeHistoryCache = createDedupeHistoryCache({
+      refreshIntervalMs: DEDUPE_HISTORY_REFRESH_MS,
+      loadHistory: loadDedupeHistorySnapshot,
+    });
+  }
+  return dedupeHistoryCache;
+}
+
+async function loadDedupeHistorySnapshot() {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { ok: false, error: "client_unavailable" };
+  }
+
   try {
-    const client = getSupabaseClient();
-    if (!client) {
-      return [];
-    }
-
-    const { data, error } = await client
-      .from("published_news")
-      .select("link,title,normalized_title,topic_cluster,published_at,created_at")
-      .order("published_at", { ascending: false })
-      .limit(200);
-
-    if (error) {
-      console.error("❌ Supabase Load Error:", error.message);
-      return [];
-    }
-
-    return (data || []).map((item) => ({
-      link: item.link,
-      title: item.title || "",
-      normalizedTitle: item.normalized_title || "",
-      topicCluster: item.topic_cluster || null,
-      publishedAt: item.published_at || item.created_at || null,
-    }));
+    const [publishedItems, newsPostItems] = await Promise.all([
+      fetchPublishedNewsHistoryRows(client),
+      fetchNewsPostsHistoryRows(client),
+    ]);
+    return { ok: true, publishedItems, newsPostItems };
   } catch (error) {
-    console.error("❌ Supabase Load Exception:", error.message);
-    return [];
+    if (!error.logged) {
+      console.error("❌ Supabase Load Exception:", error.message);
+    }
+    return { ok: false, error: error.message };
   }
 }
 
-async function loadNewsPostsFromSupabase() {
-  try {
-    const client = getSupabaseClient();
-    if (!client) {
-      return [];
-    }
+async function loadPublishedNewsFromSupabase() {
+  return getDedupeHistoryCache().getPublishedItems();
+}
 
-    const { data, error } = await client
-      .from("news_posts")
-      .select("title, content, source_link, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
+async function fetchPublishedNewsHistoryRows(client) {
+  const { data, error } = await client
+    .from("published_news")
+    .select("link,title,normalized_title,topic_cluster,published_at,created_at")
+    .order("published_at", { ascending: false })
+    .limit(200);
 
-    if (error) {
-      console.error("❌ News Posts Load Error:", error.message);
-      return [];
-    }
-
-    return (data || []).map((item) => ({
-      link: item.source_link,
-      title: item.title || item.content || "",
-      normalizedTitle: normalizeNewsTitle(`${item.title || ""} ${item.content || ""}`),
-      topicCluster: getNewsTopicCluster(`${item.title || ""} ${item.content || ""}`),
-      duplicateKey: getStrongDuplicateKey(`${item.title || ""} ${item.content || ""}`),
-      publishedAt: item.created_at || null,
-    }));
-  } catch (error) {
-    console.error("❌ News Posts Load Exception:", error.message);
-    return [];
+  if (error) {
+    console.error("❌ Supabase Load Error:", error.message);
+    const wrapped = new Error(error.message);
+    wrapped.logged = true;
+    throw wrapped;
   }
+
+  return (data || []).map(mapPublishedNewsHistoryRow);
+}
+
+async function loadNewsPostsFromSupabase() {
+  return getDedupeHistoryCache().getNewsPostItems();
+}
+
+async function fetchNewsPostsHistoryRows(client) {
+  const { data, error } = await client
+    .from("news_posts")
+    .select("title, content, source_link, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) {
+    console.error("❌ News Posts Load Error:", error.message);
+    const wrapped = new Error(error.message);
+    wrapped.logged = true;
+    throw wrapped;
+  }
+
+  return (data || []).map(mapNewsPostHistoryRow);
 }
 
 async function savePublishedNewsToSupabase(item) {
@@ -2413,6 +2450,7 @@ async function savePublishedNewsToSupabase(item) {
       return { error: error.message };
     }
 
+    getDedupeHistoryCache().notePublishedItem(mapPublishedNewsHistoryRow(item));
     return { ok: true };
   } catch (error) {
     console.error("❌ Supabase Save Exception:", error.message);
@@ -2558,6 +2596,14 @@ async function saveNewsPostToSupabase(post) {
       return { error: error.message };
     }
 
+    getDedupeHistoryCache().noteNewsPostItem(
+      mapNewsPostHistoryRow({
+        title: post.title,
+        content: post.content,
+        source_link: post.source_link,
+        created_at: new Date().toISOString(),
+      })
+    );
     return { ok: true, id: data?.id || null };
   } catch (error) {
     console.error("❌ News Post Save Exception:", error.message);
@@ -4947,6 +4993,22 @@ if (process.env.NEWS_WORKER_NO_BOOT === "1") {
       console.log("NEWS_PHASE3_SOURCE_HEALTH_HYDRATED", JSON.stringify({ loaded: result.loaded }));
     }
   });
+  getDedupeHistoryCache()
+    .ensureFresh()
+    .then((state) => {
+      if (state?.hydrated) {
+        console.log(
+          "NEWS_DEDUPE_HISTORY_HYDRATED",
+          JSON.stringify({
+            published: state.publishedCount || state.publishedItems?.length || 0,
+            newsPosts: state.newsPostCount || state.newsPostItems?.length || 0,
+          })
+        );
+      }
+    })
+    .catch((error) => {
+      console.error("❌ Supabase Load Exception:", error.message);
+    });
   checkpointHydrationPromise = hydrateIngestionCheckpoints(getSupabaseClient()).then((result) => {
     console.log("NEWS_INGESTION_CHECKPOINTS_HYDRATED", JSON.stringify(result));
     return result;

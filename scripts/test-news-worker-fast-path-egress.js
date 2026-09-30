@@ -80,6 +80,10 @@ const postsLoader = sliceBetween(
 assert.match(publishedLoader, /\.limit\(200\)/);
 assert.match(postsLoader, /\.select\("title, content, source_link, created_at"\)/);
 assert.match(postsLoader, /\.limit\(200\)/);
+assert.match(workerSource, /DEDUPE_HISTORY_REFRESH_MS = 15 \* 60 \* 1000/);
+assert.match(workerSource, /ensureFresh\(/);
+assert.match(workerSource, /notePublishedItem\(/);
+assert.match(workerSource, /noteNewsPostItem\(/);
 
 assert.match(
   envSource,
