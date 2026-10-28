@@ -79,7 +79,7 @@ const {
   evaluateRssCuratorGate,
 } = require("./lib/general-rss");
 const { buildRssPublicationPresentation } = require("./lib/general-rss/publication-format");
-const { sanitizeRssDraftAiText } = require("./lib/general-rss/rss-draft-sanitize");
+const { generateRssEditorialDraft, isOpenAiFailureReason } = require("./lib/general-rss/rss-editorial-ai");
 const {
   resolveRssSourceImage,
 } = require("./lib/general-rss/rss-source-image-resolver");
@@ -3581,84 +3581,11 @@ async function analyzeNewsWithAI(title, link, options = {}) {
     };
   }
 
-  try {
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4.1-nano",
-        messages: [
-          {
-            role: "system",
-            content:
-              "أنت محرر أخبار مالية عاجلة لقناة تيليجرام احترافية مختصة بالفوركس والأسواق العالمية. اكتب الخبر باللغة العربية فقط. ممنوع كتابة أي كلمات إنجليزية نهائياً حتى لو كان عنوان المصدر بالإنجليزية، باستثناء الرموز الاقتصادية الضرورية مثل CPI أو PPI أو NFP أو FOMC. ترجم أسماء الأخبار والأسواق والشركات إلى العربية أو احذفها إذا كانت غير مهمة. لا تخلط العربية والإنجليزية في نفس السطر. اكتب بأسلوب أخبار عاجلة ومختصرة. التنسيق الإجباري: السطر الأول عنوان عربي عاجل مع إيموجي مناسب. بعده سطر فارغ. بعده ملخص الخبر بالعربية بجملة أو جملتين فقط. لا تكتب كلمة التأثير إلا إذا كان الخبر نتيجة اقتصادية رسمية مثل CPI أو PPI أو NFP أو Jobless Claims أو FOMC أو قرار فائدة أو بيانات بطالة أو GDP أو PMI. أما أخبار الذهب أو النفط أو الكريبتو أو الأسهم أو إيران أو إسرائيل أو الحروب أو العقوبات أو التصعيدات الجيوسياسية فلا تكتب فيها كلمة التأثير نهائياً. إذا كان الخبر نتيجة اقتصادية رسمية وكان التأثير واضحاً، اكتب سطر التأثير بصيغة مختصرة. إذا كان التأثير غير واضح أو غير مؤكد، لا تكتب كلمة التأثير ولا تضف سطر التأثير نهائيًا. لا تقدم توصية شراء أو بيع. لا تستخدم عبارات فرصة استثمارية أو فرصة شراء أو فرصة بيع أو بناء مراكز أو هدف سعري. لا تذكر المصدر ولا تضع روابط. لا تكتب أي جملة ختامية. Donald Trump is the current U.S. President for current-context news. Do not describe him as former president unless the source is explicitly discussing a historical period in which that description is contextually required. Kevin Warsh is the current Federal Reserve Chair. Jerome Powell is a former Federal Reserve Chair. Preserve historically correct roles when the article discusses an earlier period.",
-          },
-          {
-            role: "user",
-            content: `عنوان الخبر: ${title}\nمهم جدًا: لا تكتب رابط المصدر ولا تذكر اسم المصدر داخل المنشور. أعد صياغة الخبر بالكامل بصياغة عربية مختلفة عن المصدر ولا تنسخ نفس ترتيب الجمل. لا تكتب كلمة "التأثير" إلا إذا كان الخبر نتيجة اقتصادية رسمية مثل CPI أو PPI أو NFP أو Jobless Claims أو FOMC أو قرار فائدة أو بيانات بطالة أو GDP أو PMI. أما أخبار الذهب أو النفط أو الكريبتو أو الأسهم أو إيران أو إسرائيل أو الحروب أو العقوبات فلا تكتب فيها كلمة التأثير نهائياً. للأخبار العادية اكتب عنواناً عاجلاً وملخصاً قصيراً فقط. ممنوع عبارات فرصة استثمارية أو فرصة شراء أو فرصة بيع أو بناء مراكز أو توصية أو هدف سعري.`,
-          },
-        ],
-        temperature: 0.4,
-        max_tokens: 350,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        timeout: RSS_DRAFT_AI_TIMEOUT_MS,
-      }
-    );
-
-    const aiText = response.data.choices?.[0]?.message?.content?.trim();
-
-    if (!aiText) {
-      throw new Error("Empty AI response");
-    }
-
-    const sanitizedDraft = sanitizeRssDraftAiText(aiText, {
-      title,
-      isEconomicReleaseTitle,
-    });
-    if (!sanitizedDraft.ok) {
-      throw new Error(sanitizedDraft.reason || "AI response contains English or empty Arabic text");
-    }
-
-    let cleanedAiText = sanitizedDraft.cleanedText;
-
-    if (!cleanedAiText || /[A-Za-z]{4,}/.test(cleanedAiText)) {
-      throw new Error("AI response contains English or empty Arabic text");
-    }
-
-    const trumpRoleGuard = applyTrumpOfficeholderGuardToMessage(cleanedAiText, title);
-    if (trumpRoleGuard.changed) {
-      cleanedAiText = trumpRoleGuard.text;
-    }
-
-    const fedRoleGuard = applyFedOfficeholderGuardToMessage(cleanedAiText, title);
-    if (fedRoleGuard.changed) {
-      cleanedAiText = fedRoleGuard.text;
-    }
-
-    const firstLine = cleanedAiText
-      .split("\n")
-      .find((line) => line.trim().length > 10) || title;
-
-    return {
-      message: `${cleanedAiText.replace(/\n/g, "\n\n")}\n\n📢 قناة الأخبار الرسمية:\nhttps://t.me/EconomicNewsi`,
-      imageTitle: firstLine
-        .replace(/🚨|📌|📈|📉|🔥|⚡|🛢️|💰|🇺🇸|🇮🇷|🔴|🟢|🟡|🎯|📊|📰/g, "")
-        .trim(),
-    };
-  } catch (error) {
-    console.error("⚠️ AI Error:", error.response?.data || error.message);
-
-    return {
-      message: null,
-      imageTitle: title,
-      aiFailed: true,
-      reason: "EDITORIAL_OUTPUT_INVALID",
-    };
-  }
+  return generateRssEditorialDraft(title, {
+    apiKey: OPENAI_API_KEY,
+    timeoutMs: RSS_DRAFT_AI_TIMEOUT_MS,
+    isEconomicReleaseTitle,
+  });
 }
 
 async function publishStructuredEconomicReleaseResult(result, stats, dryRun) {
@@ -4300,10 +4227,15 @@ async function fetchForexNews(options = {}) {
 
       if (!aiResult?.message) {
         stats.aiFailed += 1;
-        recordRssCandidateDecision(latestNews, "EDITORIAL_OUTPUT_INVALID", {
-          aiUsed: true,
-          metadata: { aiReason: aiResult?.reason || "empty_message" },
-        });
+        const aiReason = aiResult?.reason || "empty_message";
+        recordRssCandidateDecision(
+          latestNews,
+          isOpenAiFailureReason(aiReason) ? aiReason : "EDITORIAL_OUTPUT_INVALID",
+          {
+            aiUsed: true,
+            metadata: { aiReason },
+          }
+        );
         markEligibleRssItemProcessed(latestNews, "ai_failed", { dryRun });
         continue eligibleLoop;
       }

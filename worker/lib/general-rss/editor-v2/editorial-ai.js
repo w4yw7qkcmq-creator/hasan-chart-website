@@ -13,9 +13,10 @@ const { AI_DIRECT_FAILURE_REASONS } = require("./reason-codes");
 const { extractActionFromEvidence } = require("./action-resolution");
 const { resolvePrimarySubject } = require("./primary-subject");
 const { extractAttributionHint } = require("./deterministic-arabic-fallback");
+const { EDITORIAL_CHAT_MODEL, editorialChatRequestFields } = require("../../openai/editorial-chat");
 
 const DEFAULT_V2_TIMEOUT_MS = 12_000;
-const DEFAULT_V2_MODEL = "gpt-4.1-nano";
+const DEFAULT_V2_MODEL = EDITORIAL_CHAT_MODEL;
 const DEFAULT_V2_TEMPERATURE = 0.1;
 
 const V2_EDITOR_JSON_SCHEMA = Object.freeze({
@@ -146,7 +147,7 @@ function buildEditorialPayload(evidence = {}, facts = {}, options = {}) {
   const sufficiencyLevel = options.evidenceSufficiencyLevel || EVIDENCE_SUFFICIENCY.SUFFICIENT_MINIMAL;
   const semanticContext = buildSemanticContext(evidence, facts);
   return {
-    model: options.model || DEFAULT_V2_MODEL,
+    ...editorialChatRequestFields(options.model || DEFAULT_V2_MODEL),
     temperature: options.temperature ?? DEFAULT_V2_TEMPERATURE,
     max_tokens: 500,
     response_format: {

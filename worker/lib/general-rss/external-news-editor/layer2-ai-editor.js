@@ -1,9 +1,10 @@
 const axios = require("axios");
 const { validateExternalNewsDraftIntegrity } = require("./layer1-integrity");
 const { EDITOR_REASON_CODES } = require("./reason-codes");
+const { EDITORIAL_CHAT_MODEL, editorialChatRequestFields } = require("../../openai/editorial-chat");
 
 const DEFAULT_EDITOR_TIMEOUT_MS = 10_000;
-const DEFAULT_MODEL = "gpt-4.1-nano";
+const DEFAULT_MODEL = EDITORIAL_CHAT_MODEL;
 
 function parseEditorJson(content = "") {
   const trimmed = String(content || "").trim();
@@ -34,7 +35,7 @@ async function reviewExternalNewsWithAi(input = {}, options = {}) {
 
   const timeoutMs = options.editorTimeoutMs || DEFAULT_EDITOR_TIMEOUT_MS;
   const payload = {
-    model: options.model || DEFAULT_MODEL,
+    ...editorialChatRequestFields(options.model || DEFAULT_MODEL),
     temperature: 0.1,
     max_tokens: 500,
     messages: [
