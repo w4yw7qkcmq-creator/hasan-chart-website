@@ -149,7 +149,7 @@ function buildEditorialPayload(evidence = {}, facts = {}, options = {}) {
   return {
     ...editorialChatRequestFields(options.model || DEFAULT_V2_MODEL),
     temperature: options.temperature ?? DEFAULT_V2_TEMPERATURE,
-    max_tokens: 500,
+    max_completion_tokens: 500,
     response_format: {
       type: "json_schema",
       json_schema: V2_EDITOR_JSON_SCHEMA,

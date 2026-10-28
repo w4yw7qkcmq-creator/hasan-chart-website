@@ -50,7 +50,8 @@ async function postSuccess(url, body, config) {
   assert(body.model === EDITORIAL_CHAT_MODEL, "model");
   assert(body.reasoning_effort === EDITORIAL_REASONING_EFFORT, "reasoning effort");
   assert(body.temperature === 0.4, "temperature");
-  assert(body.max_tokens === 350, "max tokens");
+  assert(body.max_completion_tokens === 350, "completion token budget");
+  assert(body.max_tokens === undefined, "legacy max_tokens is not sent");
   assert(config.headers.Authorization === `Bearer ${API_KEY}`, "auth header stays on the request");
   assert(config.timeout === 12000, "timeout");
   return {

@@ -37,7 +37,7 @@ async function reviewExternalNewsWithAi(input = {}, options = {}) {
   const payload = {
     ...editorialChatRequestFields(options.model || DEFAULT_MODEL),
     temperature: 0.1,
-    max_tokens: 500,
+    max_completion_tokens: 500,
     messages: [
       {
         role: "system",

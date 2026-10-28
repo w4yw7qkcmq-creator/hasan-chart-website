@@ -211,6 +211,9 @@ function testEditorialPayloadShape() {
   const payload = buildEditorialPayload(evidence, facts, {});
   assert(payload.response_format.type === "json_schema");
   assert(payload.response_format.json_schema.name === "editor_v2_editorial");
+  assert(payload.max_completion_tokens === 500, "v2 keeps the 500 token budget");
+  assert(payload.max_tokens === undefined, "v2 does not send max_tokens");
+  assert(payload.reasoning_effort === "none", "v2 reasoning stays off");
 }
 
 async function main() {

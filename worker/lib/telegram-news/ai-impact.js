@@ -42,7 +42,7 @@ async function buildAiImpactParagraph(facts, options = {}) {
           },
         ],
         temperature: 0.2,
-        max_tokens: 180,
+        max_completion_tokens: 180,
       },
       {
         headers: {

@@ -42,7 +42,7 @@ async function generateRssEditorialDraft(title, options = {}) {
           },
         ],
         temperature: 0.4,
-        max_tokens: 350,
+        max_completion_tokens: 350,
       },
       {
         headers: {
