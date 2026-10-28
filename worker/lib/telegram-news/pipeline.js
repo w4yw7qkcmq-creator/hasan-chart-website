@@ -73,7 +73,10 @@ function prepareTelegramPost(post, stats = {}) {
     pipelineTrace,
   };
 
-  if (isPromotionOnly(sourceRawText)) {
+  // Promo-only must use the same sanitized text as parsing. Raw source often
+  // keeps the ForexBreakingNews join footer on the same line as the triple,
+  // which made isPromotionOnly() drop valid economic releases.
+  if (isPromotionOnly(cleanedText)) {
     stats.promoOnlySkipped = (stats.promoOnlySkipped || 0) + 1;
     return buildSkipResult(post, {
       skip: true,

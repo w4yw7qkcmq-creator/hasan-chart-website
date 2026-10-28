@@ -12,6 +12,7 @@ const {
 const {
   classifyTelegramMessage,
   markTelegramMessageSeen,
+  reserveTelegramMessageInFlight,
   bootstrapAllTelegramSources,
 } = require("../news-ingestion/checkpoint-store");
 
@@ -197,9 +198,10 @@ async function discoverTelegramNews(options = {}) {
         continue;
       }
       const result = buffer.submit(post);
-      if (!result?.skip) {
+      if (result?.action === "pending" || result?.action === "pending_dry_run") {
         bufferSubmitted += 1;
         bufferSubmittedKeys.add(`${post.sourceChannel}:${post.sourceMessageId}`);
+        reserveTelegramMessageInFlight(post.sourceChannel, post);
       }
     }
 

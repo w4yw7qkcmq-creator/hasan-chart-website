@@ -23,6 +23,16 @@ const memory = new Map();
 let hydrated = false;
 let dirtyKeys = new Set();
 
+/** In-memory only. Not persisted. Protects pending merge-buffer IDs from a newer cursor. */
+const telegramInflightByChannel = new Map();
+
+const ADVANCE_HIGHEST_MESSAGE_ID_OUTCOMES = new Set([
+  "published",
+  "bootstrap",
+  "bootstrap_published",
+  "bootstrap_stale",
+]);
+
 function sourceKey(sourceType, sourceId) {
   return `${sourceType}:${sourceId}`;
 }
@@ -217,13 +227,57 @@ function bootstrapRssSource(sourceId, items = [], options = {}) {
   return { alreadyBootstrapped: false, marked, evaluate };
 }
 
-function isTelegramMessageNew(channel, post) {
+function getTelegramInflightSet(channel) {
+  if (!telegramInflightByChannel.has(channel)) {
+    telegramInflightByChannel.set(channel, new Set());
+  }
+  return telegramInflightByChannel.get(channel);
+}
+
+function getMinInflightMessageId(channel) {
+  const inflight = telegramInflightByChannel.get(channel);
+  if (!inflight || inflight.size === 0) return null;
+  let minId = null;
+  for (const id of inflight) {
+    if (minId == null || id < minId) minId = id;
+  }
+  return minId;
+}
+
+function isTelegramMessageInFlight(channel, post) {
   const messageId = parseMessageId(post?.sourceMessageId);
-  const state = getTelegramState(channel);
-  const key = `msg:${messageId}`;
-  if ((state.recentSeenKeys || []).includes(key)) return false;
-  if (messageId > 0 && messageId <= state.highestMessageId) return false;
-  return true;
+  const inflight = telegramInflightByChannel.get(channel);
+  return Boolean(channel && messageId && inflight && inflight.has(messageId));
+}
+
+function reserveTelegramMessageInFlight(channel, post) {
+  const messageId = parseMessageId(post?.sourceMessageId);
+  if (!channel || !messageId) return { reserved: false, messageId };
+  const inflight = getTelegramInflightSet(channel);
+  inflight.add(messageId);
+  if (inflight.size > MAX_RECENT_SEEN) {
+    const oldest = inflight.values().next().value;
+    inflight.delete(oldest);
+  }
+  return { reserved: true, messageId };
+}
+
+function releaseTelegramMessageInFlight(channel, post) {
+  const messageId = parseMessageId(post?.sourceMessageId);
+  if (!channel || !messageId) return { released: false, messageId };
+  const inflight = telegramInflightByChannel.get(channel);
+  if (!inflight) return { released: false, messageId };
+  const released = inflight.delete(messageId);
+  if (inflight.size === 0) telegramInflightByChannel.delete(channel);
+  return { released, messageId };
+}
+
+function shouldAdvanceHighestMessageId(outcome) {
+  return ADVANCE_HIGHEST_MESSAGE_ID_OUTCOMES.has(String(outcome || ""));
+}
+
+function isTelegramMessageNew(channel, post) {
+  return classifyTelegramMessage(channel, post).new === true;
 }
 
 function classifyTelegramMessage(channel, post) {
@@ -234,6 +288,9 @@ function classifyTelegramMessage(channel, post) {
 
   if ((state.recentSeenKeys || []).includes(key)) {
     return { classification: isPinned ? "PINNED_OLD_MESSAGE" : "OLD_SEEN_MESSAGE", messageId, new: false };
+  }
+  if (isTelegramMessageInFlight(channel, post)) {
+    return { classification: "NEW_MESSAGE", messageId, new: true, inFlight: true };
   }
   if (messageId > 0 && messageId <= state.highestMessageId) {
     return { classification: isPinned ? "PINNED_OLD_MESSAGE" : "OLD_SEEN_MESSAGE", messageId, new: false };
@@ -246,8 +303,12 @@ function markTelegramMessageSeen(channel, post, { outcome } = {}) {
   if (!messageId) return { marked: false };
   const state = getTelegramState(channel);
   addRecentSeen(state, `msg:${messageId}`);
-  if (messageId > state.highestMessageId) {
-    state.highestMessageId = messageId;
+  releaseTelegramMessageInFlight(channel, post);
+  if (shouldAdvanceHighestMessageId(outcome) && messageId > state.highestMessageId) {
+    const minInflight = getMinInflightMessageId(channel);
+    if (minInflight == null || messageId < minInflight) {
+      state.highestMessageId = messageId;
+    }
   }
   state.lastObservedAt = new Date().toISOString();
   markDirty(SOURCE_TYPES.TELEGRAM, channel);
@@ -290,6 +351,7 @@ function bootstrapTelegramChannel(channel, posts = [], options = {}) {
 async function hydrateFromDb(supabase) {
   memory.clear();
   dirtyKeys.clear();
+  telegramInflightByChannel.clear();
   hydrated = false;
   if (!supabase) {
     hydrated = true;
@@ -370,6 +432,7 @@ function bootstrapAllTelegramSources(posts = [], options = {}) {
 function resetCheckpointStoreForTests() {
   memory.clear();
   dirtyKeys.clear();
+  telegramInflightByChannel.clear();
   hydrated = false;
   rssIngestionPublishFloorMs = null;
 }
@@ -413,6 +476,9 @@ module.exports = {
   isTelegramMessageNew,
   classifyTelegramMessage,
   markTelegramMessageSeen,
+  reserveTelegramMessageInFlight,
+  releaseTelegramMessageInFlight,
+  isTelegramMessageInFlight,
   bootstrapTelegramChannel,
   bootstrapAllTelegramSources,
   hydrateFromDb,
