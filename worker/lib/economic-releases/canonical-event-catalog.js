@@ -296,7 +296,11 @@ const US_EIA_INVENTORIES = Object.fromEntries([
 const US_PMI = Object.fromEntries([
   releaseDef("US", "ISM_MANUFACTURING", {
     priority: 3,
-    patterns: [/\bism\b.*manufacturing|ism manufacturing pmi/i],
+    patterns: p(
+      /\bism\b.*manufacturing|ism manufacturing pmi/i,
+      /(?<!غير )(?:الصناعي|التصنيعي)[\s\S]{0,80}معهد\s*إدارة\s*التوريدات/i,
+      /معهد\s*إدارة\s*التوريدات[\s\S]{0,80}(?<!غير )(?:الصناعي|التصنيعي|التصنيع)/i
+    ),
     arabicName: "مؤشر ISM للتصنيع",
   }),
   releaseDef("US", "ISM_NON_MANUFACTURING_PMI", {
@@ -306,8 +310,8 @@ const US_PMI = Object.fromEntries([
       /ism services pmi/i,
       /مديري\s*المشتريات(?:\s*في|\s*ل)?(?:ل)?(?:قطاع)?\s*غير\s*الصناعي/i,
       /(?:غير\s*الصناعي).*مديري\s*المشتريات/i,
-      /معهد\s*إدارة\s*التوريدات.*(?:غير\s*الصناعي|مديري\s*المشتريات)/i,
-      /مديري\s*المشتريات.*معهد\s*إدارة\s*التوريدات/i
+      /غير\s*الصناعي[\s\S]{0,80}معهد\s*إدارة\s*التوريدات/i,
+      /معهد\s*إدارة\s*التوريدات[\s\S]{0,80}غير\s*الصناعي/i
     ),
     arabicName: "مؤشر مديري المشتريات للقطاع غير الصناعي (ISM)",
   }),
@@ -316,35 +320,61 @@ const US_PMI = Object.fromEntries([
     patterns: [/\bism\b.*services|ism services pmi/i],
     arabicName: "مؤشر ISM للخدمات",
   }),
+  releaseDef("US", "SP_GLOBAL_MANUFACTURING_PMI", {
+    priority: 2,
+    patterns: p(
+      /(?:s&p|s p|sp) global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}manufacturing/i,
+      /sp global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}manufacturing/i,
+      /standard\s*(?:&|and|\s)\s*poor(?:'?s)?(?![\s\S]{0,40}(?:\bflash\b|\bfinal\b|فلاش|نهائي))[\s\S]{0,50}manufacturing/i,
+      /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)(?![\s\S]{0,40}(?:flash|فلاش|نهائي|\bfinal\b))[\s\S]{0,50}(?<!غير )(?:التصنيع|manufacturing|الصناعي|التصنيعي)/i
+    ),
+    arabicName: "مؤشر S&P Global للتصنيع",
+  }),
   releaseDef("US", "SP_GLOBAL_FLASH_MANUFACTURING_PMI", {
     priority: 2,
-    patterns: [
-      /s&p global.*(?:flash.*)?(?:us )?manufacturing|sp global.*(?:flash.*)?(?:us )?manufacturing/i,
-      /flash manufacturing pmi|s&p global us manufacturing pmi/i,
-    ],
+    patterns: p(
+      /(?:s&p|s p|sp) global[\s\S]{0,40}\bflash\b[\s\S]{0,40}manufacturing/i,
+      /sp global[\s\S]{0,40}\bflash\b[\s\S]{0,40}manufacturing/i,
+      /standard\s*(?:&|and|\s)\s*poor(?:'?s)?[\s\S]{0,40}\bflash\b[\s\S]{0,40}manufacturing/i,
+      /flash manufacturing pmi/i,
+      /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)[\s\S]{0,40}(?:flash|فلاش)[\s\S]{0,40}(?<!غير )(?:التصنيع|manufacturing|الصناعي|التصنيعي)/i
+    ),
     arabicName: "مؤشر S&P Global Flash للتصنيع",
+  }),
+  releaseDef("US", "SP_GLOBAL_SERVICES_PMI", {
+    priority: 2,
+    patterns: p(
+      /(?:s&p|s p|sp) global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}services/i,
+      /sp global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}services/i,
+      /standard\s*(?:&|and|\s)\s*poor(?:'?s)?(?![\s\S]{0,40}(?:\bflash\b|\bfinal\b|فلاش|نهائي))[\s\S]{0,50}services/i,
+      /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)(?![\s\S]{0,40}(?:flash|فلاش|نهائي|\bfinal\b))[\s\S]{0,50}(?:للخدمات|الخدمات|services|الخدمي|الخدماتي)/i
+    ),
+    arabicName: "مؤشر S&P Global للخدمات",
   }),
   releaseDef("US", "SP_GLOBAL_FLASH_SERVICES_PMI", {
     priority: 2,
-    patterns: [
-      /s&p global.*(?:flash.*)?(?:us )?services|sp global.*(?:flash.*)?(?:us )?services/i,
-      /flash services pmi|s&p global us services pmi/i,
-    ],
+    patterns: p(
+      /(?:s&p|s p|sp) global[\s\S]{0,40}\bflash\b[\s\S]{0,40}services/i,
+      /sp global[\s\S]{0,40}\bflash\b[\s\S]{0,40}services/i,
+      /standard\s*(?:&|and|\s)\s*poor(?:'?s)?[\s\S]{0,40}\bflash\b[\s\S]{0,40}services/i,
+      /flash services pmi/i,
+      /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)[\s\S]{0,40}(?:flash|فلاش)[\s\S]{0,40}(?:للخدمات|الخدمات|services|الخدمي|الخدماتي)/i
+    ),
     arabicName: "مؤشر S&P Global Flash للخدمات",
   }),
   releaseDef("US", "SP_GLOBAL_FINAL_MANUFACTURING_PMI", {
     priority: 2,
-    patterns: [/final manufacturing pmi|s&p global.*final.*manufacturing/i],
+    patterns: [/final manufacturing pmi|(?:s&p|s p|sp) global.*final.*manufacturing/i],
     arabicName: "مؤشر S&P Global النهائي للتصنيع",
   }),
   releaseDef("US", "SP_GLOBAL_FINAL_SERVICES_PMI", {
     priority: 2,
-    patterns: [/final services pmi|s&p global.*final.*services/i],
+    patterns: [/final services pmi|(?:s&p|s p|sp) global.*final.*services/i],
     arabicName: "مؤشر S&P Global النهائي للخدمات",
   }),
   releaseDef("US", "SP_GLOBAL_PMI", {
     priority: 4,
-    patterns: [/s&p global.*composite|sp global.*composite|s&p global.*pmi|sp global.*pmi/i],
+    patterns: [/(?:s&p|s p|sp) global.*composite|sp global.*composite|(?:s&p|s p|sp) global.*pmi|sp global.*pmi/i],
     arabicName: "مؤشر S&P Global PMI المركب",
   }),
   releaseDef("US", "PHILADELPHIA_FED_MANUFACTURING", {
@@ -364,14 +394,28 @@ const US_PMI = Object.fromEntries([
     ],
     arabicName: "مؤشر إمباير ستيت للصناعة — الولايات المتحدة 🇺🇸",
   }),
+  releaseDef("US", "MANUFACTURING_PMI_PRELIMINARY", {
+    priority: 35,
+    patterns: p(
+      /مديري\s*المشتريات(?:\s+(?:للقطاع|القطاع))?\s+(?<!غير )(?:الصناعي|التصنيعي)\s+(?:الأولي|الاولي)/i,
+      /(?<!(?:s&p|s p|sp) global )(?<!sp global )preliminary manufacturing pmi/i
+    ),
+    arabicName: "مؤشر مديري المشتريات الصناعي الأولي",
+  }),
   releaseDef("US", "MANUFACTURING_PMI", {
     priority: 40,
-    patterns: [/(?<!ism )(?<!s&p global )(?<!sp global )manufacturing pmi(?![\s\S]*services)/i],
+    patterns: p(
+      /مديري\s*المشتريات(?:\s+(?:للقطاع|القطاع|في))?\s+(?<!غير )(?:الصناعي|التصنيعي)/i,
+      /(?<!ism )(?<!(?:s&p|s p|sp) global )(?<!sp global )manufacturing pmi(?![\s\S]*services)/i
+    ),
     arabicName: "مؤشر مديري المشتريات للتصنيع",
   }),
   releaseDef("US", "SERVICES_PMI", {
     priority: 40,
-    patterns: [/(?<!ism )(?<!s&p global )(?<!sp global )services pmi/i],
+    patterns: p(
+      /مديري\s*المشتريات(?:\s+(?:للقطاع|لقطاع|القطاع))?\s*(?:الخدمي|الخدماتي|للخدمات|الخدمات)/i,
+      /(?<!ism )(?<!(?:s&p|s p|sp) global )(?<!sp global )services pmi/i
+    ),
     arabicName: "مؤشر مديري المشتريات للخدمات",
   }),
   releaseDef("US", "PMI", {

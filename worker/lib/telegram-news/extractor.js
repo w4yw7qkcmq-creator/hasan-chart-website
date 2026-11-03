@@ -347,6 +347,28 @@ function extractEventTitle(text) {
   return lines[0]?.slice(0, 120) || null;
 }
 
+function spGlobalReleaseKey(prefix, sector, value) {
+  const spNamed = /(?:s&p|s p|sp) global|standard\s+poor|(?:ستاندرد|standard)\s*(?:أند|آند|and|&|\s)\s*(?:بورز|poor)/i.test(
+    value
+  );
+  const flashNamed = /\bflash\b|فلاش/i.test(value);
+  const finalNamed = /\bfinal\b|نهائي/i.test(value);
+  const stage = !spNamed || flashNamed ? "FLASH" : finalNamed ? "FINAL" : "PLAIN";
+  const suffix =
+    sector === "SERVICES"
+      ? stage === "FLASH"
+        ? "SP_GLOBAL_FLASH_SERVICES_PMI"
+        : stage === "FINAL"
+          ? "SP_GLOBAL_FINAL_SERVICES_PMI"
+          : "SP_GLOBAL_SERVICES_PMI"
+      : stage === "FLASH"
+        ? "SP_GLOBAL_FLASH_MANUFACTURING_PMI"
+        : stage === "FINAL"
+          ? "SP_GLOBAL_FINAL_MANUFACTURING_PMI"
+          : "SP_GLOBAL_MANUFACTURING_PMI";
+  return `${prefix}_${suffix}`;
+}
+
 function resolveCanonicalForTelegram(text, options = {}) {
   const value = normalizeTextForMatching(text);
   const countryCode = options.countryCode || extractCountryCode(value);
@@ -360,10 +382,10 @@ function resolveCanonicalForTelegram(text, options = {}) {
     };
   }
 
-  if (/s&p global|sp global|standard\s*(?:&|and)\s*poor(?:'?s)?|(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)|ratingdog|hsbc manufacturing|caixin pmi/i.test(value)) {
+  if (/(?:s&p|s p|sp) global|standard\s+poor|(?:ستاندرد|standard)\s*(?:أند|آند|and|&|\s)\s*(?:بورز|poor)|ratingdog|hsbc manufacturing|caixin pmi/i.test(value)) {
     const prefix = countryCode || "US";
     if (/services|الخدم|للخدمات|الخدمات/i.test(value)) {
-      const key = `${prefix}_SP_GLOBAL_FLASH_SERVICES_PMI`;
+      const key = spGlobalReleaseKey(prefix, "SERVICES", value);
       if (CANONICAL_EVENT_DEFINITIONS[key]) {
         return { eventKey: key, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[key] };
       }
@@ -380,7 +402,7 @@ function resolveCanonicalForTelegram(text, options = {}) {
       }
     }
     if (/manufacturing|الصناع|التصنيع|الصناعي/i.test(value)) {
-      const key = `${prefix}_SP_GLOBAL_FLASH_MANUFACTURING_PMI`;
+      const key = spGlobalReleaseKey(prefix, "MANUFACTURING", value);
       if (CANONICAL_EVENT_DEFINITIONS[key]) {
         return { eventKey: key, country: prefix, ...CANONICAL_EVENT_DEFINITIONS[key] };
       }

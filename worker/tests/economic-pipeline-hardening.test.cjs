@@ -6,6 +6,7 @@ const root = path.join(__dirname, "..");
 const { extractFactsFromTelegramPost } = require(path.join(root, "lib/telegram-news/extractor"));
 const { sanitizeSourceForParsing } = require(path.join(root, "lib/telegram-news/sanitize-source-for-parsing"));
 const { resolveCanonicalEventKey } = require(path.join(root, "lib/economic-releases/canonical-events"));
+const { resolveImageCategory } = require(path.join(root, "lib/news-images/economic-image-pool"));
 const { composeSingleEditorial } = require(path.join(
   root,
   "lib/news-intelligence/economic-editorial/economic-editor"
@@ -138,6 +139,100 @@ function runIsmArabicTest() {
   assert(facts.sourceReading?.direction === "POSITIVE", "ISM reading direction");
 }
 
+const ISM_MANUFACTURING_SOURCE = `صدر الآن :
+أَمريكا -
+🔵 مؤشر مديري المشتريات الصناعي الصادر عن معهد إِدارة التوريدات
+▪️ السابق : 54.5
+▪️ التقدير : 54.5
+▫️ الحالي : 55.5
+النتيجة : إيجابي للدولار الأمريكي
+لمتابعة أَخبار الأَسهم والذهب والعملات إِنضم للقناة من الرابط:
+Telegram.me/ForexBreakingNews`;
+
+const GENERIC_MANUFACTURING_SOURCE = `صدر الآن :
+أَمريكا -
+🔵 مؤشر مديري المشتريات الصناعي
+▪️ السابق : 56.0
+▪️ التقدير : 56.0
+▫️ الحالي : 54.9
+النتيجة : سلبي للدولار الأمريكي
+لمتابعة أَخبار الأَسهم والذهب والعملات إِنضم للقناة من الرابط:
+Telegram.me/ForexBreakingNews`;
+
+async function replayIncident(source, messageId, expected) {
+  const sanitized = sanitizeSourceForParsing(source);
+  assert(sanitized.sanitizedText.includes(expected.sourcePhrase), `${messageId} sanitization keeps source name`);
+  const facts = extractFactsFromTelegramPost({
+    sourceChannel: "ForexBreakingNews",
+    sourceMessageId: messageId,
+    sourcePublishedAt: "2026-11-02T15:00:27.000Z",
+    sourceRawText: source,
+    sanitizedText: sanitized.sanitizedText,
+    rawText: source,
+  });
+  assert(facts.canonicalEventKey === expected.eventKey, `${messageId} canonical ${facts.canonicalEventKey}`);
+  assert(facts.previous === expected.previous, `${messageId} previous`);
+  assert(facts.forecast === expected.forecast, `${messageId} forecast`);
+  assert(facts.actual === expected.actual, `${messageId} actual`);
+  assert(facts.sourceReading?.direction === expected.direction, `${messageId} impact`);
+  assert(facts.canonicalDisplayName === expected.displayName, `${messageId} display`);
+  assert(!/S&P|Flash|فلاش/.test(facts.canonicalDisplayName || "") || expected.allowsSp, `${messageId} unsupported label`);
+  assert(resolveImageCategory(facts.canonicalEventKey) === "pmi-ism", `${messageId} image category`);
+  const result = await composeSingleEditorial(buildStructuredEventFromFacts(facts, { telegramStructuredEconomic: true }), {
+    rawSourceText: source,
+  });
+  assert(result.ok === true, `${messageId} editorial`);
+  assert(result.body.includes(expected.displayName), `${messageId} headline`);
+  assert(result.body.includes("الولايات المتحدة"), `${messageId} country line`);
+  assert(result.body.includes(expected.previous) && result.body.includes(expected.actual), `${messageId} published numbers`);
+  assert(result.body.includes(expected.impactText), `${messageId} published impact`);
+  return result.body;
+}
+
+async function runIncidentReplayTest() {
+  const ismBody = await replayIncident(ISM_MANUFACTURING_SOURCE, "43646", {
+    sourcePhrase: "مؤشر مديري المشتريات الصناعي الصادر عن معهد",
+    eventKey: "US_ISM_MANUFACTURING",
+    previous: "54.5",
+    forecast: "54.5",
+    actual: "55.5",
+    direction: "POSITIVE",
+    displayName: "مؤشر ISM للتصنيع",
+    impactText: "إيجابية للدولار الأمريكي",
+  });
+  const genericBody = await replayIncident(GENERIC_MANUFACTURING_SOURCE, "43643", {
+    sourcePhrase: "مؤشر مديري المشتريات الصناعي",
+    eventKey: "US_MANUFACTURING_PMI",
+    previous: "56.0",
+    forecast: "56.0",
+    actual: "54.9",
+    direction: "NEGATIVE",
+    displayName: "مؤشر مديري المشتريات للتصنيع",
+    impactText: "سلبية للدولار الأمريكي",
+  });
+  assert(ismBody.includes("مؤشر ISM للتصنيع — الولايات المتحدة"), "43646 headline");
+  assert(!ismBody.includes("غير الصناعي"), "43646 is manufacturing");
+  assert(genericBody.includes("مؤشر مديري المشتريات للتصنيع — الولايات المتحدة"), "43643 headline");
+  assert(!/S&P|Flash|غير الصناعي/.test(genericBody), "43643 headline stays generic");
+  assert(resolveCanonicalEventKey("US CPI m/m", { countryCode: "US" }).eventKey.includes("CPI"), "CPI unchanged");
+  assert(resolveCanonicalEventKey("nonfarm payrolls", { countryCode: "US" }).eventKey === "US_NFP", "NFP unchanged");
+  assert(
+    resolveCanonicalEventKey("philadelphia fed manufacturing", { countryCode: "US" }).eventKey ===
+      "US_PHILADELPHIA_FED_MANUFACTURING",
+    "Philly unchanged"
+  );
+  assert(
+    resolveCanonicalEventKey("empire state manufacturing", { countryCode: "US" }).eventKey ===
+      "US_EMPIRE_STATE_MANUFACTURING",
+    "Empire unchanged"
+  );
+  assert(
+    resolveCanonicalEventKey("crude oil inventories", { countryCode: "US" }).eventKey ===
+      "US_EIA_CRUDE_OIL_INVENTORIES",
+    "EIA unchanged"
+  );
+}
+
 async function runIsmPhase2Test() {
   const facts = extractFactsFromTelegramPost({
     sourceChannel: "ForexBreakingNews",
@@ -222,6 +317,7 @@ async function main() {
   runEiaSiblingCollisionTests();
   runIsmArabicTest();
   await runIsmPhase2Test();
+  await runIncidentReplayTest();
   await runNoReadingTest();
   runPromoHardeningTest();
   await runEcbInlineIncidentTest();

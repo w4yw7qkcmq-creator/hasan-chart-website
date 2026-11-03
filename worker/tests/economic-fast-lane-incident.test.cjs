@@ -149,7 +149,7 @@ function testSpGlobalAliases() {
   const servicesAr =
     "ستاندرد أند بورز\nمؤشر مديري المشتريات للخدمات\nالسابق 54.0\nالتقدير 54.2\nالحالي 54.5";
   assert(
-    resolveEventTypeFromAliases(servicesAr) === "US_SP_GLOBAL_FLASH_SERVICES_PMI",
+    resolveEventTypeFromAliases(servicesAr) === "US_SP_GLOBAL_SERVICES_PMI",
     "Arabic S&P services alias"
   );
 

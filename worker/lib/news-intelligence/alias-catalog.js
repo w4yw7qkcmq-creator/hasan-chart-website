@@ -81,37 +81,59 @@ const US_ALIASES = {
     /cushing\s+inventor(?:y|ies)/i,
     /مخزون\s*كوشينغ(?:\s*النفط\s*الخام)?/i
   ),
+  US_ISM_MANUFACTURING: alias(
+    /(?<!غير )(?:الصناعي|التصنيعي)[\s\S]{0,80}معهد\s*إدارة\s*التوريدات/i,
+    /معهد\s*إدارة\s*التوريدات[\s\S]{0,80}(?<!غير )(?:الصناعي|التصنيعي|التصنيع)/i
+  ),
   US_ISM_NON_MANUFACTURING_PMI: alias(
     /ism\s*non[\s-]?manufacturing|non[\s-]?manufacturing\s*ism/i,
     /مديري\s*المشتريات(?:\s*في|\s*ل)?(?:ل)?(?:قطاع)?\s*غير\s*الصناعي/i,
     /(?:غير\s*الصناعي).*مديري\s*المشتريات/i,
-    /معهد\s*إدارة\s*التوريدات.*(?:غير\s*الصناعي|مديري\s*المشتريات)/i,
-    /مديري\s*المشتريات.*معهد\s*إدارة\s*التوريدات/i
+    /غير\s*الصناعي[\s\S]{0,80}معهد\s*إدارة\s*التوريدات/i,
+    /معهد\s*إدارة\s*التوريدات[\s\S]{0,80}غير\s*الصناعي/i
+  ),
+  US_SP_GLOBAL_MANUFACTURING_PMI: alias(
+    /(?:s&p|s p|sp) global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}manufacturing/i,
+    /sp global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}manufacturing/i,
+    /standard\s*(?:&|and|\s)\s*poor(?:'?s)?(?![\s\S]{0,40}(?:\bflash\b|\bfinal\b|فلاش|نهائي))[\s\S]{0,50}manufacturing/i,
+    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)(?![\s\S]{0,40}(?:flash|فلاش|نهائي|\bfinal\b))[\s\S]{0,50}(?<!غير )(?:التصنيع|manufacturing|الصناعي|التصنيعي)/i
   ),
   US_SP_GLOBAL_FLASH_MANUFACTURING_PMI: alias(
-    /s&p global.*manufacturing|sp global.*manufacturing|standard\s*(?:&|and)\s*poor(?:'?s)?.*manufacturing|flash manufacturing pmi/i,
-    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?).*?(?:التصنيع|manufacturing|الصناع)/i,
-    /مؤشر مديري المشتريات الصناعي/i,
-    /مؤشر مديري المشتريات التصنيعي/i,
-    /مديري المشتريات الصناعي/i,
-    /مديري المشتريات التصنيعي/i,
-    /مؤشر مديري المشتريات للقطاع الصناعي/i,
-    /مؤشر مديري المشتريات للقطاع التصنيعي/i
+    /(?:s&p|s p|sp) global[\s\S]{0,40}\bflash\b[\s\S]{0,40}manufacturing/i,
+    /sp global[\s\S]{0,40}\bflash\b[\s\S]{0,40}manufacturing/i,
+    /standard\s*(?:&|and|\s)\s*poor(?:'?s)?[\s\S]{0,40}\bflash\b[\s\S]{0,40}manufacturing/i,
+    /flash manufacturing pmi/i,
+    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)[\s\S]{0,40}(?:flash|فلاش)[\s\S]{0,40}(?<!غير )(?:التصنيع|manufacturing|الصناعي|التصنيعي)/i
+  ),
+  US_SP_GLOBAL_SERVICES_PMI: alias(
+    /(?:s&p|s p|sp) global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}services/i,
+    /sp global(?![\s\S]{0,40}\b(?:flash|final)\b)[\s\S]{0,40}services/i,
+    /standard\s*(?:&|and|\s)\s*poor(?:'?s)?(?![\s\S]{0,40}(?:\bflash\b|\bfinal\b|فلاش|نهائي))[\s\S]{0,50}services/i,
+    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)(?![\s\S]{0,40}(?:flash|فلاش|نهائي|\bfinal\b))[\s\S]{0,50}(?:للخدمات|الخدمات|services|الخدمي|الخدماتي)/i
   ),
   US_SP_GLOBAL_FLASH_SERVICES_PMI: alias(
-    /s&p global.*services|sp global.*services|standard\s*(?:&|and)\s*poor(?:'?s)?.*services|flash services pmi/i,
-    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?).*?(?:الخدمات|services)/i,
-    /مؤشر مديري المشتريات الخدمي/i,
-    /مؤشر مديري المشتريات للخدمات/i,
-    /مديري المشتريات الخدمي/i,
-    /مديري المشتريات الخدماتي/i,
-    /مؤشر مديري المشتريات للقطاع الخدمي/i,
-    /مؤشر مديري المشتريات لقطاع الخدمات/i
+    /(?:s&p|s p|sp) global[\s\S]{0,40}\bflash\b[\s\S]{0,40}services/i,
+    /sp global[\s\S]{0,40}\bflash\b[\s\S]{0,40}services/i,
+    /standard\s*(?:&|and|\s)\s*poor(?:'?s)?[\s\S]{0,40}\bflash\b[\s\S]{0,40}services/i,
+    /flash services pmi/i,
+    /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?)[\s\S]{0,40}(?:flash|فلاش)[\s\S]{0,40}(?:للخدمات|الخدمات|services|الخدمي|الخدماتي)/i
   ),
-  US_SP_GLOBAL_FINAL_MANUFACTURING_PMI: alias(/final manufacturing pmi|s&p global.*final.*manufacturing/i),
-  US_SP_GLOBAL_FINAL_SERVICES_PMI: alias(/final services pmi|s&p global.*final.*services/i),
+  US_MANUFACTURING_PMI_PRELIMINARY: alias(
+    /مديري\s*المشتريات(?:\s+(?:للقطاع|القطاع))?\s+(?<!غير )(?:الصناعي|التصنيعي)\s+(?:الأولي|الاولي)/i,
+    /(?<!(?:s&p|s p|sp) global )(?<!sp global )preliminary manufacturing pmi/i
+  ),
+  US_MANUFACTURING_PMI: alias(
+    /مديري\s*المشتريات(?:\s+(?:للقطاع|القطاع|في))?\s+(?<!غير )(?:الصناعي|التصنيعي)/i,
+    /(?<!ism )(?<!(?:s&p|s p|sp) global )(?<!sp global )manufacturing pmi/i
+  ),
+  US_SERVICES_PMI: alias(
+    /مديري\s*المشتريات(?:\s+(?:للقطاع|لقطاع|القطاع))?\s*(?:الخدمي|الخدماتي|للخدمات|الخدمات)/i,
+    /(?<!ism )(?<!(?:s&p|s p|sp) global )(?<!sp global )services pmi/i
+  ),
+  US_SP_GLOBAL_FINAL_MANUFACTURING_PMI: alias(/final manufacturing pmi|(?:s&p|s p|sp) global.*final.*manufacturing/i),
+  US_SP_GLOBAL_FINAL_SERVICES_PMI: alias(/final services pmi|(?:s&p|s p|sp) global.*final.*services/i),
   US_SP_GLOBAL_PMI: alias(
-    /s&p global.*composite|sp global.*composite|standard\s*(?:&|and)\s*poor(?:'?s)?.*composite/i,
+    /(?:s&p|s p|sp) global.*composite|sp global.*composite|standard\s*(?:&|and|\s)\s*poor(?:'?s)?.*composite/i,
     /(?:ستاندرد|standard)\s*(?:أند|آند|and|&)\s*(?:بورز|poor(?:'?s)?).*?(?:المركب|composite)/i,
     /مؤشر مديري المشتريات المركب/i,
     /composite pmi/i

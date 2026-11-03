@@ -86,14 +86,14 @@ function runArabicAliasVariantTests() {
   for (const title of manufacturingVariants) {
     const normalized = normalizeAliasText(title);
     assert(
-      resolveEventTypeFromAliases(`${title}\nالسابق 53.9`) === "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+      resolveEventTypeFromAliases(`${title}\nالسابق 53.9`) === "US_MANUFACTURING_PMI",
       `manufacturing alias failed for ${normalized}`
     );
   }
 
   for (const title of servicesVariants) {
     assert(
-      resolveEventTypeFromAliases(`${title}\nالسابق 54.6`) === "US_SP_GLOBAL_FLASH_SERVICES_PMI",
+      resolveEventTypeFromAliases(`${title}\nالسابق 54.6`) === "US_SERVICES_PMI",
       `services alias failed for ${title}`
     );
   }
@@ -230,7 +230,7 @@ async function runSuccessfulPublishDecisionTest() {
   const publishedDecisions = getRecentDecisions({ sourceId: "ForexBreakingNews", reasonCode: "PUBLISHED" });
   assert(publishedDecisions.length === 1, "successful PMI publish must record PUBLISHED decision once");
   assert(
-    publishedDecisions[0].eventType === "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
+    publishedDecisions[0].eventType === "US_MANUFACTURING_PMI",
     "published PMI decision must carry canonical event type"
   );
 }

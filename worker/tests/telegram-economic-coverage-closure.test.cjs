@@ -96,8 +96,40 @@ function runDisambiguationTests() {
   );
   assert(
     resolveEventTypeFromAliases("مؤشر مديري المشتريات الصناعي", { countryCode: "US" }) ===
+      "US_MANUFACTURING_PMI",
+    "Generic Arabic manufacturing PMI"
+  );
+  assert(
+    resolveEventTypeFromAliases("مؤشر مديري المشتريات في القطاع غير الصناعي الصادر عن معهد إدارة التوريدات", {
+      countryCode: "US",
+    }) === "US_ISM_NON_MANUFACTURING_PMI",
+    "Arabic ISM non-manufacturing"
+  );
+  assert(
+    resolveEventTypeFromAliases("مؤشر مديري المشتريات الصناعي الصادر عن معهد إدارة التوريدات", {
+      countryCode: "US",
+    }) === "US_ISM_MANUFACTURING",
+    "Arabic ISM manufacturing"
+  );
+  assert(
+    resolveCanonicalEventKey("ISM Non-Manufacturing PMI", { countryCode: "US" }).eventKey ===
+      "US_ISM_NON_MANUFACTURING_PMI",
+    "English ISM non-manufacturing"
+  );
+  assert(
+    resolveEventTypeFromAliases("S&P Global Manufacturing PMI", { countryCode: "US" }) ===
+      "US_SP_GLOBAL_MANUFACTURING_PMI",
+    "Explicit S&P manufacturing excludes Flash"
+  );
+  assert(
+    resolveEventTypeFromAliases("S&P Global Flash Manufacturing PMI", { countryCode: "US" }) ===
       "US_SP_GLOBAL_FLASH_MANUFACTURING_PMI",
-    "Flash manufacturing Arabic"
+    "Explicit S&P Flash manufacturing"
+  );
+  assert(
+    resolveEventTypeFromAliases("مؤشر مديري المشتريات الصناعي الأولي", { countryCode: "US" }) ===
+      "US_MANUFACTURING_PMI_PRELIMINARY",
+    "Generic preliminary manufacturing"
   );
   assert(
     resolveCanonicalEventKey("Michigan consumer sentiment", { countryCode: "US" }).eventKey === "US_MICHIGAN_SENTIMENT",

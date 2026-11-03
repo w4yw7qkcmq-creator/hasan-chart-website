@@ -8,7 +8,7 @@
     "sourceUrl": "https://t.me/ForexBreakingNews/41958"
   },
   "expected": {
-    "canonicalEventKey": "US_SP_GLOBAL_FLASH_SERVICES_PMI",
+    "canonicalEventKey": "US_SERVICES_PMI",
     "actual": "56.8",
     "forecast": "53.9",
     "previous": "54.6",

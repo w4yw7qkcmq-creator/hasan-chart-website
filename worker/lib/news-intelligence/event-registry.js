@@ -1,4 +1,4 @@
-const { CANONICAL_EVENT_DEFINITIONS } = require("../economic-releases/canonical-events");
+const { CANONICAL_EVENT_DEFINITIONS, patternMatchLength, selectBestMatchedEvent } = require("../economic-releases/canonical-events");
 const { normalizeTextForMatching } = require("../economic-releases/text-normalization");
 const { resolveCountryCode, eventKeyMatchesCountry } = require("../economic-releases/country-resolver");
 const { ARABIC_ALIASES } = require("./alias-catalog");
@@ -13,10 +13,6 @@ function normalizeAliasText(value) {
   return normalizeTextForMatching(value);
 }
 
-function matchesAlias(text, patterns) {
-  return patterns.some((pattern) => pattern.test(text));
-}
-
 function resolveEventTypeFromAliases(text, options = {}) {
   const normalized = normalizeAliasText(text);
   const countryCode = options.countryCode || resolveCountryCode(normalized) || null;
@@ -25,28 +21,28 @@ function resolveEventTypeFromAliases(text, options = {}) {
     return null;
   }
 
-  const ordered = Object.entries(ARABIC_ALIASES).sort((a, b) => {
-    const priorityA = CANONICAL_EVENT_DEFINITIONS[a[0]]?.priority ?? 100;
-    const priorityB = CANONICAL_EVENT_DEFINITIONS[b[0]]?.priority ?? 100;
-    return priorityA - priorityB;
-  });
-
-  for (const [eventType, patterns] of ordered) {
+  const matched = [];
+  Object.entries(ARABIC_ALIASES).forEach(([eventType, patterns], index) => {
     if (countryCode && !eventKeyMatchesCountry(eventType, countryCode)) {
-      continue;
+      return;
     }
     if (
       !countryCode &&
       /^(?!US_).+_(MANUFACTURING_PMI|SERVICES_PMI|COMPOSITE_PMI|PMI)$/.test(eventType)
     ) {
-      continue;
+      return;
     }
-    if (matchesAlias(normalized, patterns)) {
-      return eventType;
-    }
-  }
+    const matchLength = patternMatchLength(normalized, patterns);
+    if (matchLength < 0) return;
+    matched.push({
+      eventKey: eventType,
+      priority: CANONICAL_EVENT_DEFINITIONS[eventType]?.priority ?? 100,
+      matchLength,
+      index,
+    });
+  });
 
-  return null;
+  return selectBestMatchedEvent(matched)?.eventKey || null;
 }
 
 function getEventFamily(eventType) {
