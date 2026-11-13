@@ -310,6 +310,18 @@ async function formatPreEventAlert({ facts, post, classification }, options = {}
 async function formatTelegramPost(post, facts, options = {}) {
   const classification = options.classification || {};
 
+  if (facts?.countryResolutionStatus === "ambiguous" || facts?.eventMatchAmbiguous === true) {
+    return {
+      formatted: null,
+      skipPublish: true,
+      reason: "AMBIGUOUS_REGION_SKIPPED",
+      validation: { complete: false, reason: "AMBIGUOUS_REGION_SKIPPED" },
+      missingFields: [],
+      aiImpactUsed: false,
+      aiResult: "none",
+    };
+  }
+
   if (classification.classification === "pre_event_alert") {
     return formatPreEventAlert({ facts, post, classification }, options);
   }

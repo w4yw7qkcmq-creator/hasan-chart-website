@@ -1,6 +1,6 @@
 const { CANONICAL_EVENT_DEFINITIONS, GENERIC_CPI_FALLBACKS } = require("./canonical-event-catalog");
 const { normalizeTextForMatching } = require("./text-normalization");
-const { resolveCountryCode, eventKeyMatchesCountry } = require("./country-resolver");
+const { countryCodeFromOptions, eventKeyMatchesCountry } = require("./country-resolver");
 
 function normalizeMatchText(value) {
   return normalizeTextForMatching(value);
@@ -55,9 +55,41 @@ function orderedDefinitionsForCountry(countryCode) {
   return entries.sort((a, b) => (a[1].priority ?? 100) - (b[1].priority ?? 100));
 }
 
+const SHARED_COUNTRY_INDICATORS = new Set(["GDP", "CPI", "UNEMPLOYMENT", "RETAIL_SALES"]);
+
+function eventCountryCode(match) {
+  return match.definition?.country || String(match.eventKey || "").split("_")[0];
+}
+
+function sharedIndicatorFamily(eventKey) {
+  const suffix = String(eventKey || "").split("_").slice(1).join("_");
+  if (suffix.startsWith("GDP")) return "GDP";
+  if (suffix.includes("CPI")) return "CPI";
+  if (suffix.startsWith("UNEMPLOYMENT")) return "UNEMPLOYMENT";
+  if (suffix.includes("RETAIL_SALES")) return "RETAIL_SALES";
+  return null;
+}
+
+function resolveBestEventMatch(matched, options = {}) {
+  if (!matched || !matched.length) {
+    return { match: null, ambiguous: false };
+  }
+  const countryCode = options.countryCode || null;
+  if (!countryCode) {
+    const bestLength = matched.reduce((best, item) => Math.max(best, item.matchLength || 0), 0);
+    const specific = matched.filter((item) => (item.matchLength || 0) === bestLength);
+    const countries = new Set(specific.map(eventCountryCode));
+    const families = new Set(specific.map((item) => sharedIndicatorFamily(item.eventKey)).filter(Boolean));
+    if (countries.size > 1 && families.size === 1 && SHARED_COUNTRY_INDICATORS.has([...families][0])) {
+      return { match: null, ambiguous: true };
+    }
+  }
+  return { match: selectBestMatchedEvent(matched), ambiguous: false };
+}
+
 function resolveCanonicalEventKey(title, options = {}) {
   const text = normalizeMatchText(title);
-  const countryCode = options.countryCode || resolveCountryCode(text) || null;
+  const countryCode = countryCodeFromOptions(options, text);
   const candidates = orderedDefinitionsForCountry(countryCode);
   const matched = [];
   candidates.forEach(([eventKey, definition], index) => {
@@ -72,12 +104,24 @@ function resolveCanonicalEventKey(title, options = {}) {
       });
     }
   });
-  const best = selectBestMatchedEvent(matched);
+  const outcome = resolveBestEventMatch(matched, { countryCode });
+  if (outcome.ambiguous) {
+    return {
+      eventKey: null,
+      country: null,
+      ambiguous: true,
+      requiresTripleTemplate: false,
+      eventType: "unknown",
+      arabicName: null,
+    };
+  }
+  const best = outcome.match;
   if (best) {
     return {
       eventKey: best.eventKey,
       country: best.definition.country || countryCode || best.eventKey.split("_")[0],
       ...best.definition,
+      ambiguous: false,
     };
   }
 
@@ -111,6 +155,7 @@ function resolveCanonicalEventKey(title, options = {}) {
   return {
     eventKey: null,
     country: countryCode,
+    ambiguous: false,
     requiresTripleTemplate: false,
     eventType: "unknown",
     arabicName: null,
@@ -177,6 +222,7 @@ module.exports = {
   normalizeMatchText,
   patternMatchLength,
   selectBestMatchedEvent,
+  resolveBestEventMatch,
   resolveCanonicalEventKey,
   calendarTitleMatchesCanonical,
   buildIdempotencyKey,

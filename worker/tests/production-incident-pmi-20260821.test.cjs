@@ -197,9 +197,10 @@ async function runPhase2BlockDecisionTest() {
   assert(decisions.length === 1, "Phase 2 block must write one terminal decision");
   assert(decisions[0].decision === "BLOCKED", "terminal decision must be BLOCKED");
   assert(
-    decisions[0].reasonCode === "MISSING_CANONICAL_EVENT" ||
+    decisions[0].reasonCode === "MISSING_ECONOMIC_INDICATOR" ||
+      decisions[0].reasonCode === "MISSING_CANONICAL_EVENT" ||
       decisions[0].reasonCode === "QUALITY_GATE_BLOCKED",
-    "blocked PMI must record explicit reason"
+    "blocked release without an indicator must record explicit reason"
   );
 }
 

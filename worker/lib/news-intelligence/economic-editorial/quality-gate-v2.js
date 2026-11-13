@@ -15,6 +15,7 @@ const BLOCK_REASONS = {
   QUALITY_GATE_BLOCKED: "QUALITY_GATE_BLOCKED",
   MISSING_HEADLINE: "MISSING_HEADLINE",
   MISSING_CANONICAL_EVENT: "MISSING_CANONICAL_EVENT",
+  MISSING_ECONOMIC_INDICATOR: "MISSING_ECONOMIC_INDICATOR",
   MISSING_ACTUAL: "MISSING_ACTUAL",
   MISSING_FACTS_BLOCK: "MISSING_FACTS_BLOCK",
   SOURCE_URL_PRESENT: "SOURCE_URL_PRESENT",
@@ -100,6 +101,15 @@ function validateQualityGateV2(input = {}) {
   }
 
   if (telegramStructuredEconomic && !isFamily) {
+    if (
+      isStructuredEconomicFallbackEventType(structuredEvent.eventType) &&
+      isCountryOrRegionOnlyLabel(
+        structuredEvent.canonicalDisplayName || structuredEvent.publicTitle || structuredEvent.sourceEventName
+      )
+    ) {
+      return fail(BLOCK_REASONS.MISSING_ECONOMIC_INDICATOR);
+    }
+
     const bodyFactCheck = validateStructuredBodyFacts(gateBody, structuredEvent);
     if (!bodyFactCheck.ok) {
       return fail(BLOCK_REASONS.CONTAMINATED_ECONOMIC_FIELD, bodyFactCheck);
@@ -261,6 +271,18 @@ function validateStructuredBodyFacts(body, structuredEvent = {}) {
     }
   }
   return { ok: true };
+}
+
+function isCountryOrRegionOnlyLabel(value) {
+  const cleaned = String(value || "")
+    .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}]/gu, " ")
+    .replace(/[^\p{L}\p{N}.]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return true;
+  return /^(?:أمريكا|امريكا|الولايات المتحدة|united states|usa|u\.s\.?|us|أوروبا|اوروبا|منطقة اليورو|الاتحاد الأوروبي|eurozone|euro area|إنكلترا|انكلترا|بريطانيا|united kingdom|uk|كندا|canada|أستراليا|استراليا|australia|اليابان|japan|الصين|china|سويسرا|switzerland|روسيا|russia)$/i.test(
+    cleaned
+  );
 }
 
 function fail(reason, detail = null) {

@@ -1,6 +1,6 @@
-const { CANONICAL_EVENT_DEFINITIONS, patternMatchLength, selectBestMatchedEvent } = require("../economic-releases/canonical-events");
+const { CANONICAL_EVENT_DEFINITIONS, patternMatchLength, resolveBestEventMatch } = require("../economic-releases/canonical-events");
 const { normalizeTextForMatching } = require("../economic-releases/text-normalization");
-const { resolveCountryCode, eventKeyMatchesCountry } = require("../economic-releases/country-resolver");
+const { countryCodeFromOptions, eventKeyMatchesCountry } = require("../economic-releases/country-resolver");
 const { ARABIC_ALIASES } = require("./alias-catalog");
 
 const EVENT_FAMILIES = {
@@ -13,12 +13,12 @@ function normalizeAliasText(value) {
   return normalizeTextForMatching(value);
 }
 
-function resolveEventTypeFromAliases(text, options = {}) {
+function resolveEventTypeMatch(text, options = {}) {
   const normalized = normalizeAliasText(text);
-  const countryCode = options.countryCode || resolveCountryCode(normalized) || null;
+  const countryCode = countryCodeFromOptions(options, normalized);
 
   if (/\bism\b/i.test(normalized)) {
-    return null;
+    return { eventKey: null, ambiguous: false };
   }
 
   const matched = [];
@@ -42,7 +42,15 @@ function resolveEventTypeFromAliases(text, options = {}) {
     });
   });
 
-  return selectBestMatchedEvent(matched)?.eventKey || null;
+  const outcome = resolveBestEventMatch(matched, { countryCode });
+  if (outcome.ambiguous) {
+    return { eventKey: null, ambiguous: true };
+  }
+  return { eventKey: outcome.match?.eventKey || null, ambiguous: false };
+}
+
+function resolveEventTypeFromAliases(text, options = {}) {
+  return resolveEventTypeMatch(text, options).eventKey;
 }
 
 function getEventFamily(eventType) {
@@ -73,6 +81,7 @@ module.exports = {
   FAMILY_PUBLICATION_EVENT_TYPES,
   ARABIC_ALIASES,
   normalizeAliasText,
+  resolveEventTypeMatch,
   resolveEventTypeFromAliases,
   getEventFamily,
   isFamilyPublicationEventType,

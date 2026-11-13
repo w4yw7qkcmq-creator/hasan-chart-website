@@ -19,6 +19,9 @@ function p(...parts) {
   return parts.filter(Boolean);
 }
 
+const ARABIC_GDP_PATTERN =
+  /الناتج\s*(?:ال[إا]جمالي\s*)?المحلي(?:\s*ال[إا]جمالي)?|الناتج\s*المحلي\s*ال[إا]جمالي|\bgdp\b|gross domestic product/i;
+
 const CB_RATE_LABELS = {
   previous: "القرار السابق",
   forecast: "التوقع",
@@ -153,8 +156,8 @@ const US_GROWTH = Object.fromEntries([
     patterns: [
       /\bgdp\b[\s\S]*\b(q\/q|qoq|quarter|advance|prelim|final)\b/i,
       /gross domestic product/i,
-      /الناتج\s*(?:الإجمالي\s*)?المحلي(?:\s*الإجمالي)?(?:\s*الأمريكي)?/i,
-      /الناتج\s*المحلي\s*الإجمالي(?:\s*الأمريكي)?/i,
+      /الناتج\s*(?:ال[إا]جمالي\s*)?المحلي(?:\s*ال[إا]جمالي)?(?:\s*(?:الأمريكي|الامريكي))?/i,
+      /الناتج\s*المحلي\s*ال[إا]جمالي(?:\s*(?:الأمريكي|الامريكي))?/i,
     ],
     arabicName: "الناتج المحلي الإجمالي الأمريكي",
   }),
@@ -485,7 +488,7 @@ function countryPmi(country, labelAr) {
 
 const UK = Object.fromEntries([
   ...Object.entries(countryInflation("UK", "بريطانيا")),
-  releaseDef("UK", "GDP", { patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i], arabicName: "الناتج المحلي البريطاني" }),
+  releaseDef("UK", "GDP", { patterns: [ARABIC_GDP_PATTERN], arabicName: "الناتج المحلي البريطاني" }),
   releaseDef("UK", "RETAIL_SALES", { patterns: [/retail sales|مبيعات التجزئة(?!.*أساس)/i], arabicName: "مبيعات التجزئة البريطانية" }),
   releaseDef("UK", "CORE_RETAIL_SALES", {
     priority: 9,
@@ -505,14 +508,14 @@ const UK = Object.fromEntries([
 
 const EZ = Object.fromEntries([
   ...Object.entries(countryInflation("EZ", "منطقة اليورو")),
-  releaseDef("EZ", "GDP", { patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i], arabicName: "الناتج المحلي لمنطقة اليورو" }),
+  releaseDef("EZ", "GDP", { patterns: [ARABIC_GDP_PATTERN], arabicName: "الناتج المحلي لمنطقة اليورو" }),
   releaseDef("EZ", "UNEMPLOYMENT", {
     patterns: [/unemployment rate|unemployment change|معدل البطالة/i],
     arabicName: "معدل البطالة في منطقة اليورو",
   }),
   centralBankRate("EZ", "ECB_RATE_DECISION", {
     patterns: p(
-      /ecb rate decision|ecb interest rate|european central bank rate|interest rate decision|european central bank|البنك المركزي الأوروبي|المركزي الأوروبي|قرار الفائدة الأوروبي/i,
+      /ecb rate|ecb interest rate|european central bank rate|interest rate decision|قرار الفائدة الأوروبي/i,
       /قرار الفائدة|قرار فائدة|\brate decision\b|\brate cut\b|\brate hike\b/i
     ),
     arabicName: "قرار الفائدة الأوروبية",
@@ -547,7 +550,7 @@ const EZ = Object.fromEntries([
 const CH = Object.fromEntries([
   ...Object.entries(countryInflation("CH", "سويسرا")),
   releaseDef("CH", "GDP", {
-    patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i],
+    patterns: [ARABIC_GDP_PATTERN],
     arabicName: "الناتج المحلي السويسري",
   }),
   releaseDef("CH", "UNEMPLOYMENT", {
@@ -577,7 +580,7 @@ const RU = Object.fromEntries([
     arabicName: "مؤشر التضخم الروسي",
   }),
   releaseDef("RU", "GDP", {
-    patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i],
+    patterns: [ARABIC_GDP_PATTERN],
     arabicName: "الناتج المحلي الروسي",
   }),
   releaseDef("RU", "UNEMPLOYMENT", {
@@ -603,7 +606,7 @@ const RU = Object.fromEntries([
 
 const CA = Object.fromEntries([
   ...Object.entries(countryInflation("CA", "كندا")),
-  releaseDef("CA", "GDP", { patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i], arabicName: "الناتج المحلي الكندي" }),
+  releaseDef("CA", "GDP", { patterns: [ARABIC_GDP_PATTERN], arabicName: "الناتج المحلي الكندي" }),
   releaseDef("CA", "EMPLOYMENT_CHANGE", { patterns: [/employment change|net change in employment|التغير في الوظائف/i], arabicName: "تغير التوظيف الكندي" }),
   releaseDef("CA", "UNEMPLOYMENT", { patterns: [/unemployment rate|معدل البطالة/i], arabicName: "معدل البطالة الكندي" }),
   releaseDef("CA", "BOC_RATE_DECISION", {
@@ -616,7 +619,7 @@ const CA = Object.fromEntries([
 
 const AU = Object.fromEntries([
   releaseDef("AU", "CPI", { patterns: [/\bcpi\b|consumer price index|inflation|التضخم/i], arabicName: "مؤشر التضخم الأسترالي" }),
-  releaseDef("AU", "GDP", { patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i], arabicName: "الناتج المحلي الأسترالي" }),
+  releaseDef("AU", "GDP", { patterns: [ARABIC_GDP_PATTERN], arabicName: "الناتج المحلي الأسترالي" }),
   releaseDef("AU", "EMPLOYMENT_CHANGE", { patterns: [/employment change|net change in employment|التغير في الوظائف/i], arabicName: "تغير التوظيف الأسترالي" }),
   releaseDef("AU", "UNEMPLOYMENT", { patterns: [/unemployment rate|معدل البطالة/i], arabicName: "معدل البطالة الأسترالي" }),
   releaseDef("AU", "RBA_RATE_DECISION", {
@@ -630,7 +633,7 @@ const AU = Object.fromEntries([
 
 const JP = Object.fromEntries([
   ...Object.entries(countryInflation("JP", "اليابان")),
-  releaseDef("JP", "GDP", { patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i], arabicName: "الناتج المحلي الياباني" }),
+  releaseDef("JP", "GDP", { patterns: [ARABIC_GDP_PATTERN], arabicName: "الناتج المحلي الياباني" }),
   releaseDef("JP", "BOJ_RATE_DECISION", {
     patterns: [/boj rate|bank of japan rate|interest rate decision|قرار الفائدة/i],
     eventType: "rate_decision",
@@ -642,7 +645,7 @@ const JP = Object.fromEntries([
 const CN = Object.fromEntries([
   releaseDef("CN", "CPI", { patterns: [/\bcpi\b|consumer price index|inflation|التضخم/i], arabicName: "مؤشر التضخم الصيني" }),
   releaseDef("CN", "PPI", { patterns: [/\bppi\b|producer price index|أسعار المنتجين/i], arabicName: "مؤشر أسعار المنتجين الصيني" }),
-  releaseDef("CN", "GDP", { patterns: [/\bgdp\b|gross domestic product|الناتج المحلي/i], arabicName: "الناتج المحلي الصيني" }),
+  releaseDef("CN", "GDP", { patterns: [ARABIC_GDP_PATTERN], arabicName: "الناتج المحلي الصيني" }),
   releaseDef("CN", "INDUSTRIAL_PRODUCTION", { patterns: [/industrial production|الإنتاج الصناعي/i], arabicName: "الإنتاج الصناعي الصيني" }),
   releaseDef("CN", "RETAIL_SALES", { patterns: [/retail sales|مبيعات التجزئة/i], arabicName: "مبيعات التجزئة الصينية" }),
   ...Object.entries(countryPmi("CN", "الصين")),
@@ -694,6 +697,7 @@ const CANONICAL_EVENT_DEFINITIONS = {
 };
 
 module.exports = {
+  ARABIC_GDP_PATTERN,
   CANONICAL_EVENT_DEFINITIONS,
   GENERIC_CPI_FALLBACKS,
 };

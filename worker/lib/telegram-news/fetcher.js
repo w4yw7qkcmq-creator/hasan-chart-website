@@ -6,7 +6,15 @@ function decodeTelegramHtml(value) {
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<\/div>/gi, "\n")
-    .replace(/<tg-emoji[^>]*>[\s\S]*?<\/tg-emoji>/gi, " ")
+    .replace(/<tg-emoji\b([^>]*)>([\s\S]*?)<\/tg-emoji>/gi, (_match, attrs, inner) => {
+      const innerText = String(inner || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (innerText) return ` ${innerText} `;
+      const alt = /(?:\balt|\bdata-emoji)="([^"]*)"/i.exec(String(attrs || ""));
+      return alt && alt[1] ? ` ${alt[1]} ` : " ";
+    })
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")

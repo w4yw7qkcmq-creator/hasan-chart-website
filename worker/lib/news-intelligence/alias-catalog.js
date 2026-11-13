@@ -1,3 +1,5 @@
+const { ARABIC_GDP_PATTERN } = require("../economic-releases/canonical-event-catalog");
+
 function alias(...patterns) {
   return patterns;
 }
@@ -43,8 +45,8 @@ const US_ALIASES = {
   ),
   US_GDP_QOQ: alias(
     /\bgdp\b|gross domestic product/i,
-    /الناتج\s*(?:الإجمالي\s*)?المحلي(?:\s*الإجمالي)?/i,
-    /الناتج\s*المحلي\s*الإجمالي/i
+    /الناتج\s*(?:ال[إا]جمالي\s*)?المحلي(?:\s*ال[إا]جمالي)?/i,
+    /الناتج\s*المحلي\s*ال[إا]جمالي/i
   ),
   US_RETAIL_SALES: alias(/retail sales(?!.*core)/i),
   US_CORE_RETAIL_SALES: alias(/core retail sales|retail sales ex autos/i),
@@ -155,7 +157,7 @@ const US_ALIASES = {
 const UK_ALIASES = {
   UK_CPI: alias(/\bcpi\b|consumer price index|inflation/i),
   UK_CORE_CPI: alias(/core cpi|core inflation/i),
-  UK_GDP: alias(/\bgdp\b|gross domestic product/i),
+  UK_GDP: alias(ARABIC_GDP_PATTERN),
   UK_RETAIL_SALES: alias(/retail sales(?!.*core)/i),
   UK_CORE_RETAIL_SALES: alias(/core retail sales|retail sales ex fuel|مؤشر مبيعات التجزئة الأساس/i, /مبيعات التجزئة الأساس/i),
   UK_UNEMPLOYMENT: alias(/unemployment rate|unemployment change/i),
@@ -170,10 +172,10 @@ const UK_ALIASES = {
 const EZ_ALIASES = {
   EZ_CPI: alias(/\bcpi\b|inflation|hicp|التضخم/i),
   EZ_CORE_CPI: alias(/core cpi|core inflation|hicp ex|underlying inflation/i),
-  EZ_GDP: alias(/\bgdp\b|gross domestic product|الناتج المحلي/i),
+  EZ_GDP: alias(ARABIC_GDP_PATTERN),
   EZ_UNEMPLOYMENT: alias(/unemployment rate|unemployment change|معدل البطالة/i),
   EZ_ECB_RATE_DECISION: alias(
-    /ecb rate|european central bank rate|interest rate decision|قرار الفائدة|قرار ecb|البنك المركزي الأوروبي|المركزي الأوروبي/i
+    /ecb rate|european central bank rate|interest rate decision|قرار الفائدة|قرار ecb/i
   ),
   EZ_ECB_DEPOSIT_RATE: alias(/deposit rate|deposit facility|سعر الإيداع/i),
   EZ_ECB_MAIN_REFINANCING_RATE: alias(/main refinancing rate|refi rate|mro/i),
@@ -187,7 +189,7 @@ const EZ_ALIASES = {
 const CH_ALIASES = {
   CH_CPI: alias(/\bcpi\b|inflation|التضخم|أسعار المستهلك/i),
   CH_CORE_CPI: alias(/core cpi|core inflation|التضخم الأساس/i),
-  CH_GDP: alias(/\bgdp\b|gross domestic product|الناتج المحلي/i),
+  CH_GDP: alias(ARABIC_GDP_PATTERN),
   CH_UNEMPLOYMENT: alias(/unemployment rate|unemployment change|معدل البطالة/i),
   CH_SNB_RATE_DECISION: alias(
     /snb rate|swiss national bank rate|interest rate decision|قرار الفائدة|البنك الوطني السويسري|المركزي السويسري|swiss national bank/i
@@ -200,7 +202,7 @@ const CH_ALIASES = {
 
 const RU_ALIASES = {
   RU_CPI: alias(/\bcpi\b|inflation|التضخم|أسعار المستهلك/i),
-  RU_GDP: alias(/\bgdp\b|gross domestic product|الناتج المحلي/i),
+  RU_GDP: alias(ARABIC_GDP_PATTERN),
   RU_UNEMPLOYMENT: alias(/unemployment rate|unemployment change|معدل البطالة/i),
   RU_CBR_RATE_DECISION: alias(
     /cbr rate|bank of russia rate|key rate|interest rate decision|قرار الفائدة|البنك المركزي الروسي|بنك روسيا|bank of russia/i
@@ -214,7 +216,7 @@ const RU_ALIASES = {
 const CA_ALIASES = {
   CA_CPI: alias(/\bcpi\b|inflation/i),
   CA_CORE_CPI: alias(/core cpi|core inflation/i),
-  CA_GDP: alias(/\bgdp\b|gross domestic product/i),
+  CA_GDP: alias(ARABIC_GDP_PATTERN),
   CA_EMPLOYMENT_CHANGE: alias(/employment change|net change in employment/i),
   CA_UNEMPLOYMENT: alias(/unemployment rate/i),
   CA_BOC_RATE_DECISION: alias(/boc rate|bank of canada rate/i),
@@ -223,7 +225,7 @@ const CA_ALIASES = {
 
 const AU_ALIASES = {
   AU_CPI: alias(/\bcpi\b|inflation/i),
-  AU_GDP: alias(/\bgdp\b|gross domestic product/i),
+  AU_GDP: alias(ARABIC_GDP_PATTERN),
   AU_EMPLOYMENT_CHANGE: alias(/employment change|net change in employment/i),
   AU_UNEMPLOYMENT: alias(/unemployment rate/i),
   AU_RBA_RATE_DECISION: alias(/rba rate|reserve bank of australia rate/i),
@@ -235,7 +237,7 @@ const AU_ALIASES = {
 const JP_ALIASES = {
   JP_CPI: alias(/\bcpi\b|inflation/i),
   JP_CORE_CPI: alias(/core cpi|core inflation/i),
-  JP_GDP: alias(/\bgdp\b|gross domestic product/i),
+  JP_GDP: alias(ARABIC_GDP_PATTERN),
   JP_BOJ_RATE_DECISION: alias(/boj rate|bank of japan rate/i),
   JP_MANUFACTURING_PMI: alias(/manufacturing pmi/i),
   JP_SERVICES_PMI: alias(/services pmi/i),
@@ -244,7 +246,7 @@ const JP_ALIASES = {
 const CN_ALIASES = {
   CN_CPI: alias(/\bcpi\b|inflation/i),
   CN_PPI: alias(/\bppi\b|producer price index/i),
-  CN_GDP: alias(/\bgdp\b|gross domestic product/i),
+  CN_GDP: alias(ARABIC_GDP_PATTERN),
   CN_INDUSTRIAL_PRODUCTION: alias(/industrial production/i),
   CN_RETAIL_SALES: alias(/retail sales/i),
   CN_MANUFACTURING_PMI: alias(/manufacturing pmi|caixin manufacturing/i),

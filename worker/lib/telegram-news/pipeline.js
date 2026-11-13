@@ -110,6 +110,20 @@ function prepareTelegramPost(post, stats = {}) {
 
   appendPipelineStage(pipelineTrace, "COVERAGE_ALLOWED");
 
+  if (
+    classification.facts?.countryResolutionStatus === "ambiguous" ||
+    classification.facts?.eventMatchAmbiguous === true
+  ) {
+    return buildSkipResult(enrichedPost, {
+      skip: true,
+      reason: "AMBIGUOUS_REGION_SKIPPED",
+      logReason: classification.facts?.countryResolutionStatus || "ambiguous_event",
+      classification,
+      promoFooterRemoved,
+      newsValue,
+    });
+  }
+
   if (!classification.isPublishable) {
     if (classification.classification === "unclear") {
       stats.unclearSkipped = (stats.unclearSkipped || 0) + 1;

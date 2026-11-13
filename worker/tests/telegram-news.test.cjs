@@ -588,7 +588,7 @@ function testNoSemanticRepetitionInSections() {
 }
 
 async function testAiFailureDoesNotStopNews() {
-  const rawText = "CPI\nالسابق: 0.2%\nالمتوقع: 0.3%\nالحالي: 0.4%";
+  const rawText = "US CPI\nالسابق: 0.2%\nالمتوقع: 0.3%\nالحالي: 0.4%";
   const processed = await processTelegramPosts([post({ rawText })], {
     disableAi: false,
     aiBuilder: async () => ({ rejected: true, fallback: true, aiResult: "fallback", impactParagraph: null }),

@@ -73,57 +73,132 @@ function resolveCountryCodeFromFlags(text) {
   return null;
 }
 
-function resolveCountryCode(text, options = {}) {
-  if (options.countryCode) {
-    return String(options.countryCode).trim().toUpperCase();
-  }
+function flattenCountryText(text) {
+  return String(text || "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  const fromFlag = resolveCountryCodeFromFlags(text);
-  if (fromFlag) {
-    return fromFlag;
-  }
+function countrySignalText(text) {
+  return String(text || "")
+    .split("\n")
+    .filter((line) => !/^\s*(?:[^\p{L}\p{N}]{0,6})?النتيجة\b/u.test(line))
+    .join("\n");
+}
 
+function collectFlagCodes(text) {
+  const codes = [];
+  for (const [flag, code] of FLAG_COUNTRY_CODES) {
+    if (String(text || "").includes(flag)) codes.push(code);
+  }
+  return [...new Set(codes)];
+}
+
+function isExplicitEuropeRegion(text) {
+  const raw = String(text || "");
+  const lineHeader =
+    /(?:^|[\n:：])\s*(?:[^\p{L}\p{N}\n]{0,12})?(?:أوروبا|اوروبا)\s*(?:$|[-–—:：])/gmu;
+  if (lineHeader.test(raw)) return true;
+  const lineIndicator =
+    /(?:^|[\n:：])\s*(?:[^\p{L}\p{N}\n]{0,12})?(?:أوروبا|اوروبا)\s+ل?\s*(?:الناتج|مؤشر|معدل|قرار|بيانات|التضخم|البطالة)/gmu;
+  if (lineIndicator.test(raw)) return true;
+  const flat = flattenCountryText(raw);
+  if (/^(?:أوروبا|اوروبا)$/u.test(flat)) return true;
+  const withoutGeographic = flat.replace(
+    /(?:في|داخل|عبر|دول|قارة|أسواق|سوق|من)\s*(?:أوروبا|اوروبا)/gu,
+    " "
+  );
+  return /(?:^|\s)(?:أوروبا|اوروبا)\s+ل?\s*(?=الناتج|مؤشر|معدل|قرار|بيانات|التضخم|البطالة)/u.test(
+    withoutGeographic
+  );
+}
+
+function hasSupportiveEuropeContext(text) {
+  if (isExplicitEuropeRegion(text)) return false;
+  const flat = flattenCountryText(text);
+  const withoutGeographic = flat.replace(
+    /(?:في|داخل|عبر|دول|قارة|أسواق|سوق|من)\s*(?:أوروبا|اوروبا)/gu,
+    " "
+  );
+  if (!/(?:أوروبا|اوروبا)/u.test(withoutGeographic)) return false;
+  const hasContext = /(?:اليورو|يورو|\beur\b|\becb\b|المركزي الأوروبي|منطقة اليورو)/iu.test(flat);
+  const hasIndicator = /(?:الناتج|\bgdp\b|مؤشر|التضخم|البطالة)/iu.test(flat);
+  return hasContext && hasIndicator;
+}
+
+function matchCountryWords(text) {
   const normalized = normalizeTextForMatching(text);
-  if (!normalized) {
-    return null;
-  }
-
+  if (!normalized) return [];
   const matches = [];
   for (const rule of COUNTRY_RULES) {
     if (rule.patterns.some((pattern) => pattern.test(normalized))) {
       matches.push(rule.code);
     }
   }
+  return matches;
+}
 
+function legacyPick(matches) {
   if (matches.includes("DE") || matches.includes("FR")) {
     return matches.find((code) => code === "DE" || code === "FR") || matches[0];
   }
-
-  if (matches.includes("UK")) {
-    return "UK";
-  }
-
-  if (matches.includes("CH")) {
-    return "CH";
-  }
-
-  if (matches.includes("RU")) {
-    return "RU";
-  }
-
-  if (matches.includes("EZ") && !matches.includes("UK") && !matches.includes("US")) {
-    return "EZ";
-  }
-
-  if (matches.length === 1) {
-    return matches[0];
-  }
-
-  if (matches.includes("US")) {
-    return "US";
-  }
-
+  if (matches.includes("UK")) return "UK";
+  if (matches.includes("CH")) return "CH";
+  if (matches.includes("RU")) return "RU";
+  if (matches.includes("EZ") && !matches.includes("UK") && !matches.includes("US")) return "EZ";
+  if (matches.length === 1) return matches[0];
+  if (matches.includes("US")) return "US";
   return matches[0] || null;
+}
+
+function resolveCountryResolution(text, options = {}) {
+  if (options.countryCode) {
+    return {
+      countryCode: String(options.countryCode).trim().toUpperCase(),
+      status: "resolved",
+    };
+  }
+
+  const signal = countrySignalText(text);
+  const flags = collectFlagCodes(signal);
+  const words = matchCountryWords(signal);
+  const europeExplicit = isExplicitEuropeRegion(signal);
+  const codes = new Set(words);
+  for (const flag of flags) codes.add(flag);
+  if (europeExplicit || (codes.size === 0 && hasSupportiveEuropeContext(signal))) {
+    codes.add("EZ");
+  }
+
+  if (codes.size === 0) {
+    return { countryCode: null, status: "unknown" };
+  }
+  if (codes.size === 1) {
+    return { countryCode: [...codes][0], status: "resolved" };
+  }
+  if (europeExplicit || flags.length > 1) {
+    return { countryCode: null, status: "ambiguous" };
+  }
+  if (flags.length === 1) {
+    const foreign = [...codes].filter((code) => code !== flags[0]);
+    if (foreign.length) {
+      return { countryCode: null, status: "ambiguous" };
+    }
+    return { countryCode: flags[0], status: "resolved" };
+  }
+
+  return { countryCode: legacyPick([...codes]), status: "resolved" };
+}
+
+function resolveCountryCode(text, options = {}) {
+  return resolveCountryResolution(text, options).countryCode;
+}
+
+function countryCodeFromOptions(options, text) {
+  if (options && Object.prototype.hasOwnProperty.call(options, "countryCode")) {
+    return options.countryCode ? String(options.countryCode).trim().toUpperCase() : null;
+  }
+  return resolveCountryCode(text);
 }
 
 function countryPrefixForEventKey(countryCode) {
@@ -145,7 +220,9 @@ module.exports = {
   COUNTRY_RULES,
   FLAG_COUNTRY_CODES,
   resolveCountryCodeFromFlags,
+  resolveCountryResolution,
   resolveCountryCode,
+  countryCodeFromOptions,
   countryPrefixForEventKey,
   eventKeyMatchesCountry,
 };

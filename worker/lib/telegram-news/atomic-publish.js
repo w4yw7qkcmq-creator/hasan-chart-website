@@ -157,8 +157,8 @@ async function reserveNewsPublishFingerprint(candidate, options = {}) {
 function resolveTerminalReasonCode(evaluation = {}) {
   if (evaluation.detail && evaluation.detail !== evaluation.reason) {
     const detail = String(evaluation.detail).trim();
-    if (detail === "MISSING_CANONICAL_EVENT") {
-      return "MISSING_CANONICAL_EVENT";
+    if (detail === "MISSING_CANONICAL_EVENT" || detail === "MISSING_ECONOMIC_INDICATOR") {
+      return detail;
     }
   }
   return evaluation.reason || evaluation.detail || "QUALITY_GATE_BLOCKED";

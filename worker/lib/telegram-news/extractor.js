@@ -2,8 +2,8 @@ const {
   resolveCanonicalEventKey,
   CANONICAL_EVENT_DEFINITIONS,
 } = require("../economic-releases/canonical-events");
-const { resolveEventTypeFromAliases } = require("../news-intelligence/event-registry");
-const { resolveCountryCode } = require("../economic-releases/country-resolver");
+const { resolveEventTypeFromAliases, resolveEventTypeMatch } = require("../news-intelligence/event-registry");
+const { resolveCountryCode, resolveCountryResolution, countryCodeFromOptions } = require("../economic-releases/country-resolver");
 const {
   normalizeTextForMatching,
   normalizeArabicIndicDigits,
@@ -218,7 +218,7 @@ function isCountryOnlyLine(cleaned) {
   if (!value) {
     return true;
   }
-  return /^(?:أمريكا|امريكا|الولايات المتحدة|united states|usa|us|إنكلترا|انكلترا|بريطانيا|uk|كندا|canada|أستراليا|استراليا|australia|اليابان|japan|الصين|china)$/i.test(
+  return /^(?:أمريكا|امريكا|الولايات المتحدة|united states|usa|us|أوروبا|اوروبا|منطقة اليورو|الاتحاد الأوروبي|إنكلترا|انكلترا|بريطانيا|uk|كندا|canada|أستراليا|استراليا|australia|اليابان|japan|الصين|china)$/i.test(
     value
   );
 }
@@ -369,15 +369,31 @@ function spGlobalReleaseKey(prefix, sector, value) {
   return `${prefix}_${suffix}`;
 }
 
+function ambiguousCanonicalResult() {
+  return {
+    eventKey: null,
+    country: null,
+    ambiguous: true,
+    requiresTripleTemplate: false,
+    eventType: "unknown",
+    arabicName: null,
+  };
+}
+
 function resolveCanonicalForTelegram(text, options = {}) {
   const value = normalizeTextForMatching(text);
-  const countryCode = options.countryCode || extractCountryCode(value);
+  const countryCode = countryCodeFromOptions(options, text);
+  const aliasMatch = resolveEventTypeMatch(value, { countryCode });
+  if (aliasMatch.ambiguous) {
+    return ambiguousCanonicalResult();
+  }
 
-  const aliasEventKey = resolveEventTypeFromAliases(value, { countryCode });
+  const aliasEventKey = aliasMatch.eventKey;
   if (aliasEventKey && CANONICAL_EVENT_DEFINITIONS[aliasEventKey]) {
     return {
       eventKey: aliasEventKey,
       country: countryCode || aliasEventKey.split("_")[0],
+      ambiguous: false,
       ...CANONICAL_EVENT_DEFINITIONS[aliasEventKey],
     };
   }
@@ -531,17 +547,21 @@ function extractFactsFromTelegramPost(post) {
   let forecast = extractField(text, "forecast");
   let actual = extractField(text, "actual");
   const revisedPrevious = extractField(text, "revisedPrevious");
-  let countryCode = extractCountryCode(text);
-  const country = extractCountry(text) || COUNTRY_DISPLAY[countryCode] || null;
   const title = sourceEventName || extractEventTitle(text);
   const period = extractPeriod(text);
   const combined = `${title || ""} ${text}`;
-  if (!countryCode) {
-    countryCode = extractCountryCode(`${title || ""}\n${sourceRawText}`) || null;
+  let resolution = resolveCountryResolution(text);
+  if (resolution.status === "unknown") {
+    const retry = resolveCountryResolution(`${title || ""}\n${sourceRawText}`);
+    if (retry.status !== "unknown") resolution = retry;
   }
+  const countryCode = resolution.status === "resolved" ? resolution.countryCode : null;
+  const country = (countryCode && COUNTRY_DISPLAY[countryCode]) || null;
   const canonical = resolveCanonicalForTelegram(combined, { countryCode });
-  const resolvedEventKey =
-    canonical.eventKey || resolveEventTypeFromAliases(combined, { countryCode });
+  const eventMatchAmbiguous = canonical.ambiguous === true;
+  const resolvedEventKey = eventMatchAmbiguous
+    ? null
+    : canonical.eventKey || resolveEventTypeFromAliases(combined, { countryCode });
   const identity = resolveEventIdentity(resolvedEventKey || canonical.eventKey, title, canonical);
   const sourceReading =
     post.sourceReading ||
@@ -615,7 +635,11 @@ function extractFactsFromTelegramPost(post) {
     isStructuredTriple,
     numericFieldValidation,
   };
+  const blockUnconfirmedCountry = resolution.status === "ambiguous" || eventMatchAmbiguous;
+  const publishedCountryCode = blockUnconfirmedCountry ? null : countryCode || canonical.country || null;
+  const publishedCountry = publishedCountryCode ? COUNTRY_DISPLAY[publishedCountryCode] || country : null;
   const useStructuredFallback =
+    !blockUnconfirmedCountry &&
     !resolvedEventKey &&
     !canonical.eventKey &&
     hasValidStrictEconomicTriple(strictTripleFacts);
@@ -631,15 +655,17 @@ function extractFactsFromTelegramPost(post) {
     sourcePublishedAt: post.sourcePublishedAt,
     sourceRawText,
     sanitizedText: text,
-    countryCode: countryCode || canonical.country || extractCountryCode(title || "") || null,
-    canonicalEventKey: resolvedEventKey || canonical.eventKey,
+    countryCode: publishedCountryCode,
+    countryResolutionStatus: resolution.status,
+    eventMatchAmbiguous,
+    canonicalEventKey: blockUnconfirmedCountry ? null : resolvedEventKey || canonical.eventKey,
     sourceEventName: identity.sourceEventName,
     canonicalEventId: identity.canonicalEventId,
     canonicalDisplayName: identity.canonicalDisplayName,
     institution: identity.institution,
     sector: identity.sector,
     title,
-    country,
+    country: publishedCountry,
     eventType: resolvedEventType,
     canonicalStatus: useStructuredFallback ? "UNMAPPED" : "MAPPED",
     period,
