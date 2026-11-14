@@ -32,6 +32,20 @@ export async function register() {
 
     const { warmupSymbolRegistry } = await import("./lib/market-data/symbol-registry.js");
     warmupSymbolRegistry("instrumentation-register");
+
+    if (process.env["MEMORY_DIAGNOSTICS"] === "1") {
+      try {
+        const { startMemoryDiagnostics } = await import("./lib/memory-diagnostics.js");
+        startMemoryDiagnostics();
+      } catch {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "memory_diagnostics_failed",
+          })
+        );
+      }
+    }
   }
 
   if (process.env.NEXT_RUNTIME === "edge") {
