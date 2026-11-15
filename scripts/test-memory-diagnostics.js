@@ -22,6 +22,10 @@ import {
   scheduleAlbumGroupFinalization,
 } from "../lib/telegram-content/album-liveness-scheduler.js";
 import { getSymbolRegistryHealth } from "../lib/market-data/symbol-registry.js";
+import {
+  readReadApiCacheEntryCount,
+  withReadCache,
+} from "../lib/server-read-cache.js";
 
 const FORBIDDEN = [
   "BTCUSDT",
@@ -157,6 +161,7 @@ assert.equal(isMemoryDiagnosticsEnabled({ MEMORY_DIAGNOSTICS: "1" }), true);
   assert.equal(parsed.okxConnections, 1);
   assert.equal(parsed.okxReconnects, 4);
   assert.equal(parsed.registryEntries, 30);
+  assert.equal(parsed.readApiCacheEntries, null);
 }
 
 {
@@ -229,10 +234,13 @@ assert.equal(isMemoryDiagnosticsEnabled({ MEMORY_DIAGNOSTICS: "1" }), true);
 {
   const registryBefore = getSymbolRegistryHealth();
   const albumBefore = getAlbumTimerRegistrySize();
+  const cacheBefore = globalThis.__hcReadApiCache;
+  const cacheSizeBefore = cacheBefore?.size ?? 0;
   const counts = await readProductionComponentCounts();
-
   assert.equal(counts.albumTimers, albumBefore);
   assert.equal(counts.registryEntries, registryBefore.registrySymbolCount);
+  assert.equal(counts.readApiCacheEntries, cacheSizeBefore);
+  assert.equal(globalThis.__hcReadApiCache, cacheBefore);
   assert.equal(counts.okxSubscribers, 0);
   assert.equal(counts.okxConnections, 0);
   assert.equal(globalThis.__okxMarketStreamHub, undefined);
@@ -269,6 +277,64 @@ assert.equal(isMemoryDiagnosticsEnabled({ MEMORY_DIAGNOSTICS: "1" }), true);
   assert.equal(nodeBlock.split("startMemoryDiagnostics(").length - 1, 1);
   assert.ok(nodeBlock.includes('process.env["MEMORY_DIAGNOSTICS"] === "1"'));
   assert.ok(nodeBlock.indexOf("warmupSymbolRegistry") < nodeBlock.indexOf("MEMORY_DIAGNOSTICS"));
+}
+
+{
+  const previousCache = globalThis.__hcReadApiCache;
+  delete globalThis.__hcReadApiCache;
+
+  assert.equal(readReadApiCacheEntryCount(), 0);
+  assert.equal(globalThis.__hcReadApiCache, undefined);
+
+  globalThis.__hcReadApiCache = new Map();
+  assert.equal(readReadApiCacheEntryCount(), 0);
+  assert.equal(globalThis.__hcReadApiCache.size, 0);
+
+  const stored = { query: "user search gold", items: ["secret-token"] };
+  globalThis.__hcReadApiCache.set("alpha", { data: stored, expiresAt: Date.now() + 60000 });
+  assert.equal(readReadApiCacheEntryCount(), 1);
+  assert.equal(globalThis.__hcReadApiCache.get("alpha").data, stored);
+
+  delete globalThis.__hcReadApiCache;
+  const repeated = await withReadCache("alpha", 60000, async () => ({ query: "user search gold" }));
+  const repeatedHit = await withReadCache("alpha", 60000, async () => ({ query: "should-not-run" }));
+  assert.equal(repeated.cacheHit, false);
+  assert.equal(repeatedHit.cacheHit, true);
+  assert.equal(repeatedHit.data.query, "user search gold");
+  assert.equal(readReadApiCacheEntryCount(), 1);
+
+  await withReadCache("beta", 60000, async () => ({ query: "silver query" }));
+  assert.equal(readReadApiCacheEntryCount(), 2);
+
+  const lines = [];
+  await sampleMemoryDiagnostics({
+    logger: (line) => lines.push(line),
+    now: () => new Date("2026-11-14T00:30:00.000Z"),
+    memoryUsage: () => ({
+      rss: 4,
+      heapUsed: 3,
+      heapTotal: 5,
+      external: 2,
+      arrayBuffers: 1,
+    }),
+    readCounts: async () => ({
+      albumTimers: 0,
+      okxSubscribers: 0,
+      okxConnections: 0,
+      okxReconnects: 0,
+      registryEntries: 0,
+      readApiCacheEntries: readReadApiCacheEntryCount(),
+      query: "user search gold",
+    }),
+  });
+  const parsed = assertSafeLog(lines[0]);
+  assert.equal(parsed.readApiCacheEntries, 2);
+  assert.equal(lines[0].includes("user search gold"), false);
+  assert.equal(lines[0].includes("alpha"), false);
+  assert.equal(lines[0].includes("silver query"), false);
+
+  if (previousCache) globalThis.__hcReadApiCache = previousCache;
+  else delete globalThis.__hcReadApiCache;
 }
 
 console.log("memory diagnostics tests passed");
