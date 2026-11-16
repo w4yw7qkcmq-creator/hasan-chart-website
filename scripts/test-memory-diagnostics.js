@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import {
   MEMORY_DIAGNOSTICS_FIELDS,
   MEMORY_DIAGNOSTICS_INTERVAL_MS,
+  WEBSITE_ROUTE_COUNT_KEYS,
   buildMemoryDiagnosticsSample,
   formatMemoryDiagnosticsLog,
+  installWebsiteRequestCounter,
   isMemoryDiagnosticsEnabled,
   readProductionComponentCounts,
+  readWebsiteRouteCounts,
   sampleMemoryDiagnostics,
   startMemoryDiagnostics,
   stopMemoryDiagnostics,
@@ -43,11 +47,17 @@ function assertSafeLog(line) {
     "at",
     "intervalMs",
     ...MEMORY_DIAGNOSTICS_FIELDS,
+    "routeCounts",
   ]);
 
   assert.deepEqual(Object.keys(parsed).filter((key) => !allowed.has(key)), []);
   for (const field of MEMORY_DIAGNOSTICS_FIELDS) {
     assert.ok(parsed[field] === null || Number.isFinite(parsed[field]));
+  }
+  assert.deepEqual(Object.keys(parsed.routeCounts), WEBSITE_ROUTE_COUNT_KEYS);
+  for (const key of WEBSITE_ROUTE_COUNT_KEYS) {
+    assert.equal(Number.isInteger(parsed.routeCounts[key]), true);
+    assert.ok(parsed.routeCounts[key] >= 0);
   }
   for (const secret of FORBIDDEN) {
     assert.equal(line.includes(secret), false);
@@ -274,8 +284,11 @@ assert.equal(isMemoryDiagnosticsEnabled({ MEMORY_DIAGNOSTICS: "1" }), true);
 
   assert.equal(nodeBlock.includes("setInterval"), false);
   assert.equal(edgeBlock.includes("startMemoryDiagnostics"), false);
+  assert.equal(edgeBlock.includes("installWebsiteRequestCounter"), false);
   assert.equal(nodeBlock.split("startMemoryDiagnostics(").length - 1, 1);
+  assert.equal(nodeBlock.split("installWebsiteRequestCounter(").length - 1, 1);
   assert.ok(nodeBlock.includes('process.env["MEMORY_DIAGNOSTICS"] === "1"'));
+  assert.ok(nodeBlock.indexOf("MEMORY_DIAGNOSTICS") < nodeBlock.indexOf("installWebsiteRequestCounter("));
   assert.ok(nodeBlock.indexOf("warmupSymbolRegistry") < nodeBlock.indexOf("MEMORY_DIAGNOSTICS"));
 }
 
@@ -335,6 +348,265 @@ assert.equal(isMemoryDiagnosticsEnabled({ MEMORY_DIAGNOSTICS: "1" }), true);
 
   if (previousCache) globalThis.__hcReadApiCache = previousCache;
   else delete globalThis.__hcReadApiCache;
+}
+
+{
+  const http = createRequire("/")("http");
+  const originalEmit = http.Server.prototype.emit;
+  delete http.Server.prototype.__hcWebsiteRequestCounterInstalled;
+  delete globalThis.__hcWebsiteRequestCounterInstalled;
+  delete globalThis.__hcWebsiteRouteCounts;
+
+  const disabled = await installWebsiteRequestCounter({ env: {} });
+  assert.deepEqual(disabled, { installed: false, reason: "disabled" });
+  assert.equal(globalThis.__hcWebsiteRouteCounts, undefined);
+  assert.equal(http.Server.prototype.emit, originalEmit);
+
+  let installFailed = false;
+  try {
+    await installWebsiteRequestCounter({
+      env: { MEMORY_DIAGNOSTICS: "1" },
+      loadHttp: async () => {
+        throw new Error("secret-token /api/news?search=gold");
+      },
+    });
+  } catch (error) {
+    installFailed = true;
+    assert.equal(error.message.includes("secret-token"), true);
+  }
+  assert.equal(installFailed, true);
+  assert.equal(globalThis.__hcWebsiteRequestCounterInstalled, undefined);
+  assert.equal(globalThis.__hcWebsiteRouteCounts, undefined);
+  const failureLog = JSON.stringify({ level: "error", event: "memory_diagnostics_failed" });
+  assert.equal(failureLog.includes("secret-token"), false);
+  assert.equal(failureLog.includes("gold"), false);
+
+  let intervals = 0;
+  const originalSetInterval = globalThis.setInterval;
+  globalThis.setInterval = (...args) => {
+    intervals += 1;
+    return originalSetInterval(...args);
+  };
+  const first = await installWebsiteRequestCounter({ env: { MEMORY_DIAGNOSTICS: "1" } });
+  const wrappedEmit = http.Server.prototype.emit;
+  const second = await installWebsiteRequestCounter({ env: { MEMORY_DIAGNOSTICS: "1" } });
+  globalThis.setInterval = originalSetInterval;
+  assert.deepEqual(first, { installed: true, reason: "installed" });
+  assert.deepEqual(second, { installed: true, reason: "already_installed" });
+  assert.equal(http.Server.prototype.emit, wrappedEmit);
+  assert.notEqual(wrappedEmit, originalEmit);
+  assert.equal(intervals, 0);
+  assert.equal(Object.isSealed(globalThis.__hcWebsiteRouteCounts), true);
+
+  try {
+    const bare = new http.Server();
+    let context = null;
+    let args = null;
+    bare.on("request", function onRequest(...received) {
+      context = this;
+      args = received;
+    });
+    const response = { untouched: true };
+    const request = {
+      method: "GET",
+      url: "/api/health?token=secret-token",
+    };
+    const returned = bare.emit("request", request, response, "tail");
+    assert.equal(returned, true);
+    assert.equal(context, bare);
+    assert.equal(args[0], request);
+    assert.equal(args[1], response);
+    assert.equal(args[2], "tail");
+    assert.equal(response.untouched, true);
+    assert.equal(request.url, "/api/health?token=secret-token");
+    assert.equal(readWebsiteRouteCounts()["GET /api/health"], 1);
+
+    const beforeOther = readWebsiteRouteCounts().OTHER;
+    bare.emit("not-a-request", { method: "GET", url: "/api/health" });
+    assert.equal(readWebsiteRouteCounts()["GET /api/health"], 1);
+    assert.equal(readWebsiteRouteCounts().OTHER, beforeOther);
+
+    let listenerRan = false;
+    bare.on("request", () => {
+      listenerRan = true;
+    });
+    const throwing = {
+      method: "GET",
+      get url() {
+        throw new Error("secret-token /private/raw-path");
+      },
+    };
+    const safeResponse = { untouched: true };
+    const afterThrow = bare.emit("request", throwing, safeResponse);
+    assert.equal(afterThrow, true);
+    assert.equal(listenerRan, true);
+    assert.equal(safeResponse.untouched, true);
+    assert.equal(readWebsiteRouteCounts()["GET /api/health"], 1);
+
+    const outgoingBefore = readWebsiteRouteCounts();
+    await new Promise((resolve) => {
+      const outgoing = http.request({
+        hostname: "127.0.0.1",
+        port: 1,
+        method: "GET",
+        path: "/api/health?token=secret-token",
+      });
+      outgoing.on("error", () => resolve());
+      outgoing.end();
+    });
+    assert.deepEqual(readWebsiteRouteCounts(), outgoingBefore);
+
+    function send(port, method, path, body) {
+      return new Promise((resolve, reject) => {
+        const req = http.request(
+          { hostname: "127.0.0.1", port, method, path },
+          (res) => {
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => {
+              resolve({
+                status: res.statusCode,
+                marker: res.headers["x-marker"],
+                body: Buffer.concat(chunks).toString("utf8"),
+              });
+            });
+          }
+        );
+        req.on("error", reject);
+        req.end(body);
+      });
+    }
+
+    const server = http.createServer((req, res) => {
+      const chunks = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        if ((req.url || "").startsWith("/api/market-stream")) {
+          res.writeHead(200, { "content-type": "text/event-stream", "x-marker": "sse" });
+          res.write("data: one\n\n");
+          res.write("data: tick\n\n");
+          res.end();
+          return;
+        }
+        if ((req.url || "").startsWith("/api/market-depth/stream")) {
+          res.writeHead(200, { "content-type": "text/plain", "x-marker": "depth" });
+          res.write("hello-");
+          res.end("stream");
+          return;
+        }
+        const pathname = (req.url || "").split("?")[0];
+        const authed =
+          pathname === "/login" ||
+          pathname.startsWith("/login/") ||
+          pathname === "/admin" ||
+          pathname.startsWith("/admin/") ||
+          pathname === "/api/admin" ||
+          pathname.startsWith("/api/admin/") ||
+          pathname === "/api/iam" ||
+          pathname.startsWith("/api/iam/") ||
+          pathname === "/api/admin-reply";
+        res.writeHead(authed ? 401 : 200, { "content-type": "text/plain", "x-marker": "plain" });
+        res.end(body || "empty");
+      });
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = server.address().port;
+    const before = readWebsiteRouteCounts();
+
+    const health = await send(port, "GET", "/api/health");
+    const news = await send(port, "GET", "/api/news?search=gold-secret-query&token=secret-token");
+    const dynamic = await send(port, "GET", "/api/news/abc-secret-id?x=secret-token");
+    const denied = await send(port, "POST", "/api/admin/users?token=secret-token", "secret-token-body");
+    const login = await send(port, "GET", "/login?returnUrl=/admin/secret-token");
+    const iam = await send(port, "GET", "/api/iam/roles/secret-token");
+    const depth = await send(port, "GET", "/api/market-depth/stream");
+    const sse = await send(port, "GET", "/api/market-stream");
+    const unknown = await send(port, "GET", "/api/not-a-route/secret-token?q=gold");
+
+    assert.deepEqual(health, { status: 200, marker: "plain", body: "empty" });
+    assert.deepEqual(news, { status: 200, marker: "plain", body: "empty" });
+    assert.deepEqual(dynamic, { status: 200, marker: "plain", body: "empty" });
+    assert.deepEqual(denied, { status: 401, marker: "plain", body: "secret-token-body" });
+    assert.deepEqual(login, { status: 401, marker: "plain", body: "empty" });
+    assert.deepEqual(iam, { status: 401, marker: "plain", body: "empty" });
+    assert.deepEqual(depth, { status: 200, marker: "depth", body: "hello-stream" });
+    assert.deepEqual(sse, { status: 200, marker: "sse", body: "data: one\n\ndata: tick\n\n" });
+    assert.deepEqual(unknown, { status: 200, marker: "plain", body: "empty" });
+
+    const afterSingles = readWebsiteRouteCounts();
+    assert.equal(afterSingles["GET /api/health"] - before["GET /api/health"], 1);
+    assert.equal(afterSingles["GET /api/news"] - before["GET /api/news"], 1);
+    assert.equal(afterSingles["GET /api/market-depth/stream"] - before["GET /api/market-depth/stream"], 1);
+    assert.equal(afterSingles["GET /api/market-stream"] - before["GET /api/market-stream"], 1);
+    assert.equal(afterSingles.AUTH - before.AUTH, 3);
+    assert.equal(afterSingles.OTHER - before.OTHER, 2);
+
+    const beforeConcurrent = readWebsiteRouteCounts();
+    const concurrent = await Promise.all(
+      Array.from({ length: 40 }, () => send(port, "GET", "/api/health?token=secret-token"))
+    );
+    assert.equal(concurrent.every((item) => item.status === 200 && item.body === "empty"), true);
+    assert.equal(readWebsiteRouteCounts()["GET /api/health"] - beforeConcurrent["GET /api/health"], 40);
+
+    const beforeUnique = readWebsiteRouteCounts();
+    for (let offset = 0; offset < 2000; offset += 100) {
+      await Promise.all(
+        Array.from({ length: 100 }, (_, index) => {
+          const id = `path-${offset + index}-secret-token`;
+          return send(port, "GET", `/api/news/${id}?search=gold-secret-query&n=${offset + index}`);
+        })
+      );
+    }
+    const afterUnique = readWebsiteRouteCounts();
+    assert.equal(afterUnique.OTHER - beforeUnique.OTHER, 2000);
+    assert.equal(afterUnique["GET /api/news"], beforeUnique["GET /api/news"]);
+    assert.deepEqual(Object.keys(afterUnique), WEBSITE_ROUTE_COUNT_KEYS);
+    assert.equal(Object.isSealed(globalThis.__hcWebsiteRouteCounts), true);
+    const serializedCounts = JSON.stringify(afterUnique);
+    assert.equal(serializedCounts.includes("secret-token"), false);
+    assert.equal(serializedCounts.includes("gold-secret-query"), false);
+    assert.equal(serializedCounts.includes("abc-secret-id"), false);
+    assert.equal(Buffer.byteLength(serializedCounts) < 300, true);
+
+    const beforeSample = readWebsiteRouteCounts();
+    const lines = [];
+    await sampleMemoryDiagnostics({
+      logger: (line) => lines.push(line),
+      now: () => new Date("2026-11-16T00:00:00.000Z"),
+      memoryUsage: () => ({
+        rss: 9,
+        heapUsed: 8,
+        heapTotal: 7,
+        external: 6,
+        arrayBuffers: 5,
+      }),
+      readCounts: async () => ({
+        albumTimers: 0,
+        okxSubscribers: 0,
+        okxConnections: 0,
+        okxReconnects: 0,
+        registryEntries: 0,
+        readApiCacheEntries: 0,
+        routeCounts: { "/api/news?search=gold-secret-query": 9, OTHER: "secret-token" },
+        token: "secret-token",
+      }),
+    });
+    const parsed = assertSafeLog(lines[0]);
+    assert.deepEqual(parsed.routeCounts, beforeSample);
+    assert.deepEqual(readWebsiteRouteCounts(), beforeSample);
+    assert.equal(lines[0].includes("gold-secret-query"), false);
+    assert.equal(lines[0].includes("secret-token"), false);
+    assert.equal(lines[0].includes("abc-secret-id"), false);
+    assert.equal(lines[0].includes("routeCountOverflow"), false);
+
+    server.close();
+  } finally {
+    http.Server.prototype.emit = originalEmit;
+    delete http.Server.prototype.__hcWebsiteRequestCounterInstalled;
+    delete globalThis.__hcWebsiteRequestCounterInstalled;
+    delete globalThis.__hcWebsiteRouteCounts;
+  }
 }
 
 console.log("memory diagnostics tests passed");

@@ -35,7 +35,22 @@ export async function register() {
 
     if (process.env["MEMORY_DIAGNOSTICS"] === "1") {
       try {
-        const { startMemoryDiagnostics } = await import("./lib/memory-diagnostics.js");
+        const {
+          startMemoryDiagnostics,
+          installWebsiteRequestCounter,
+        } = await import("./lib/memory-diagnostics.js");
+        if (typeof installWebsiteRequestCounter === "function") {
+          try {
+            await installWebsiteRequestCounter();
+          } catch {
+            console.error(
+              JSON.stringify({
+                level: "error",
+                event: "memory_diagnostics_failed",
+              })
+            );
+          }
+        }
         startMemoryDiagnostics();
       } catch {
         console.error(
