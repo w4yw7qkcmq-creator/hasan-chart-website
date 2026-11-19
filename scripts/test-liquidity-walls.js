@@ -10,6 +10,8 @@ import {
 import { LiquidityWallMetrics } from "../lib/market-data/history/liquidity-walls/liquidity-wall-metrics.js";
 import {
   clearLiquidityWallQueryCacheForTests,
+  getLiquidityWallQueryCacheSizeForTests,
+  LIQUIDITY_WALL_QUERY_CACHE_MAX_ENTRIES,
   queryHistoricalLiquidityWalls,
 } from "../lib/market-data/history/liquidity-walls/liquidity-wall-query.js";
 import { computePersistenceScore } from "../lib/market-data/history/liquidity-walls/persistence-score.js";
@@ -425,6 +427,57 @@ test("UI panel uses arabic labels", () => {
   );
   assert.match(source, /جدران السيولة التاريخية/);
   assert.match(source, /الأكثر ثباتًا/);
+});
+
+test("liquidity wall cache reuses equivalent requests and drops failures", async () => {
+  clearLiquidityWallQueryCacheForTests();
+  let calls = 0;
+  const client = {
+    restGet() {
+      calls += 1;
+      return Promise.resolve([]);
+    },
+  };
+  await queryHistoricalLiquidityWalls({
+    client,
+    symbol: "BTCUSDT",
+    window: "1h",
+    exchange: "binance",
+    limit: 20,
+    now: 10,
+  });
+  await queryHistoricalLiquidityWalls({
+    client,
+    symbol: "BTCUSDT",
+    window: "1h",
+    exchange: "binance",
+    limit: 20,
+    now: 11,
+  });
+  assert.equal(calls, 1);
+
+  let failures = 0;
+  const failing = {
+    restGet() {
+      failures += 1;
+      return Promise.reject(new Error("db down"));
+    },
+  };
+  await assert.rejects(() => queryHistoricalLiquidityWalls({
+    client: failing,
+    symbol: "ETHUSDT",
+    window: "4h",
+    now: 12,
+  }));
+  await assert.rejects(() => queryHistoricalLiquidityWalls({
+    client: failing,
+    symbol: "ETHUSDT",
+    window: "4h",
+    now: 13,
+  }));
+  assert.equal(failures, 2);
+  assert.ok(getLiquidityWallQueryCacheSizeForTests() <= LIQUIDITY_WALL_QUERY_CACHE_MAX_ENTRIES);
+  clearLiquidityWallQueryCacheForTests();
 });
 
 test("migration defines market_liquidity_walls table", () => {

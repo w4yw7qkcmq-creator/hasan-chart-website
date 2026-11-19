@@ -289,7 +289,11 @@ assert.equal(isMemoryDiagnosticsEnabled({ MEMORY_DIAGNOSTICS: "1" }), true);
   assert.equal(nodeBlock.split("installWebsiteRequestCounter(").length - 1, 1);
   assert.ok(nodeBlock.includes('process.env["MEMORY_DIAGNOSTICS"] === "1"'));
   assert.ok(nodeBlock.indexOf("MEMORY_DIAGNOSTICS") < nodeBlock.indexOf("installWebsiteRequestCounter("));
-  assert.ok(nodeBlock.indexOf("warmupSymbolRegistry") < nodeBlock.indexOf("MEMORY_DIAGNOSTICS"));
+  assert.ok(
+    nodeBlock.indexOf("installWebsiteRequestCounter(") <
+      nodeBlock.indexOf('import("./sentry.server.config.js")')
+  );
+  assert.ok(nodeBlock.indexOf("warmupSymbolRegistry") < nodeBlock.indexOf("startMemoryDiagnostics("));
 }
 
 {

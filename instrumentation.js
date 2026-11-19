@@ -2,6 +2,35 @@ import * as Sentry from "@sentry/nextjs";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    let startMemoryDiagnostics = null;
+    if (process.env["MEMORY_DIAGNOSTICS"] === "1") {
+      try {
+        const diagnostics = await import("./lib/memory-diagnostics.js");
+        if (typeof diagnostics.installWebsiteRequestCounter === "function") {
+          try {
+            await diagnostics.installWebsiteRequestCounter();
+          } catch {
+            console.error(
+              JSON.stringify({
+                level: "error",
+                event: "memory_diagnostics_failed",
+              })
+            );
+          }
+        }
+        if (typeof diagnostics.startMemoryDiagnostics === "function") {
+          startMemoryDiagnostics = diagnostics.startMemoryDiagnostics;
+        }
+      } catch {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "memory_diagnostics_failed",
+          })
+        );
+      }
+    }
+
     await import("./sentry.server.config.js");
 
     const { announceWebsitePriceAlertEmailGuard } = await import(
@@ -33,24 +62,8 @@ export async function register() {
     const { warmupSymbolRegistry } = await import("./lib/market-data/symbol-registry.js");
     warmupSymbolRegistry("instrumentation-register");
 
-    if (process.env["MEMORY_DIAGNOSTICS"] === "1") {
+    if (typeof startMemoryDiagnostics === "function") {
       try {
-        const {
-          startMemoryDiagnostics,
-          installWebsiteRequestCounter,
-        } = await import("./lib/memory-diagnostics.js");
-        if (typeof installWebsiteRequestCounter === "function") {
-          try {
-            await installWebsiteRequestCounter();
-          } catch {
-            console.error(
-              JSON.stringify({
-                level: "error",
-                event: "memory_diagnostics_failed",
-              })
-            );
-          }
-        }
         startMemoryDiagnostics();
       } catch {
         console.error(

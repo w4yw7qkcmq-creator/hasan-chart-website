@@ -10,6 +10,8 @@ import {
   buildFlowDominance,
   clearHistoryQueryCacheForTests,
   createHistoryQueryClient,
+  getHistoryQueryCacheSizeForTests,
+  HISTORY_QUERY_CACHE_MAX_ENTRIES,
   queryHistoricalFlow,
   queryHistoricalLargeTrades,
 } from "../lib/market-data/history/history-query.js";
@@ -17,8 +19,13 @@ import { HISTORY_FLOW_API_WINDOWS, HISTORY_LARGE_TRADE_API_WINDOWS } from "../li
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 let passed = 0;
+const asyncTests = [];
 
 function test(name, fn) {
+  if (fn.constructor.name === "AsyncFunction") {
+    asyncTests.push({ name, fn });
+    return;
+  }
   fn();
   passed += 1;
 }
@@ -232,5 +239,188 @@ test("history query client uses NEXT_PUBLIC_SUPABASE_URL fallback", () => {
     else process.env.SUPABASE_URL = prevPrivate;
   }
 });
+
+for (const { name, fn } of asyncTests) {
+  await fn();
+  passed += 1;
+  console.log(`✓ ${name}`);
+}
+
+const cacheTests = [];
+
+function cacheTest(name, fn) {
+  cacheTests.push({ name, fn });
+}
+
+function countingClient(rows, calls) {
+  return {
+    restGet() {
+      calls.count += 1;
+      return Promise.resolve(rows);
+    },
+  };
+}
+
+cacheTest("identical flow requests reuse one query inside the TTL", async () => {
+  clearHistoryQueryCacheForTests();
+  const calls = { count: 0 };
+  const client = countingClient(
+    [{ bucket_start: new Date(1_700_000_000_000).toISOString(), buy_notional: 10, sell_notional: 4, buy_count: 1, sell_count: 1 }],
+    calls,
+  );
+  const first = await queryHistoricalFlow({
+    client,
+    symbol: "BTCUSDT",
+    window: "1h",
+    scope: "aggregated",
+    now: 1_700_000_000_000,
+  });
+  const second = await queryHistoricalFlow({
+    client,
+    symbol: "BTCUSDT",
+    window: "1h",
+    scope: "aggregated",
+    now: 1_700_000_000_000 + 5_000,
+  });
+  assert.equal(calls.count, 1);
+  assert.equal(second.buyNotional, first.buyNotional);
+  assert.equal(getHistoryQueryCacheSizeForTests(), 1);
+});
+
+cacheTest("flow query runs again after the 30 second TTL", async () => {
+  clearHistoryQueryCacheForTests();
+  const calls = { count: 0 };
+  const client = countingClient([], calls);
+  const originalNow = Date.now;
+  let clock = originalNow();
+  Date.now = () => clock;
+  try {
+    await queryHistoricalFlow({
+      client,
+      symbol: "ETHUSDT",
+      window: "4h",
+      scope: "binance",
+      now: clock,
+    });
+    clock += 30_001;
+    await queryHistoricalFlow({
+      client,
+      symbol: "ETHUSDT",
+      window: "4h",
+      scope: "binance",
+      now: clock,
+    });
+    assert.equal(calls.count, 2);
+    assert.equal(getHistoryQueryCacheSizeForTests(), 1);
+  } finally {
+    Date.now = originalNow;
+    clearHistoryQueryCacheForTests();
+  }
+});
+
+cacheTest("different symbols, windows, and parameters do not share a cache entry", async () => {
+  clearHistoryQueryCacheForTests();
+  const calls = { count: 0 };
+  const client = countingClient([], calls);
+  await queryHistoricalLargeTrades({
+    client, symbol: "BTCUSDT", window: "1h", minNotional: 10_000, limit: 50, now: 1,
+  });
+  await queryHistoricalLargeTrades({
+    client, symbol: "ETHUSDT", window: "1h", minNotional: 10_000, limit: 50, now: 1,
+  });
+  await queryHistoricalLargeTrades({
+    client, symbol: "ETHUSDT", window: "4h", minNotional: 10_000, limit: 50, now: 1,
+  });
+  await queryHistoricalLargeTrades({
+    client, symbol: "ETHUSDT", window: "4h", minNotional: 25_000, limit: 20, exchange: "okx", now: 1,
+  });
+  assert.equal(calls.count, 4);
+  assert.equal(getHistoryQueryCacheSizeForTests(), 4);
+});
+
+cacheTest("failed database queries are not cached", async () => {
+  clearHistoryQueryCacheForTests();
+  let calls = 0;
+  const client = {
+    restGet() {
+      calls += 1;
+      return Promise.reject(new Error("db down"));
+    },
+  };
+  await assert.rejects(() => queryHistoricalFlow({
+    client,
+    symbol: "SOLUSDT",
+    window: "1h",
+    scope: "aggregated",
+    now: 1,
+  }));
+  await assert.rejects(() => queryHistoricalFlow({
+    client,
+    symbol: "SOLUSDT",
+    window: "1h",
+    scope: "aggregated",
+    now: 2,
+  }));
+  assert.equal(calls, 2);
+  assert.equal(getHistoryQueryCacheSizeForTests(), 0);
+});
+
+cacheTest("concurrent identical requests share one database read", async () => {
+  clearHistoryQueryCacheForTests();
+  let calls = 0;
+  const client = {
+    restGet() {
+      calls += 1;
+      return Promise.resolve([]);
+    },
+  };
+  await Promise.all(Array.from({ length: 25 }, () => queryHistoricalFlow({
+    client,
+    symbol: "BTCUSDT",
+    window: "4h",
+    scope: "aggregated",
+    now: 5,
+  })));
+  assert.equal(calls, 1);
+  assert.equal(getHistoryQueryCacheSizeForTests(), 1);
+});
+
+cacheTest("unique keys stay within the cache bound", async () => {
+  clearHistoryQueryCacheForTests();
+  let calls = 0;
+  const client = {
+    restGet() {
+      calls += 1;
+      return Promise.resolve([]);
+    },
+  };
+  for (let index = 0; index < HISTORY_QUERY_CACHE_MAX_ENTRIES + 40; index += 1) {
+    await queryHistoricalFlow({
+      client,
+      symbol: `SYM${index}`,
+      window: "1h",
+      scope: "aggregated",
+      now: index,
+    });
+  }
+  assert.equal(getHistoryQueryCacheSizeForTests(), HISTORY_QUERY_CACHE_MAX_ENTRIES);
+  const beforeEvicted = calls;
+  await queryHistoricalFlow({
+    client,
+    symbol: "SYM0",
+    window: "1h",
+    scope: "aggregated",
+    now: 0,
+  });
+  assert.equal(calls, beforeEvicted + 1);
+  assert.equal(getHistoryQueryCacheSizeForTests(), HISTORY_QUERY_CACHE_MAX_ENTRIES);
+  clearHistoryQueryCacheForTests();
+});
+
+for (const { name, fn } of cacheTests) {
+  await fn();
+  passed += 1;
+  console.log(`✓ ${name}`);
+}
 
 console.log(`market-history-api tests passed: ${passed}/${passed}`);
